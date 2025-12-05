@@ -5,7 +5,12 @@ import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Activity, AlertTriangle, TrendingUp, Clock, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useDriftAlerts, useDriftAlertStats, DriftAlert } from "@/hooks/useDriftAlerts";
+import { useModels, Model } from "@/hooks/useModels";
+import { Skeleton } from "@/components/ui/skeleton";
+import { formatDistanceToNow } from "date-fns";
 
+// Static live metrics for now (would be real-time WebSocket in production)
 const liveMetrics = [
   { label: "Requests/min", value: 12847, unit: "req/m", trend: [120, 125, 118, 130, 128, 135, 142, 138] },
   { label: "Avg Latency", value: 42, unit: "ms", trend: [45, 42, 48, 44, 41, 43, 42, 40] },
@@ -13,20 +18,29 @@ const liveMetrics = [
   { label: "Safety Blocks", value: 23, unit: "today", trend: [2, 3, 1, 4, 2, 3, 5, 3] },
 ];
 
-const driftAlerts = [
-  { id: "1", model: "Fraud Detection v3", feature: "transaction_amount", drift: "PSI: 0.23", severity: "warning", detected: "15m ago" },
-  { id: "2", model: "Credit Scoring v2", feature: "income_bracket", drift: "KL: 0.18", severity: "warning", detected: "1h ago" },
-  { id: "3", model: "Loan Approval v1", feature: "employment_status", drift: "EMD: 0.31", severity: "critical", detected: "2h ago" },
-];
-
-const modelHealth = [
-  { name: "Credit Scoring v2", status: "warning", uptime: "99.2%", latency: "45ms", throughput: "2.1K/min" },
-  { name: "Fraud Detection v3", status: "healthy", uptime: "99.9%", latency: "32ms", throughput: "5.4K/min" },
-  { name: "Support Chatbot", status: "healthy", uptime: "99.8%", latency: "120ms", throughput: "890/min" },
-  { name: "Loan Approval v1", status: "critical", uptime: "98.1%", latency: "78ms", throughput: "1.2K/min" },
-];
+function getModelStatus(model: Model): "healthy" | "warning" | "critical" {
+  const fairness = model.fairness_score ?? 100;
+  const robustness = model.robustness_score ?? 100;
+  const minScore = Math.min(fairness, robustness);
+  
+  if (minScore < 60) return "critical";
+  if (minScore < 80) return "warning";
+  return "healthy";
+}
 
 export default function Observability() {
+  const { data: driftAlerts, isLoading: alertsLoading } = useDriftAlerts();
+  const { data: driftStats } = useDriftAlertStats();
+  const { data: models, isLoading: modelsLoading } = useModels();
+
+  // Create model lookup
+  const modelMap = models?.reduce((acc, m) => {
+    acc[m.id] = m;
+    return acc;
+  }, {} as Record<string, Model>) || {};
+
+  const openAlerts = driftAlerts?.filter(a => a.status !== 'resolved').slice(0, 5) || [];
+
   return (
     <MainLayout title="Observability" subtitle="Real-time telemetry, drift detection, and model health monitoring">
       {/* KPIs */}
@@ -40,10 +54,10 @@ export default function Observability() {
         />
         <MetricCard
           title="Drift Alerts"
-          value="3"
-          subtitle="1 critical, 2 warning"
+          value={(driftStats?.open || 0).toString()}
+          subtitle={`${driftStats?.critical || 0} critical`}
           icon={<TrendingUp className="w-4 h-4 text-warning" />}
-          status="warning"
+          status={driftStats?.critical ? "danger" : driftStats?.open ? "warning" : "success"}
         />
         <MetricCard
           title="Avg Latency"
@@ -53,9 +67,9 @@ export default function Observability() {
           trend={{ value: 8, direction: "down" }}
         />
         <MetricCard
-          title="Safety Events"
-          value="23"
-          subtitle="Last 24 hours"
+          title="Total Alerts"
+          value={(driftStats?.total || 0).toString()}
+          subtitle="All time"
           icon={<AlertTriangle className="w-4 h-4 text-muted-foreground" />}
         />
       </div>
@@ -76,32 +90,52 @@ export default function Observability() {
               </Button>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left pb-3 text-xs font-semibold text-muted-foreground uppercase">Model</th>
-                    <th className="text-center pb-3 text-xs font-semibold text-muted-foreground uppercase">Status</th>
-                    <th className="text-right pb-3 text-xs font-semibold text-muted-foreground uppercase">Uptime</th>
-                    <th className="text-right pb-3 text-xs font-semibold text-muted-foreground uppercase">Latency</th>
-                    <th className="text-right pb-3 text-xs font-semibold text-muted-foreground uppercase">Throughput</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {modelHealth.map((model) => (
-                    <tr key={model.name} className="border-b border-border last:border-0 hover:bg-secondary/30 transition-colors">
-                      <td className="py-3 font-medium text-foreground">{model.name}</td>
-                      <td className="py-3 text-center">
-                        <StatusBadge status={model.status as any} />
-                      </td>
-                      <td className="py-3 text-right font-mono text-sm text-foreground">{model.uptime}</td>
-                      <td className="py-3 text-right font-mono text-sm text-muted-foreground">{model.latency}</td>
-                      <td className="py-3 text-right font-mono text-sm text-muted-foreground">{model.throughput}</td>
+            {modelsLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="flex items-center gap-4">
+                    <Skeleton className="h-5 w-32" />
+                    <Skeleton className="h-6 w-16" />
+                    <Skeleton className="h-5 w-16" />
+                    <Skeleton className="h-5 w-16" />
+                  </div>
+                ))}
+              </div>
+            ) : models?.length === 0 ? (
+              <div className="text-center py-8">
+                <Activity className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No models to monitor</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left pb-3 text-xs font-semibold text-muted-foreground uppercase">Model</th>
+                      <th className="text-center pb-3 text-xs font-semibold text-muted-foreground uppercase">Status</th>
+                      <th className="text-right pb-3 text-xs font-semibold text-muted-foreground uppercase">Fairness</th>
+                      <th className="text-right pb-3 text-xs font-semibold text-muted-foreground uppercase">Robustness</th>
+                      <th className="text-right pb-3 text-xs font-semibold text-muted-foreground uppercase">Updated</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {models?.map((model) => (
+                      <tr key={model.id} className="border-b border-border last:border-0 hover:bg-secondary/30 transition-colors">
+                        <td className="py-3 font-medium text-foreground">{model.name}</td>
+                        <td className="py-3 text-center">
+                          <StatusBadge status={getModelStatus(model)} />
+                        </td>
+                        <td className="py-3 text-right font-mono text-sm text-foreground">{model.fairness_score ?? '-'}%</td>
+                        <td className="py-3 text-right font-mono text-sm text-muted-foreground">{model.robustness_score ?? '-'}%</td>
+                        <td className="py-3 text-right font-mono text-sm text-muted-foreground">
+                          {formatDistanceToNow(new Date(model.updated_at), { addSuffix: true })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {/* Drift Alerts */}
@@ -114,30 +148,29 @@ export default function Observability() {
               <Button variant="outline" size="sm">Configure Thresholds</Button>
             </div>
 
-            <div className="space-y-3">
-              {driftAlerts.map((alert) => (
-                <div
-                  key={alert.id}
-                  className={cn(
-                    "flex items-center gap-4 p-4 rounded-xl border-l-2",
-                    alert.severity === "critical" ? "bg-danger/5 border-l-danger" : "bg-warning/5 border-l-warning"
-                  )}
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium text-foreground">{alert.model}</span>
-                      <span className="text-xs text-muted-foreground">•</span>
-                      <span className="text-xs font-mono text-primary">{alert.feature}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span className="font-mono">{alert.drift}</span>
-                      <span>Detected {alert.detected}</span>
-                    </div>
-                  </div>
-                  <StatusBadge status={alert.severity === "critical" ? "critical" : "warning"} />
-                </div>
-              ))}
-            </div>
+            {alertsLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-20 w-full rounded-xl" />
+                ))}
+              </div>
+            ) : openAlerts.length === 0 ? (
+              <div className="text-center py-8 bg-success/5 rounded-xl border border-success/20">
+                <Activity className="w-12 h-12 text-success mx-auto mb-4" />
+                <p className="text-foreground font-medium">No active drift alerts</p>
+                <p className="text-sm text-muted-foreground mt-1">All features are within normal distribution</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {openAlerts.map((alert) => (
+                  <DriftAlertCard 
+                    key={alert.id} 
+                    alert={alert} 
+                    modelName={modelMap[alert.model_id]?.name || 'Unknown'}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -166,5 +199,27 @@ export default function Observability() {
         </div>
       </div>
     </MainLayout>
+  );
+}
+
+function DriftAlertCard({ alert, modelName }: { alert: DriftAlert; modelName: string }) {
+  return (
+    <div className={cn(
+      "flex items-center gap-4 p-4 rounded-xl border-l-2",
+      alert.severity === "critical" ? "bg-danger/5 border-l-danger" : "bg-warning/5 border-l-warning"
+    )}>
+      <div className="flex-1">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="font-medium text-foreground">{modelName}</span>
+          <span className="text-xs text-muted-foreground">•</span>
+          <span className="text-xs font-mono text-primary">{alert.feature}</span>
+        </div>
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <span className="font-mono">{alert.drift_type}: {alert.drift_value.toFixed(2)}</span>
+          <span>Detected {formatDistanceToNow(new Date(alert.detected_at), { addSuffix: true })}</span>
+        </div>
+      </div>
+      <StatusBadge status={alert.severity === "critical" ? "critical" : "warning"} />
+    </div>
   );
 }
