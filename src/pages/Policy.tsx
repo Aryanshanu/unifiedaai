@@ -1,53 +1,53 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { MetricCard } from "@/components/dashboard/MetricCard";
-import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { Lock, Shield, Play, Plus, AlertTriangle, CheckCircle } from "lucide-react";
+import { Lock, Shield, Play, Plus, AlertTriangle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const policies = [
-  { id: "POL-001", name: "Content Safety - High Risk", rules: 12, models: 4, status: "active", blocks: 23 },
-  { id: "POL-002", name: "PII Protection - HIPAA", rules: 8, models: 6, status: "active", blocks: 45 },
-  { id: "POL-003", name: "Prompt Injection Defense", rules: 15, models: 2, status: "active", blocks: 12 },
-  { id: "POL-004", name: "Output Watermarking", rules: 3, models: 4, status: "draft", blocks: 0 },
-  { id: "POL-005", name: "Citation Enforcement", rules: 5, models: 1, status: "active", blocks: 8 },
-];
-
-const redTeamCampaigns = [
-  { id: "RT-001", name: "Jailbreak Probes - Q4", model: "Support Chatbot", attacks: 150, failures: 3, coverage: 98, status: "completed" },
-  { id: "RT-002", name: "Adversarial Inputs", model: "Credit Scoring v2", attacks: 200, failures: 8, coverage: 96, status: "running" },
-  { id: "RT-003", name: "PII Extraction", model: "Resume Screener", attacks: 100, failures: 1, coverage: 99, status: "completed" },
-];
+import { usePolicyPacks, useRedTeamCampaigns, usePolicyStats } from "@/hooks/usePolicies";
+import { useModels } from "@/hooks/useModels";
 
 export default function Policy() {
+  const { data: policies, isLoading: policiesLoading } = usePolicyPacks();
+  const { data: campaigns, isLoading: campaignsLoading } = useRedTeamCampaigns();
+  const { data: stats, isLoading: statsLoading } = usePolicyStats();
+  const { data: models } = useModels();
+
+  const getModelName = (modelId: string | null) => {
+    if (!modelId || !models) return 'Unknown Model';
+    const model = models.find(m => m.id === modelId);
+    return model?.name || 'Unknown Model';
+  };
+
+  const isLoading = policiesLoading || campaignsLoading || statsLoading;
+
   return (
     <MainLayout title="Policy Studio" subtitle="Runtime guardrails, enforcement rules, and red team orchestration">
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <MetricCard
           title="Active Policies"
-          value="47"
-          subtitle="Across 24 models"
+          value={statsLoading ? "..." : String(stats?.activePolicies || 0)}
+          subtitle={`${policies?.length || 0} total policies`}
           icon={<Lock className="w-4 h-4 text-primary" />}
         />
         <MetricCard
-          title="Blocks Today"
-          value="88"
-          subtitle="45 PII, 23 safety, 20 other"
+          title="Blocked Violations"
+          value={statsLoading ? "..." : String(stats?.blockedViolations || 0)}
+          subtitle="Threats prevented"
           icon={<Shield className="w-4 h-4 text-warning" />}
           status="warning"
         />
         <MetricCard
-          title="Red Team Coverage"
-          value="97%"
-          subtitle="All high-risk models"
+          title="Running Campaigns"
+          value={statsLoading ? "..." : String(stats?.runningCampaigns || 0)}
+          subtitle="Active red team tests"
           icon={<AlertTriangle className="w-4 h-4 text-success" />}
           status="success"
         />
         <MetricCard
-          title="Avg Block Rate"
-          value="0.3%"
-          subtitle="Of total requests"
+          title="Total Findings"
+          value={statsLoading ? "..." : String(stats?.totalFindings || 0)}
+          subtitle="From all campaigns"
         />
       </div>
 
@@ -65,33 +65,49 @@ export default function Policy() {
             </Button>
           </div>
 
-          <div className="space-y-3">
-            {policies.map((policy) => (
-              <div
-                key={policy.id}
-                className="p-4 bg-secondary/30 rounded-xl hover:bg-secondary/50 transition-colors cursor-pointer"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-muted-foreground">{policy.id}</span>
-                    <span className={cn(
-                      "text-[10px] px-1.5 py-0.5 rounded-full",
-                      policy.status === "active" ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"
-                    )}>
-                      {policy.status}
-                    </span>
+          {policiesLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : !policies?.length ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Lock className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p>No policy packs yet</p>
+              <p className="text-xs">Create your first policy pack to enforce guardrails</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {policies.map((policy) => {
+                const rulesCount = Array.isArray(policy.rules) ? policy.rules.length : 0;
+                return (
+                  <div
+                    key={policy.id}
+                    className="p-4 bg-secondary/30 rounded-xl hover:bg-secondary/50 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono text-muted-foreground">v{policy.version}</span>
+                        <span className={cn(
+                          "text-[10px] px-1.5 py-0.5 rounded-full",
+                          policy.status === "active" ? "bg-success/10 text-success" : 
+                          policy.status === "disabled" ? "bg-danger/10 text-danger" : "bg-muted text-muted-foreground"
+                        )}>
+                          {policy.status}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="font-medium text-foreground mb-1">{policy.name}</p>
+                    {policy.description && (
+                      <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{policy.description}</p>
+                    )}
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span>{rulesCount} rules</span>
+                    </div>
                   </div>
-                  <span className="text-xs font-mono text-warning">{policy.blocks} blocks</span>
-                </div>
-                <p className="font-medium text-foreground mb-1">{policy.name}</p>
-                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  <span>{policy.rules} rules</span>
-                  <span>•</span>
-                  <span>{policy.models} models</span>
-                </div>
-              </div>
-            ))}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Red Team Campaigns */}
@@ -107,44 +123,60 @@ export default function Policy() {
             </Button>
           </div>
 
-          <div className="space-y-3">
-            {redTeamCampaigns.map((campaign) => (
-              <div
-                key={campaign.id}
-                className="p-4 bg-secondary/30 rounded-xl hover:bg-secondary/50 transition-colors cursor-pointer"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-muted-foreground">{campaign.id}</span>
-                    <span className={cn(
-                      "text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-1",
-                      campaign.status === "running" ? "bg-primary/10 text-primary" : "bg-success/10 text-success"
-                    )}>
-                      {campaign.status === "running" && <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />}
-                      {campaign.status}
-                    </span>
+          {campaignsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : !campaigns?.length ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p>No red team campaigns yet</p>
+              <p className="text-xs">Start a campaign to test model robustness</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {campaigns.map((campaign) => {
+                const attackCount = Array.isArray(campaign.attack_types) ? campaign.attack_types.length : 0;
+                return (
+                  <div
+                    key={campaign.id}
+                    className="p-4 bg-secondary/30 rounded-xl hover:bg-secondary/50 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          "text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-1",
+                          campaign.status === "running" ? "bg-primary/10 text-primary" : 
+                          campaign.status === "completed" ? "bg-success/10 text-success" :
+                          campaign.status === "paused" ? "bg-warning/10 text-warning" : "bg-muted text-muted-foreground"
+                        )}>
+                          {campaign.status === "running" && <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />}
+                          {campaign.status}
+                        </span>
+                      </div>
+                      <span className={cn(
+                        "text-sm font-bold font-mono",
+                        (campaign.coverage || 0) >= 98 ? "text-success" : (campaign.coverage || 0) >= 95 ? "text-warning" : "text-danger"
+                      )}>
+                        {campaign.coverage || 0}%
+                      </span>
+                    </div>
+                    <p className="font-medium text-foreground mb-1">{campaign.name}</p>
+                    <p className="text-xs text-muted-foreground mb-2">{getModelName(campaign.model_id)}</p>
+                    <div className="flex items-center gap-4 text-xs">
+                      <span className="text-muted-foreground">{attackCount} attack types</span>
+                      <span className={cn(
+                        "font-medium",
+                        (campaign.findings_count || 0) > 5 ? "text-danger" : (campaign.findings_count || 0) > 0 ? "text-warning" : "text-success"
+                      )}>
+                        {campaign.findings_count || 0} findings
+                      </span>
+                    </div>
                   </div>
-                  <span className={cn(
-                    "text-sm font-bold font-mono",
-                    campaign.coverage >= 98 ? "text-success" : campaign.coverage >= 95 ? "text-warning" : "text-danger"
-                  )}>
-                    {campaign.coverage}%
-                  </span>
-                </div>
-                <p className="font-medium text-foreground mb-1">{campaign.name}</p>
-                <p className="text-xs text-muted-foreground mb-2">{campaign.model}</p>
-                <div className="flex items-center gap-4 text-xs">
-                  <span className="text-muted-foreground">{campaign.attacks} attacks</span>
-                  <span className={cn(
-                    "font-medium",
-                    campaign.failures > 5 ? "text-danger" : campaign.failures > 0 ? "text-warning" : "text-success"
-                  )}>
-                    {campaign.failures} failures
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </MainLayout>
