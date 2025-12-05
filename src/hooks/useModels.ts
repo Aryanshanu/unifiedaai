@@ -23,6 +23,9 @@ export interface Model {
   metadata: Record<string, any>;
   created_at: string;
   updated_at: string;
+  huggingface_model_id: string | null;
+  huggingface_endpoint: string | null;
+  huggingface_api_token: string | null;
 }
 
 export interface CreateModelInput {
@@ -33,6 +36,9 @@ export interface CreateModelInput {
   provider?: string;
   use_case?: string;
   endpoint?: string;
+  huggingface_model_id?: string;
+  huggingface_endpoint?: string;
+  huggingface_api_token?: string;
 }
 
 export function useModels() {

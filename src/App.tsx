@@ -9,13 +9,11 @@ import Auth from "./pages/Auth";
 import Index from "./pages/Index";
 import Models from "./pages/Models";
 import ModelDetail from "./pages/ModelDetail";
-import Evaluation from "./pages/Evaluation";
-import Observability from "./pages/Observability";
-import Governance from "./pages/Governance";
-import HITL from "./pages/HITL";
-import Lineage from "./pages/Lineage";
-import Policy from "./pages/Policy";
-import Reports from "./pages/Reports";
+import FairnessEngine from "./pages/engines/FairnessEngine";
+import HallucinationEngine from "./pages/engines/HallucinationEngine";
+import ToxicityEngine from "./pages/engines/ToxicityEngine";
+import PrivacyEngine from "./pages/engines/PrivacyEngine";
+import ExplainabilityEngine from "./pages/engines/ExplainabilityEngine";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -31,26 +29,14 @@ const App = () => (
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/models" element={<ProtectedRoute><Models /></ProtectedRoute>} />
             <Route path="/models/:id" element={<ProtectedRoute><ModelDetail /></ProtectedRoute>} />
-            {/* Core Engines - all go to Evaluation with different tabs */}
-            <Route path="/evaluation" element={<ProtectedRoute><Evaluation /></ProtectedRoute>} />
-            <Route path="/evaluation/:engine" element={<ProtectedRoute><Evaluation /></ProtectedRoute>} />
-            {/* Monitoring */}
-            <Route path="/observability" element={<ProtectedRoute><Observability /></ProtectedRoute>} />
-            <Route path="/monitoring" element={<ProtectedRoute><Observability /></ProtectedRoute>} />
-            {/* Governance */}
-            <Route path="/compliance" element={<ProtectedRoute><Governance /></ProtectedRoute>} />
-            <Route path="/governance" element={<ProtectedRoute><Governance /></ProtectedRoute>} />
-            <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-            {/* Operations */}
-            <Route path="/hitl" element={<ProtectedRoute><HITL /></ProtectedRoute>} />
-            <Route path="/decision" element={<ProtectedRoute><HITL /></ProtectedRoute>} />
-            <Route path="/lineage" element={<ProtectedRoute><Lineage /></ProtectedRoute>} />
-            {/* Security */}
-            <Route path="/redteam" element={<ProtectedRoute><Policy /></ProtectedRoute>} />
-            <Route path="/policy" element={<ProtectedRoute><Policy /></ProtectedRoute>} />
+            {/* Core RAI Engines - Each has unique page */}
+            <Route path="/engine/fairness" element={<ProtectedRoute><FairnessEngine /></ProtectedRoute>} />
+            <Route path="/engine/hallucination" element={<ProtectedRoute><HallucinationEngine /></ProtectedRoute>} />
+            <Route path="/engine/toxicity" element={<ProtectedRoute><ToxicityEngine /></ProtectedRoute>} />
+            <Route path="/engine/privacy" element={<ProtectedRoute><PrivacyEngine /></ProtectedRoute>} />
+            <Route path="/engine/explainability" element={<ProtectedRoute><ExplainabilityEngine /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
