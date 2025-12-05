@@ -9,6 +9,7 @@ import { useModels } from "@/hooks/useModels";
 import { useToast } from "@/hooks/use-toast";
 import { ShieldAlert, Play, Loader2, CheckCircle, XCircle, Shield } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface ToxicityMetrics {
@@ -176,8 +177,8 @@ export default function ToxicityEngine() {
         status: "completed",
         overall_score,
         toxicity_score: overall_score,
-        metric_details,
-        explanations,
+        metric_details: metric_details as unknown as Json,
+        explanations: explanations as unknown as Json,
         completed_at: new Date().toISOString(),
       }]);
 
