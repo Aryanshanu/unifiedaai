@@ -10,45 +10,20 @@ import {
   ShieldAlert,
   Lock,
   Eye,
-  Activity,
-  MonitorDot,
-  ClipboardCheck,
-  Shield,
-  FileText,
-  Users,
-  Brain,
-  GitBranch,
-  Target,
-  FileCode,
   Settings,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
 
 const navItems = [
-  { path: "/", icon: LayoutDashboard, label: "Control Tower" },
-  { path: "/dashboard", icon: MonitorDot, label: "Dashboard" },
+  { path: "/", icon: LayoutDashboard, label: "Dashboard" },
   { path: "/models", icon: Database, label: "Model Registry" },
-  { divider: true, label: "Core Engines" },
-  { path: "/evaluation/fairness", icon: Scale, label: "Fairness Engine" },
-  { path: "/evaluation/hallucination", icon: AlertCircle, label: "Hallucination Engine" },
-  { path: "/evaluation/toxicity", icon: ShieldAlert, label: "Toxicity Engine" },
-  { path: "/evaluation/privacy", icon: Lock, label: "Privacy Engine" },
-  { path: "/evaluation/explainability", icon: Eye, label: "Explainability Engine" },
-  { divider: true, label: "Monitoring" },
-  { path: "/observability", icon: Activity, label: "Real-Time Observability" },
-  { path: "/monitoring", icon: MonitorDot, label: "Monitoring Dashboard" },
-  { divider: true, label: "Governance" },
-  { path: "/compliance", icon: ClipboardCheck, label: "Compliance Center" },
-  { path: "/governance", icon: Shield, label: "Governance" },
-  { path: "/reports", icon: FileText, label: "Reports & Scorecards" },
-  { divider: true, label: "Operations" },
-  { path: "/hitl", icon: Users, label: "Human-in-the-Loop" },
-  { path: "/decision", icon: Brain, label: "Decision Intelligence" },
-  { path: "/lineage", icon: GitBranch, label: "Knowledge Graph" },
-  { divider: true, label: "Security" },
-  { path: "/redteam", icon: Target, label: "Red-Team Orchestrator" },
-  { path: "/policy", icon: FileCode, label: "Policy Enforcement" },
+  { divider: true, label: "Core RAI Engines" },
+  { path: "/engine/fairness", icon: Scale, label: "Fairness Engine" },
+  { path: "/engine/hallucination", icon: AlertCircle, label: "Hallucination Engine" },
+  { path: "/engine/toxicity", icon: ShieldAlert, label: "Toxicity Engine" },
+  { path: "/engine/privacy", icon: Lock, label: "Privacy Engine" },
+  { path: "/engine/explainability", icon: Eye, label: "Explainability Engine" },
   { divider: true, label: "System" },
   { path: "/settings", icon: Settings, label: "Settings" },
 ];
@@ -72,7 +47,7 @@ export function Sidebar() {
           </div>
           {!collapsed && (
             <div className="flex flex-col">
-              <span className="font-bold text-foreground text-base tracking-tight">fractal</span>
+              <span className="font-bold text-foreground text-base tracking-tight">Fractal RAI</span>
             </div>
           )}
         </div>

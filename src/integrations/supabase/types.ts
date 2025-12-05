@@ -321,9 +321,12 @@ export type Database = {
           completed_at: string | null
           created_at: string
           details: Json | null
+          engine_type: string | null
+          explanations: Json | null
           factuality_score: number | null
           fairness_score: number | null
           id: string
+          metric_details: Json | null
           model_id: string
           overall_score: number | null
           privacy_score: number | null
@@ -338,9 +341,12 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           details?: Json | null
+          engine_type?: string | null
+          explanations?: Json | null
           factuality_score?: number | null
           fairness_score?: number | null
           id?: string
+          metric_details?: Json | null
           model_id: string
           overall_score?: number | null
           privacy_score?: number | null
@@ -355,9 +361,12 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           details?: Json | null
+          engine_type?: string | null
+          explanations?: Json | null
           factuality_score?: number | null
           fairness_score?: number | null
           id?: string
+          metric_details?: Json | null
           model_id?: string
           overall_score?: number | null
           privacy_score?: number | null
@@ -575,6 +584,9 @@ export type Database = {
           description: string | null
           endpoint: string | null
           fairness_score: number | null
+          huggingface_api_token: string | null
+          huggingface_endpoint: string | null
+          huggingface_model_id: string | null
           id: string
           metadata: Json | null
           model_type: string
@@ -595,6 +607,9 @@ export type Database = {
           description?: string | null
           endpoint?: string | null
           fairness_score?: number | null
+          huggingface_api_token?: string | null
+          huggingface_endpoint?: string | null
+          huggingface_model_id?: string | null
           id?: string
           metadata?: Json | null
           model_type: string
@@ -615,6 +630,9 @@ export type Database = {
           description?: string | null
           endpoint?: string | null
           fairness_score?: number | null
+          huggingface_api_token?: string | null
+          huggingface_endpoint?: string | null
+          huggingface_model_id?: string | null
           id?: string
           metadata?: Json | null
           model_type?: string
