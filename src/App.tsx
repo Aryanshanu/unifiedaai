@@ -31,15 +31,26 @@ const App = () => (
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/models" element={<ProtectedRoute><Models /></ProtectedRoute>} />
             <Route path="/models/:id" element={<ProtectedRoute><ModelDetail /></ProtectedRoute>} />
+            {/* Core Engines - all go to Evaluation with different tabs */}
             <Route path="/evaluation" element={<ProtectedRoute><Evaluation /></ProtectedRoute>} />
+            <Route path="/evaluation/:engine" element={<ProtectedRoute><Evaluation /></ProtectedRoute>} />
+            {/* Monitoring */}
             <Route path="/observability" element={<ProtectedRoute><Observability /></ProtectedRoute>} />
+            <Route path="/monitoring" element={<ProtectedRoute><Observability /></ProtectedRoute>} />
+            {/* Governance */}
+            <Route path="/compliance" element={<ProtectedRoute><Governance /></ProtectedRoute>} />
             <Route path="/governance" element={<ProtectedRoute><Governance /></ProtectedRoute>} />
-            <Route path="/hitl" element={<ProtectedRoute requiredRoles={['admin', 'reviewer']}><HITL /></ProtectedRoute>} />
-            <Route path="/lineage" element={<ProtectedRoute><Lineage /></ProtectedRoute>} />
-            <Route path="/policy" element={<ProtectedRoute requiredRoles={['admin']}><Policy /></ProtectedRoute>} />
             <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+            {/* Operations */}
+            <Route path="/hitl" element={<ProtectedRoute><HITL /></ProtectedRoute>} />
+            <Route path="/decision" element={<ProtectedRoute><HITL /></ProtectedRoute>} />
+            <Route path="/lineage" element={<ProtectedRoute><Lineage /></ProtectedRoute>} />
+            {/* Security */}
+            <Route path="/redteam" element={<ProtectedRoute><Policy /></ProtectedRoute>} />
+            <Route path="/policy" element={<ProtectedRoute><Policy /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
