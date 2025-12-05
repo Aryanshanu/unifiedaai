@@ -9,6 +9,7 @@ import { useModels } from "@/hooks/useModels";
 import { useToast } from "@/hooks/use-toast";
 import { Scale, Play, Loader2, AlertTriangle, CheckCircle, Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface FairnessMetrics {
@@ -164,8 +165,8 @@ export default function FairnessEngine() {
         status: "completed",
         overall_score,
         fairness_score: overall_score,
-        metric_details,
-        explanations,
+        metric_details: metric_details as unknown as Json,
+        explanations: explanations as unknown as Json,
         completed_at: new Date().toISOString(),
       }]);
 

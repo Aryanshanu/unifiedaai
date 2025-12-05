@@ -9,6 +9,7 @@ import { useModels } from "@/hooks/useModels";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, Play, Loader2, CheckCircle, XCircle, AlertTriangle, Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface ExplainabilityMetrics {
@@ -190,8 +191,8 @@ export default function ExplainabilityEngine() {
         engine_type: "explainability",
         status: "completed",
         overall_score,
-        metric_details,
-        explanations,
+        metric_details: metric_details as unknown as Json,
+        explanations: explanations as unknown as Json,
         completed_at: new Date().toISOString(),
       }]);
 
