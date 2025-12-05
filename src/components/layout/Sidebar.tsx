@@ -5,47 +5,57 @@ import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard,
   Database,
-  Activity,
-  Shield,
-  Users,
-  GitBranch,
+  Scale,
+  AlertCircle,
+  ShieldAlert,
   Lock,
+  Eye,
+  Activity,
+  MonitorDot,
+  ClipboardCheck,
+  Shield,
   FileText,
+  Users,
+  Brain,
+  GitBranch,
+  Target,
+  FileCode,
   Settings,
   ChevronLeft,
   ChevronRight,
-  Hexagon,
 } from "lucide-react";
 
 const navItems = [
-  { path: "/", icon: LayoutDashboard, label: "Control Tower", section: "main" },
-  { path: "/models", icon: Database, label: "Model Registry", section: "main" },
-  { path: "/evaluation", icon: Activity, label: "Evaluation Hub", section: "pillars" },
-  { path: "/observability", icon: Activity, label: "Observability", section: "pillars" },
-  { path: "/governance", icon: Shield, label: "Governance", section: "pillars" },
-  { path: "/hitl", icon: Users, label: "HITL Console", section: "pillars" },
-  { path: "/lineage", icon: GitBranch, label: "Knowledge Graph", section: "pillars" },
-  { path: "/policy", icon: Lock, label: "Policy Studio", section: "pillars" },
-  { path: "/reports", icon: FileText, label: "Scorecards", section: "reports" },
-  { path: "/settings", icon: Settings, label: "Settings", section: "system" },
+  { path: "/", icon: LayoutDashboard, label: "Control Tower" },
+  { path: "/dashboard", icon: MonitorDot, label: "Dashboard" },
+  { path: "/models", icon: Database, label: "Model Registry" },
+  { divider: true, label: "Core Engines" },
+  { path: "/evaluation/fairness", icon: Scale, label: "Fairness Engine" },
+  { path: "/evaluation/hallucination", icon: AlertCircle, label: "Hallucination Engine" },
+  { path: "/evaluation/toxicity", icon: ShieldAlert, label: "Toxicity Engine" },
+  { path: "/evaluation/privacy", icon: Lock, label: "Privacy Engine" },
+  { path: "/evaluation/explainability", icon: Eye, label: "Explainability Engine" },
+  { divider: true, label: "Monitoring" },
+  { path: "/observability", icon: Activity, label: "Real-Time Observability" },
+  { path: "/monitoring", icon: MonitorDot, label: "Monitoring Dashboard" },
+  { divider: true, label: "Governance" },
+  { path: "/compliance", icon: ClipboardCheck, label: "Compliance Center" },
+  { path: "/governance", icon: Shield, label: "Governance" },
+  { path: "/reports", icon: FileText, label: "Reports & Scorecards" },
+  { divider: true, label: "Operations" },
+  { path: "/hitl", icon: Users, label: "Human-in-the-Loop" },
+  { path: "/decision", icon: Brain, label: "Decision Intelligence" },
+  { path: "/lineage", icon: GitBranch, label: "Knowledge Graph" },
+  { divider: true, label: "Security" },
+  { path: "/redteam", icon: Target, label: "Red-Team Orchestrator" },
+  { path: "/policy", icon: FileCode, label: "Policy Enforcement" },
+  { divider: true, label: "System" },
+  { path: "/settings", icon: Settings, label: "Settings" },
 ];
-
-const sections = {
-  main: "Overview",
-  pillars: "Core Pillars",
-  reports: "Reports",
-  system: "System",
-};
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
-
-  const groupedNav = navItems.reduce((acc, item) => {
-    if (!acc[item.section]) acc[item.section] = [];
-    acc[item.section].push(item);
-    return acc;
-  }, {} as Record<string, typeof navItems>);
 
   return (
     <aside
@@ -57,49 +67,52 @@ export function Sidebar() {
       {/* Logo */}
       <div className="h-16 flex items-center px-4 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-gradient-primary flex items-center justify-center shadow-glow">
-            <Hexagon className="w-5 h-5 text-primary-foreground" />
+          <div className="w-9 h-9 rounded-lg bg-gradient-primary flex items-center justify-center">
+            <span className="text-primary-foreground font-bold text-sm">F</span>
           </div>
           {!collapsed && (
             <div className="flex flex-col">
-              <span className="font-bold text-foreground text-sm">Fractal</span>
-              <span className="text-[10px] text-primary font-medium tracking-wider">RAI OS</span>
+              <span className="font-bold text-foreground text-base tracking-tight">fractal</span>
             </div>
           )}
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4 px-3">
-        {Object.entries(groupedNav).map(([section, items]) => (
-          <div key={section} className="mb-6">
-            {!collapsed && (
-              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-2 block">
-                {sections[section as keyof typeof sections]}
-              </span>
-            )}
-            <div className="space-y-1">
-              {items.map((item) => {
-                const isActive = location.pathname === item.path;
-                return (
-                  <NavLink key={item.path} to={item.path}>
-                    <Button
-                      variant={isActive ? "navActive" : "nav"}
-                      size="default"
-                      className={cn(
-                        collapsed && "justify-center px-0",
-                        "h-10"
-                      )}
-                    >
-                      <item.icon className={cn("w-4 h-4 shrink-0", isActive && "text-primary")} />
-                      {!collapsed && <span>{item.label}</span>}
-                    </Button>
-                  </NavLink>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+      <nav className="flex-1 overflow-y-auto py-2 px-2">
+        {navItems.map((item, index) => {
+          if (item.divider) {
+            if (collapsed) return null;
+            return (
+              <div key={`divider-${index}`} className="mt-4 mb-2 px-3">
+                <span className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider">
+                  {item.label}
+                </span>
+              </div>
+            );
+          }
+
+          const isActive = location.pathname === item.path || 
+            (item.path !== "/" && location.pathname.startsWith(item.path!));
+          const Icon = item.icon!;
+
+          return (
+            <NavLink key={item.path} to={item.path!}>
+              <div
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200 mb-0.5",
+                  isActive
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground",
+                  collapsed && "justify-center px-2"
+                )}
+              >
+                <Icon className={cn("w-4 h-4 shrink-0", isActive && "text-primary")} />
+                {!collapsed && <span className="truncate">{item.label}</span>}
+              </div>
+            </NavLink>
+          );
+        })}
       </nav>
 
       {/* Collapse Button */}
@@ -108,7 +121,7 @@ export function Sidebar() {
           variant="ghost"
           size="sm"
           onClick={() => setCollapsed(!collapsed)}
-          className={cn("w-full", collapsed && "justify-center px-0")}
+          className={cn("w-full h-8", collapsed && "justify-center px-0")}
         >
           {collapsed ? (
             <ChevronRight className="w-4 h-4" />
