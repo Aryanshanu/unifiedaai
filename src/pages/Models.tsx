@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { ModelCard } from "@/components/dashboard/ModelCard";
+import { ModelRegistrationForm } from "@/components/models/ModelRegistrationForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
@@ -25,6 +27,8 @@ function getModelStatus(model: Model): "healthy" | "warning" | "critical" {
 export default function Models() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [search, setSearch] = useState("");
+  const [showRegistration, setShowRegistration] = useState(false);
+  const navigate = useNavigate();
   
   const { data: models, isLoading, error } = useModels();
   const { data: incidents } = useIncidents();
@@ -87,7 +91,7 @@ export default function Models() {
             </Button>
           </div>
 
-          <Button variant="default" size="sm" className="bg-gradient-primary">
+          <Button variant="default" size="sm" className="bg-gradient-primary" onClick={() => setShowRegistration(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Register Model
           </Button>
@@ -147,7 +151,7 @@ export default function Models() {
             {search ? "Try adjusting your search" : "Register your first model to get started"}
           </p>
           {!search && (
-            <Button variant="default" size="sm" className="mt-4 bg-gradient-primary">
+            <Button variant="default" size="sm" className="mt-4 bg-gradient-primary" onClick={() => setShowRegistration(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Register Model
             </Button>
@@ -163,6 +167,7 @@ export default function Models() {
               {filteredModels.map((model) => (
                 <ModelCard
                   key={model.id}
+                  id={model.id}
                   name={model.name}
                   type={model.model_type}
                   version={model.version}
@@ -189,7 +194,11 @@ export default function Models() {
                 </thead>
                 <tbody>
                   {filteredModels.map((model) => (
-                    <tr key={model.id} className="border-t border-border hover:bg-secondary/30 transition-colors">
+                    <tr 
+                      key={model.id} 
+                      className="border-t border-border hover:bg-secondary/30 transition-colors cursor-pointer"
+                      onClick={() => navigate(`/models/${model.id}`)}
+                    >
                       <td className="p-4">
                         <div>
                           <p className="font-medium text-foreground">{model.name}</p>
@@ -218,6 +227,9 @@ export default function Models() {
           )}
         </>
       )}
+
+      {/* Registration Form Modal */}
+      <ModelRegistrationForm open={showRegistration} onOpenChange={setShowRegistration} />
     </MainLayout>
   );
 }

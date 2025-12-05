@@ -233,6 +233,7 @@ export default function Index() {
                 {topModels.map((model) => (
                   <ModelCard
                     key={model.id}
+                    id={model.id}
                     name={model.name}
                     type={model.model_type}
                     version={model.version}
