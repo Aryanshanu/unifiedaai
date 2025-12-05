@@ -1,10 +1,12 @@
+import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "./StatusBadge";
 import { ScoreRing } from "./ScoreRing";
-import { Clock, AlertTriangle } from "lucide-react";
+import { Clock, AlertTriangle, ChevronRight } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 interface ModelCardProps {
+  id: string;
   name: string;
   type: string;
   version: string;
@@ -17,6 +19,7 @@ interface ModelCardProps {
 }
 
 export function ModelCard({
+  id,
   name,
   type,
   version,
@@ -27,10 +30,18 @@ export function ModelCard({
   incidents = 0,
   updatedAt,
 }: ModelCardProps) {
+  const navigate = useNavigate();
   const displayTime = lastEval || (updatedAt ? formatDistanceToNow(new Date(updatedAt), { addSuffix: true }) : 'Never');
   
+  const handleClick = () => {
+    navigate(`/models/${id}`);
+  };
+  
   return (
-    <div className="metric-card border border-border hover:border-primary/30 transition-all duration-300 group">
+    <div 
+      onClick={handleClick}
+      className="metric-card border border-border hover:border-primary/30 transition-all duration-300 group cursor-pointer"
+    >
       <div className="flex items-start justify-between mb-4">
         <div>
           <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
@@ -40,7 +51,10 @@ export function ModelCard({
             {type} • v{version}
           </p>
         </div>
-        <StatusBadge status={status} />
+        <div className="flex items-center gap-2">
+          <StatusBadge status={status} />
+          <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+        </div>
       </div>
 
       <div className="flex items-center gap-6 mb-4">
