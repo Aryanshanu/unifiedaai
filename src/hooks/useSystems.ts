@@ -24,6 +24,9 @@ export interface System {
   owner_id: string | null;
   created_at: string;
   updated_at: string;
+  uri_score: number | null;
+  runtime_risk_score: number | null;
+  last_risk_calculation: string | null;
 }
 
 export interface CreateSystemInput {

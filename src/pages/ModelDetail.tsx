@@ -15,6 +15,7 @@ import { CopilotDrawer } from "@/components/copilot/CopilotDrawer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useModel } from "@/hooks/useModels";
 import { useSystem } from "@/hooks/useSystems";
+import { useRequestLogs } from "@/hooks/useRequestLogs";
 import { useRiskAssessments } from "@/hooks/useRiskAssessments";
 import { useImpactAssessments } from "@/hooks/useImpactAssessments";
 import { useSystemApprovals, useRequestApproval } from "@/hooks/useSystemApprovals";
@@ -45,6 +46,12 @@ import {
 import { formatDistanceToNow, format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+
+// Helper component to load logs by systemId
+function SystemActivityLogs({ systemId }: { systemId: string }) {
+  const { data: logs, isLoading } = useRequestLogs(systemId, 20);
+  return <RequestLogsList logs={logs} isLoading={isLoading} />;
+}
 
 function getScoreExplanation(score: number | null, type: string): { status: string; reason: string; recommendation: string } {
   const value = score ?? 0;
@@ -616,7 +623,7 @@ export default function ModelDetail() {
           <p className="text-sm text-muted-foreground mb-4">Recent gateway traffic and decisions</p>
           
           {system ? (
-            <RequestLogsList systemId={system.id} limit={20} />
+            <SystemActivityLogs systemId={system.id} />
           ) : (
             <div className="bg-card border border-border rounded-xl p-8 text-center">
               <Activity className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
@@ -762,12 +769,14 @@ export default function ModelDetail() {
             onOpenChange={setShowRiskWizard}
             systemId={system.id}
             projectId={model.project_id}
+            systemName={system.name}
           />
           <ImpactAssessmentWizard
             open={showImpactWizard}
             onOpenChange={setShowImpactWizard}
             systemId={system.id}
             projectId={model.project_id}
+            systemName={system.name}
           />
         </>
       )}
@@ -775,9 +784,8 @@ export default function ModelDetail() {
       {/* Copilot Drawer */}
       {system && (
         <CopilotDrawer
-          open={copilotOpen}
-          onOpenChange={setCopilotOpen}
           systemId={system.id}
+          systemName={system.name}
         />
       )}
     </MainLayout>
