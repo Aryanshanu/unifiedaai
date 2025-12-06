@@ -127,11 +127,33 @@ serve(async (req) => {
   const startTime = Date.now();
 
   try {
-    const { systemId, input, traceId } = await req.json();
+    const body = await req.json().catch(() => null);
+
+    if (!body) {
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON body" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { systemId, traceId } = body;
+    // Support both formats: { input: { messages: [...] } } and { messages: [...] }
+    const input = body.input || {};
+    const messages = input.messages || body.messages || [];
 
     if (!systemId) {
       return new Response(
         JSON.stringify({ error: "systemId is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return new Response(
+        JSON.stringify({ 
+          error: "BadRequest", 
+          message: "Expected payload: { systemId, messages: [...] } or { systemId, input: { messages: [...] } }" 
+        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -160,7 +182,7 @@ serve(async (req) => {
       const logEntry = {
         system_id: systemId,
         project_id: system.project_id,
-        request_body: input,
+        request_body: { messages },
         response_body: { error: "System not approved for deployment" },
         status_code: 403,
         latency_ms: Date.now() - startTime,
@@ -179,8 +201,7 @@ serve(async (req) => {
       );
     }
 
-    // Get user input text for evaluation
-    const messages = input?.messages || [];
+    // Get user input text for evaluation (messages already validated above)
     const userMessage = messages.find((m: any) => m.role === "user")?.content || "";
     
     // Run input evaluations
@@ -197,14 +218,14 @@ serve(async (req) => {
       const logEntry = {
         system_id: systemId,
         project_id: system.project_id,
-        request_body: input,
+        request_body: { messages },
         response_body: { error: "Input blocked by safety policy" },
         status_code: 451,
         latency_ms: Date.now() - startTime,
         error_message: inputEngineScores.find(e => e.verdict === "BLOCK")?.details,
         trace_id: traceId,
         decision: "BLOCK",
-        engine_scores: Object.fromEntries(inputEngineScores.map(e => [e.engine, e])),
+        engine_scores: { input: Object.fromEntries(inputEngineScores.map(e => [e.engine, e])) },
       };
       await supabase.from("request_logs").insert(logEntry);
 
@@ -231,7 +252,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: input?.model || "google/gemini-2.5-flash",
+        model: input?.model || body?.model || "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: system.use_case || "You are a helpful AI assistant." },
           ...messages,
@@ -298,7 +319,7 @@ serve(async (req) => {
     const logEntry = {
       system_id: systemId,
       project_id: system.project_id,
-      request_body: input,
+      request_body: { messages },
       response_body: { message: assistantMessage.substring(0, 500) },
       status_code: finalStatusCode,
       latency_ms: latencyMs,

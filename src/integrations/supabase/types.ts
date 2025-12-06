@@ -657,11 +657,11 @@ export type Database = {
           overall_score: number | null
           owner_id: string | null
           privacy_score: number | null
-          project_id: string | null
+          project_id: string
           provider: string | null
           robustness_score: number | null
           status: Database["public"]["Enums"]["model_status"]
-          system_id: string | null
+          system_id: string
           toxicity_score: number | null
           updated_at: string
           use_case: string | null
@@ -682,11 +682,11 @@ export type Database = {
           overall_score?: number | null
           owner_id?: string | null
           privacy_score?: number | null
-          project_id?: string | null
+          project_id: string
           provider?: string | null
           robustness_score?: number | null
           status?: Database["public"]["Enums"]["model_status"]
-          system_id?: string | null
+          system_id: string
           toxicity_score?: number | null
           updated_at?: string
           use_case?: string | null
@@ -707,11 +707,11 @@ export type Database = {
           overall_score?: number | null
           owner_id?: string | null
           privacy_score?: number | null
-          project_id?: string | null
+          project_id?: string
           provider?: string | null
           robustness_score?: number | null
           status?: Database["public"]["Enums"]["model_status"]
-          system_id?: string | null
+          system_id?: string
           toxicity_score?: number | null
           updated_at?: string
           use_case?: string | null
