@@ -909,6 +909,110 @@ export type Database = {
           },
         ]
       }
+      risk_assessments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          dimension_scores: Json
+          id: string
+          notes: string | null
+          project_id: string
+          questionnaire_answers: Json
+          risk_tier: Database["public"]["Enums"]["risk_tier"]
+          runtime_risk_score: number
+          static_risk_score: number
+          summary: string | null
+          system_id: string
+          updated_at: string
+          uri_score: number
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          dimension_scores?: Json
+          id?: string
+          notes?: string | null
+          project_id: string
+          questionnaire_answers?: Json
+          risk_tier?: Database["public"]["Enums"]["risk_tier"]
+          runtime_risk_score?: number
+          static_risk_score?: number
+          summary?: string | null
+          system_id: string
+          updated_at?: string
+          uri_score?: number
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          dimension_scores?: Json
+          id?: string
+          notes?: string | null
+          project_id?: string
+          questionnaire_answers?: Json
+          risk_tier?: Database["public"]["Enums"]["risk_tier"]
+          runtime_risk_score?: number
+          static_risk_score?: number
+          summary?: string | null
+          system_id?: string
+          updated_at?: string
+          uri_score?: number
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "risk_assessments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "risk_assessments_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      risk_metrics: {
+        Row: {
+          id: string
+          metric_name: string
+          metric_value: number
+          recorded_at: string
+          system_id: string
+          time_window: string | null
+        }
+        Insert: {
+          id?: string
+          metric_name: string
+          metric_value: number
+          recorded_at?: string
+          system_id: string
+          time_window?: string | null
+        }
+        Update: {
+          id?: string
+          metric_name?: string
+          metric_value?: number
+          recorded_at?: string
+          system_id?: string
+          time_window?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "risk_metrics_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       systems: {
         Row: {
           api_headers: Json | null
@@ -1070,6 +1174,7 @@ export type Database = {
         | "approved"
         | "rejected"
         | "escalated"
+      risk_tier: "low" | "medium" | "high" | "critical"
       sensitivity_level: "low" | "medium" | "high" | "critical"
       severity_level: "low" | "medium" | "high" | "critical"
       system_type: "model" | "agent" | "provider" | "pipeline"
@@ -1221,6 +1326,7 @@ export const Constants = {
         "rejected",
         "escalated",
       ],
+      risk_tier: ["low", "medium", "high", "critical"],
       sensitivity_level: ["low", "medium", "high", "critical"],
       severity_level: ["low", "medium", "high", "critical"],
       system_type: ["model", "agent", "provider", "pipeline"],
