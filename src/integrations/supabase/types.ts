@@ -916,6 +916,72 @@ export type Database = {
           },
         ]
       }
+      request_logs: {
+        Row: {
+          created_at: string
+          decision: string | null
+          engine_scores: Json | null
+          environment: string | null
+          error_message: string | null
+          id: string
+          latency_ms: number | null
+          project_id: string | null
+          request_body: Json | null
+          response_body: Json | null
+          status_code: number | null
+          system_id: string
+          trace_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          decision?: string | null
+          engine_scores?: Json | null
+          environment?: string | null
+          error_message?: string | null
+          id?: string
+          latency_ms?: number | null
+          project_id?: string | null
+          request_body?: Json | null
+          response_body?: Json | null
+          status_code?: number | null
+          system_id: string
+          trace_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          decision?: string | null
+          engine_scores?: Json | null
+          environment?: string | null
+          error_message?: string | null
+          id?: string
+          latency_ms?: number | null
+          project_id?: string | null
+          request_body?: Json | null
+          response_body?: Json | null
+          status_code?: number | null
+          system_id?: string
+          trace_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "request_logs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "request_logs_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       review_queue: {
         Row: {
           assignee_id: string | null
