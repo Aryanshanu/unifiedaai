@@ -9,12 +9,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSystem } from "@/hooks/useSystems";
 import { useProject } from "@/hooks/useProjects";
 import { useLatestRiskAssessment, useRiskAssessments } from "@/hooks/useRiskAssessments";
+import { useLatestImpactAssessment, useImpactAssessments } from "@/hooks/useImpactAssessments";
+import { useSystemApprovals, useRequestApproval, useProcessApproval } from "@/hooks/useSystemApprovals";
 import { RiskAssessmentWizard } from "@/components/risk/RiskAssessmentWizard";
 import { RiskScoreCard } from "@/components/risk/RiskScoreCard";
 import { RiskBadge } from "@/components/risk/RiskBadge";
+import { ImpactAssessmentWizard } from "@/components/impact/ImpactAssessmentWizard";
+import { ImpactScoreCard } from "@/components/impact/ImpactScoreCard";
+import { ImpactMatrix } from "@/components/impact/ImpactMatrix";
+import { DeploymentStatusBadge } from "@/components/governance/DeploymentStatusBadge";
 import { 
   ArrowLeft, Cpu, Server, Globe, FileText, AlertTriangle, Activity, 
-  Settings, Play, Calendar, CheckCircle2, Clock, Archive, History
+  Settings, Play, Calendar, CheckCircle2, Clock, Archive, History,
+  Target, Shield, CheckCircle, XCircle
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -22,11 +29,17 @@ export default function SystemDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [showRiskWizard, setShowRiskWizard] = useState(false);
+  const [showImpactWizard, setShowImpactWizard] = useState(false);
 
-  const { data: system, isLoading: systemLoading } = useSystem(id ?? "");
+  const { data: system, isLoading: systemLoading, refetch: refetchSystem } = useSystem(id ?? "");
   const { data: project } = useProject(system?.project_id ?? "");
   const { data: latestAssessment, isLoading: assessmentLoading } = useLatestRiskAssessment(id ?? "");
   const { data: allAssessments } = useRiskAssessments(id);
+  const { data: latestImpact, isLoading: impactLoading } = useLatestImpactAssessment(id ?? "");
+  const { data: allImpactAssessments } = useImpactAssessments(id);
+  const { data: approvals } = useSystemApprovals(id ?? "");
+  const requestApproval = useRequestApproval();
+  const processApproval = useProcessApproval();
 
   const getSystemTypeIcon = (type: string) => {
     switch (type) {
@@ -133,14 +146,24 @@ export default function SystemDetail() {
                   score={latestAssessment?.uri_score}
                   showScore
                 />
+                <DeploymentStatusBadge 
+                  status={system.deployment_status} 
+                  requiresApproval={system.requires_approval}
+                />
               </div>
             </div>
           </div>
 
-          <Button onClick={() => setShowRiskWizard(true)} className="gap-2">
-            <Play className="h-4 w-4" />
-            Run Risk Assessment
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => setShowRiskWizard(true)} variant="outline" className="gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              Risk Assessment
+            </Button>
+            <Button onClick={() => setShowImpactWizard(true)} className="gap-2">
+              <Target className="h-4 w-4" />
+              Impact Assessment
+            </Button>
+          </div>
         </div>
 
         {/* Use Case */}
@@ -215,10 +238,18 @@ export default function SystemDetail() {
 
         {/* Tabs */}
         <Tabs defaultValue="risk" className="space-y-6">
-          <TabsList>
+          <TabsList className="flex-wrap">
             <TabsTrigger value="risk" className="gap-2">
               <AlertTriangle className="h-4 w-4" />
-              Risk Assessment
+              Risk
+            </TabsTrigger>
+            <TabsTrigger value="impact" className="gap-2">
+              <Target className="h-4 w-4" />
+              Impact
+            </TabsTrigger>
+            <TabsTrigger value="governance" className="gap-2">
+              <Shield className="h-4 w-4" />
+              Governance
             </TabsTrigger>
             <TabsTrigger value="evaluations" className="gap-2">
               <Activity className="h-4 w-4" />
@@ -288,6 +319,209 @@ export default function SystemDetail() {
             </div>
           </TabsContent>
 
+          {/* Impact Tab */}
+          <TabsContent value="impact" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Impact Score Card */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Current Impact Status</h3>
+                  {latestImpact && (
+                    <span className="text-sm text-muted-foreground">
+                      v{latestImpact.version}
+                    </span>
+                  )}
+                </div>
+                {impactLoading ? (
+                  <Skeleton className="h-[400px]" />
+                ) : (
+                  <ImpactScoreCard assessment={latestImpact ?? null} />
+                )}
+              </div>
+
+              {/* Impact Matrix */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Risk × Impact Matrix</h3>
+                <ImpactMatrix 
+                  riskTier={latestAssessment?.risk_tier}
+                  impactScore={latestImpact?.overall_score}
+                />
+                
+                {/* Impact History */}
+                <h3 className="text-lg font-semibold mt-6">Assessment History</h3>
+                {allImpactAssessments?.length === 0 ? (
+                  <Card>
+                    <CardContent className="flex flex-col items-center justify-center py-8 text-center">
+                      <Target className="h-8 w-8 text-muted-foreground mb-2" />
+                      <p className="text-muted-foreground text-sm">No impact assessments yet</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                    {allImpactAssessments?.map((assessment) => (
+                      <Card key={assessment.id} className="hover:border-primary/30 transition-colors">
+                        <CardContent className="py-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium">Version {assessment.version}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {format(new Date(assessment.created_at), "MMM d, yyyy 'at' h:mm a")}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-lg font-bold">{Math.round(assessment.overall_score)}</p>
+                              <p className="text-xs text-muted-foreground capitalize">{assessment.quadrant.replace(/_/g, " ")}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Governance Tab */}
+          <TabsContent value="governance" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Deployment Status */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="h-5 w-5 text-primary" />
+                    Deployment Governance
+                  </CardTitle>
+                  <CardDescription>
+                    Current deployment status and approval requirements
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="flex items-center gap-4">
+                    <DeploymentStatusBadge 
+                      status={system.deployment_status} 
+                      requiresApproval={system.requires_approval}
+                      size="lg"
+                    />
+                    {system.requires_approval && (
+                      <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
+                        Requires Approval
+                      </Badge>
+                    )}
+                  </div>
+
+                  {system.requires_approval && system.deployment_status !== "approved" && system.deployment_status !== "deployed" && (
+                    <div className="p-4 rounded-lg bg-muted/50 border">
+                      <p className="text-sm text-muted-foreground mb-3">
+                        This system requires approval before deployment due to elevated risk or impact levels.
+                      </p>
+                      {system.deployment_status === "draft" && (
+                        <Button 
+                          onClick={() => requestApproval.mutate(system.id, {
+                            onSuccess: () => refetchSystem()
+                          })}
+                          disabled={requestApproval.isPending}
+                          className="gap-2"
+                        >
+                          <Shield className="h-4 w-4" />
+                          Request Approval
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Approval Actions for pending */}
+                  {approvals?.[0]?.status === "pending" && (
+                    <div className="p-4 rounded-lg border border-yellow-500/30 bg-yellow-500/5">
+                      <p className="text-sm font-medium mb-3">Pending Approval Request</p>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="default"
+                          size="sm"
+                          onClick={() => processApproval.mutate({ 
+                            approvalId: approvals[0].id, 
+                            systemId: system.id,
+                            status: "approved",
+                            reason: "Approved via governance review"
+                          }, {
+                            onSuccess: () => refetchSystem()
+                          })}
+                          className="gap-1"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                          Approve
+                        </Button>
+                        <Button 
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => processApproval.mutate({ 
+                            approvalId: approvals[0].id, 
+                            systemId: system.id,
+                            status: "rejected",
+                            reason: "Rejected - requires remediation"
+                          }, {
+                            onSuccess: () => refetchSystem()
+                          })}
+                          className="gap-1"
+                        >
+                          <XCircle className="h-4 w-4" />
+                          Reject
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Approval History */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Approval History</CardTitle>
+                  <CardDescription>
+                    Track of all approval requests and decisions
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {approvals?.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <History className="h-8 w-8 text-muted-foreground mb-2" />
+                      <p className="text-muted-foreground text-sm">No approval requests yet</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {approvals?.map((approval) => (
+                        <div key={approval.id} className="flex items-center justify-between p-3 rounded-lg border">
+                          <div className="flex items-center gap-3">
+                            {approval.status === "approved" && (
+                              <CheckCircle className="h-5 w-5 text-green-500" />
+                            )}
+                            {approval.status === "rejected" && (
+                              <XCircle className="h-5 w-5 text-red-500" />
+                            )}
+                            {approval.status === "pending" && (
+                              <Clock className="h-5 w-5 text-yellow-500" />
+                            )}
+                            <div>
+                              <p className="text-sm font-medium capitalize">{approval.status}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {format(new Date(approval.created_at), "MMM d, yyyy")}
+                              </p>
+                            </div>
+                          </div>
+                          {approval.reason && (
+                            <p className="text-xs text-muted-foreground max-w-[200px] truncate">
+                              {approval.reason}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
           <TabsContent value="evaluations">
             <Card>
               <CardHeader>
@@ -348,13 +582,22 @@ export default function SystemDetail() {
       </div>
 
       {project && (
-        <RiskAssessmentWizard
-          projectId={project.id}
-          systemId={system.id}
-          systemName={system.name}
-          open={showRiskWizard}
-          onOpenChange={setShowRiskWizard}
-        />
+        <>
+          <RiskAssessmentWizard
+            projectId={project.id}
+            systemId={system.id}
+            systemName={system.name}
+            open={showRiskWizard}
+            onOpenChange={setShowRiskWizard}
+          />
+          <ImpactAssessmentWizard
+            projectId={project.id}
+            systemId={system.id}
+            systemName={system.name}
+            open={showImpactWizard}
+            onOpenChange={setShowImpactWizard}
+          />
+        </>
       )}
     </MainLayout>
   );

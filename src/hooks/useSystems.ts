@@ -5,6 +5,7 @@ import type { Database, Json } from "@/integrations/supabase/types";
 
 type SystemType = Database["public"]["Enums"]["system_type"];
 type ModelStatus = Database["public"]["Enums"]["model_status"];
+type DeploymentStatus = Database["public"]["Enums"]["deployment_status"];
 
 export interface System {
   id: string;
@@ -18,6 +19,8 @@ export interface System {
   api_token_encrypted: string | null;
   use_case: string | null;
   status: ModelStatus;
+  deployment_status: DeploymentStatus;
+  requires_approval: boolean;
   owner_id: string | null;
   created_at: string;
   updated_at: string;
