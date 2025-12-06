@@ -7,16 +7,9 @@ import { Activity, AlertTriangle, TrendingUp, Clock, RefreshCw } from "lucide-re
 import { cn } from "@/lib/utils";
 import { useDriftAlerts, useDriftAlertStats, DriftAlert } from "@/hooks/useDriftAlerts";
 import { useModels, Model } from "@/hooks/useModels";
+import { usePlatformMetrics, useSystemHealthSummary } from "@/hooks/usePlatformMetrics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
-
-// Static live metrics for now (would be real-time WebSocket in production)
-const liveMetrics = [
-  { label: "Requests/min", value: 12847, unit: "req/m", trend: [120, 125, 118, 130, 128, 135, 142, 138] },
-  { label: "Avg Latency", value: 42, unit: "ms", trend: [45, 42, 48, 44, 41, 43, 42, 40] },
-  { label: "Error Rate", value: 0.12, unit: "%", trend: [0.1, 0.15, 0.12, 0.11, 0.13, 0.12, 0.11, 0.12] },
-  { label: "Safety Blocks", value: 23, unit: "today", trend: [2, 3, 1, 4, 2, 3, 5, 3] },
-];
 
 function getModelStatus(model: Model): "healthy" | "warning" | "critical" {
   const fairness = model.fairness_score ?? 100;
@@ -32,6 +25,8 @@ export default function Observability() {
   const { data: driftAlerts, isLoading: alertsLoading } = useDriftAlerts();
   const { data: driftStats } = useDriftAlertStats();
   const { data: models, isLoading: modelsLoading } = useModels();
+  const { data: platformMetrics, isLoading: metricsLoading } = usePlatformMetrics();
+  const { data: systemHealth } = useSystemHealthSummary();
 
   // Create model lookup
   const modelMap = models?.reduce((acc, m) => {
@@ -41,16 +36,46 @@ export default function Observability() {
 
   const openAlerts = driftAlerts?.filter(a => a.status !== 'resolved').slice(0, 5) || [];
 
+  // Build live metrics from real data
+  const liveMetrics = [
+    { 
+      label: "Requests/24h", 
+      value: platformMetrics?.totalRequests || 0, 
+      unit: "req", 
+      trend: [] 
+    },
+    { 
+      label: "Avg Latency", 
+      value: platformMetrics?.avgLatency || 0, 
+      unit: "ms", 
+      trend: [] 
+    },
+    { 
+      label: "Block Rate", 
+      value: platformMetrics?.totalRequests 
+        ? Math.round((platformMetrics.blockedRequests / platformMetrics.totalRequests) * 100 * 10) / 10
+        : 0, 
+      unit: "%", 
+      trend: [] 
+    },
+    { 
+      label: "Blocked", 
+      value: platformMetrics?.blockedRequests || 0, 
+      unit: "today", 
+      trend: [] 
+    },
+  ];
+
   return (
     <MainLayout title="Observability" subtitle="Real-time telemetry, drift detection, and model health monitoring">
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <MetricCard
-          title="System Health"
-          value="98.7%"
-          subtitle="All systems operational"
+          title="Gateway Health"
+          value={platformMetrics?.errorCount === 0 ? "100%" : `${Math.round((1 - (platformMetrics?.errorCount || 0) / (platformMetrics?.totalRequests || 1)) * 100)}%`}
+          subtitle={`${platformMetrics?.systemsCount || 0} active systems`}
           icon={<Activity className="w-4 h-4 text-success" />}
-          status="success"
+          status={platformMetrics?.errorCount === 0 ? "success" : "warning"}
         />
         <MetricCard
           title="Drift Alerts"
@@ -61,22 +86,85 @@ export default function Observability() {
         />
         <MetricCard
           title="Avg Latency"
-          value="42ms"
-          subtitle="p99: 156ms"
+          value={`${platformMetrics?.avgLatency || 0}ms`}
+          subtitle={`${platformMetrics?.totalRequests || 0} requests today`}
           icon={<Clock className="w-4 h-4 text-primary" />}
-          trend={{ value: 8, direction: "down" }}
+          trend={platformMetrics?.avgLatency && platformMetrics.avgLatency < 100 
+            ? { value: 8, direction: "down" } 
+            : undefined
+          }
         />
         <MetricCard
-          title="Total Alerts"
-          value={(driftStats?.total || 0).toString()}
-          subtitle="All time"
+          title="Open Incidents"
+          value={(platformMetrics?.recentIncidents || 0).toString()}
+          subtitle={platformMetrics?.recentIncidents === 0 ? "All clear" : "Requires attention"}
           icon={<AlertTriangle className="w-4 h-4 text-muted-foreground" />}
+          status={platformMetrics?.recentIncidents ? "danger" : "success"}
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
+          {/* System Health Table */}
+          <div className="bg-card border border-border rounded-xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Activity className="w-4 h-4 text-primary" />
+                System Health
+              </h2>
+              <Button variant="ghost" size="sm">
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Refresh
+              </Button>
+            </div>
+
+            {!systemHealth ? (
+              <div className="space-y-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="flex items-center gap-4">
+                    <Skeleton className="h-5 w-32" />
+                    <Skeleton className="h-6 w-16" />
+                    <Skeleton className="h-5 w-16" />
+                    <Skeleton className="h-5 w-16" />
+                  </div>
+                ))}
+              </div>
+            ) : systemHealth.length === 0 ? (
+              <div className="text-center py-8">
+                <Activity className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No systems to monitor</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left pb-3 text-xs font-semibold text-muted-foreground uppercase">System</th>
+                      <th className="text-center pb-3 text-xs font-semibold text-muted-foreground uppercase">Status</th>
+                      <th className="text-right pb-3 text-xs font-semibold text-muted-foreground uppercase">Requests</th>
+                      <th className="text-right pb-3 text-xs font-semibold text-muted-foreground uppercase">Blocked</th>
+                      <th className="text-right pb-3 text-xs font-semibold text-muted-foreground uppercase">Latency</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {systemHealth.map((system) => (
+                      <tr key={system.id} className="border-b border-border last:border-0 hover:bg-secondary/30 transition-colors">
+                        <td className="py-3 font-medium text-foreground">{system.name}</td>
+                        <td className="py-3 text-center">
+                          <StatusBadge status={system.healthStatus} />
+                        </td>
+                        <td className="py-3 text-right font-mono text-sm text-foreground">{system.totalRequests}</td>
+                        <td className="py-3 text-right font-mono text-sm text-muted-foreground">{system.blockedRequests}</td>
+                        <td className="py-3 text-right font-mono text-sm text-muted-foreground">{system.avgLatency}ms</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
           {/* Model Health Table */}
           <div className="bg-card border border-border rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
@@ -84,10 +172,6 @@ export default function Observability() {
                 <Activity className="w-4 h-4 text-primary" />
                 Model Health
               </h2>
-              <Button variant="ghost" size="sm">
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh
-              </Button>
             </div>
 
             {modelsLoading ? (
