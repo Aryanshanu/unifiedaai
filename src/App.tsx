@@ -39,15 +39,24 @@ const App = () => (
             <Route path="/systems/:id" element={<ProtectedRoute><SystemDetail /></ProtectedRoute>} />
             <Route path="/models" element={<ProtectedRoute><Models /></ProtectedRoute>} />
             <Route path="/models/:id" element={<ProtectedRoute><ModelDetail /></ProtectedRoute>} />
-            {/* Governance */}
-            <Route path="/governance/approvals" element={<ProtectedRoute><Approvals /></ProtectedRoute>} />
+            {/* Governance - Admin/Reviewer only */}
+            <Route path="/governance/approvals" element={
+              <ProtectedRoute requiredRoles={['admin', 'reviewer']}>
+                <Approvals />
+              </ProtectedRoute>
+            } />
             {/* Core RAI Engines - Each has unique page */}
             <Route path="/engine/fairness" element={<ProtectedRoute><FairnessEngine /></ProtectedRoute>} />
             <Route path="/engine/hallucination" element={<ProtectedRoute><HallucinationEngine /></ProtectedRoute>} />
             <Route path="/engine/toxicity" element={<ProtectedRoute><ToxicityEngine /></ProtectedRoute>} />
             <Route path="/engine/privacy" element={<ProtectedRoute><PrivacyEngine /></ProtectedRoute>} />
             <Route path="/engine/explainability" element={<ProtectedRoute><ExplainabilityEngine /></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            {/* Settings - Admin only */}
+            <Route path="/settings" element={
+              <ProtectedRoute requiredRoles={['admin']}>
+                <Settings />
+              </ProtectedRoute>
+            } />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
