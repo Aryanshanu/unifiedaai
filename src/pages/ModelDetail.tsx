@@ -309,12 +309,12 @@ export default function ModelDetail() {
         <div className="bg-card border border-border rounded-xl p-4">
           <p className={cn(
             "text-2xl font-bold font-mono",
-            system?.uri_score !== null ? (
+            system?.uri_score != null ? (
               system.uri_score >= 61 ? "text-danger" : 
               system.uri_score >= 31 ? "text-warning" : "text-success"
             ) : "text-muted-foreground"
           )}>
-            {system?.uri_score !== null ? `${Math.round(system.uri_score)}` : "--"}
+            {system?.uri_score != null ? `${Math.round(system.uri_score)}` : "--"}
           </p>
           <p className="text-xs text-muted-foreground">URI Score</p>
         </div>
