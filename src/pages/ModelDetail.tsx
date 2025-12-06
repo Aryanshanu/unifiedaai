@@ -5,41 +5,46 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScoreRing } from "@/components/dashboard/ScoreRing";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
+import { DeploymentStatusBadge } from "@/components/governance/DeploymentStatusBadge";
+import { RiskBadge } from "@/components/risk/RiskBadge";
+import { RiskAssessmentWizard } from "@/components/risk/RiskAssessmentWizard";
+import { ImpactAssessmentWizard } from "@/components/impact/ImpactAssessmentWizard";
+import { RuntimeRiskOverlay } from "@/components/dashboard/RuntimeRiskOverlay";
+import { RequestLogsList } from "@/components/activity/RequestLogsList";
+import { CopilotDrawer } from "@/components/copilot/CopilotDrawer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useModel } from "@/hooks/useModels";
+import { useSystem } from "@/hooks/useSystems";
+import { useRiskAssessments } from "@/hooks/useRiskAssessments";
+import { useImpactAssessments } from "@/hooks/useImpactAssessments";
+import { useSystemApprovals, useRequestApproval } from "@/hooks/useSystemApprovals";
 import { useIncidents } from "@/hooks/useIncidents";
 import { useEvaluationRuns } from "@/hooks/useEvaluations";
 import { useDriftAlerts } from "@/hooks/useDriftAlerts";
+import { toast } from "sonner";
 import { 
   ArrowLeft, 
   Play, 
   Edit, 
-  Archive, 
-  Trash2, 
+  Archive,
   AlertTriangle,
   CheckCircle,
-  XCircle,
   Clock,
-  TrendingUp,
-  TrendingDown,
   Shield,
   Eye,
   Brain,
   Lock,
-  Scale
+  Scale,
+  FolderOpen,
+  ExternalLink,
+  Activity,
+  MessageSquare,
+  Target,
+  FileCheck
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { cn } from "@/lib/utils";
-
-function getModelStatus(model: { fairness_score: number | null; robustness_score: number | null }): "healthy" | "warning" | "critical" {
-  const fairness = model.fairness_score ?? 100;
-  const robustness = model.robustness_score ?? 100;
-  const minScore = Math.min(fairness, robustness);
-  
-  if (minScore < 60) return "critical";
-  if (minScore < 80) return "warning";
-  return "healthy";
-}
+import { useState } from "react";
 
 function getScoreExplanation(score: number | null, type: string): { status: string; reason: string; recommendation: string } {
   const value = score ?? 0;
@@ -145,15 +150,29 @@ function ScoreCard({ title, score, icon, type }: ScoreCardProps) {
 export default function ModelDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [showRiskWizard, setShowRiskWizard] = useState(false);
+  const [showImpactWizard, setShowImpactWizard] = useState(false);
+  const [copilotOpen, setCopilotOpen] = useState(false);
   
-  const { data: model, isLoading, error } = useModel(id || "");
+  const { data: model, isLoading: modelLoading, error: modelError } = useModel(id || "");
+  const { data: system, isLoading: systemLoading } = useSystem(model?.system_id || "");
   const { data: incidents } = useIncidents();
   const { data: evaluationRuns } = useEvaluationRuns();
   const { data: driftAlerts } = useDriftAlerts();
+  const { data: riskAssessments } = useRiskAssessments(model?.system_id);
+  const { data: impactAssessments } = useImpactAssessments(model?.system_id);
+  const { data: approvals } = useSystemApprovals(model?.system_id);
+  const requestApproval = useRequestApproval();
   
   const modelIncidents = incidents?.filter(i => i.model_id === id) || [];
   const modelEvaluations = evaluationRuns?.filter(e => e.model_id === id) || [];
   const modelDriftAlerts = driftAlerts?.filter(d => d.model_id === id) || [];
+  
+  const latestRisk = riskAssessments?.[0];
+  const latestImpact = impactAssessments?.[0];
+  const latestApproval = approvals?.[0];
+  
+  const isLoading = modelLoading || systemLoading;
   
   if (isLoading) {
     return (
@@ -170,7 +189,7 @@ export default function ModelDetail() {
     );
   }
   
-  if (error || !model) {
+  if (modelError || !model) {
     return (
       <MainLayout title="Model Not Found" subtitle="">
         <div className="text-center py-12">
@@ -184,7 +203,15 @@ export default function ModelDetail() {
     );
   }
   
-  const status = getModelStatus(model);
+  const handleRequestApproval = async () => {
+    if (!system) return;
+    try {
+      await requestApproval.mutateAsync(system.id);
+      toast.success("Approval requested successfully");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to request approval");
+    }
+  };
 
   return (
     <MainLayout 
@@ -198,23 +225,52 @@ export default function ModelDetail() {
           Back
         </Button>
         <div className="flex-1" />
-        <StatusBadge status={status} />
+        
+        {/* System badges */}
+        {system && (
+          <>
+            <RiskBadge tier={latestRisk?.risk_tier || 'low'} />
+            <DeploymentStatusBadge status={system.deployment_status} />
+          </>
+        )}
+        
         <Button variant="default" size="sm" className="bg-gradient-primary">
           <Play className="w-4 h-4 mr-2" />
           Run Evaluation
         </Button>
-        <Button variant="outline" size="sm">
-          <Edit className="w-4 h-4 mr-2" />
-          Edit
-        </Button>
-        <Button variant="outline" size="sm">
-          <Archive className="w-4 h-4 mr-2" />
-          Archive
-        </Button>
+        
+        {system && (
+          <Button variant="outline" size="sm" onClick={() => navigate(`/systems/${system.id}`)}>
+            <ExternalLink className="w-4 h-4 mr-2" />
+            Open System
+          </Button>
+        )}
       </div>
 
+      {/* Project & System Context */}
+      {(model.project || system) && (
+        <div className="flex flex-wrap gap-3 mb-6">
+          {model.project && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-2"
+              onClick={() => navigate(`/projects/${model.project!.id}`)}
+            >
+              <FolderOpen className="w-4 h-4" />
+              {model.project.name}
+            </Button>
+          )}
+          {system && (
+            <Badge variant="outline" className="text-sm py-1 px-3">
+              System: {system.name}
+            </Badge>
+          )}
+        </div>
+      )}
+
       {/* Overview Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-card border border-border rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <ScoreRing score={model.overall_score ?? 0} size="sm" />
@@ -243,16 +299,114 @@ export default function ModelDetail() {
           </p>
           <p className="text-xs text-muted-foreground">Drift Alerts</p>
         </div>
+        <div className="bg-card border border-border rounded-xl p-4">
+          <p className={cn(
+            "text-2xl font-bold font-mono",
+            system?.uri_score !== null ? (
+              system.uri_score >= 61 ? "text-danger" : 
+              system.uri_score >= 31 ? "text-warning" : "text-success"
+            ) : "text-muted-foreground"
+          )}>
+            {system?.uri_score !== null ? `${Math.round(system.uri_score)}` : "--"}
+          </p>
+          <p className="text-xs text-muted-foreground">URI Score</p>
+        </div>
       </div>
 
-      <Tabs defaultValue="scores" className="space-y-6">
-        <TabsList className="bg-secondary">
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList className="bg-secondary flex-wrap h-auto gap-1 p-1">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="scores">RAI Scores</TabsTrigger>
-          <TabsTrigger value="evaluations">Evaluation History</TabsTrigger>
+          <TabsTrigger value="risk">Risk</TabsTrigger>
+          <TabsTrigger value="impact">Impact</TabsTrigger>
+          <TabsTrigger value="governance">Governance</TabsTrigger>
+          <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="evaluations">Evaluations</TabsTrigger>
           <TabsTrigger value="incidents">Incidents</TabsTrigger>
-          <TabsTrigger value="details">Model Details</TabsTrigger>
         </TabsList>
 
+        {/* Overview Tab */}
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+              <h4 className="font-medium text-foreground">Model Information</h4>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">Name</p>
+                  <p className="text-sm text-foreground">{model.name}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Type</p>
+                  <p className="text-sm text-foreground">{model.model_type}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Version</p>
+                  <p className="text-sm text-foreground">v{model.version}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Provider</p>
+                  <p className="text-sm text-foreground">{model.provider || "Custom"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Status</p>
+                  <Badge className="mt-1">{model.status}</Badge>
+                </div>
+              </div>
+            </div>
+            
+            {system && (
+              <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+                <h4 className="font-medium text-foreground">Linked System</h4>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">System Name</p>
+                    <p className="text-sm text-foreground">{system.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Deployment Status</p>
+                    <DeploymentStatusBadge status={system.deployment_status} />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Risk Tier</p>
+                    <RiskBadge tier={latestRisk?.risk_tier || 'low'} />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Requires Approval</p>
+                    <p className="text-sm text-foreground">{system.requires_approval ? 'Yes' : 'No'}</p>
+                  </div>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full mt-2"
+                  onClick={() => navigate(`/systems/${system.id}`)}
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  View Full System Details
+                </Button>
+              </div>
+            )}
+            
+            {!system && (
+              <div className="bg-card border border-border rounded-xl p-5 flex flex-col items-center justify-center text-center">
+                <AlertTriangle className="w-10 h-10 text-warning mb-3" />
+                <h4 className="font-medium text-foreground">No Linked System</h4>
+                <p className="text-sm text-muted-foreground mt-1">
+                  This model is not linked to a governed system.
+                </p>
+              </div>
+            )}
+          </div>
+          
+          {model.description && (
+            <div className="bg-card border border-border rounded-xl p-5">
+              <h4 className="font-medium text-foreground mb-2">Description</h4>
+              <p className="text-sm text-muted-foreground">{model.description}</p>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* RAI Scores Tab */}
         <TabsContent value="scores" className="space-y-4">
           <h3 className="text-lg font-semibold text-foreground">Responsible AI Score Breakdown</h3>
           <p className="text-sm text-muted-foreground mb-4">
@@ -293,6 +447,186 @@ export default function ModelDetail() {
           </div>
         </TabsContent>
 
+        {/* Risk Tab */}
+        <TabsContent value="risk" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-foreground">Risk Assessment</h3>
+              <p className="text-sm text-muted-foreground">Static and runtime risk analysis</p>
+            </div>
+            {system && (
+              <Button onClick={() => setShowRiskWizard(true)}>
+                <Target className="w-4 h-4 mr-2" />
+                {latestRisk ? "Update Assessment" : "Run Assessment"}
+              </Button>
+            )}
+          </div>
+          
+          {system && <RuntimeRiskOverlay systemId={system.id} />}
+          
+          {latestRisk ? (
+            <div className="bg-card border border-border rounded-xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="font-medium text-foreground">Latest Risk Assessment</h4>
+                <RiskBadge tier={latestRisk.risk_tier} />
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">Static Risk</p>
+                  <p className="text-lg font-bold font-mono">{latestRisk.static_risk_score}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Runtime Risk</p>
+                  <p className="text-lg font-bold font-mono">{latestRisk.runtime_risk_score}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">URI Score</p>
+                  <p className="text-lg font-bold font-mono">{latestRisk.uri_score}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Version</p>
+                  <p className="text-lg font-bold font-mono">v{latestRisk.version}</p>
+                </div>
+              </div>
+              {latestRisk.summary && (
+                <p className="text-sm text-muted-foreground mt-4">{latestRisk.summary}</p>
+              )}
+            </div>
+          ) : (
+            <div className="bg-card border border-border rounded-xl p-8 text-center">
+              <Target className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+              <p className="text-foreground font-medium">No Risk Assessment</p>
+              <p className="text-sm text-muted-foreground mt-1">Run a risk assessment to evaluate this model.</p>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Impact Tab */}
+        <TabsContent value="impact" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-foreground">Impact Assessment</h3>
+              <p className="text-sm text-muted-foreground">Business and societal impact analysis</p>
+            </div>
+            {system && (
+              <Button onClick={() => setShowImpactWizard(true)}>
+                <FileCheck className="w-4 h-4 mr-2" />
+                {latestImpact ? "Update Assessment" : "Run Assessment"}
+              </Button>
+            )}
+          </div>
+          
+          {latestImpact ? (
+            <div className="bg-card border border-border rounded-xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="font-medium text-foreground">Latest Impact Assessment</h4>
+                <Badge>{latestImpact.quadrant.replace('_', ' / ')}</Badge>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">Overall Score</p>
+                  <p className="text-lg font-bold font-mono">{latestImpact.overall_score}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Version</p>
+                  <p className="text-lg font-bold font-mono">v{latestImpact.version}</p>
+                </div>
+              </div>
+              {latestImpact.summary && (
+                <p className="text-sm text-muted-foreground mt-4">{latestImpact.summary}</p>
+              )}
+            </div>
+          ) : (
+            <div className="bg-card border border-border rounded-xl p-8 text-center">
+              <FileCheck className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+              <p className="text-foreground font-medium">No Impact Assessment</p>
+              <p className="text-sm text-muted-foreground mt-1">Run an impact assessment to evaluate business impact.</p>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Governance Tab */}
+        <TabsContent value="governance" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-foreground">Governance Status</h3>
+              <p className="text-sm text-muted-foreground">Approval workflow and deployment gates</p>
+            </div>
+            {system && system.requires_approval && !latestApproval && (
+              <Button onClick={handleRequestApproval} disabled={requestApproval.isPending}>
+                <FileCheck className="w-4 h-4 mr-2" />
+                Request Approval
+              </Button>
+            )}
+          </div>
+          
+          {system ? (
+            <div className="space-y-4">
+              <div className="bg-card border border-border rounded-xl p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-medium text-foreground">Deployment Status</h4>
+                  <DeploymentStatusBadge status={system.deployment_status} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Requires Approval</p>
+                    <p className="text-sm font-medium">{system.requires_approval ? 'Yes' : 'No'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">System Type</p>
+                    <p className="text-sm font-medium capitalize">{system.system_type}</p>
+                  </div>
+                </div>
+              </div>
+              
+              {latestApproval && (
+                <div className="bg-card border border-border rounded-xl p-5">
+                  <h4 className="font-medium text-foreground mb-3">Latest Approval</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Status</p>
+                      <Badge className="mt-1">{latestApproval.status}</Badge>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Requested</p>
+                      <p className="text-sm">{format(new Date(latestApproval.created_at), "PPP")}</p>
+                    </div>
+                  </div>
+                  {latestApproval.reason && (
+                    <div className="mt-3">
+                      <p className="text-xs text-muted-foreground">Reason</p>
+                      <p className="text-sm">{latestApproval.reason}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="bg-card border border-border rounded-xl p-8 text-center">
+              <AlertTriangle className="w-12 h-12 text-warning mx-auto mb-3" />
+              <p className="text-foreground font-medium">No Linked System</p>
+              <p className="text-sm text-muted-foreground mt-1">Governance requires a linked system.</p>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Activity Tab */}
+        <TabsContent value="activity" className="space-y-4">
+          <h3 className="text-lg font-semibold text-foreground">Request Activity</h3>
+          <p className="text-sm text-muted-foreground mb-4">Recent gateway traffic and decisions</p>
+          
+          {system ? (
+            <RequestLogsList systemId={system.id} limit={20} />
+          ) : (
+            <div className="bg-card border border-border rounded-xl p-8 text-center">
+              <Activity className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+              <p className="text-foreground font-medium">No Activity Data</p>
+              <p className="text-sm text-muted-foreground mt-1">Activity requires a linked system.</p>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Evaluations Tab */}
         <TabsContent value="evaluations" className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-foreground">Evaluation History</h3>
@@ -364,6 +698,7 @@ export default function ModelDetail() {
           )}
         </TabsContent>
 
+        {/* Incidents Tab */}
         <TabsContent value="incidents" className="space-y-4">
           <h3 className="text-lg font-semibold text-foreground">Related Incidents</h3>
           
@@ -409,71 +744,42 @@ export default function ModelDetail() {
             </div>
           )}
         </TabsContent>
-
-        <TabsContent value="details" className="space-y-4">
-          <h3 className="text-lg font-semibold text-foreground">Model Information</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-              <h4 className="font-medium text-foreground">Basic Information</h4>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">Name</p>
-                  <p className="text-sm text-foreground">{model.name}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Type</p>
-                  <p className="text-sm text-foreground">{model.model_type}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Version</p>
-                  <p className="text-sm text-foreground">v{model.version}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Status</p>
-                  <Badge className="mt-1">{model.status}</Badge>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-              <h4 className="font-medium text-foreground">Configuration</h4>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">Provider</p>
-                  <p className="text-sm text-foreground">{model.provider || "Custom"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Use Case</p>
-                  <p className="text-sm text-foreground">{model.use_case || "Not specified"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Endpoint</p>
-                  <p className="text-sm text-foreground font-mono text-xs">{model.endpoint || "Not configured"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Description</p>
-                  <p className="text-sm text-foreground">{model.description || "No description provided"}</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-              <h4 className="font-medium text-foreground">Timestamps</h4>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">Created</p>
-                  <p className="text-sm text-foreground">{format(new Date(model.created_at), "PPP 'at' p")}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Last Updated</p>
-                  <p className="text-sm text-foreground">{format(new Date(model.updated_at), "PPP 'at' p")}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </TabsContent>
       </Tabs>
+
+      {/* Copilot FAB */}
+      <Button
+        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg bg-gradient-primary"
+        onClick={() => setCopilotOpen(true)}
+      >
+        <MessageSquare className="w-6 h-6" />
+      </Button>
+
+      {/* Wizards */}
+      {system && model.project_id && (
+        <>
+          <RiskAssessmentWizard
+            open={showRiskWizard}
+            onOpenChange={setShowRiskWizard}
+            systemId={system.id}
+            projectId={model.project_id}
+          />
+          <ImpactAssessmentWizard
+            open={showImpactWizard}
+            onOpenChange={setShowImpactWizard}
+            systemId={system.id}
+            projectId={model.project_id}
+          />
+        </>
+      )}
+      
+      {/* Copilot Drawer */}
+      {system && (
+        <CopilotDrawer
+          open={copilotOpen}
+          onOpenChange={setCopilotOpen}
+          systemId={system.id}
+        />
+      )}
     </MainLayout>
   );
 }

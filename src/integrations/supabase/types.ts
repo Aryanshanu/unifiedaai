@@ -657,9 +657,11 @@ export type Database = {
           overall_score: number | null
           owner_id: string | null
           privacy_score: number | null
+          project_id: string | null
           provider: string | null
           robustness_score: number | null
           status: Database["public"]["Enums"]["model_status"]
+          system_id: string | null
           toxicity_score: number | null
           updated_at: string
           use_case: string | null
@@ -680,9 +682,11 @@ export type Database = {
           overall_score?: number | null
           owner_id?: string | null
           privacy_score?: number | null
+          project_id?: string | null
           provider?: string | null
           robustness_score?: number | null
           status?: Database["public"]["Enums"]["model_status"]
+          system_id?: string | null
           toxicity_score?: number | null
           updated_at?: string
           use_case?: string | null
@@ -703,15 +707,32 @@ export type Database = {
           overall_score?: number | null
           owner_id?: string | null
           privacy_score?: number | null
+          project_id?: string | null
           provider?: string | null
           robustness_score?: number | null
           status?: Database["public"]["Enums"]["model_status"]
+          system_id?: string | null
           toxicity_score?: number | null
           updated_at?: string
           use_case?: string | null
           version?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "models_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "models_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       policy_packs: {
         Row: {
