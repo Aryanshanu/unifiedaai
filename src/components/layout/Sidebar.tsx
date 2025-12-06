@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard,
+  FolderOpen,
   Database,
   Scale,
   AlertCircle,
@@ -17,6 +18,8 @@ import {
 
 const navItems = [
   { path: "/", icon: LayoutDashboard, label: "Dashboard" },
+  { divider: true, label: "Registry" },
+  { path: "/projects", icon: FolderOpen, label: "Projects" },
   { path: "/models", icon: Database, label: "Model Registry" },
   { divider: true, label: "Core RAI Engines" },
   { path: "/engine/fairness", icon: Scale, label: "Fairness Engine" },

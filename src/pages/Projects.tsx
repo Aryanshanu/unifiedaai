@@ -28,7 +28,7 @@ export default function Projects() {
   };
 
   return (
-    <MainLayout>
+    <MainLayout title="Project Registry" subtitle="Manage AI projects and their associated systems">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
