@@ -734,6 +734,39 @@ export type Database = {
           },
         ]
       }
+      organization_settings: {
+        Row: {
+          created_at: string
+          data_retention_days: number | null
+          default_workspace: string | null
+          id: string
+          organization_name: string | null
+          timezone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data_retention_days?: number | null
+          default_workspace?: string | null
+          id?: string
+          organization_name?: string | null
+          timezone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data_retention_days?: number | null
+          default_workspace?: string | null
+          id?: string
+          organization_name?: string | null
+          timezone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       policy_packs: {
         Row: {
           created_at: string
