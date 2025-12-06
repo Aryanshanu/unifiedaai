@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { AlertCircle, Play, Loader2, CheckCircle, XCircle, Info } from "lucide-r
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { telemetry, traceAsync, instrumentPageLoad } from "@/lib/telemetry";
 
 interface HallucinationMetrics {
   factuality_score: number;
@@ -69,6 +70,12 @@ export default function HallucinationEngine() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Instrument page load
+  useEffect(() => {
+    const endTrace = instrumentPageLoad('HallucinationEngine');
+    return () => endTrace();
+  }, []);
+
   const { data: results, isLoading: loadingResults } = useQuery({
     queryKey: ["hallucination-results", selectedModelId],
     queryFn: async () => {
@@ -88,102 +95,149 @@ export default function HallucinationEngine() {
 
   const latestResult = results?.[0];
 
+  // Get endpoint and API token - check model first, then fall back to linked system
+  const getModelConfig = (modelId: string) => {
+    const model = models?.find(m => m.id === modelId);
+    if (!model) return { endpoint: null, apiToken: null };
+
+    // Priority 1: Model's HuggingFace endpoint
+    if (model.huggingface_endpoint && model.huggingface_api_token) {
+      return { 
+        endpoint: model.huggingface_endpoint, 
+        apiToken: model.huggingface_api_token 
+      };
+    }
+
+    // Priority 2: Model's generic endpoint (with system's API token if available)
+    if (model.endpoint) {
+      const systemToken = (model as any).system?.api_token_encrypted || model.huggingface_api_token;
+      return { 
+        endpoint: model.endpoint, 
+        apiToken: systemToken || null 
+      };
+    }
+
+    // Priority 3: Linked system's endpoint
+    const system = (model as any).system;
+    if (system?.endpoint) {
+      return { 
+        endpoint: system.endpoint, 
+        apiToken: system.api_token_encrypted || null 
+      };
+    }
+
+    return { endpoint: null, apiToken: null };
+  };
+
   const runEvaluation = async () => {
     if (!selectedModelId) {
       toast({ title: "Please select a model", variant: "destructive" });
       return;
     }
 
-    const selectedModel = models?.find(m => m.id === selectedModelId);
-    if (!selectedModel?.huggingface_endpoint || !selectedModel?.huggingface_api_token) {
+    const { endpoint, apiToken } = getModelConfig(selectedModelId);
+    
+    if (!endpoint) {
       toast({ 
         title: "Model Configuration Missing", 
-        description: "This model doesn't have Hugging Face endpoint configured",
+        description: "This model doesn't have an API endpoint configured. Please add an endpoint in the model settings.",
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    if (!apiToken) {
+      toast({ 
+        title: "API Token Missing", 
+        description: "This model doesn't have an API token configured. Please add the token in model settings.",
         variant: "destructive" 
       });
       return;
     }
 
     setIsEvaluating(true);
+    
     try {
-      let verifiedClaims = 0;
-      let unverifiedClaims = 0;
-      const detectedIssues: string[] = [];
+      await traceAsync('hallucination.evaluation', async () => {
+        let verifiedClaims = 0;
+        let unverifiedClaims = 0;
+        const detectedIssues: string[] = [];
 
-      for (const fact of factQuestions) {
-        try {
-          const response = await fetch(selectedModel.huggingface_endpoint, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${selectedModel.huggingface_api_token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ inputs: fact.question }),
-          });
+        for (const fact of factQuestions) {
+          try {
+            const response = await fetch(endpoint, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${apiToken}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ inputs: fact.question }),
+            });
 
-          if (response.ok) {
-            const result = await response.json();
-            const generatedText = (Array.isArray(result) 
-              ? result[0]?.generated_text || "" 
-              : result?.generated_text || JSON.stringify(result)).toLowerCase();
+            if (response.ok) {
+              const result = await response.json();
+              const generatedText = (Array.isArray(result) 
+                ? result[0]?.generated_text || "" 
+                : result?.generated_text || JSON.stringify(result)).toLowerCase();
 
-            const isCorrect = fact.keywords.some(keyword => generatedText.includes(keyword));
-            
-            if (isCorrect) {
-              verifiedClaims++;
-            } else {
-              unverifiedClaims++;
-              detectedIssues.push(`Incorrect answer for: "${fact.question}" - Expected: ${fact.answer}`);
+              const isCorrect = fact.keywords.some(keyword => generatedText.includes(keyword));
+              
+              if (isCorrect) {
+                verifiedClaims++;
+              } else {
+                unverifiedClaims++;
+                detectedIssues.push(`Incorrect answer for: "${fact.question}" - Expected: ${fact.answer}`);
+              }
             }
+          } catch (e) {
+            console.error(`Failed to verify fact:`, e);
+            unverifiedClaims++;
           }
-        } catch (e) {
-          console.error(`Failed to verify fact:`, e);
-          unverifiedClaims++;
         }
-      }
 
-      const totalQuestions = factQuestions.length;
-      const factuality_score = Math.round((verifiedClaims / totalQuestions) * 100);
-      const groundedness_score = Math.round(((verifiedClaims + 1) / (totalQuestions + 1)) * 100);
-      const claim_verification = Math.round((verifiedClaims / Math.max(verifiedClaims + unverifiedClaims, 1)) * 100);
-      const citation_accuracy = Math.round(factuality_score * 0.9 + 10);
+        const totalQuestions = factQuestions.length;
+        const factuality_score = Math.round((verifiedClaims / totalQuestions) * 100);
+        const groundedness_score = Math.round(((verifiedClaims + 1) / (totalQuestions + 1)) * 100);
+        const claim_verification = Math.round((verifiedClaims / Math.max(verifiedClaims + unverifiedClaims, 1)) * 100);
+        const citation_accuracy = Math.round(factuality_score * 0.9 + 10);
 
-      const overall_score = Math.round((factuality_score + groundedness_score + claim_verification + citation_accuracy) / 4);
+        const overall_score = Math.round((factuality_score + groundedness_score + claim_verification + citation_accuracy) / 4);
 
-      const metric_details: HallucinationMetrics = {
-        factuality_score,
-        groundedness_score,
-        claim_verification,
-        citation_accuracy,
-      };
+        const metric_details: HallucinationMetrics = {
+          factuality_score,
+          groundedness_score,
+          claim_verification,
+          citation_accuracy,
+        };
 
-      const explanations = {
-        detected_issues: detectedIssues.slice(0, 5),
-        verified_claims: verifiedClaims,
-        unverified_claims: unverifiedClaims,
-        recommendations: [
-          unverifiedClaims > 2 ? "Model shows tendency to hallucinate factual information" : null,
-          factuality_score < 70 ? "Consider fine-tuning with factual datasets" : null,
-          groundedness_score < 80 ? "Implement retrieval-augmented generation (RAG)" : null,
-          overall_score < 60 ? "Add fact-checking guardrails before production deployment" : null,
-        ].filter(Boolean) as string[],
-      };
+        const explanations = {
+          detected_issues: detectedIssues.slice(0, 5),
+          verified_claims: verifiedClaims,
+          unverified_claims: unverifiedClaims,
+          recommendations: [
+            unverifiedClaims > 2 ? "Model shows tendency to hallucinate factual information" : null,
+            factuality_score < 70 ? "Consider fine-tuning with factual datasets" : null,
+            groundedness_score < 80 ? "Implement retrieval-augmented generation (RAG)" : null,
+            overall_score < 60 ? "Add fact-checking guardrails before production deployment" : null,
+          ].filter(Boolean) as string[],
+        };
 
-      const { error } = await supabase.from("evaluation_runs").insert([{
-        model_id: selectedModelId,
-        engine_type: "hallucination",
-        status: "completed",
-        overall_score,
-        factuality_score,
-        metric_details: metric_details as unknown as Json,
-        explanations: explanations as unknown as Json,
-        completed_at: new Date().toISOString(),
-      }]);
+        const { error } = await supabase.from("evaluation_runs").insert([{
+          model_id: selectedModelId,
+          engine_type: "hallucination",
+          status: "completed",
+          overall_score,
+          factuality_score,
+          metric_details: metric_details as unknown as Json,
+          explanations: explanations as unknown as Json,
+          completed_at: new Date().toISOString(),
+        }]);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      toast({ title: "Evaluation Complete", description: `Hallucination score: ${overall_score}%` });
-      queryClient.invalidateQueries({ queryKey: ["hallucination-results", selectedModelId] });
+        toast({ title: "Evaluation Complete", description: `Hallucination score: ${overall_score}%` });
+        queryClient.invalidateQueries({ queryKey: ["hallucination-results", selectedModelId] });
+      }, { 'engine.type': 'hallucination', 'model.id': selectedModelId });
 
     } catch (error: any) {
       toast({ title: "Evaluation Failed", description: error.message, variant: "destructive" });
@@ -193,15 +247,15 @@ export default function HallucinationEngine() {
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 80) return "text-green-500";
-    if (score >= 60) return "text-yellow-500";
-    return "text-red-500";
+    if (score >= 80) return "text-success";
+    if (score >= 60) return "text-warning";
+    return "text-danger";
   };
 
   const getScoreIcon = (score: number) => {
-    if (score >= 80) return <CheckCircle className="w-5 h-5 text-green-500" />;
-    if (score >= 60) return <AlertCircle className="w-5 h-5 text-yellow-500" />;
-    return <XCircle className="w-5 h-5 text-red-500" />;
+    if (score >= 80) return <CheckCircle className="w-5 h-5 text-success" />;
+    if (score >= 60) return <AlertCircle className="w-5 h-5 text-warning" />;
+    return <XCircle className="w-5 h-5 text-danger" />;
   };
 
   return (
@@ -296,7 +350,7 @@ export default function HallucinationEngine() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <XCircle className="w-5 h-5 text-red-500" />
+                  <XCircle className="w-5 h-5 text-danger" />
                   Detected Issues
                 </CardTitle>
               </CardHeader>
@@ -304,14 +358,14 @@ export default function HallucinationEngine() {
                 {latestResult.explanations?.detected_issues?.length > 0 ? (
                   <ul className="space-y-2">
                     {latestResult.explanations.detected_issues.map((issue, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm p-2 bg-red-500/10 rounded-lg">
-                        <XCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                      <li key={i} className="flex items-start gap-2 text-sm p-2 bg-danger/10 rounded-lg">
+                        <XCircle className="w-4 h-4 text-danger shrink-0 mt-0.5" />
                         <span className="text-muted-foreground">{issue}</span>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <div className="flex items-center gap-2 text-green-500">
+                  <div className="flex items-center gap-2 text-success">
                     <CheckCircle className="w-5 h-5" />
                     <span>No hallucinations detected</span>
                   </div>
@@ -322,20 +376,20 @@ export default function HallucinationEngine() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Info className="w-5 h-5 text-blue-500" />
+                  <Info className="w-5 h-5 text-primary" />
                   Claim Verification
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex justify-between items-center p-3 bg-green-500/10 rounded-lg">
+                <div className="flex justify-between items-center p-3 bg-success/10 rounded-lg">
                   <span className="text-sm text-muted-foreground">Verified Claims</span>
-                  <Badge variant="outline" className="text-green-500 border-green-500">
+                  <Badge variant="outline" className="text-success border-success">
                     {latestResult.explanations?.verified_claims || 0}
                   </Badge>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-red-500/10 rounded-lg">
+                <div className="flex justify-between items-center p-3 bg-danger/10 rounded-lg">
                   <span className="text-sm text-muted-foreground">Unverified Claims</span>
-                  <Badge variant="outline" className="text-red-500 border-red-500">
+                  <Badge variant="outline" className="text-danger border-danger">
                     {latestResult.explanations?.unverified_claims || 0}
                   </Badge>
                 </div>

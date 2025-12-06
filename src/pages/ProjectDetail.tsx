@@ -8,7 +8,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useProject } from "@/hooks/useProjects";
 import { useSystems } from "@/hooks/useSystems";
-import { AddSystemForm } from "@/components/registry/AddSystemForm";
 import { SystemCard } from "@/components/registry/SystemCard";
 import { ProjectModelsTab } from "@/components/project/ProjectModelsTab";
 import { ModelRegistrationForm } from "@/components/models/ModelRegistrationForm";
@@ -21,7 +20,6 @@ import { format } from "date-fns";
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [showAddSystem, setShowAddSystem] = useState(false);
   const [showAddModel, setShowAddModel] = useState(false);
 
   const { data: project, isLoading: projectLoading } = useProject(id ?? "");
@@ -29,28 +27,28 @@ export default function ProjectDetail() {
 
   const getSensitivityColor = (level: string) => {
     switch (level) {
-      case "low": return "bg-green-500/10 text-green-500 border-green-500/20";
-      case "medium": return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20";
+      case "low": return "bg-success/10 text-success border-success/20";
+      case "medium": return "bg-warning/10 text-warning border-warning/20";
       case "high": return "bg-orange-500/10 text-orange-500 border-orange-500/20";
-      case "critical": return "bg-red-500/10 text-red-500 border-red-500/20";
+      case "critical": return "bg-danger/10 text-danger border-danger/20";
       default: return "bg-muted text-muted-foreground";
     }
   };
 
   const getEnvironmentColor = (env: string) => {
     switch (env) {
-      case "development": return "bg-blue-500/10 text-blue-500 border-blue-500/20";
+      case "development": return "bg-primary/10 text-primary border-primary/20";
       case "staging": return "bg-purple-500/10 text-purple-500 border-purple-500/20";
-      case "production": return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
+      case "production": return "bg-success/10 text-success border-success/20";
       default: return "bg-muted text-muted-foreground";
     }
   };
 
   const getCriticalityColor = (score: number) => {
-    if (score <= 3) return "text-green-500";
-    if (score <= 5) return "text-yellow-500";
+    if (score <= 3) return "text-success";
+    if (score <= 5) return "text-warning";
     if (score <= 7) return "text-orange-500";
-    return "text-red-500";
+    return "text-danger";
   };
 
   if (projectLoading) {
@@ -121,9 +119,9 @@ export default function ProjectDetail() {
             </div>
           </div>
 
-          <Button onClick={() => setShowAddSystem(true)} className="gap-2">
+          <Button onClick={() => setShowAddModel(true)} className="gap-2">
             <Plus className="h-4 w-4" />
-            Add System
+            Add Model
           </Button>
         </div>
 
@@ -171,8 +169,8 @@ export default function ProjectDetail() {
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-yellow-500/10">
-                  <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                <div className="p-2 rounded-lg bg-warning/10">
+                  <AlertTriangle className="h-5 w-5 text-warning" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">--</p>
@@ -246,11 +244,11 @@ export default function ProjectDetail() {
                   </div>
                   <h3 className="text-xl font-semibold">No Systems Yet</h3>
                   <p className="text-muted-foreground mt-2 max-w-md">
-                    Add AI models, agents, or providers to this project to start monitoring and governance.
+                    Add AI models to this project to start monitoring and governance. Systems are created automatically when you add a model.
                   </p>
-                  <Button onClick={() => setShowAddSystem(true)} className="mt-6 gap-2">
+                  <Button onClick={() => setShowAddModel(true)} className="mt-6 gap-2">
                     <Plus className="h-4 w-4" />
-                    Add Your First System
+                    Add Your First Model
                   </Button>
                 </CardContent>
               </Card>
@@ -331,18 +329,11 @@ export default function ProjectDetail() {
       </div>
 
       {id && (
-        <>
-          <AddSystemForm 
-            projectId={id}
-            open={showAddSystem} 
-            onOpenChange={setShowAddSystem} 
-          />
-          <ModelRegistrationForm
-            open={showAddModel}
-            onOpenChange={setShowAddModel}
-            defaultProjectId={id}
-          />
-        </>
+        <ModelRegistrationForm
+          open={showAddModel}
+          onOpenChange={setShowAddModel}
+          defaultProjectId={id}
+        />
       )}
     </MainLayout>
   );
