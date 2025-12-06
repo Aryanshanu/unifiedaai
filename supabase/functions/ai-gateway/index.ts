@@ -6,26 +6,43 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Simple PII detection patterns
+// Simple PII detection patterns - FIX #4 & #5: Format detection, not validation
 const PII_PATTERNS = {
   email: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
-  phone: /\b(\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g,
-  ssn: /\b\d{3}[-.\s]?\d{2}[-.\s]?\d{4}\b/g,
+  // FIX #5: Expanded phone patterns for various formats
+  phone: /\b(\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b|\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b|\b\d{10}\b/g,
+  // FIX #4: Simple format detection instead of validation
+  ssn: /\b\d{3}-\d{2}-\d{4}\b/g,
   creditCard: /\b(?:\d{4}[-.\s]?){3}\d{4}\b/g,
 };
 
-// Harmful content keywords (basic safety check)
+// FIX #3: Expanded harmful content keywords for self-harm detection
 const HARMFUL_KEYWORDS = [
-  "kill yourself", "self-harm", "suicide methods", "how to make a bomb",
-  "synthesize drugs", "child exploitation"
+  // Self-harm patterns
+  "how to harm myself", "hurt myself", "harm my body", "harm myself",
+  "end my life", "kill myself", "commit suicide", "suicide methods",
+  "self harm", "self-harm",
+  // Violence patterns
+  "kill yourself", "how to make a bomb", "synthesize drugs", "child exploitation",
+  // Chemical harm
+  "harm using chemicals", "poison myself", "dangerous chemicals to hurt",
+  // General dangerous
+  "how to hurt someone", "how to kill", "how to attack"
 ];
 
-// Secret patterns
+// FIX #2: Expanded secret patterns with sk-test and JWT detection
 const SECRET_PATTERNS = {
   apiKey: /\b(api[_-]?key|apikey)\s*[:=]\s*['"]?[\w-]{20,}['"]?/gi,
+  // FIX #2: Add sk- prefix pattern (OpenAI style keys)
+  skPrefix: /\bsk-[a-zA-Z0-9]{10,}\b/g,
   bearer: /\bBearer\s+[A-Za-z0-9._-]{20,}\b/gi,
-  awsKey: /\bAKIA[0-9A-Z]{16}\b/g,
+  // FIX #2: Expanded AWS key pattern
+  awsKey: /\bAKIA[0-9A-Z]{12,}\b/g,
   privateKey: /-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----/g,
+  // FIX #2: JWT pattern detection
+  jwt: /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g,
+  // FIX #2: Internal URL detection
+  internalUrl: /https?:\/\/[a-z0-9.-]*\.(local|internal|cluster\.local|svc|corp)\b/gi,
 };
 
 interface EngineScore {
@@ -177,8 +194,70 @@ serve(async (req) => {
       );
     }
 
-    // Check if system requires approval and is not approved
+    // FIX #6: Check if Risk & Impact assessments exist
+    const { data: riskAssessments } = await supabase
+      .from("risk_assessments")
+      .select("id")
+      .eq("system_id", systemId);
+
+    const { data: impactAssessments } = await supabase
+      .from("impact_assessments")
+      .select("id")
+      .eq("system_id", systemId);
+
+    if (!riskAssessments?.length || !impactAssessments?.length) {
+      const missingAssessments = [];
+      if (!riskAssessments?.length) missingAssessments.push("Risk");
+      if (!impactAssessments?.length) missingAssessments.push("Impact");
+      
+      const logEntry = {
+        system_id: systemId,
+        project_id: system.project_id,
+        request_body: { messages },
+        response_body: { error: `${missingAssessments.join(" & ")} assessment(s) missing` },
+        status_code: 451,
+        latency_ms: Date.now() - startTime,
+        error_message: `Compliance block: ${missingAssessments.join(" & ")} evaluation missing`,
+        trace_id: traceId,
+        decision: "BLOCK",
+        engine_scores: {
+          compliance: { verdict: "BLOCK", reason: `Missing: ${missingAssessments.join(", ")}` }
+        },
+      };
+      await supabase.from("request_logs").insert(logEntry);
+
+      return new Response(
+        JSON.stringify({ 
+          error: `${missingAssessments.join(" & ")} assessment(s) missing. Complete required evaluations.`,
+          decision: "BLOCK",
+          missing: missingAssessments
+        }),
+        { status: 451, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // FIX #7: Check if system requires approval and is not approved (BEFORE engine compute)
     if (system.requires_approval && system.deployment_status !== "approved" && system.deployment_status !== "deployed") {
+      // FIX #1: Ensure approval record exists when pending
+      if (system.deployment_status === "pending_approval") {
+        const { data: existingApproval } = await supabase
+          .from("system_approvals")
+          .select("id")
+          .eq("system_id", systemId)
+          .eq("status", "pending")
+          .single();
+
+        if (!existingApproval) {
+          await supabase.from("system_approvals").insert({
+            system_id: systemId,
+            status: "pending",
+            reason: "Auto-generated on gateway call - transition to pending_approval",
+            requested_by: system.owner_id,
+          });
+          console.log(`Auto-created pending approval for system ${systemId}`);
+        }
+      }
+
       const logEntry = {
         system_id: systemId,
         project_id: system.project_id,
