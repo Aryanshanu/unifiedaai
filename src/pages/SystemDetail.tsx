@@ -11,6 +11,7 @@ import { useProject } from "@/hooks/useProjects";
 import { useLatestRiskAssessment, useRiskAssessments } from "@/hooks/useRiskAssessments";
 import { useLatestImpactAssessment, useImpactAssessments } from "@/hooks/useImpactAssessments";
 import { useSystemApprovals, useRequestApproval, useProcessApproval } from "@/hooks/useSystemApprovals";
+import { useRequestLogs, useActivityMetrics } from "@/hooks/useRequestLogs";
 import { RiskAssessmentWizard } from "@/components/risk/RiskAssessmentWizard";
 import { RiskScoreCard } from "@/components/risk/RiskScoreCard";
 import { RiskBadge } from "@/components/risk/RiskBadge";
@@ -18,10 +19,14 @@ import { ImpactAssessmentWizard } from "@/components/impact/ImpactAssessmentWiza
 import { ImpactScoreCard } from "@/components/impact/ImpactScoreCard";
 import { ImpactMatrix } from "@/components/impact/ImpactMatrix";
 import { DeploymentStatusBadge } from "@/components/governance/DeploymentStatusBadge";
+import { UsageSummaryCard } from "@/components/activity/UsageSummaryCard";
+import { UsageChart } from "@/components/activity/UsageChart";
+import { RequestLogsList } from "@/components/activity/RequestLogsList";
+import { CopilotDrawer } from "@/components/copilot/CopilotDrawer";
 import { 
   ArrowLeft, Cpu, Server, Globe, FileText, AlertTriangle, Activity, 
   Settings, Play, Calendar, CheckCircle2, Clock, Archive, History,
-  Target, Shield, CheckCircle, XCircle
+  Target, Shield, CheckCircle, XCircle, Zap
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -38,6 +43,8 @@ export default function SystemDetail() {
   const { data: latestImpact, isLoading: impactLoading } = useLatestImpactAssessment(id ?? "");
   const { data: allImpactAssessments } = useImpactAssessments(id);
   const { data: approvals } = useSystemApprovals(id ?? "");
+  const { data: requestLogs, isLoading: logsLoading } = useRequestLogs(id ?? "");
+  const { data: activityMetrics, isLoading: metricsLoading } = useActivityMetrics(id ?? "");
   const requestApproval = useRequestApproval();
   const processApproval = useProcessApproval();
 
@@ -154,7 +161,8 @@ export default function SystemDetail() {
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <CopilotDrawer systemId={system.id} systemName={system.name} />
             <Button onClick={() => setShowRiskWizard(true)} variant="outline" className="gap-2">
               <AlertTriangle className="h-4 w-4" />
               Risk Assessment
@@ -254,6 +262,10 @@ export default function SystemDetail() {
             <TabsTrigger value="evaluations" className="gap-2">
               <Activity className="h-4 w-4" />
               Evaluations
+            </TabsTrigger>
+            <TabsTrigger value="activity" className="gap-2">
+              <Zap className="h-4 w-4" />
+              Activity
             </TabsTrigger>
             <TabsTrigger value="config" className="gap-2">
               <Settings className="h-4 w-4" />
@@ -538,6 +550,15 @@ export default function SystemDetail() {
                 </p>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Activity Tab */}
+          <TabsContent value="activity" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <UsageSummaryCard metrics={activityMetrics ?? null} isLoading={metricsLoading} />
+              <UsageChart metrics={activityMetrics ?? null} isLoading={metricsLoading} />
+            </div>
+            <RequestLogsList logs={requestLogs} isLoading={logsLoading} />
           </TabsContent>
 
           <TabsContent value="config">
