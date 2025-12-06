@@ -52,7 +52,7 @@ export default function ProjectDetail() {
 
   if (projectLoading) {
     return (
-      <MainLayout>
+      <MainLayout title="Loading..." subtitle="Please wait">
         <div className="space-y-6">
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-32 w-full" />
@@ -64,7 +64,7 @@ export default function ProjectDetail() {
 
   if (!project) {
     return (
-      <MainLayout>
+      <MainLayout title="Project Not Found">
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <FolderOpen className="h-16 w-16 text-muted-foreground mb-4" />
           <h2 className="text-2xl font-semibold">Project Not Found</h2>
@@ -79,7 +79,7 @@ export default function ProjectDetail() {
   }
 
   return (
-    <MainLayout>
+    <MainLayout title={project.name} subtitle={project.organization || "Project Details"}>
       <div className="space-y-6">
         {/* Back Button */}
         <Button variant="ghost" onClick={() => navigate("/projects")} className="gap-2 -ml-2">

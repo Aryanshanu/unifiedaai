@@ -56,7 +56,15 @@ export function CreateProjectForm({ open, onOpenChange }: CreateProjectFormProps
 
   const onSubmit = async (data: ProjectFormData) => {
     try {
-      await createProject.mutateAsync(data);
+      await createProject.mutateAsync({
+        name: data.name,
+        description: data.description,
+        organization: data.organization,
+        business_sensitivity: data.business_sensitivity,
+        data_sensitivity: data.data_sensitivity,
+        criticality: data.criticality,
+        environment: data.environment,
+      });
       toast({
         title: "Project Created",
         description: `Project "${data.name}" has been created successfully.`,
