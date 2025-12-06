@@ -10,8 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useCreateModel } from "@/hooks/useModels";
+import { useProjects } from "@/hooks/useProjects";
 import { toast } from "sonner";
-import { Loader2, ChevronRight, ChevronLeft, Check, Brain, Server, Settings, FileCheck } from "lucide-react";
+import { Loader2, ChevronRight, ChevronLeft, Check, Brain, Server, Settings, FileCheck, FolderOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const modelSchema = z.object({
@@ -22,6 +23,7 @@ const modelSchema = z.object({
   version: z.string().default("1.0.0"),
   use_case: z.string().optional(),
   endpoint: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+  project_id: z.string().min(1, "Project is required"),
 });
 
 type ModelFormData = z.infer<typeof modelSchema>;
@@ -29,13 +31,15 @@ type ModelFormData = z.infer<typeof modelSchema>;
 interface ModelRegistrationFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  defaultProjectId?: string;
 }
 
 const steps = [
-  { id: 1, name: "Basic Info", icon: Brain },
-  { id: 2, name: "Provider", icon: Server },
-  { id: 3, name: "Configuration", icon: Settings },
-  { id: 4, name: "Review", icon: FileCheck },
+  { id: 1, name: "Project", icon: FolderOpen },
+  { id: 2, name: "Basic Info", icon: Brain },
+  { id: 3, name: "Provider", icon: Server },
+  { id: 4, name: "Configuration", icon: Settings },
+  { id: 5, name: "Review", icon: FileCheck },
 ];
 
 const modelTypes = [
@@ -71,10 +75,11 @@ const useCases = [
   "Other",
 ];
 
-export function ModelRegistrationForm({ open, onOpenChange }: ModelRegistrationFormProps) {
-  const [step, setStep] = useState(1);
+export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: ModelRegistrationFormProps) {
+  const [step, setStep] = useState(defaultProjectId ? 2 : 1);
   const navigate = useNavigate();
   const createModel = useCreateModel();
+  const { data: projects, isLoading: projectsLoading } = useProjects();
 
   const form = useForm<ModelFormData>({
     resolver: zodResolver(modelSchema),
@@ -86,6 +91,7 @@ export function ModelRegistrationForm({ open, onOpenChange }: ModelRegistrationF
       version: "1.0.0",
       use_case: "",
       endpoint: "",
+      project_id: defaultProjectId || "",
     },
   });
 
@@ -99,13 +105,17 @@ export function ModelRegistrationForm({ open, onOpenChange }: ModelRegistrationF
         version: data.version,
         use_case: data.use_case || undefined,
         endpoint: data.endpoint || undefined,
+        project_id: data.project_id,
       });
       
-      toast.success("Model registered successfully!");
+      toast.success("Model registered and system created!", {
+        description: "Run Risk & Impact assessments next.",
+      });
       onOpenChange(false);
       form.reset();
-      setStep(1);
-      navigate(`/models/${result.id}`);
+      setStep(defaultProjectId ? 2 : 1);
+      // Navigate to the system detail page for governance
+      navigate(`/systems/${result.system.id}`);
     } catch (error: any) {
       toast.error(error.message || "Failed to register model");
     }
@@ -113,10 +123,14 @@ export function ModelRegistrationForm({ open, onOpenChange }: ModelRegistrationF
 
   const nextStep = async () => {
     if (step === 1) {
+      const valid = await form.trigger(["project_id"]);
+      if (!valid) return;
+    }
+    if (step === 2) {
       const valid = await form.trigger(["name", "model_type"]);
       if (!valid) return;
     }
-    if (step < 4) setStep(step + 1);
+    if (step < 5) setStep(step + 1);
   };
 
   const prevStep = () => {
@@ -124,6 +138,7 @@ export function ModelRegistrationForm({ open, onOpenChange }: ModelRegistrationF
   };
 
   const formValues = form.watch();
+  const selectedProject = projects?.find(p => p.id === formValues.project_id);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -131,29 +146,29 @@ export function ModelRegistrationForm({ open, onOpenChange }: ModelRegistrationF
         <DialogHeader>
           <DialogTitle className="text-xl">Register New Model</DialogTitle>
           <DialogDescription>
-            Add a new AI/ML model to your registry for governance and monitoring.
+            Add a new AI/ML model to your registry. A governed System will be created automatically.
           </DialogDescription>
         </DialogHeader>
 
         {/* Progress Steps */}
-        <div className="flex items-center justify-between mb-6 px-4">
+        <div className="flex items-center justify-between mb-6 px-2">
           {steps.map((s, i) => (
             <div key={s.id} className="flex items-center">
               <div className={cn(
-                "flex items-center justify-center w-10 h-10 rounded-full border-2 transition-colors",
+                "flex items-center justify-center w-9 h-9 rounded-full border-2 transition-colors",
                 step >= s.id 
                   ? "bg-primary border-primary text-primary-foreground" 
                   : "border-border text-muted-foreground"
               )}>
                 {step > s.id ? (
-                  <Check className="w-5 h-5" />
+                  <Check className="w-4 h-4" />
                 ) : (
-                  <s.icon className="w-5 h-5" />
+                  <s.icon className="w-4 h-4" />
                 )}
               </div>
               {i < steps.length - 1 && (
                 <div className={cn(
-                  "w-12 md:w-20 h-0.5 mx-2",
+                  "w-8 md:w-12 h-0.5 mx-1",
                   step > s.id ? "bg-primary" : "bg-border"
                 )} />
               )}
@@ -163,13 +178,89 @@ export function ModelRegistrationForm({ open, onOpenChange }: ModelRegistrationF
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            {/* Step 1: Basic Info */}
+            {/* Step 1: Project Selection */}
             {step === 1 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-foreground">Select Project</h3>
+                <p className="text-sm text-muted-foreground">
+                  Choose the project this model belongs to. A governed System will be created in this project.
+                </p>
+                
+                <FormField
+                  control={form.control}
+                  name="project_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Project *</FormLabel>
+                      {projectsLoading ? (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Loading projects...
+                        </div>
+                      ) : projects?.length === 0 ? (
+                        <div className="p-4 rounded-lg border border-border bg-secondary/50 text-center">
+                          <p className="text-sm text-muted-foreground">No projects found.</p>
+                          <Button 
+                            type="button" 
+                            variant="link" 
+                            className="mt-2"
+                            onClick={() => {
+                              onOpenChange(false);
+                              navigate('/projects');
+                            }}
+                          >
+                            Create a project first
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 gap-3 max-h-[300px] overflow-y-auto">
+                          {projects?.map((project) => (
+                            <div
+                              key={project.id}
+                              onClick={() => field.onChange(project.id)}
+                              className={cn(
+                                "p-4 rounded-xl border-2 cursor-pointer transition-all",
+                                field.value === project.id
+                                  ? "border-primary bg-primary/10"
+                                  : "border-border hover:border-primary/50"
+                              )}
+                            >
+                              <div className="flex items-center gap-3">
+                                <FolderOpen className="w-5 h-5 text-primary" />
+                                <div>
+                                  <p className="font-medium text-foreground">{project.name}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {project.organization || 'No organization'} • {project.environment}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
+
+            {/* Step 2: Basic Info */}
+            {step === 2 && (
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-foreground">Basic Information</h3>
                 <p className="text-sm text-muted-foreground">
                   Enter the fundamental details about your model.
                 </p>
+                
+                {selectedProject && (
+                  <div className="p-3 rounded-lg border border-primary/30 bg-primary/5 flex items-center gap-2">
+                    <FolderOpen className="w-4 h-4 text-primary" />
+                    <span className="text-sm">
+                      Project: <strong>{selectedProject.name}</strong>
+                    </span>
+                  </div>
+                )}
                 
                 <FormField
                   control={form.control}
@@ -236,8 +327,8 @@ export function ModelRegistrationForm({ open, onOpenChange }: ModelRegistrationF
               </div>
             )}
 
-            {/* Step 2: Provider */}
-            {step === 2 && (
+            {/* Step 3: Provider */}
+            {step === 3 && (
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-foreground">Model Provider</h3>
                 <p className="text-sm text-muted-foreground">
@@ -274,8 +365,8 @@ export function ModelRegistrationForm({ open, onOpenChange }: ModelRegistrationF
               </div>
             )}
 
-            {/* Step 3: Configuration */}
-            {step === 3 && (
+            {/* Step 4: Configuration */}
+            {step === 4 && (
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-foreground">Configuration</h3>
                 <p className="text-sm text-muted-foreground">
@@ -344,8 +435,8 @@ export function ModelRegistrationForm({ open, onOpenChange }: ModelRegistrationF
               </div>
             )}
 
-            {/* Step 4: Review */}
-            {step === 4 && (
+            {/* Step 5: Review */}
+            {step === 5 && (
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-foreground">Review & Submit</h3>
                 <p className="text-sm text-muted-foreground">
@@ -354,6 +445,10 @@ export function ModelRegistrationForm({ open, onOpenChange }: ModelRegistrationF
 
                 <div className="bg-secondary/50 rounded-xl p-5 space-y-4">
                   <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Project</p>
+                      <p className="font-medium text-foreground">{selectedProject?.name || "-"}</p>
+                    </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Model Name</p>
                       <p className="font-medium text-foreground">{formValues.name || "-"}</p>
@@ -374,10 +469,6 @@ export function ModelRegistrationForm({ open, onOpenChange }: ModelRegistrationF
                       <p className="text-xs text-muted-foreground">Use Case</p>
                       <p className="font-medium text-foreground">{formValues.use_case || "Not specified"}</p>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Endpoint</p>
-                      <p className="font-medium text-foreground text-xs truncate">{formValues.endpoint || "Not configured"}</p>
-                    </div>
                   </div>
                   
                   {formValues.description && (
@@ -390,7 +481,8 @@ export function ModelRegistrationForm({ open, onOpenChange }: ModelRegistrationF
 
                 <div className="bg-primary/10 border border-primary/20 rounded-xl p-4">
                   <p className="text-sm text-foreground">
-                    <strong>Next Steps:</strong> After registration, you can run RAI evaluations to assess fairness, robustness, privacy, and safety scores.
+                    <strong>What happens next:</strong> A governed System will be created in the selected project. 
+                    You'll be redirected to run Risk & Impact assessments before deployment.
                   </p>
                 </div>
               </div>
@@ -402,13 +494,13 @@ export function ModelRegistrationForm({ open, onOpenChange }: ModelRegistrationF
                 type="button"
                 variant="outline"
                 onClick={prevStep}
-                disabled={step === 1}
+                disabled={step === 1 || (defaultProjectId && step === 2)}
               >
                 <ChevronLeft className="w-4 h-4 mr-2" />
                 Back
               </Button>
 
-              {step < 4 ? (
+              {step < 5 ? (
                 <Button type="button" onClick={nextStep}>
                   Next
                   <ChevronRight className="w-4 h-4 ml-2" />
@@ -422,7 +514,7 @@ export function ModelRegistrationForm({ open, onOpenChange }: ModelRegistrationF
                   {createModel.isPending ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Registering...
+                      Creating...
                     </>
                   ) : (
                     <>

@@ -5,13 +5,22 @@ import { ModelCard } from "@/components/dashboard/ModelCard";
 import { ModelRegistrationForm } from "@/components/models/ModelRegistrationForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, SlidersHorizontal, Plus, Loader2 } from "lucide-react";
-import { useModels, Model } from "@/hooks/useModels";
+import { Search, SlidersHorizontal, Plus } from "lucide-react";
+import { useModels, ModelWithSystem } from "@/hooks/useModels";
 import { useIncidents } from "@/hooks/useIncidents";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// Helper to derive status from scores
-function getModelStatus(model: Model): "healthy" | "warning" | "critical" {
+// Helper to derive status from system data or fallback to model scores
+function getModelStatus(model: ModelWithSystem): "healthy" | "warning" | "critical" {
+  // If linked to a system, use uri_score
+  if (model.system?.uri_score !== null && model.system?.uri_score !== undefined) {
+    const uriScore = model.system.uri_score;
+    if (uriScore >= 61) return "critical";
+    if (uriScore >= 31) return "warning";
+    return "healthy";
+  }
+  
+  // Fallback to model's own scores
   const fairness = model.fairness_score ?? 100;
   const robustness = model.robustness_score ?? 100;
   const minScore = Math.min(fairness, robustness);
@@ -19,6 +28,36 @@ function getModelStatus(model: Model): "healthy" | "warning" | "critical" {
   if (minScore < 60) return "critical";
   if (minScore < 80) return "warning";
   return "healthy";
+}
+
+// Get risk level from system
+function getRiskLevel(model: ModelWithSystem): "minimal" | "limited" | "high" | "critical" {
+  if (model.system?.risk_tier) {
+    const tier = model.system.risk_tier;
+    if (tier === 'low') return 'minimal';
+    if (tier === 'medium') return 'limited';
+    if (tier === 'high') return 'high';
+    return 'critical';
+  }
+  
+  // Fallback
+  const fairness = model.fairness_score ?? 100;
+  const robustness = model.robustness_score ?? 100;
+  const minScore = Math.min(fairness, robustness);
+  if (minScore >= 80) return 'minimal';
+  if (minScore >= 60) return 'limited';
+  if (minScore >= 40) return 'high';
+  return 'critical';
+}
+
+// Get environment from system or project
+function getEnvironment(model: ModelWithSystem): "production" | "staging" | "development" {
+  if (model.project?.environment) {
+    return model.project.environment as "production" | "staging" | "development";
+  }
+  if (model.system?.deployment_status === 'deployed') return 'production';
+  if (model.system?.deployment_status === 'approved') return 'staging';
+  return 'development';
 }
 
 // Generate team name based on model type
@@ -52,7 +91,8 @@ export default function Models() {
   const filteredModels = models?.filter((m) =>
     m.name.toLowerCase().includes(search.toLowerCase()) ||
     m.model_type.toLowerCase().includes(search.toLowerCase()) ||
-    (m.description?.toLowerCase().includes(search.toLowerCase()))
+    (m.description?.toLowerCase().includes(search.toLowerCase())) ||
+    (m.project?.name?.toLowerCase().includes(search.toLowerCase()))
   ) || [];
 
   const totalModels = models?.length || 0;
@@ -64,7 +104,7 @@ export default function Models() {
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search models by name, type, owner, or industry..."
+            placeholder="Search models by name, type, project..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-10 h-11 bg-card border-border text-sm"
@@ -160,6 +200,8 @@ export default function Models() {
               version={model.version}
               description={model.description || undefined}
               status={getModelStatus(model)}
+              riskLevel={getRiskLevel(model)}
+              environment={getEnvironment(model)}
               fairnessScore={model.fairness_score}
               robustnessScore={model.robustness_score}
               team={getTeamName(model.model_type)}

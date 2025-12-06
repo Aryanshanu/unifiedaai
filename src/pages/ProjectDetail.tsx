@@ -10,9 +10,11 @@ import { useProject } from "@/hooks/useProjects";
 import { useSystems } from "@/hooks/useSystems";
 import { AddSystemForm } from "@/components/registry/AddSystemForm";
 import { SystemCard } from "@/components/registry/SystemCard";
+import { ProjectModelsTab } from "@/components/project/ProjectModelsTab";
+import { ModelRegistrationForm } from "@/components/models/ModelRegistrationForm";
 import { 
   ArrowLeft, Plus, FolderOpen, Server, Shield, Database, 
-  Gauge, Building2, Calendar, Cpu, AlertTriangle, Activity, FileText 
+  Gauge, Building2, Calendar, Cpu, AlertTriangle, Activity, FileText, Brain 
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -20,6 +22,7 @@ export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [showAddSystem, setShowAddSystem] = useState(false);
+  const [showAddModel, setShowAddModel] = useState(false);
 
   const { data: project, isLoading: projectLoading } = useProject(id ?? "");
   const { data: systems, isLoading: systemsLoading } = useSystems(id);
@@ -201,6 +204,10 @@ export default function ProjectDetail() {
               <Cpu className="h-4 w-4" />
               Systems ({systems?.length ?? 0})
             </TabsTrigger>
+            <TabsTrigger value="models" className="gap-2">
+              <Brain className="h-4 w-4" />
+              Models
+            </TabsTrigger>
             <TabsTrigger value="risk" className="gap-2">
               <AlertTriangle className="h-4 w-4" />
               Risk Assessment
@@ -254,6 +261,20 @@ export default function ProjectDetail() {
                 ))}
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="models" className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold">Project Models</h3>
+                <p className="text-sm text-muted-foreground">AI models registered in this project</p>
+              </div>
+              <Button onClick={() => setShowAddModel(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Add Model
+              </Button>
+            </div>
+            {id && <ProjectModelsTab projectId={id} onAddModel={() => setShowAddModel(true)} />}
           </TabsContent>
 
           <TabsContent value="risk">
@@ -310,11 +331,18 @@ export default function ProjectDetail() {
       </div>
 
       {id && (
-        <AddSystemForm 
-          projectId={id}
-          open={showAddSystem} 
-          onOpenChange={setShowAddSystem} 
-        />
+        <>
+          <AddSystemForm 
+            projectId={id}
+            open={showAddSystem} 
+            onOpenChange={setShowAddSystem} 
+          />
+          <ModelRegistrationForm
+            open={showAddModel}
+            onOpenChange={setShowAddModel}
+            defaultProjectId={id}
+          />
+        </>
       )}
     </MainLayout>
   );
