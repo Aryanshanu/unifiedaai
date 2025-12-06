@@ -21,32 +21,79 @@ serve(async (req) => {
       );
     }
 
-    // Initialize Supabase client
+    // Initialize Supabase client with service role for data access
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Fetch context data
-    const [systemRes, riskRes, impactRes, logsRes, metricsRes] = await Promise.all([
-      supabase.from("systems").select("*, projects(*)").eq("id", systemId).single(),
+    // Extract user ID from JWT token for authorization check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Authorization header required" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Decode JWT to get user ID (token already verified by Supabase)
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: userError } = await createClient(
+      supabaseUrl,
+      Deno.env.get("SUPABASE_ANON_KEY")!
+    ).auth.getUser(token);
+
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Invalid authentication token" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Check if user has access to this system (owner or admin/analyst role)
+    const { data: system, error: systemError } = await supabase
+      .from("systems")
+      .select("*, projects(*)")
+      .eq("id", systemId)
+      .single();
+
+    if (systemError || !system) {
+      return new Response(
+        JSON.stringify({ error: "System not found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Authorization check: user must be owner or have admin/analyst role
+    const { data: userRoles } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id);
+
+    const isOwner = system.owner_id === user.id;
+    const hasPrivilegedRole = userRoles?.some(r => 
+      r.role === "admin" || r.role === "analyst"
+    );
+
+    if (!isOwner && !hasPrivilegedRole) {
+      console.log(`Unauthorized copilot access attempt: user ${user.id} tried to access system ${systemId}`);
+      return new Response(
+        JSON.stringify({ error: "You don't have permission to access this system" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Fetch context data (user is now authorized)
+    const [riskRes, impactRes, logsRes, metricsRes] = await Promise.all([
       supabase.from("risk_assessments").select("*").eq("system_id", systemId).order("created_at", { ascending: false }).limit(1),
       supabase.from("impact_assessments").select("*").eq("system_id", systemId).order("created_at", { ascending: false }).limit(1),
       supabase.from("request_logs").select("*").eq("system_id", systemId).order("created_at", { ascending: false }).limit(20),
       supabase.from("risk_metrics").select("*").eq("system_id", systemId).order("recorded_at", { ascending: false }).limit(50),
     ]);
 
-    const system = systemRes.data;
     const riskAssessment = riskRes.data?.[0];
     const impactAssessment = impactRes.data?.[0];
     const recentLogs = logsRes.data || [];
     const metrics = metricsRes.data || [];
-
-    if (!system) {
-      return new Response(
-        JSON.stringify({ error: "System not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
 
     // Calculate runtime stats
     const blockedLogs = recentLogs.filter((l: any) => l.decision === "BLOCK");

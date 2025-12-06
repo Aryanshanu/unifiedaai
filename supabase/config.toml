@@ -1,10 +1,10 @@
 project_id = "avmzkngttrfmowihkqzr"
 
 [functions.ai-gateway]
-verify_jwt = false
+verify_jwt = true
 
 [functions.copilot]
-verify_jwt = false
+verify_jwt = true
 
 [functions.compute-runtime-risk]
 verify_jwt = false
