@@ -24,6 +24,7 @@ import { UsageChart } from "@/components/activity/UsageChart";
 import { RequestLogsList } from "@/components/activity/RequestLogsList";
 import { CopilotDrawer } from "@/components/copilot/CopilotDrawer";
 import { RuntimeRiskOverlay } from "@/components/dashboard/RuntimeRiskOverlay";
+import { SystemSettingsTab } from "@/components/system/SystemSettingsTab";
 import { 
   ArrowLeft, Cpu, Server, Globe, FileText, AlertTriangle, Activity, 
   Settings, Play, Calendar, CheckCircle2, Clock, Archive, History,
@@ -309,9 +310,9 @@ export default function SystemDetail() {
               <Zap className="h-4 w-4" />
               Activity
             </TabsTrigger>
-            <TabsTrigger value="config" className="gap-2">
+            <TabsTrigger value="settings" className="gap-2">
               <Settings className="h-4 w-4" />
-              Configuration
+              Settings
             </TabsTrigger>
           </TabsList>
 
@@ -619,7 +620,8 @@ export default function SystemDetail() {
             <RequestLogsList logs={requestLogs} isLoading={logsLoading} />
           </TabsContent>
 
-          <TabsContent value="config">
+          {/* Settings Tab */}
+          <TabsContent value="settings" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>System Configuration</CardTitle>
@@ -628,7 +630,7 @@ export default function SystemDetail() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                   <div className="space-y-1">
                     <p className="text-sm text-muted-foreground">System Type</p>
                     <p className="font-medium capitalize">{system.system_type}</p>
@@ -645,17 +647,11 @@ export default function SystemDetail() {
                     <p className="text-sm text-muted-foreground">Status</p>
                     <p className="font-medium capitalize">{system.status}</p>
                   </div>
-                  <div className="space-y-1 col-span-2">
-                    <p className="text-sm text-muted-foreground">Endpoint</p>
-                    <p className="font-medium font-mono text-sm break-all">{system.endpoint || "Not configured"}</p>
-                  </div>
-                  <div className="space-y-1 col-span-2">
-                    <p className="text-sm text-muted-foreground">API Token</p>
-                    <p className="font-medium">{system.api_token_encrypted ? "••••••••" : "Not configured"}</p>
-                  </div>
                 </div>
               </CardContent>
             </Card>
+            
+            <SystemSettingsTab system={system} />
           </TabsContent>
         </Tabs>
       </div>

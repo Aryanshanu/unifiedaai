@@ -23,6 +23,7 @@ const modelSchema = z.object({
   version: z.string().default("1.0.0"),
   use_case: z.string().optional(),
   endpoint: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+  api_token: z.string().optional(),
   project_id: z.string().min(1, "Project is required"),
 });
 
@@ -91,6 +92,7 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
       version: "1.0.0",
       use_case: "",
       endpoint: "",
+      api_token: "",
       project_id: defaultProjectId || "",
     },
   });
@@ -105,6 +107,7 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
         version: data.version,
         use_case: data.use_case || undefined,
         endpoint: data.endpoint || undefined,
+        api_token: data.api_token || undefined,
         project_id: data.project_id,
       });
       
@@ -432,6 +435,27 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name="api_token"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>API Token</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="password" 
+                          placeholder="sk_live_..." 
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Authentication token for the API endpoint. Required if your endpoint needs authentication.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
             )}
 
@@ -465,11 +489,15 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                       <p className="text-xs text-muted-foreground">Version</p>
                       <p className="font-medium text-foreground">{formValues.version}</p>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Use Case</p>
-                      <p className="font-medium text-foreground">{formValues.use_case || "Not specified"}</p>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Use Case</p>
+                        <p className="font-medium text-foreground">{formValues.use_case || "Not specified"}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">API Token</p>
+                        <p className="font-medium text-foreground">{formValues.api_token ? "••••••••" : "Not provided"}</p>
+                      </div>
                     </div>
-                  </div>
                   
                   {formValues.description && (
                     <div>
