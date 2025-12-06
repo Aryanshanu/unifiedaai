@@ -424,6 +424,69 @@ export type Database = {
         }
         Relationships: []
       }
+      impact_assessments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          dimensions: Json
+          id: string
+          notes: string | null
+          overall_score: number
+          project_id: string
+          quadrant: Database["public"]["Enums"]["impact_quadrant"]
+          questionnaire_answers: Json
+          summary: string | null
+          system_id: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          dimensions?: Json
+          id?: string
+          notes?: string | null
+          overall_score?: number
+          project_id: string
+          quadrant?: Database["public"]["Enums"]["impact_quadrant"]
+          questionnaire_answers?: Json
+          summary?: string | null
+          system_id: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          dimensions?: Json
+          id?: string
+          notes?: string | null
+          overall_score?: number
+          project_id?: string
+          quadrant?: Database["public"]["Enums"]["impact_quadrant"]
+          questionnaire_answers?: Json
+          summary?: string | null
+          system_id?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "impact_assessments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "impact_assessments_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       incidents: {
         Row: {
           assignee_id: string | null
@@ -1013,11 +1076,53 @@ export type Database = {
           },
         ]
       }
+      system_approvals: {
+        Row: {
+          approved_at: string | null
+          approver_id: string | null
+          created_at: string
+          id: string
+          reason: string | null
+          requested_by: string | null
+          status: Database["public"]["Enums"]["approval_status"]
+          system_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approver_id?: string | null
+          created_at?: string
+          id?: string
+          reason?: string | null
+          requested_by?: string | null
+          status?: Database["public"]["Enums"]["approval_status"]
+          system_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approver_id?: string | null
+          created_at?: string
+          id?: string
+          reason?: string | null
+          requested_by?: string | null
+          status?: Database["public"]["Enums"]["approval_status"]
+          system_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "system_approvals_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       systems: {
         Row: {
           api_headers: Json | null
           api_token_encrypted: string | null
           created_at: string
+          deployment_status: Database["public"]["Enums"]["deployment_status"]
           endpoint: string | null
           id: string
           model_name: string | null
@@ -1025,6 +1130,7 @@ export type Database = {
           owner_id: string | null
           project_id: string
           provider: string
+          requires_approval: boolean
           status: Database["public"]["Enums"]["model_status"]
           system_type: Database["public"]["Enums"]["system_type"]
           updated_at: string
@@ -1034,6 +1140,7 @@ export type Database = {
           api_headers?: Json | null
           api_token_encrypted?: string | null
           created_at?: string
+          deployment_status?: Database["public"]["Enums"]["deployment_status"]
           endpoint?: string | null
           id?: string
           model_name?: string | null
@@ -1041,6 +1148,7 @@ export type Database = {
           owner_id?: string | null
           project_id: string
           provider: string
+          requires_approval?: boolean
           status?: Database["public"]["Enums"]["model_status"]
           system_type?: Database["public"]["Enums"]["system_type"]
           updated_at?: string
@@ -1050,6 +1158,7 @@ export type Database = {
           api_headers?: Json | null
           api_token_encrypted?: string | null
           created_at?: string
+          deployment_status?: Database["public"]["Enums"]["deployment_status"]
           endpoint?: string | null
           id?: string
           model_name?: string | null
@@ -1057,6 +1166,7 @@ export type Database = {
           owner_id?: string | null
           project_id?: string
           provider?: string
+          requires_approval?: boolean
           status?: Database["public"]["Enums"]["model_status"]
           system_type?: Database["public"]["Enums"]["system_type"]
           updated_at?: string
@@ -1156,6 +1266,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "reviewer" | "analyst" | "viewer"
+      approval_status: "pending" | "approved" | "rejected"
       campaign_status: "draft" | "running" | "completed" | "paused"
       control_status:
         | "not_started"
@@ -1163,8 +1274,26 @@ export type Database = {
         | "compliant"
         | "non_compliant"
         | "not_applicable"
+      deployment_status:
+        | "draft"
+        | "ready_for_review"
+        | "pending_approval"
+        | "approved"
+        | "blocked"
+        | "deployed"
       environment_type: "development" | "staging" | "production"
       evaluation_status: "pending" | "running" | "completed" | "failed"
+      impact_quadrant:
+        | "low_low"
+        | "low_medium"
+        | "low_high"
+        | "medium_low"
+        | "medium_medium"
+        | "medium_high"
+        | "high_low"
+        | "high_medium"
+        | "high_high"
+        | "critical_critical"
       incident_status: "open" | "investigating" | "mitigating" | "resolved"
       model_status: "draft" | "active" | "deprecated" | "archived"
       policy_status: "draft" | "active" | "disabled"
@@ -1306,6 +1435,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "reviewer", "analyst", "viewer"],
+      approval_status: ["pending", "approved", "rejected"],
       campaign_status: ["draft", "running", "completed", "paused"],
       control_status: [
         "not_started",
@@ -1314,8 +1444,28 @@ export const Constants = {
         "non_compliant",
         "not_applicable",
       ],
+      deployment_status: [
+        "draft",
+        "ready_for_review",
+        "pending_approval",
+        "approved",
+        "blocked",
+        "deployed",
+      ],
       environment_type: ["development", "staging", "production"],
       evaluation_status: ["pending", "running", "completed", "failed"],
+      impact_quadrant: [
+        "low_low",
+        "low_medium",
+        "low_high",
+        "medium_low",
+        "medium_medium",
+        "medium_high",
+        "high_low",
+        "high_medium",
+        "high_high",
+        "critical_critical",
+      ],
       incident_status: ["open", "investigating", "mitigating", "resolved"],
       model_status: ["draft", "active", "deprecated", "archived"],
       policy_status: ["draft", "active", "disabled"],
