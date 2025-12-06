@@ -85,12 +85,18 @@ export function useCreateSystem() {
 
   return useMutation({
     mutationFn: async (input: CreateSystemInput) => {
+      // FIX #8: Auto-set requires_approval and pending_approval for production
+      const isProduction = input.use_case?.toLowerCase().includes("production") || false;
+      
       const { data, error } = await supabase
         .from("systems")
         .insert([{
           ...input,
           api_headers: input.api_headers as unknown as Json,
           owner_id: user?.id,
+          // FIX #8: If this looks like production, enforce approval
+          requires_approval: isProduction ? true : undefined,
+          deployment_status: isProduction ? "pending_approval" : "draft",
         }])
         .select()
         .single();

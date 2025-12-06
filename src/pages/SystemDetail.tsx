@@ -175,26 +175,38 @@ export default function SystemDetail() {
           </div>
         </div>
 
-        {/* Missing Assessments Banner */}
+        {/* Missing Assessments Banner - FIX #9: Show blocking message */}
         {(!latestAssessment || !latestImpact) && (
-          <div className="p-4 rounded-xl border-2 border-yellow-500/50 bg-yellow-500/5 flex items-start gap-4">
-            <AlertTriangle className="h-6 w-6 text-yellow-500 shrink-0 mt-0.5" />
+          <div className="p-4 rounded-xl border-2 border-destructive/50 bg-destructive/5 flex items-start gap-4">
+            <AlertTriangle className="h-6 w-6 text-destructive shrink-0 mt-0.5" />
             <div className="flex-1">
-              <h3 className="font-semibold text-yellow-600 dark:text-yellow-400">Assessments Required</h3>
+              <h3 className="font-semibold text-destructive">Assessments Required for Deployment</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                {!latestAssessment && !latestImpact && "Risk and Impact assessments are missing. This system cannot be approved for production."}
-                {!latestAssessment && latestImpact && "Risk assessment is missing. Complete it to enable governance approval."}
-                {latestAssessment && !latestImpact && "Impact assessment is missing. Complete it for full governance compliance."}
+                {!latestAssessment && !latestImpact && (
+                  <>
+                    <strong>Risk and Impact assessments are missing.</strong> This system cannot be deployed or used via the gateway until both assessments are complete.
+                  </>
+                )}
+                {!latestAssessment && latestImpact && (
+                  <>
+                    <strong>Risk assessment is missing.</strong> Complete it to enable gateway access and governance approval.
+                  </>
+                )}
+                {latestAssessment && !latestImpact && (
+                  <>
+                    <strong>Impact assessment is missing.</strong> Complete it for full governance compliance and gateway access.
+                  </>
+                )}
               </p>
               <div className="flex gap-2 mt-3">
                 {!latestAssessment && (
-                  <Button size="sm" variant="outline" onClick={() => setShowRiskWizard(true)}>
+                  <Button size="sm" variant="default" onClick={() => setShowRiskWizard(true)}>
                     <AlertTriangle className="h-4 w-4 mr-1" />
                     Run Risk Assessment
                   </Button>
                 )}
                 {!latestImpact && (
-                  <Button size="sm" variant="outline" onClick={() => setShowImpactWizard(true)}>
+                  <Button size="sm" variant="default" onClick={() => setShowImpactWizard(true)}>
                     <Target className="h-4 w-4 mr-1" />
                     Run Impact Assessment
                   </Button>
@@ -462,17 +474,28 @@ export default function SystemDetail() {
                       <p className="text-sm text-muted-foreground mb-3">
                         This system requires approval before deployment due to elevated risk or impact levels.
                       </p>
+                      {/* FIX #9: Disable button if assessments missing */}
                       {system.deployment_status === "draft" && (
-                        <Button 
-                          onClick={() => requestApproval.mutate(system.id, {
-                            onSuccess: () => refetchSystem()
-                          })}
-                          disabled={requestApproval.isPending}
-                          className="gap-2"
-                        >
-                          <Shield className="h-4 w-4" />
-                          Request Approval
-                        </Button>
+                        <>
+                          {(!latestAssessment || !latestImpact) ? (
+                            <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                              <p className="text-sm text-destructive font-medium">
+                                Cannot request approval until Risk & Impact assessments are complete.
+                              </p>
+                            </div>
+                          ) : (
+                            <Button 
+                              onClick={() => requestApproval.mutate(system.id, {
+                                onSuccess: () => refetchSystem()
+                              })}
+                              disabled={requestApproval.isPending}
+                              className="gap-2"
+                            >
+                              <Shield className="h-4 w-4" />
+                              Request Approval
+                            </Button>
+                          )}
+                        </>
                       )}
                     </div>
                   )}

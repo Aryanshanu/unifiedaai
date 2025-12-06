@@ -87,25 +87,38 @@ export function useRequestApproval() {
 
   return useMutation({
     mutationFn: async (systemId: string) => {
-      // Update system status
+      // Update system status to pending_approval
       await supabase
         .from("systems")
         .update({ deployment_status: "pending_approval" })
         .eq("id", systemId);
 
-      // Create approval request
-      const { data, error } = await supabase
+      // Check if pending approval already exists
+      const { data: existingApproval } = await supabase
         .from("system_approvals")
-        .insert([{
-          system_id: systemId,
-          requested_by: user?.id,
-          status: "pending",
-        }])
-        .select()
+        .select("id")
+        .eq("system_id", systemId)
+        .eq("status", "pending")
         .single();
-      
-      if (error) throw error;
-      return data as SystemApproval;
+
+      // FIX #1: Only create if not exists (trigger may have created it)
+      if (!existingApproval) {
+        const { data, error } = await supabase
+          .from("system_approvals")
+          .insert([{
+            system_id: systemId,
+            requested_by: user?.id,
+            status: "pending",
+            reason: "Approval requested via governance workflow"
+          }])
+          .select()
+          .single();
+        
+        if (error) throw error;
+        return data as SystemApproval;
+      }
+
+      return existingApproval as SystemApproval;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["system-approvals"] });
