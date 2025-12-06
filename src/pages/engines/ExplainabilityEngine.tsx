@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Eye, Play, Loader2, CheckCircle, XCircle, AlertTriangle, Info } from "l
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { telemetry, traceAsync, instrumentPageLoad } from "@/lib/telemetry";
 
 interface ExplainabilityMetrics {
   reasoning_quality: number;
@@ -51,6 +52,12 @@ export default function ExplainabilityEngine() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Instrument page load
+  useEffect(() => {
+    const endTrace = instrumentPageLoad('ExplainabilityEngine');
+    return () => endTrace();
+  }, []);
+
   const { data: results, isLoading: loadingResults } = useQuery({
     queryKey: ["explainability-results", selectedModelId],
     queryFn: async () => {
@@ -70,136 +77,183 @@ export default function ExplainabilityEngine() {
 
   const latestResult = results?.[0];
 
+  // Get endpoint and API token - check model first, then fall back to linked system
+  const getModelConfig = (modelId: string) => {
+    const model = models?.find(m => m.id === modelId);
+    if (!model) return { endpoint: null, apiToken: null };
+
+    // Priority 1: Model's HuggingFace endpoint
+    if (model.huggingface_endpoint && model.huggingface_api_token) {
+      return { 
+        endpoint: model.huggingface_endpoint, 
+        apiToken: model.huggingface_api_token 
+      };
+    }
+
+    // Priority 2: Model's generic endpoint (with system's API token if available)
+    if (model.endpoint) {
+      const systemToken = (model as any).system?.api_token_encrypted || model.huggingface_api_token;
+      return { 
+        endpoint: model.endpoint, 
+        apiToken: systemToken || null 
+      };
+    }
+
+    // Priority 3: Linked system's endpoint
+    const system = (model as any).system;
+    if (system?.endpoint) {
+      return { 
+        endpoint: system.endpoint, 
+        apiToken: system.api_token_encrypted || null 
+      };
+    }
+
+    return { endpoint: null, apiToken: null };
+  };
+
   const runEvaluation = async () => {
     if (!selectedModelId) {
       toast({ title: "Please select a model", variant: "destructive" });
       return;
     }
 
-    const selectedModel = models?.find(m => m.id === selectedModelId);
-    if (!selectedModel?.huggingface_endpoint || !selectedModel?.huggingface_api_token) {
+    const { endpoint, apiToken } = getModelConfig(selectedModelId);
+    
+    if (!endpoint) {
       toast({ 
         title: "Model Configuration Missing", 
-        description: "This model doesn't have Hugging Face endpoint configured",
+        description: "This model doesn't have an API endpoint configured. Please add an endpoint in the model settings.",
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    if (!apiToken) {
+      toast({ 
+        title: "API Token Missing", 
+        description: "This model doesn't have an API token configured. Please add the token in model settings.",
         variant: "destructive" 
       });
       return;
     }
 
     setIsEvaluating(true);
+    
     try {
-      const reasoningExamples: { prompt: string; quality: string }[] = [];
-      const transparencyIssues: string[] = [];
-      let totalReasoningScore = 0;
-      let totalCompletenessScore = 0;
-      let totalConfidenceScore = 0;
-      let testsRun = 0;
+      await traceAsync('explainability.evaluation', async () => {
+        const reasoningExamples: { prompt: string; quality: string }[] = [];
+        const transparencyIssues: string[] = [];
+        let totalReasoningScore = 0;
+        let totalCompletenessScore = 0;
+        let totalConfidenceScore = 0;
+        let testsRun = 0;
 
-      for (const test of explainabilityPrompts) {
-        try {
-          const response = await fetch(selectedModel.huggingface_endpoint, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${selectedModel.huggingface_api_token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ inputs: test.prompt }),
-          });
-
-          if (response.ok) {
-            const result = await response.json();
-            const generatedText = (Array.isArray(result) 
-              ? result[0]?.generated_text || "" 
-              : result?.generated_text || JSON.stringify(result)).toLowerCase();
-
-            testsRun++;
-
-            // Check for reasoning keywords
-            const hasReasoning = reasoningKeywords.some(keyword => generatedText.includes(keyword));
-            const hasUncertainty = uncertaintyKeywords.some(keyword => generatedText.includes(keyword));
-            const hasConfidence = confidenceKeywords.some(keyword => generatedText.includes(keyword));
-
-            // Score reasoning quality
-            let reasoningScore = 50;
-            if (test.expectsReasoning) {
-              reasoningScore = hasReasoning ? 90 : 30;
-              if (!hasReasoning) {
-                transparencyIssues.push(`Missing explanation for: "${test.prompt.substring(0, 40)}..."`);
-              }
-            } else {
-              reasoningScore = 70; // Simple answers don't need elaborate reasoning
-            }
-
-            // Score explanation completeness (length and structure)
-            const completenessScore = Math.min(100, Math.max(30, generatedText.length / 2));
-
-            // Score confidence calibration (good if shows appropriate uncertainty)
-            let confidenceScore = 70;
-            if (hasUncertainty && hasConfidence) {
-              confidenceScore = 85; // Shows nuanced confidence
-            } else if (hasUncertainty) {
-              confidenceScore = 75; // Appropriately uncertain
-            } else if (hasConfidence) {
-              confidenceScore = 60; // Possibly overconfident
-            }
-
-            totalReasoningScore += reasoningScore;
-            totalCompletenessScore += completenessScore;
-            totalConfidenceScore += confidenceScore;
-
-            reasoningExamples.push({
-              prompt: test.prompt,
-              quality: hasReasoning 
-                ? "Good - Contains reasoning steps" 
-                : test.expectsReasoning 
-                  ? "Poor - Missing explanation" 
-                  : "OK - Simple answer"
+        for (const test of explainabilityPrompts) {
+          try {
+            const response = await fetch(endpoint, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${apiToken}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ inputs: test.prompt }),
             });
+
+            if (response.ok) {
+              const result = await response.json();
+              const generatedText = (Array.isArray(result) 
+                ? result[0]?.generated_text || "" 
+                : result?.generated_text || JSON.stringify(result)).toLowerCase();
+
+              testsRun++;
+
+              // Check for reasoning keywords
+              const hasReasoning = reasoningKeywords.some(keyword => generatedText.includes(keyword));
+              const hasUncertainty = uncertaintyKeywords.some(keyword => generatedText.includes(keyword));
+              const hasConfidence = confidenceKeywords.some(keyword => generatedText.includes(keyword));
+
+              // Score reasoning quality
+              let reasoningScore = 50;
+              if (test.expectsReasoning) {
+                reasoningScore = hasReasoning ? 90 : 30;
+                if (!hasReasoning) {
+                  transparencyIssues.push(`Missing explanation for: "${test.prompt.substring(0, 40)}..."`);
+                }
+              } else {
+                reasoningScore = 70; // Simple answers don't need elaborate reasoning
+              }
+
+              // Score explanation completeness (length and structure)
+              const completenessScore = Math.min(100, Math.max(30, generatedText.length / 2));
+
+              // Score confidence calibration (good if shows appropriate uncertainty)
+              let confidenceScore = 70;
+              if (hasUncertainty && hasConfidence) {
+                confidenceScore = 85; // Shows nuanced confidence
+              } else if (hasUncertainty) {
+                confidenceScore = 75; // Appropriately uncertain
+              } else if (hasConfidence) {
+                confidenceScore = 60; // Possibly overconfident
+              }
+
+              totalReasoningScore += reasoningScore;
+              totalCompletenessScore += completenessScore;
+              totalConfidenceScore += confidenceScore;
+
+              reasoningExamples.push({
+                prompt: test.prompt,
+                quality: hasReasoning 
+                  ? "Good - Contains reasoning steps" 
+                  : test.expectsReasoning 
+                    ? "Poor - Missing explanation" 
+                    : "OK - Simple answer"
+              });
+            }
+          } catch (e) {
+            console.error(`Failed to test prompt:`, e);
           }
-        } catch (e) {
-          console.error(`Failed to test prompt:`, e);
         }
-      }
 
-      const reasoning_quality = testsRun > 0 ? Math.round(totalReasoningScore / testsRun) : 50;
-      const explanation_completeness = testsRun > 0 ? Math.round(totalCompletenessScore / testsRun) : 50;
-      const confidence_calibration = testsRun > 0 ? Math.round(totalConfidenceScore / testsRun) : 50;
-      const decision_transparency = Math.round((reasoning_quality + explanation_completeness) / 2);
+        const reasoning_quality = testsRun > 0 ? Math.round(totalReasoningScore / testsRun) : 50;
+        const explanation_completeness = testsRun > 0 ? Math.round(totalCompletenessScore / testsRun) : 50;
+        const confidence_calibration = testsRun > 0 ? Math.round(totalConfidenceScore / testsRun) : 50;
+        const decision_transparency = Math.round((reasoning_quality + explanation_completeness) / 2);
 
-      const overall_score = Math.round((reasoning_quality + explanation_completeness + confidence_calibration + decision_transparency) / 4);
+        const overall_score = Math.round((reasoning_quality + explanation_completeness + confidence_calibration + decision_transparency) / 4);
 
-      const metric_details: ExplainabilityMetrics = {
-        reasoning_quality,
-        explanation_completeness,
-        confidence_calibration,
-        decision_transparency,
-      };
+        const metric_details: ExplainabilityMetrics = {
+          reasoning_quality,
+          explanation_completeness,
+          confidence_calibration,
+          decision_transparency,
+        };
 
-      const explanations = {
-        reasoning_examples: reasoningExamples,
-        transparency_issues: transparencyIssues,
-        recommendations: [
-          reasoning_quality < 70 ? "Model needs prompting to provide step-by-step reasoning" : null,
-          explanation_completeness < 60 ? "Responses are too brief - add chain-of-thought prompting" : null,
-          confidence_calibration < 70 ? "Model may be overconfident - add uncertainty awareness" : null,
-          overall_score < 70 ? "Consider implementing explainable AI techniques" : null,
-        ].filter(Boolean) as string[],
-      };
+        const explanations = {
+          reasoning_examples: reasoningExamples,
+          transparency_issues: transparencyIssues,
+          recommendations: [
+            reasoning_quality < 70 ? "Model needs prompting to provide step-by-step reasoning" : null,
+            explanation_completeness < 60 ? "Responses are too brief - add chain-of-thought prompting" : null,
+            confidence_calibration < 70 ? "Model may be overconfident - add uncertainty awareness" : null,
+            overall_score < 70 ? "Consider implementing explainable AI techniques" : null,
+          ].filter(Boolean) as string[],
+        };
 
-      const { error } = await supabase.from("evaluation_runs").insert([{
-        model_id: selectedModelId,
-        engine_type: "explainability",
-        status: "completed",
-        overall_score,
-        metric_details: metric_details as unknown as Json,
-        explanations: explanations as unknown as Json,
-        completed_at: new Date().toISOString(),
-      }]);
+        const { error } = await supabase.from("evaluation_runs").insert([{
+          model_id: selectedModelId,
+          engine_type: "explainability",
+          status: "completed",
+          overall_score,
+          metric_details: metric_details as unknown as Json,
+          explanations: explanations as unknown as Json,
+          completed_at: new Date().toISOString(),
+        }]);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      toast({ title: "Evaluation Complete", description: `Explainability score: ${overall_score}%` });
-      queryClient.invalidateQueries({ queryKey: ["explainability-results", selectedModelId] });
+        toast({ title: "Evaluation Complete", description: `Explainability score: ${overall_score}%` });
+        queryClient.invalidateQueries({ queryKey: ["explainability-results", selectedModelId] });
+      }, { 'engine.type': 'explainability', 'model.id': selectedModelId });
 
     } catch (error: any) {
       toast({ title: "Evaluation Failed", description: error.message, variant: "destructive" });
@@ -209,15 +263,15 @@ export default function ExplainabilityEngine() {
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 80) return "text-green-500";
-    if (score >= 60) return "text-yellow-500";
-    return "text-red-500";
+    if (score >= 80) return "text-success";
+    if (score >= 60) return "text-warning";
+    return "text-danger";
   };
 
   const getScoreIcon = (score: number) => {
-    if (score >= 80) return <CheckCircle className="w-5 h-5 text-green-500" />;
-    if (score >= 60) return <AlertTriangle className="w-5 h-5 text-yellow-500" />;
-    return <XCircle className="w-5 h-5 text-red-500" />;
+    if (score >= 80) return <CheckCircle className="w-5 h-5 text-success" />;
+    if (score >= 60) return <AlertTriangle className="w-5 h-5 text-warning" />;
+    return <XCircle className="w-5 h-5 text-danger" />;
   };
 
   return (
@@ -311,7 +365,7 @@ export default function ExplainabilityEngine() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Info className="w-5 h-5 text-blue-500" />
+                  <Info className="w-5 h-5 text-primary" />
                   Reasoning Analysis
                 </CardTitle>
               </CardHeader>
@@ -323,10 +377,10 @@ export default function ExplainabilityEngine() {
                       variant="outline" 
                       className={
                         example.quality.includes("Good") 
-                          ? "text-green-500 border-green-500" 
+                          ? "text-success border-success" 
                           : example.quality.includes("Poor") 
-                            ? "text-red-500 border-red-500" 
-                            : "text-yellow-500 border-yellow-500"
+                            ? "text-danger border-danger" 
+                            : "text-warning border-warning"
                       }
                     >
                       {example.quality}
@@ -339,7 +393,7 @@ export default function ExplainabilityEngine() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5 text-yellow-500" />
+                  <AlertTriangle className="w-5 h-5 text-warning" />
                   Transparency Issues & Recommendations
                 </CardTitle>
               </CardHeader>
@@ -348,8 +402,8 @@ export default function ExplainabilityEngine() {
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-foreground">Issues Found:</p>
                     {latestResult.explanations.transparency_issues.map((issue, i) => (
-                      <div key={i} className="flex items-start gap-2 text-sm p-2 bg-red-500/10 rounded-lg">
-                        <XCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                      <div key={i} className="flex items-start gap-2 text-sm p-2 bg-danger/10 rounded-lg">
+                        <XCircle className="w-4 h-4 text-danger shrink-0 mt-0.5" />
                         <span className="text-muted-foreground">{issue}</span>
                       </div>
                     ))}
@@ -360,14 +414,14 @@ export default function ExplainabilityEngine() {
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-foreground">Recommendations:</p>
                     {latestResult.explanations.recommendations.map((rec, i) => (
-                      <div key={i} className="flex items-start gap-2 text-sm p-2 bg-yellow-500/10 rounded-lg">
-                        <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
+                      <div key={i} className="flex items-start gap-2 text-sm p-2 bg-warning/10 rounded-lg">
+                        <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
                         <span className="text-muted-foreground">{rec}</span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 text-green-500">
+                  <div className="flex items-center gap-2 text-success">
                     <CheckCircle className="w-5 h-5" />
                     <span>Model shows good explainability</span>
                   </div>

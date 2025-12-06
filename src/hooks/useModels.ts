@@ -44,6 +44,8 @@ export interface ModelWithSystem extends Model {
     deployment_status: DeploymentStatus;
     requires_approval: boolean;
     status: ModelStatus;
+    endpoint: string | null;
+    api_token_encrypted: string | null;
   } | null;
   project?: {
     id: string;
@@ -63,6 +65,7 @@ export interface CreateModelInput {
   huggingface_model_id?: string;
   huggingface_endpoint?: string;
   huggingface_api_token?: string;
+  api_token?: string; // Generic API token for non-HuggingFace models
   project_id: string; // Required - must select a project
 }
 
@@ -75,7 +78,7 @@ export function useModels() {
         .from('models')
         .select(`
           *,
-          system:systems(id, name, uri_score, runtime_risk_score, deployment_status, requires_approval, status),
+          system:systems(id, name, uri_score, runtime_risk_score, deployment_status, requires_approval, status, endpoint, api_token_encrypted),
           project:projects(id, name, environment)
         `)
         .order('created_at', { ascending: false });
@@ -107,7 +110,7 @@ export function useModel(id: string) {
         .from('models')
         .select(`
           *,
-          system:systems(id, name, uri_score, runtime_risk_score, deployment_status, requires_approval, status),
+          system:systems(id, name, uri_score, runtime_risk_score, deployment_status, requires_approval, status, endpoint, api_token_encrypted),
           project:projects(id, name, environment)
         `)
         .eq('id', id)
@@ -139,6 +142,12 @@ export function useCreateModel() {
 
   return useMutation({
     mutationFn: async (input: CreateModelInput) => {
+      // Determine the API token to store in the system
+      const apiToken = input.api_token || input.huggingface_api_token || null;
+      
+      // Determine the endpoint to use
+      const systemEndpoint = input.endpoint || input.huggingface_endpoint || null;
+      
       // Step 1: Create the System first
       const { data: systemData, error: systemError } = await supabase
         .from('systems')
@@ -148,7 +157,8 @@ export function useCreateModel() {
           provider: input.provider || 'Custom',
           system_type: 'model',
           model_name: input.huggingface_model_id || input.name,
-          endpoint: input.endpoint || input.huggingface_endpoint || null,
+          endpoint: systemEndpoint,
+          api_token_encrypted: apiToken, // Store API token in system
           use_case: input.use_case || null,
           status: 'draft',
           deployment_status: 'draft',
@@ -280,7 +290,7 @@ export function useProjectModels(projectId: string) {
         .from('models')
         .select(`
           *,
-          system:systems(id, name, uri_score, runtime_risk_score, deployment_status, requires_approval, status)
+          system:systems(id, name, uri_score, runtime_risk_score, deployment_status, requires_approval, status, endpoint, api_token_encrypted)
         `)
         .eq('project_id', projectId)
         .order('created_at', { ascending: false });
