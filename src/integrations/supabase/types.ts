@@ -916,6 +916,39 @@ export type Database = {
           },
         ]
       }
+      red_team_tests: {
+        Row: {
+          category: string
+          created_at: string | null
+          expected_behavior: string
+          id: string
+          is_active: boolean | null
+          prompt: string
+          severity: Database["public"]["Enums"]["severity_level"]
+          updated_at: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          expected_behavior: string
+          id?: string
+          is_active?: boolean | null
+          prompt: string
+          severity?: Database["public"]["Enums"]["severity_level"]
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          expected_behavior?: string
+          id?: string
+          is_active?: boolean | null
+          prompt?: string
+          severity?: Database["public"]["Enums"]["severity_level"]
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       request_logs: {
         Row: {
           created_at: string
@@ -1183,6 +1216,47 @@ export type Database = {
           },
         ]
       }
+      system_documents: {
+        Row: {
+          content: string
+          created_at: string | null
+          document_type: string
+          generated_by: string | null
+          id: string
+          system_id: string
+          title: string
+          version: number | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          document_type?: string
+          generated_by?: string | null
+          id?: string
+          system_id: string
+          title: string
+          version?: number | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          document_type?: string
+          generated_by?: string | null
+          id?: string
+          system_id?: string
+          title?: string
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "system_documents_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       systems: {
         Row: {
           api_headers: Json | null
@@ -1191,15 +1265,18 @@ export type Database = {
           deployment_status: Database["public"]["Enums"]["deployment_status"]
           endpoint: string | null
           id: string
+          last_risk_calculation: string | null
           model_name: string | null
           name: string
           owner_id: string | null
           project_id: string
           provider: string
           requires_approval: boolean
+          runtime_risk_score: number | null
           status: Database["public"]["Enums"]["model_status"]
           system_type: Database["public"]["Enums"]["system_type"]
           updated_at: string
+          uri_score: number | null
           use_case: string | null
         }
         Insert: {
@@ -1209,15 +1286,18 @@ export type Database = {
           deployment_status?: Database["public"]["Enums"]["deployment_status"]
           endpoint?: string | null
           id?: string
+          last_risk_calculation?: string | null
           model_name?: string | null
           name: string
           owner_id?: string | null
           project_id: string
           provider: string
           requires_approval?: boolean
+          runtime_risk_score?: number | null
           status?: Database["public"]["Enums"]["model_status"]
           system_type?: Database["public"]["Enums"]["system_type"]
           updated_at?: string
+          uri_score?: number | null
           use_case?: string | null
         }
         Update: {
@@ -1227,15 +1307,18 @@ export type Database = {
           deployment_status?: Database["public"]["Enums"]["deployment_status"]
           endpoint?: string | null
           id?: string
+          last_risk_calculation?: string | null
           model_name?: string | null
           name?: string
           owner_id?: string | null
           project_id?: string
           provider?: string
           requires_approval?: boolean
+          runtime_risk_score?: number | null
           status?: Database["public"]["Enums"]["model_status"]
           system_type?: Database["public"]["Enums"]["system_type"]
           updated_at?: string
+          uri_score?: number | null
           use_case?: string | null
         }
         Relationships: [

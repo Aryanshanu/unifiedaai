@@ -2,6 +2,8 @@ import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { usePlatformMetrics } from "@/hooks/usePlatformMetrics";
 import {
   LayoutDashboard,
   FolderOpen,
@@ -14,6 +16,7 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  Shield,
 } from "lucide-react";
 
 const navItems = [
@@ -21,6 +24,8 @@ const navItems = [
   { divider: true, label: "Registry" },
   { path: "/projects", icon: FolderOpen, label: "Projects" },
   { path: "/models", icon: Database, label: "Model Registry" },
+  { divider: true, label: "Governance" },
+  { path: "/governance/approvals", icon: Shield, label: "Approvals", showBadge: true },
   { divider: true, label: "Core RAI Engines" },
   { path: "/engine/fairness", icon: Scale, label: "Fairness Engine" },
   { path: "/engine/hallucination", icon: AlertCircle, label: "Hallucination Engine" },
@@ -34,6 +39,9 @@ const navItems = [
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const { data: metrics } = usePlatformMetrics();
+
+  const pendingApprovals = metrics?.pendingApprovals || 0;
 
   return (
     <aside
@@ -86,7 +94,14 @@ export function Sidebar() {
                 )}
               >
                 <Icon className={cn("w-4 h-4 shrink-0", isActive && "text-primary")} />
-                {!collapsed && <span className="truncate">{item.label}</span>}
+                {!collapsed && (
+                  <span className="truncate flex-1">{item.label}</span>
+                )}
+                {!collapsed && item.showBadge && pendingApprovals > 0 && (
+                  <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">
+                    {pendingApprovals}
+                  </Badge>
+                )}
               </div>
             </NavLink>
           );

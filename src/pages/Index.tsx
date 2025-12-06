@@ -2,11 +2,16 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { useModels } from "@/hooks/useModels";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Database, Scale, AlertCircle, ShieldAlert, Lock, Eye, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { PlatformHealthCards } from "@/components/dashboard/PlatformHealthCards";
+import { useUnsafeDeployments, usePlatformMetrics } from "@/hooks/usePlatformMetrics";
+import { Database, Scale, AlertCircle, ShieldAlert, Lock, Eye, Plus, AlertOctagon, ArrowRight, Shield } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function Index() {
   const { data: models } = useModels();
+  const { data: unsafeDeployments } = useUnsafeDeployments();
+  const { data: metrics } = usePlatformMetrics();
   const navigate = useNavigate();
 
   const engines = [
@@ -49,35 +54,72 @@ export default function Index() {
 
   return (
     <MainLayout title="Dashboard" subtitle="Fractal RAI Platform Overview">
-      {/* Model Stats */}
-      <Card className="mb-6">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Database className="w-5 h-5 text-primary" />
-            <CardTitle className="text-lg">Model Registry</CardTitle>
+      {/* Unsafe Deployment Alert */}
+      {(unsafeDeployments?.length || 0) > 0 && (
+        <div className="p-4 mb-6 rounded-xl border-2 border-destructive bg-destructive/5 flex items-start gap-4">
+          <AlertOctagon className="h-6 w-6 text-destructive shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="font-semibold text-destructive">Unsafe Deployment Detected</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              {unsafeDeployments?.length} system(s) have live traffic without proper approval.
+            </p>
+            <Button 
+              variant="destructive" 
+              size="sm" 
+              className="mt-3"
+              onClick={() => navigate("/governance/approvals")}
+            >
+              Review Now
+              <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
           </div>
-          <Button onClick={() => navigate("/models")} size="sm">
-            <Plus className="w-4 h-4 mr-2" />
-            Register Model
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {models && models.length > 0 ? (
+        </div>
+      )}
+
+      {/* Platform Health */}
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold text-foreground mb-4">Platform Health</h2>
+        <PlatformHealthCards />
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate("/projects")}>
+          <CardContent className="pt-6 flex items-center gap-4">
+            <div className="p-3 rounded-lg bg-primary/10">
+              <Database className="h-6 w-6 text-primary" />
+            </div>
             <div>
-              <p className="text-2xl font-bold text-foreground">{models.length}</p>
-              <p className="text-sm text-muted-foreground">registered models</p>
+              <p className="text-2xl font-bold">{metrics?.systemsCount || 0}</p>
+              <p className="text-sm text-muted-foreground">Registered Systems</p>
             </div>
-          ) : (
-            <div className="text-center py-8">
-              <Database className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-muted-foreground mb-4">No models registered yet</p>
-              <Button onClick={() => navigate("/models")} variant="outline">
-                Register your first Hugging Face model
-              </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate("/governance/approvals")}>
+          <CardContent className="pt-6 flex items-center gap-4">
+            <div className="p-3 rounded-lg bg-yellow-500/10">
+              <Shield className="h-6 w-6 text-yellow-500" />
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <div>
+              <p className="text-2xl font-bold">{metrics?.pendingApprovals || 0}</p>
+              <p className="text-sm text-muted-foreground">Pending Approvals</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate("/models")}>
+          <CardContent className="pt-6 flex items-center gap-4">
+            <div className="p-3 rounded-lg bg-muted">
+              <Database className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{models?.length || 0}</p>
+              <p className="text-sm text-muted-foreground">ML Models</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Core Engines Grid */}
       <h2 className="text-lg font-semibold text-foreground mb-4">Core RAI Engines</h2>

@@ -23,6 +23,7 @@ import { UsageSummaryCard } from "@/components/activity/UsageSummaryCard";
 import { UsageChart } from "@/components/activity/UsageChart";
 import { RequestLogsList } from "@/components/activity/RequestLogsList";
 import { CopilotDrawer } from "@/components/copilot/CopilotDrawer";
+import { RuntimeRiskOverlay } from "@/components/dashboard/RuntimeRiskOverlay";
 import { 
   ArrowLeft, Cpu, Server, Globe, FileText, AlertTriangle, Activity, 
   Settings, Play, Calendar, CheckCircle2, Clock, Archive, History,
@@ -292,42 +293,47 @@ export default function SystemDetail() {
                 )}
               </div>
 
-              {/* Assessment History */}
+              {/* Runtime Risk Overlay */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Assessment History</h3>
-                {allAssessments?.length === 0 ? (
-                  <Card>
-                    <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                      <History className="h-10 w-10 text-muted-foreground mb-3" />
-                      <p className="text-muted-foreground">No assessments yet</p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div className="space-y-3">
-                    {allAssessments?.map((assessment) => (
-                      <Card key={assessment.id} className="hover:border-primary/30 transition-colors">
-                        <CardContent className="py-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <RiskBadge tier={assessment.risk_tier} size="sm" />
-                              <div>
-                                <p className="text-sm font-medium">Version {assessment.version}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {format(new Date(assessment.created_at), "MMM d, yyyy 'at' h:mm a")}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-lg font-bold">{Math.round(assessment.uri_score)}</p>
-                              <p className="text-xs text-muted-foreground">URI Score</p>
+                <RuntimeRiskOverlay systemId={id!} />
+              </div>
+            </div>
+
+            {/* Assessment History */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Assessment History</h3>
+              {allAssessments?.length === 0 ? (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                    <History className="h-10 w-10 text-muted-foreground mb-3" />
+                    <p className="text-muted-foreground">No assessments yet</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {allAssessments?.map((assessment) => (
+                    <Card key={assessment.id} className="hover:border-primary/30 transition-colors">
+                      <CardContent className="py-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <RiskBadge tier={assessment.risk_tier} size="sm" />
+                            <div>
+                              <p className="text-sm font-medium">Version {assessment.version}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {format(new Date(assessment.created_at), "MMM d, yyyy 'at' h:mm a")}
+                              </p>
                             </div>
                           </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </div>
+                          <div className="text-right">
+                            <p className="text-lg font-bold">{Math.round(assessment.uri_score)}</p>
+                            <p className="text-xs text-muted-foreground">URI Score</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </div>
           </TabsContent>
 

@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.copilot]
 verify_jwt = false
+
+[functions.compute-runtime-risk]
+verify_jwt = false
+
+[functions.run-red-team]
+verify_jwt = false
