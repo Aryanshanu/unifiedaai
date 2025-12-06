@@ -761,6 +761,48 @@ export type Database = {
         }
         Relationships: []
       }
+      projects: {
+        Row: {
+          business_sensitivity: Database["public"]["Enums"]["sensitivity_level"]
+          created_at: string
+          criticality: number
+          data_sensitivity: Database["public"]["Enums"]["sensitivity_level"]
+          description: string | null
+          environment: Database["public"]["Enums"]["environment_type"]
+          id: string
+          name: string
+          organization: string | null
+          owner_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          business_sensitivity?: Database["public"]["Enums"]["sensitivity_level"]
+          created_at?: string
+          criticality?: number
+          data_sensitivity?: Database["public"]["Enums"]["sensitivity_level"]
+          description?: string | null
+          environment?: Database["public"]["Enums"]["environment_type"]
+          id?: string
+          name: string
+          organization?: string | null
+          owner_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          business_sensitivity?: Database["public"]["Enums"]["sensitivity_level"]
+          created_at?: string
+          criticality?: number
+          data_sensitivity?: Database["public"]["Enums"]["sensitivity_level"]
+          description?: string | null
+          environment?: Database["public"]["Enums"]["environment_type"]
+          id?: string
+          name?: string
+          organization?: string | null
+          owner_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       red_team_campaigns: {
         Row: {
           attack_types: Json | null
@@ -867,6 +909,65 @@ export type Database = {
           },
         ]
       }
+      systems: {
+        Row: {
+          api_headers: Json | null
+          api_token_encrypted: string | null
+          created_at: string
+          endpoint: string | null
+          id: string
+          model_name: string | null
+          name: string
+          owner_id: string | null
+          project_id: string
+          provider: string
+          status: Database["public"]["Enums"]["model_status"]
+          system_type: Database["public"]["Enums"]["system_type"]
+          updated_at: string
+          use_case: string | null
+        }
+        Insert: {
+          api_headers?: Json | null
+          api_token_encrypted?: string | null
+          created_at?: string
+          endpoint?: string | null
+          id?: string
+          model_name?: string | null
+          name: string
+          owner_id?: string | null
+          project_id: string
+          provider: string
+          status?: Database["public"]["Enums"]["model_status"]
+          system_type?: Database["public"]["Enums"]["system_type"]
+          updated_at?: string
+          use_case?: string | null
+        }
+        Update: {
+          api_headers?: Json | null
+          api_token_encrypted?: string | null
+          created_at?: string
+          endpoint?: string | null
+          id?: string
+          model_name?: string | null
+          name?: string
+          owner_id?: string | null
+          project_id?: string
+          provider?: string
+          status?: Database["public"]["Enums"]["model_status"]
+          system_type?: Database["public"]["Enums"]["system_type"]
+          updated_at?: string
+          use_case?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "systems_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       telemetry_logs: {
         Row: {
           avg_latency_ms: number | null
@@ -958,6 +1059,7 @@ export type Database = {
         | "compliant"
         | "non_compliant"
         | "not_applicable"
+      environment_type: "development" | "staging" | "production"
       evaluation_status: "pending" | "running" | "completed" | "failed"
       incident_status: "open" | "investigating" | "mitigating" | "resolved"
       model_status: "draft" | "active" | "deprecated" | "archived"
@@ -968,7 +1070,9 @@ export type Database = {
         | "approved"
         | "rejected"
         | "escalated"
+      sensitivity_level: "low" | "medium" | "high" | "critical"
       severity_level: "low" | "medium" | "high" | "critical"
+      system_type: "model" | "agent" | "provider" | "pipeline"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1105,6 +1209,7 @@ export const Constants = {
         "non_compliant",
         "not_applicable",
       ],
+      environment_type: ["development", "staging", "production"],
       evaluation_status: ["pending", "running", "completed", "failed"],
       incident_status: ["open", "investigating", "mitigating", "resolved"],
       model_status: ["draft", "active", "deprecated", "archived"],
@@ -1116,7 +1221,9 @@ export const Constants = {
         "rejected",
         "escalated",
       ],
+      sensitivity_level: ["low", "medium", "high", "critical"],
       severity_level: ["low", "medium", "high", "critical"],
+      system_type: ["model", "agent", "provider", "pipeline"],
     },
   },
 } as const
