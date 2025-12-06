@@ -85,12 +85,13 @@ serve(async (req) => {
         const latencyImpact = Math.max(0, Math.min(1, (avgLatency - 200) / 1000));
 
         // Calculate runtime risk score (0-100)
+        // blockRate/warnRate/errorRate are fractions (0-1), multiply by weights to get 0-100 score
         const runtimeRiskScore = Math.min(100, Math.round(
-          (blockRate * 40) +
-          (warnRate * 30) +
-          (errorRate * 20) +
-          (latencyImpact * 10)
-        ) * 100);
+          (blockRate * 100 * 0.4) +   // 40% weight for blocks
+          (warnRate * 100 * 0.3) +    // 30% weight for warns  
+          (errorRate * 100 * 0.2) +   // 20% weight for errors
+          (latencyImpact * 100 * 0.1) // 10% weight for latency
+        ));
 
         // Get latest static risk assessment
         const { data: latestRisk } = await supabase

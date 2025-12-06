@@ -175,6 +175,35 @@ export default function SystemDetail() {
           </div>
         </div>
 
+        {/* Missing Assessments Banner */}
+        {(!latestAssessment || !latestImpact) && (
+          <div className="p-4 rounded-xl border-2 border-yellow-500/50 bg-yellow-500/5 flex items-start gap-4">
+            <AlertTriangle className="h-6 w-6 text-yellow-500 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-yellow-600 dark:text-yellow-400">Assessments Required</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                {!latestAssessment && !latestImpact && "Risk and Impact assessments are missing. This system cannot be approved for production."}
+                {!latestAssessment && latestImpact && "Risk assessment is missing. Complete it to enable governance approval."}
+                {latestAssessment && !latestImpact && "Impact assessment is missing. Complete it for full governance compliance."}
+              </p>
+              <div className="flex gap-2 mt-3">
+                {!latestAssessment && (
+                  <Button size="sm" variant="outline" onClick={() => setShowRiskWizard(true)}>
+                    <AlertTriangle className="h-4 w-4 mr-1" />
+                    Run Risk Assessment
+                  </Button>
+                )}
+                {!latestImpact && (
+                  <Button size="sm" variant="outline" onClick={() => setShowImpactWizard(true)}>
+                    <Target className="h-4 w-4 mr-1" />
+                    Run Impact Assessment
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Use Case */}
         {system.use_case && (
           <Card>

@@ -31,6 +31,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
+import { useProjects } from "@/hooks/useProjects";
 import { Loader2, Check, ExternalLink } from "lucide-react";
 
 const modelSchema = z.object({
@@ -40,6 +41,7 @@ const modelSchema = z.object({
   huggingface_model_id: z.string().min(1, "Hugging Face Model ID is required"),
   huggingface_endpoint: z.string().url("Please enter a valid endpoint URL"),
   huggingface_api_token: z.string().min(1, "API token is required"),
+  project_id: z.string().min(1, "Please select a project"),
 });
 
 type ModelFormData = z.infer<typeof modelSchema>;
@@ -75,6 +77,7 @@ export function HuggingFaceModelForm({ open, onOpenChange }: HuggingFaceModelFor
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { data: projects } = useProjects();
 
   const form = useForm<ModelFormData>({
     resolver: zodResolver(modelSchema),
@@ -85,13 +88,35 @@ export function HuggingFaceModelForm({ open, onOpenChange }: HuggingFaceModelFor
       huggingface_model_id: "",
       huggingface_endpoint: "",
       huggingface_api_token: "",
+      project_id: "",
     },
   });
 
   const onSubmit = async (data: ModelFormData) => {
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from("models").insert({
+      // Step 1: Create the System first (transactional pattern)
+      const { data: systemData, error: systemError } = await supabase
+        .from("systems")
+        .insert({
+          project_id: data.project_id,
+          name: data.name,
+          provider: "Hugging Face",
+          system_type: "model",
+          model_name: data.huggingface_model_id,
+          endpoint: data.huggingface_endpoint,
+          api_token_encrypted: data.huggingface_api_token,
+          status: "draft",
+          deployment_status: "draft",
+          owner_id: user?.id,
+        })
+        .select()
+        .single();
+
+      if (systemError) throw systemError;
+
+      // Step 2: Create the Model linked to the System
+      const { error: modelError } = await supabase.from("models").insert({
         name: data.name,
         description: data.description || null,
         model_type: data.model_type,
@@ -101,9 +126,15 @@ export function HuggingFaceModelForm({ open, onOpenChange }: HuggingFaceModelFor
         provider: "huggingface",
         owner_id: user?.id,
         status: "draft",
+        project_id: data.project_id,
+        system_id: systemData.id,
       });
 
-      if (error) throw error;
+      if (modelError) {
+        // Rollback: delete the system if model creation fails
+        await supabase.from("systems").delete().eq("id", systemData.id);
+        throw modelError;
+      }
 
       toast({
         title: "Model Registered",
@@ -111,6 +142,7 @@ export function HuggingFaceModelForm({ open, onOpenChange }: HuggingFaceModelFor
       });
 
       queryClient.invalidateQueries({ queryKey: ["models"] });
+      queryClient.invalidateQueries({ queryKey: ["systems"] });
       form.reset();
       setCurrentStep(1);
       setConnectionTested(false);
@@ -177,7 +209,7 @@ export function HuggingFaceModelForm({ open, onOpenChange }: HuggingFaceModelFor
     let fieldsToValidate: (keyof ModelFormData)[] = [];
     
     if (currentStep === 1) {
-      fieldsToValidate = ["name", "model_type"];
+      fieldsToValidate = ["name", "model_type", "project_id"];
     } else if (currentStep === 2) {
       fieldsToValidate = ["huggingface_model_id", "huggingface_endpoint"];
     } else if (currentStep === 3) {
@@ -230,6 +262,34 @@ export function HuggingFaceModelForm({ open, onOpenChange }: HuggingFaceModelFor
             {/* Step 1: Basic Info */}
             {currentStep === 1 && (
               <>
+                <FormField
+                  control={form.control}
+                  name="project_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Project *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a project" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {projects?.map((project) => (
+                            <SelectItem key={project.id} value={project.id}>
+                              {project.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        The project this model belongs to
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 <FormField
                   control={form.control}
                   name="name"
