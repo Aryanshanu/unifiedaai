@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.run-red-team]
 verify_jwt = false
+
+[functions.rai-reasoning-engine]
+verify_jwt = true
