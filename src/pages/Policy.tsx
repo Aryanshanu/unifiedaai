@@ -37,9 +37,9 @@ export default function Policy() {
   const queryClient = useQueryClient();
 
   const getModelName = (modelId: string | null) => {
-    if (!modelId || !models) return 'Unknown Model';
-    const model = models.find(m => m.id === modelId);
-    return model?.name || 'Unknown Model';
+    if (!modelId || !models) return "Unknown Model";
+    const model = models.find((m) => m.id === modelId);
+    return model?.name || "Unknown Model";
   };
 
   const runSampleCampaign = async () => {
@@ -49,20 +49,20 @@ export default function Policy() {
 
     try {
       toast.info("🔥 Starting Red Team Campaign", {
-        description: "Executing 30 adversarial attack scenarios..."
+        description: "Executing adversarial attack scenarios...",
       });
 
       // Simulate progress updates
       const progressInterval = setInterval(() => {
-        setCampaignProgress(prev => Math.min(prev + 3, 95));
+        setCampaignProgress((prev) => Math.min(prev + 3, 95));
       }, 200);
 
-      const { data, error } = await supabase.functions.invoke('run-red-team', {
-        body: { 
+      const { data, error } = await supabase.functions.invoke("run-red-team", {
+        body: {
           campaignName: `Sample Campaign ${new Date().toLocaleDateString()}`,
           attackCount: 30,
-          runFullCampaign: true
-        }
+          runFullCampaign: true,
+        },
       });
 
       clearInterval(progressInterval);
@@ -71,26 +71,25 @@ export default function Policy() {
       if (error) throw error;
 
       setLatestCampaignResult(data);
-      
+
       // Invalidate queries to refresh data
-      queryClient.invalidateQueries({ queryKey: ['red-team-campaigns'] });
-      queryClient.invalidateQueries({ queryKey: ['policy', 'stats'] });
-      queryClient.invalidateQueries({ queryKey: ['policy-violations'] });
-      queryClient.invalidateQueries({ queryKey: ['review-queue'] });
+      queryClient.invalidateQueries({ queryKey: ["red-team-campaigns"] });
+      queryClient.invalidateQueries({ queryKey: ["policy", "stats"] });
+      queryClient.invalidateQueries({ queryKey: ["policy-violations"] });
+      queryClient.invalidateQueries({ queryKey: ["review-queue"] });
 
       const passRate = data?.summary?.passRate || 0;
       const findings = data?.summary?.failedTests || 0;
 
       toast.success("✅ Red Team Campaign Complete", {
-        description: `Coverage: ${passRate}% | ${findings} vulnerabilities found`
+        description: `Coverage: ${passRate}% | ${findings} vulnerabilities found`,
       });
 
       if (findings > 0) {
         toast.warning("⚠️ Vulnerabilities detected", {
-          description: `${findings} issues added to review queue for human oversight`
+          description: `${findings} issues added to review queue for human oversight`,
         });
       }
-
     } catch (error: any) {
       console.error("Campaign error:", error);
       toast.error("Campaign failed", { description: error.message });
@@ -112,10 +111,12 @@ export default function Policy() {
             </div>
             <div>
               <h3 className="font-semibold text-foreground">Run Sample Red-Team Campaign</h3>
-              <p className="text-sm text-muted-foreground">Execute 30 adversarial attacks (jailbreaks, prompt injection, toxicity, PII extraction)</p>
+              <p className="text-sm text-muted-foreground">
+                Execute 30 adversarial attacks (jailbreaks, prompt injection, toxicity, PII extraction)
+              </p>
             </div>
           </div>
-          <Button 
+          <Button
             onClick={runSampleCampaign}
             disabled={isRunningCampaign}
             className="gap-2 bg-gradient-to-r from-danger to-warning text-white hover:opacity-90"
@@ -134,7 +135,7 @@ export default function Policy() {
             )}
           </Button>
         </div>
-        
+
         {isRunningCampaign && (
           <div className="mt-4">
             <Progress value={campaignProgress} className="h-2" />
@@ -157,7 +158,9 @@ export default function Policy() {
                 return (
                   <div key={cat.name} className={cn("p-3 rounded-lg", cat.color)}>
                     <p className="text-xs font-medium">{cat.name}</p>
-                    <p className="text-lg font-bold">{blocked}/{count}</p>
+                    <p className="text-lg font-bold">
+                      {blocked}/{count}
+                    </p>
                     <p className="text-[10px] opacity-80">blocked</p>
                   </div>
                 );
@@ -170,9 +173,7 @@ export default function Policy() {
               <Badge className="bg-danger/10 text-danger">
                 Findings: {latestCampaignResult?.summary?.failedTests || 4}
               </Badge>
-              <Badge variant="outline">
-                Total Tests: {latestCampaignResult?.summary?.totalTests || 30}
-              </Badge>
+              <Badge variant="outline">Total Tests: {latestCampaignResult?.summary?.totalTests || 30}</Badge>
             </div>
           </div>
         )}
@@ -245,11 +246,16 @@ export default function Policy() {
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-mono text-muted-foreground">v{policy.version}</span>
-                        <span className={cn(
-                          "text-[10px] px-1.5 py-0.5 rounded-full",
-                          policy.status === "active" ? "bg-success/10 text-success" : 
-                          policy.status === "disabled" ? "bg-danger/10 text-danger" : "bg-muted text-muted-foreground"
-                        )}>
+                        <span
+                          className={cn(
+                            "text-[10px] px-1.5 py-0.5 rounded-full",
+                            policy.status === "active"
+                              ? "bg-success/10 text-success"
+                              : policy.status === "disabled"
+                                ? "bg-danger/10 text-danger"
+                                : "bg-muted text-muted-foreground",
+                          )}
+                        >
                           {policy.status}
                         </span>
                       </div>
@@ -304,20 +310,34 @@ export default function Policy() {
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className={cn(
-                          "text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-1",
-                          campaign.status === "running" ? "bg-primary/10 text-primary" : 
-                          campaign.status === "completed" ? "bg-success/10 text-success" :
-                          campaign.status === "paused" ? "bg-warning/10 text-warning" : "bg-muted text-muted-foreground"
-                        )}>
-                          {campaign.status === "running" && <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />}
+                        <span
+                          className={cn(
+                            "text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-1",
+                            campaign.status === "running"
+                              ? "bg-primary/10 text-primary"
+                              : campaign.status === "completed"
+                                ? "bg-success/10 text-success"
+                                : campaign.status === "paused"
+                                  ? "bg-warning/10 text-warning"
+                                  : "bg-muted text-muted-foreground",
+                          )}
+                        >
+                          {campaign.status === "running" && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                          )}
                           {campaign.status}
                         </span>
                       </div>
-                      <span className={cn(
-                        "text-sm font-bold font-mono",
-                        (campaign.coverage || 0) >= 98 ? "text-success" : (campaign.coverage || 0) >= 95 ? "text-warning" : "text-danger"
-                      )}>
+                      <span
+                        className={cn(
+                          "text-sm font-bold font-mono",
+                          (campaign.coverage || 0) >= 98
+                            ? "text-success"
+                            : (campaign.coverage || 0) >= 95
+                              ? "text-warning"
+                              : "text-danger",
+                        )}
+                      >
                         {campaign.coverage || 0}%
                       </span>
                     </div>
@@ -325,10 +345,16 @@ export default function Policy() {
                     <p className="text-xs text-muted-foreground mb-2">{getModelName(campaign.model_id)}</p>
                     <div className="flex items-center gap-4 text-xs">
                       <span className="text-muted-foreground">{attackCount} attack types</span>
-                      <span className={cn(
-                        "font-medium",
-                        (campaign.findings_count || 0) > 5 ? "text-danger" : (campaign.findings_count || 0) > 0 ? "text-warning" : "text-success"
-                      )}>
+                      <span
+                        className={cn(
+                          "font-medium",
+                          (campaign.findings_count || 0) > 5
+                            ? "text-danger"
+                            : (campaign.findings_count || 0) > 0
+                              ? "text-warning"
+                              : "text-success",
+                        )}
+                      >
                         {campaign.findings_count || 0} findings
                       </span>
                     </div>
@@ -341,16 +367,10 @@ export default function Policy() {
       </div>
 
       {/* Policy Editor Dialog */}
-      <PolicyDSLEditor 
-        open={showPolicyEditor} 
-        onOpenChange={setShowPolicyEditor} 
-      />
+      <PolicyDSLEditor open={showPolicyEditor} onOpenChange={setShowPolicyEditor} />
 
       {/* Red Team Campaign Form Dialog */}
-      <RedTeamCampaignForm 
-        open={showCampaignForm} 
-        onOpenChange={setShowCampaignForm} 
-      />
+      <RedTeamCampaignForm open={showCampaignForm} onOpenChange={setShowCampaignForm} />
     </MainLayout>
   );
 }
