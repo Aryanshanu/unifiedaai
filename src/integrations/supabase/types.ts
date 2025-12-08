@@ -540,27 +540,42 @@ export type Database = {
       kg_edges: {
         Row: {
           created_at: string
+          evidence: Json | null
+          hash: string | null
           id: string
           properties: Json | null
           relationship_type: string
           source_node_id: string
           target_node_id: string
+          valid_from: string | null
+          valid_to: string | null
+          weight: number | null
         }
         Insert: {
           created_at?: string
+          evidence?: Json | null
+          hash?: string | null
           id?: string
           properties?: Json | null
           relationship_type: string
           source_node_id: string
           target_node_id: string
+          valid_from?: string | null
+          valid_to?: string | null
+          weight?: number | null
         }
         Update: {
           created_at?: string
+          evidence?: Json | null
+          hash?: string | null
           id?: string
           properties?: Json | null
           relationship_type?: string
           source_node_id?: string
           target_node_id?: string
+          valid_from?: string | null
+          valid_to?: string | null
+          weight?: number | null
         }
         Relationships: [
           {
@@ -584,25 +599,40 @@ export type Database = {
           created_at: string
           entity_id: string
           entity_type: string
+          hash: string | null
           id: string
           label: string
+          metadata: Json | null
           properties: Json | null
+          source: string | null
+          status: string | null
+          version: number | null
         }
         Insert: {
           created_at?: string
           entity_id: string
           entity_type: string
+          hash?: string | null
           id?: string
           label: string
+          metadata?: Json | null
           properties?: Json | null
+          source?: string | null
+          status?: string | null
+          version?: number | null
         }
         Update: {
           created_at?: string
           entity_id?: string
           entity_type?: string
+          hash?: string | null
           id?: string
           label?: string
+          metadata?: Json | null
           properties?: Json | null
+          source?: string | null
+          status?: string | null
+          version?: number | null
         }
         Relationships: []
       }
@@ -1543,6 +1573,30 @@ export type Database = {
         | "high_high"
         | "critical_critical"
       incident_status: "open" | "investigating" | "mitigating" | "resolved"
+      kg_entity_type:
+        | "model"
+        | "dataset"
+        | "feature"
+        | "evaluation"
+        | "control"
+        | "risk"
+        | "incident"
+        | "decision"
+        | "deployment"
+        | "outcome"
+      kg_relationship:
+        | "uses"
+        | "derived_from"
+        | "violates"
+        | "satisfies"
+        | "monitored_by"
+        | "approved_by"
+        | "feeds_into"
+        | "trains"
+        | "evaluated_by"
+        | "governed_by"
+        | "deployed_to"
+        | "triggers"
       model_status: "draft" | "active" | "deprecated" | "archived"
       policy_status: "draft" | "active" | "disabled"
       review_status:
@@ -1715,6 +1769,32 @@ export const Constants = {
         "critical_critical",
       ],
       incident_status: ["open", "investigating", "mitigating", "resolved"],
+      kg_entity_type: [
+        "model",
+        "dataset",
+        "feature",
+        "evaluation",
+        "control",
+        "risk",
+        "incident",
+        "decision",
+        "deployment",
+        "outcome",
+      ],
+      kg_relationship: [
+        "uses",
+        "derived_from",
+        "violates",
+        "satisfies",
+        "monitored_by",
+        "approved_by",
+        "feeds_into",
+        "trains",
+        "evaluated_by",
+        "governed_by",
+        "deployed_to",
+        "triggers",
+      ],
       model_status: ["draft", "active", "deprecated", "archived"],
       policy_status: ["draft", "active", "disabled"],
       review_status: [
