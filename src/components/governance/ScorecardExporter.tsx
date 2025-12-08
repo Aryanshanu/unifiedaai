@@ -55,27 +55,33 @@ export function ScorecardExporter() {
   };
 
   const handleDownloadPDF = async () => {
-    if (!selectedModel) return;
+    if (!selectedModel) {
+      toast.error('Please select a model first');
+      return;
+    }
 
+    setIsGenerating(true);
+    
     try {
       const { data, error } = await supabase.functions.invoke('generate-scorecard', {
-        body: { modelId: selectedModel, format: 'html' },
+        body: { modelId: selectedModel, format: 'pdf' },
       });
 
       if (error) throw error;
 
-      // Open HTML in new window for printing
+      // Open HTML in new window for PDF printing
       const printWindow = window.open('', '_blank');
       if (printWindow) {
         printWindow.document.write(data);
         printWindow.document.close();
         printWindow.focus();
-        setTimeout(() => {
-          printWindow.print();
-        }, 500);
       }
+      
+      toast.success('Legal-grade EU AI Act Scorecard exported — ready for regulators');
     } catch (error: any) {
       toast.error('PDF generation failed: ' + error.message);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -104,7 +110,7 @@ export function ScorecardExporter() {
       <DialogTrigger asChild>
         <Button variant="gradient" size="sm">
           <FileText className="w-4 h-4 mr-2" />
-          Generate Scorecard
+          Export Scorecard (PDF)
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl">
@@ -133,13 +139,13 @@ export function ScorecardExporter() {
               </Select>
             </div>
             
-            <Button variant="outline" onClick={handleGenerate} disabled={isGenerating || !selectedModel}>
+            <Button variant="gradient" onClick={handleDownloadPDF} disabled={isGenerating || !selectedModel}>
               {isGenerating ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
-                <FileText className="w-4 h-4 mr-2" />
+                <Download className="w-4 h-4 mr-2" />
               )}
-              Generate Preview
+              Generate 6-Page PDF Scorecard
             </Button>
           </div>
           
