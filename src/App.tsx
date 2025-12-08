@@ -14,6 +14,7 @@ import Models from "./pages/Models";
 import ModelDetail from "./pages/ModelDetail";
 import Approvals from "./pages/Approvals";
 import HITL from "./pages/HITL";
+import Incidents from "./pages/Incidents";
 import Lineage from "./pages/Lineage";
 import Observability from "./pages/Observability";
 import Alerts from "./pages/Alerts";
@@ -52,6 +53,7 @@ const App = () => (
               </ProtectedRoute>
             } />
             <Route path="/hitl" element={<ProtectedRoute><HITL /></ProtectedRoute>} />
+            <Route path="/incidents" element={<ProtectedRoute><Incidents /></ProtectedRoute>} />
             {/* Knowledge Graph */}
             <Route path="/lineage" element={<ProtectedRoute><Lineage /></ProtectedRoute>} />
             {/* Monitoring */}

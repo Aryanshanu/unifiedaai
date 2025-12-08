@@ -33,6 +33,7 @@ const navItems = [
   { divider: true, label: "Governance" },
   { path: "/governance/approvals", icon: Shield, label: "Approvals", showBadge: true },
   { path: "/hitl", icon: Users, label: "HITL Console" },
+  { path: "/incidents", icon: AlertCircle, label: "Incidents" },
   { path: "/lineage", icon: GitBranch, label: "Knowledge Graph" },
   { divider: true, label: "Monitoring" },
   { path: "/observability", icon: Activity, label: "Observability" },
