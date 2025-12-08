@@ -13,6 +13,7 @@ import SystemDetail from "./pages/SystemDetail";
 import Models from "./pages/Models";
 import ModelDetail from "./pages/ModelDetail";
 import Approvals from "./pages/Approvals";
+import Lineage from "./pages/Lineage";
 import FairnessEngine from "./pages/engines/FairnessEngine";
 import HallucinationEngine from "./pages/engines/HallucinationEngine";
 import ToxicityEngine from "./pages/engines/ToxicityEngine";
@@ -39,12 +40,14 @@ const App = () => (
             <Route path="/systems/:id" element={<ProtectedRoute><SystemDetail /></ProtectedRoute>} />
             <Route path="/models" element={<ProtectedRoute><Models /></ProtectedRoute>} />
             <Route path="/models/:id" element={<ProtectedRoute><ModelDetail /></ProtectedRoute>} />
-            {/* Governance - Admin/Reviewer only */}
+            {/* Governance */}
             <Route path="/governance/approvals" element={
               <ProtectedRoute requiredRoles={['admin', 'reviewer']}>
                 <Approvals />
               </ProtectedRoute>
             } />
+            {/* Knowledge Graph */}
+            <Route path="/lineage" element={<ProtectedRoute><Lineage /></ProtectedRoute>} />
             {/* Core RAI Engines - Each has unique page */}
             <Route path="/engine/fairness" element={<ProtectedRoute><FairnessEngine /></ProtectedRoute>} />
             <Route path="/engine/hallucination" element={<ProtectedRoute><HallucinationEngine /></ProtectedRoute>} />
