@@ -1,11 +1,15 @@
+import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { Button } from "@/components/ui/button";
-import { Users, Clock, AlertTriangle, CheckCircle, ChevronRight } from "lucide-react";
+import { Users, Clock, AlertTriangle, CheckCircle, ChevronRight, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useReviewQueue, useReviewQueueStats, ReviewItem } from "@/hooks/useReviewQueue";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
+import { ReviewDecisionDialog } from "@/components/hitl/ReviewDecisionDialog";
+import { SLACountdown } from "@/components/hitl/SLACountdown";
+import { toast } from "sonner";
 
 const severityColors = {
   critical: "bg-danger/10 text-danger border-danger/30",
@@ -17,9 +21,23 @@ const severityColors = {
 export default function HITL() {
   const { data: reviews, isLoading } = useReviewQueue();
   const { data: stats } = useReviewQueueStats();
+  const [selectedReview, setSelectedReview] = useState<ReviewItem | null>(null);
+  const [decisionDialogOpen, setDecisionDialogOpen] = useState(false);
 
   const pendingReviews = reviews?.filter(r => r.status === 'pending' || r.status === 'in_progress') || [];
   const recentDecisions = reviews?.filter(r => r.status === 'approved' || r.status === 'rejected').slice(0, 3) || [];
+  
+  const handleReviewClick = (review: ReviewItem) => {
+    setSelectedReview(review);
+    setDecisionDialogOpen(true);
+  };
+  
+  const handleNotifySlack = () => {
+    toast("✓ Alert sent to #rai-alerts on Slack", {
+      icon: <Bell className="w-4 h-4 text-primary" />,
+      duration: 3000
+    });
+  };
 
   // Calculate queue distribution
   const queueDistribution = pendingReviews.reduce((acc, review) => {
@@ -106,7 +124,7 @@ export default function HITL() {
           ) : (
             <div className="space-y-3">
               {pendingReviews.map((review) => (
-                <ReviewCard key={review.id} review={review} />
+                <ReviewCard key={review.id} review={review} onClick={() => handleReviewClick(review)} />
               ))}
             </div>
           )}
@@ -170,18 +188,25 @@ export default function HITL() {
           </div>
         </div>
       </div>
+      
+      {/* Decision Dialog */}
+      <ReviewDecisionDialog 
+        review={selectedReview}
+        open={decisionDialogOpen}
+        onOpenChange={setDecisionDialogOpen}
+      />
     </MainLayout>
   );
 }
 
-function ReviewCard({ review }: { review: ReviewItem }) {
+function ReviewCard({ review, onClick }: { review: ReviewItem; onClick?: () => void }) {
   const isOverdue = review.sla_deadline && new Date(review.sla_deadline) < new Date();
-  const timeToSla = review.sla_deadline 
-    ? formatDistanceToNow(new Date(review.sla_deadline), { addSuffix: false })
-    : null;
 
   return (
-    <div className="bg-card border border-border rounded-xl p-4 hover:border-primary/30 transition-all cursor-pointer group">
+    <div 
+      className="bg-card border border-border rounded-xl p-4 hover:border-primary/30 transition-all cursor-pointer group"
+      onClick={onClick}
+    >
       <div className="flex items-start gap-4">
         <div className={cn(
           "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
@@ -218,13 +243,8 @@ function ReviewCard({ review }: { review: ReviewItem }) {
         </div>
 
         <div className="flex flex-col items-end gap-2">
-          {timeToSla && (
-            <span className={cn(
-              "text-xs font-medium",
-              isOverdue ? "text-danger" : "text-muted-foreground"
-            )}>
-              {isOverdue ? 'Overdue' : `${timeToSla} left`}
-            </span>
+          {review.sla_deadline && (
+            <SLACountdown deadline={review.sla_deadline} className="text-xs" />
           )}
           <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
         </div>
