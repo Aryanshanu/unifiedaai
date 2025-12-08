@@ -17,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Shield,
+  GitBranch,
 } from "lucide-react";
 
 const navItems = [
@@ -26,6 +27,7 @@ const navItems = [
   { path: "/models", icon: Database, label: "Model Registry" },
   { divider: true, label: "Governance" },
   { path: "/governance/approvals", icon: Shield, label: "Approvals", showBadge: true },
+  { path: "/lineage", icon: GitBranch, label: "Knowledge Graph" },
   { divider: true, label: "Core RAI Engines" },
   { path: "/engine/fairness", icon: Scale, label: "Fairness Engine" },
   { path: "/engine/hallucination", icon: AlertCircle, label: "Hallucination Engine" },
