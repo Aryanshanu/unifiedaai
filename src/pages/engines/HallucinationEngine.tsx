@@ -14,6 +14,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { telemetry, traceAsync, instrumentPageLoad } from "@/lib/telemetry";
 import { useRAIReasoning } from "@/hooks/useRAIReasoning";
 import { ReasoningChainDisplay } from "@/components/engines/ReasoningChainDisplay";
+import { CustomPromptTest } from "@/components/engines/CustomPromptTest";
 
 interface HallucinationMetrics {
   factuality_score: number;
@@ -189,7 +190,17 @@ export default function HallucinationEngine() {
         </CardContent>
       </Card>
 
-      {/* No Model Selected */}
+      {/* Custom Prompt Test Section */}
+      {selectedModelId && (
+        <div className="mb-6">
+          <CustomPromptTest
+            modelId={selectedModelId}
+            engineType="hallucination"
+            engineName="Hallucination"
+          />
+        </div>
+      )}
+
       {!selectedModelId && (
         <div className="text-center py-16 bg-card rounded-xl border border-border">
           <AlertCircle className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
