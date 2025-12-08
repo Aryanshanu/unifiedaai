@@ -17,11 +17,11 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useKGNodes, useKGEdges, useKnowledgeGraphStats, useKGLineage, useKGExplain, useKGSync } from "@/hooks/useKnowledgeGraph";
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { NodeDetailPanel } from "@/components/lineage/NodeDetailPanel";
 import { ExplainDialog } from "@/components/lineage/ExplainDialog";
 import { toast } from "sonner";
-
+import { supabase } from "@/integrations/supabase/client";
 const nodeColors: Record<string, string> = {
   dataset: "bg-blue-500/20 border-blue-500/50 text-blue-400",
   feature: "bg-purple-500/20 border-purple-500/50 text-purple-400",
@@ -89,6 +89,45 @@ export default function Lineage() {
   const { mutate: syncKG, isPending: isSyncing } = useKGSync();
 
   const isLoading = nodesLoading || edgesLoading;
+
+  // Auto-sync when models or evaluations change
+  useEffect(() => {
+    const channel = supabase
+      .channel('kg-auto-sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'models' },
+        () => {
+          toast.info("Model changed, syncing Knowledge Graph...");
+          syncKG(undefined, {
+            onSuccess: () => {
+              refetchNodes();
+              refetchEdges();
+              refetchStats();
+            }
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'evaluation_runs' },
+        () => {
+          toast.info("Evaluation updated, syncing Knowledge Graph...");
+          syncKG(undefined, {
+            onSuccess: () => {
+              refetchNodes();
+              refetchEdges();
+              refetchStats();
+            }
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [syncKG, refetchNodes, refetchEdges, refetchStats]);
 
   const handleSync = useCallback(() => {
     syncKG(undefined, {
