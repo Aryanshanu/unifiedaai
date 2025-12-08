@@ -14,6 +14,9 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { PolicyExplainer } from "@/components/policy/PolicyExplainer";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, HelpCircle } from "lucide-react";
 
 const ATTACK_CATEGORIES = [
   { name: "Jailbreak", color: "bg-danger/20 text-danger" },
@@ -371,6 +374,22 @@ export default function Policy() {
 
       {/* Red Team Campaign Form Dialog */}
       <RedTeamCampaignForm open={showCampaignForm} onOpenChange={setShowCampaignForm} />
+
+      {/* Educational Section */}
+      <Collapsible className="mt-6">
+        <CollapsibleTrigger asChild>
+          <Button variant="outline" className="w-full justify-between">
+            <span className="flex items-center gap-2">
+              <HelpCircle className="w-4 h-4" />
+              Learn About Policy Packs & Red Team Campaigns
+            </span>
+            <ChevronDown className="w-4 h-4" />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-4">
+          <PolicyExplainer />
+        </CollapsibleContent>
+      </Collapsible>
     </MainLayout>
   );
 }

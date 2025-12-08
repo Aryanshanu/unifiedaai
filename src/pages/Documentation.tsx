@@ -21,7 +21,11 @@ import {
   Zap,
   Target,
   Layers,
-  CheckCircle
+  CheckCircle,
+  PlayCircle,
+  TestTube,
+  Download,
+  Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -32,72 +36,94 @@ const docSections = [
     title: 'Platform Overview',
     icon: BookOpen,
     content: `
-# Fractal RAI OS - Responsible AI Operating System
+# Fractal RAI OS — The World's First Responsible AI Operating System
 
-## What is Fractal RAI OS?
+## Mission Statement
 
-Fractal RAI OS is an enterprise-grade Responsible AI platform that provides comprehensive governance, evaluation, and monitoring capabilities for AI/ML models. It enables organizations to deploy AI systems safely, fairly, and in compliance with regulatory requirements.
+Fractal RAI OS provides comprehensive governance, evaluation, and monitoring capabilities for AI/ML systems at enterprise scale. It enables organizations to deploy AI systems that are **safe**, **fair**, **transparent**, and **compliant** with regulatory requirements like the EU AI Act.
 
-## Core Capabilities
+## The 6 Core Pillars
 
-1. **Model Registry & Governance** - Centralized catalog of all AI models with full lifecycle management
-2. **RAI Evaluation Engines** - Automated assessment of fairness, safety, privacy, robustness, and explainability
-3. **Real-Time Observability** - Live monitoring, drift detection, and alerting
-4. **Human-in-the-Loop** - Structured review workflows for high-risk decisions
-5. **Knowledge Graph** - Full lineage tracking from data to deployment
-6. **Policy Enforcement** - Runtime guardrails and red team orchestration
+Fractal RAI OS is built on six foundational pillars that work together to provide complete AI governance:
+
+### 1. RAI Evaluation Engines
+Five independent engines (Fairness, Toxicity, Privacy, Hallucination, Explainability) that perform systematic checks on AI models using K2 chain-of-thought reasoning for full transparency.
+
+### 2. Real-Time AI Observability
+Streaming telemetry, drift detection, safety alerts, and SLA monitoring for all deployed AI systems.
+
+### 3. Governance & Regulatory Compliance
+Control library mappings (EU AI Act, NIST AI RMF, ISO/IEC), risk scoring, and certified attestations.
+
+### 4. Human-in-the-Loop Decision Layer
+Escalation queues, reviewer workflows, deployment gates, and complete audit trails.
+
+### 5. Knowledge Graph
+Connects models, data, risks, controls, incidents, and decisions through provenance-tracked relationships with lineage and blast radius analysis.
+
+### 6. Policy Enforcement & Red Team Orchestration
+Runtime guardrails, policy DSL, jailbreak detection, and adversarial campaign testing.
 
 ## Getting Started
 
-1. Create a **Project** to organize your AI initiatives
-2. Register **Models** (directly or via Hugging Face import)
-3. Run **Evaluations** using the Core RAI Engines
-4. Set up **Approvals** for production deployment
-5. Monitor in **Observability** dashboard
+1. **Create a Project** — Organize your AI initiatives
+2. **Register Models** — Import from Hugging Face or register manually
+3. **Run Risk Assessment** — Evaluate static and runtime risks
+4. **Configure Policies** — Set up guardrails and enforcement rules
+5. **Deploy with Governance** — Approval workflows for high-risk systems
+6. **Monitor Continuously** — Real-time observability and alerting
     `,
   },
   {
     id: 'projects',
-    title: 'Projects',
+    title: 'Projects & Systems',
     icon: FolderOpen,
     content: `
-# Projects
+# Projects & Systems
 
-## What is a Project?
+## Hierarchy Structure
 
-A Project is the top-level organizational unit in Fractal RAI. It represents a business initiative, application, or use case that involves one or more AI models.
+\`\`\`
+Project (Top-level container)
+├── System (AI deployment unit with governance)
+│   ├── Model (AI model metadata)
+│   ├── Risk Assessment (Static + Runtime)
+│   ├── Impact Assessment
+│   └── Approval Workflow
+└── Multiple Systems per Project
+\`\`\`
 
 ## Project Properties
 
-- **Name** - Descriptive name for the project
-- **Description** - Detailed description of the project's purpose
-- **Environment** - Development, Staging, or Production
-- **Data Sensitivity** - Low, Medium, High, or Critical
-- **Business Sensitivity** - Low, Medium, High, or Critical
-- **Criticality** - 1-10 scale indicating business importance
-- **Compliance Frameworks** - NIST AI RMF, EU AI Act, ISO/IEC, etc.
-- **Data Residency** - Geographic location requirements
-- **Primary Owner Email** - Main point of contact
+- **Name** — Descriptive identifier
+- **Description** — Purpose and scope
+- **Environment** — Development, Staging, or Production
+- **Data Sensitivity** — Low, Medium, High, Critical
+- **Business Sensitivity** — Impact on business operations
+- **Criticality** — 1-10 scale for business importance
+- **Compliance Frameworks** — EU AI Act, NIST AI RMF, ISO/IEC
+- **Data Residency** — Geographic location requirements
+- **Primary Owner Email** — Accountability contact
+
+## Systems
+
+A System represents the actual deployed AI component with:
+- API endpoint configuration
+- Runtime risk scoring (URI Score)
+- Approval status tracking
+- Request logging and telemetry
+- Policy enforcement at the gateway level
 
 ## Creating a Project
 
-1. Navigate to **Projects** in the sidebar
-2. Click **Create Project**
-3. Fill in required fields
-4. Select applicable compliance frameworks
-5. Click **Create**
+1. Navigate to **Projects** → **Create Project**
+2. Fill in required governance fields
+3. Select applicable compliance frameworks
+4. The system auto-creates initial risk profile
 
-## Project Hierarchy
+## Risk-Based Governance
 
-\`\`\`
-Project
-├── System (AI deployment unit)
-│   ├── Model (AI model metadata)
-│   ├── Risk Assessment
-│   ├── Impact Assessment
-│   └── Approvals
-└── Models (multiple per project)
-\`\`\`
+Systems with **High/Critical** risk tier or **Impact Score > 60** automatically require approval before deployment.
     `,
   },
   {
@@ -109,41 +135,47 @@ Project
 
 ## What is a Model?
 
-A Model in Fractal RAI represents an AI/ML model registered for governance. Models are linked to Systems which handle deployment and runtime governance.
+A Model represents AI/ML model metadata registered for governance. Every model is linked to a System which handles deployment and runtime governance.
 
-## Model Types
+## Model Types Supported
 
-- **LLM** - Large Language Models (GPT, Claude, Llama, etc.)
-- **Classification** - Binary/multi-class classifiers
-- **Regression** - Numerical prediction models
-- **NER** - Named Entity Recognition
-- **Embedding** - Vector embedding models
-- **Custom** - Other model types
+- **LLM** — Large Language Models (GPT, Claude, Llama, etc.)
+- **Classification** — Binary/multi-class classifiers
+- **Regression** — Numerical prediction models
+- **NER** — Named Entity Recognition
+- **Embedding** — Vector embedding models
+- **Custom** — Other model architectures
 
 ## Registering a Model
 
 ### Via Hugging Face Import
 1. Click **Add Model** → **Import from Hugging Face**
-2. Enter the Hugging Face Model ID (e.g., \`meta-llama/Llama-2-7b-chat-hf\`)
+2. Enter the Hugging Face Model ID (e.g., \`meta-llama/Llama-3-8B-Instruct\`)
 3. Configure the Inference Endpoint URL
-4. Add your API Token (securely stored)
-5. Review and submit
+4. Add your API Token (securely encrypted)
+5. Review and submit — System is auto-created
 
 ### Manual Registration
 1. Click **Add Model** → **Manual Registration**
-2. Enter model name, type, and description
-3. Configure API endpoint if applicable
-4. Add metadata (version, license, etc.)
+2. Enter model metadata (name, type, version)
+3. Configure API endpoint
+4. Add governance fields (license, owner, use case)
 
 ## Model Scores
 
-After evaluation, models receive scores for:
-- **Fairness** - Demographic parity, equalized odds
-- **Toxicity** - Harmful content detection
-- **Privacy** - PII detection, data leakage risk
-- **Robustness** - Adversarial resistance
-- **Explainability** - Reasoning quality
-- **Overall** - Weighted composite score
+After evaluation, models display scores for:
+- **Fairness** — Demographic parity, equalized odds
+- **Privacy** — PII detection, data leakage risk
+- **Toxicity** — Harmful content detection
+- **Robustness** — Hallucination resistance, factuality
+- **Explainability** — Reasoning quality
+- **Overall** — Weighted composite score
+
+## Status Indicators
+
+- 🟢 **Healthy** — All scores above thresholds
+- 🟡 **Warning** — Some metrics need attention
+- 🔴 **Critical** — Urgent remediation required
     `,
   },
   {
@@ -155,7 +187,7 @@ After evaluation, models receive scores for:
 
 ## Overview
 
-Fractal RAI includes 5 independent evaluation engines, each focused on a specific dimension of responsible AI:
+Five independent engines evaluate different dimensions of responsible AI. Each uses **K2 chain-of-thought reasoning** with Gemini 2.5 Pro for complete transparency.
 
 ## 1. Fairness Engine
 
@@ -167,7 +199,7 @@ Fractal RAI includes 5 independent evaluation engines, each focused on a specifi
 - Disparate Impact Score
 - Calibration by Group
 
-**Use When**: Evaluating models that make decisions affecting people (hiring, lending, etc.)
+**Use When**: Evaluating models making decisions about people (hiring, lending, insurance)
 
 ## 2. Hallucination Engine
 
@@ -179,7 +211,7 @@ Fractal RAI includes 5 independent evaluation engines, each focused on a specifi
 - Claim Verification Rate
 - Citation Accuracy
 
-**Use When**: Evaluating LLMs for factual accuracy
+**Use When**: Evaluating LLMs for factual reliability
 
 ## 3. Toxicity Engine
 
@@ -187,11 +219,11 @@ Fractal RAI includes 5 independent evaluation engines, each focused on a specifi
 
 **Metrics**:
 - Toxicity Score
-- Hate Speech Detection
+- Hate Speech Detection Rate
 - Harmful Content Percentage
 - Jailbreak Resistance
 
-**Use When**: Ensuring model outputs are safe for users
+**Use When**: Ensuring outputs are safe for end users
 
 ## 4. Privacy Engine
 
@@ -201,7 +233,7 @@ Fractal RAI includes 5 independent evaluation engines, each focused on a specifi
 - PII Detection Rate
 - Data Leakage Score
 - Membership Inference Risk
-- Model Memorization
+- Model Memorization Rate
 
 **Use When**: Protecting sensitive information
 
@@ -210,7 +242,7 @@ Fractal RAI includes 5 independent evaluation engines, each focused on a specifi
 **Purpose**: Assess reasoning quality and decision transparency
 
 **Metrics**:
-- Reasoning Quality
+- Reasoning Quality Score
 - Explanation Completeness
 - Confidence Calibration
 - Decision Transparency
@@ -219,11 +251,15 @@ Fractal RAI includes 5 independent evaluation engines, each focused on a specifi
 
 ## Running Evaluations
 
-1. Navigate to the desired engine
+1. Navigate to desired engine (e.g., /engine/fairness)
 2. Select a registered model
 3. Click **Run Evaluation**
-4. View detailed results with K2 chain-of-thought reasoning
+4. View detailed K2 reasoning chain with evidence
 5. Export scorecard for compliance documentation
+
+## Custom Prompt Testing
+
+Each engine includes a **Custom Prompt Test** feature to validate engine behavior on specific inputs.
     `,
   },
   {
@@ -233,43 +269,54 @@ Fractal RAI includes 5 independent evaluation engines, each focused on a specifi
     content: `
 # Human-in-the-Loop (HITL) Console
 
-## What is HITL?
+## Purpose
 
-The HITL Console manages escalations, reviews, and approvals that require human judgment before AI systems can proceed.
+The HITL Console manages escalations, reviews, and approvals requiring human judgment before AI systems can proceed.
 
 ## Review Types
 
-1. **Safety Reviews** - Flagged for potential harmful outputs
-2. **Fairness Reviews** - Bias concerns requiring human assessment
-3. **Privacy Reviews** - Potential data leakage issues
-4. **Deployment Approvals** - Pre-production sign-off
-5. **Incident Reviews** - Post-incident analysis
+1. **Safety Reviews** — Flagged for harmful outputs
+2. **Fairness Reviews** — Bias concerns
+3. **Privacy Reviews** — Data leakage issues
+4. **Deployment Approvals** — Pre-production sign-off
+5. **Incident Reviews** — Post-incident analysis
+6. **Policy Violations** — Guardrail breaches
 
 ## Review Workflow
 
 \`\`\`
 1. Issue Detected → Auto-escalated to Queue
 2. Assigned to Reviewer (or self-assign)
-3. Reviewer Analyzes Evidence
+3. Reviewer Analyzes Evidence Package
 4. Decision: Approve / Reject / Escalate
-5. Rationale Documented
-6. Action Taken (deploy, block, remediate)
+5. Rationale Documented with Conditions
+6. Action Executed (deploy, block, remediate)
+7. Knowledge Graph updated with decision edge
 \`\`\`
 
 ## SLA Management
 
-- **Critical**: 4-hour response
-- **High**: 24-hour response
-- **Medium**: 72-hour response
-- **Low**: 1-week response
+| Severity | Response Time |
+|----------|---------------|
+| Critical | 4 hours |
+| High | 24 hours |
+| Medium | 72 hours |
+| Low | 1 week |
 
-Overdue items are highlighted and can trigger notifications.
+Items approaching SLA deadline show countdown timers. Overdue items trigger notifications.
 
-## Roles & Permissions
+## Roles
 
-- **Reviewer**: Can review and decide on items
-- **Admin**: Can assign items and configure rules
-- **Analyst**: Can view queue but not decide
+- **Reviewer** — Can review and make decisions
+- **Admin** — Can assign items and configure rules
+- **Analyst** — Can view queue but not decide
+
+## Decisions Create Audit Trail
+
+Every decision creates:
+- Decision record with rationale
+- KG edge linking system → decision
+- Audit log entry for compliance
     `,
   },
   {
@@ -281,40 +328,46 @@ Overdue items are highlighted and can trigger notifications.
 
 ## Overview
 
-The Observability dashboard provides live monitoring of all AI systems with drift detection, performance metrics, and safety alerts.
+Live monitoring of all AI systems with drift detection, performance metrics, and safety alerts fed from request logs.
 
 ## Key Metrics
 
 ### Performance
-- **Request Count** - Total API calls
-- **Latency (P50, P95, P99)** - Response time percentiles
-- **Error Rate** - Failed request percentage
-- **Throughput** - Requests per second
+- **Request Count** — Total API calls
+- **Latency (P50, P95, P99)** — Response times
+- **Error Rate** — Failed request percentage
+- **Throughput** — Requests per second
 
 ### Safety
-- **Block Rate** - Percentage blocked by guardrails
-- **Warn Rate** - Percentage triggering warnings
-- **Toxicity Detections** - Harmful content catches
-- **PII Detections** - Privacy violation catches
+- **Block Rate** — Blocked by guardrails
+- **Warn Rate** — Warnings triggered
+- **Toxicity Detections** — Harmful content catches
+- **PII Detections** — Privacy violation catches
 
-### Drift
-- **Feature Drift (PSI)** - Input distribution changes
-- **Concept Drift** - Model performance degradation
-- **Data Quality** - Missing/invalid input rates
+### Drift Detection
+- **Feature Drift (PSI)** — Input distribution changes
+- **Concept Drift** — Performance degradation
+- **Data Quality** — Missing/invalid input rates
 
-## Alerts & Notifications
+## Alert Configuration
 
-Configure alerts for:
-- Drift thresholds exceeded
-- Error rate spikes
-- Latency degradation
+Configure thresholds for:
+- Drift alerts when PSI > threshold
+- Error rate spike detection
+- Latency degradation warnings
 - Safety metric breaches
 
-Route to: Email, Slack, Teams, PagerDuty
+## Incident Auto-Creation
 
-## Traffic Generation (Testing)
+When critical thresholds are exceeded:
+1. Incident automatically created
+2. Added to HITL review queue
+3. Notifications sent to configured channels
+4. System can be auto-suspended on repeated violations
 
-Use the Traffic Generator to:
+## Traffic Generator
+
+For testing, use the Traffic Generator to:
 1. Simulate production load
 2. Test safety guardrails
 3. Populate metrics dashboards
@@ -330,44 +383,51 @@ Use the Traffic Generator to:
 
 ## What is the Knowledge Graph?
 
-The Knowledge Graph provides complete traceability from data sources through models to production deployments. It enables impact analysis and compliance auditing.
+The KG provides complete traceability from data sources through models to production deployments. It enables impact analysis and compliance auditing.
 
 ## Entity Types
 
-- **Dataset** - Training/evaluation data sources
-- **Feature** - Engineered features from data
-- **Model** - AI/ML models
-- **Evaluation** - Evaluation run results
-- **Control** - Compliance controls (NIST, EU AI Act)
-- **Risk** - Risk assessments
-- **Incident** - Safety/compliance incidents
-- **Decision** - Human review decisions
-- **Deployment** - Production deployments
+- **Dataset** — Training/evaluation data sources
+- **Feature** — Engineered features
+- **Model** — AI/ML models
+- **Evaluation** — Evaluation run results
+- **Control** — Compliance controls (NIST, EU AI Act)
+- **Risk** — Risk assessments
+- **Incident** — Safety/compliance incidents
+- **Decision** — Human review decisions
+- **Deployment** — Production deployments
 
 ## Relationship Types
 
-- **feeds_into** - Data → Feature → Model
-- **trains** - Feature → Model
-- **evaluated_by** - Model → Evaluation
-- **governed_by** - Model → Control
-- **monitored_by** - System → Risk
-- **triggers** - Incident → Model
-- **approved_by** - System → Decision
-- **deployed_to** - Model → Deployment
+- **feeds_into** — Data → Feature → Model
+- **trains** — Feature → Model
+- **evaluated_by** — Model → Evaluation
+- **governed_by** — Model → Control
+- **monitored_by** — System → Risk
+- **triggers** — Incident → Model
+- **approved_by** — System → Decision
+- **deployed_to** — Model → Deployment
 
-## Blast Radius Analysis
+## Key Features
 
-Click any node → "Blast Radius" to see:
-- All downstream dependencies
-- Affected deployments
-- Impact on production systems
+### Blast Radius Analysis
+Click any node → "Blast Radius" to see all downstream dependencies and affected deployments.
 
-## Natural Language Queries
-
-Ask questions like:
+### Natural Language Queries
+Ask questions via Copilot:
 - "Why is this model non-compliant?"
 - "What data sources feed into this model?"
 - "Which deployments are affected by this incident?"
+
+### Immutable Hash Chains
+Every node and edge has a SHA-256 hash for tamper-proof audit trails.
+
+## Visualization
+
+- Zoom/pan controls for exploration
+- Entity type filters
+- 350px minimum node spacing (no overlaps)
+- Real-time sync with platform data
     `,
   },
   {
@@ -377,12 +437,12 @@ Ask questions like:
     content: `
 # Governance & Approvals
 
-## Deployment Workflow
+## Deployment Workflow States
 
 \`\`\`
 Draft → Ready for Review → Pending Approval → Approved → Deployed
-                                  ↓
-                              Blocked (if rejected)
+                                   ↓
+                               Blocked (if rejected)
 \`\`\`
 
 ## Risk-Based Gating
@@ -391,30 +451,38 @@ Systems automatically require approval when:
 - **Risk Tier** = High or Critical
 - **Impact Score** > 60
 - **Data Sensitivity** = High or Critical
-- **Compliance Framework** requires it
+- **Compliance Framework** mandates it
 
 ## Approval Process
 
 1. System owner marks "Ready for Review"
-2. System auto-transitions to "Pending Approval"
+2. Auto-transition to "Pending Approval"
 3. Approval record created in queue
 4. Required approvers notified
-5. Approvers review evidence package
+5. Evidence package reviewed
 6. Decision recorded with rationale
 7. System transitions to Approved or Blocked
 
 ## Required Approvers
 
 For High/Critical systems:
-- **Product Owner** - Business sign-off
-- **Compliance Lead** or **CISO** - Risk sign-off
+- **Product Owner** — Business sign-off
+- **Compliance Lead** or **CISO** — Risk sign-off
 
 ## Runtime Enforcement
 
-The AI Gateway enforces governance by:
-- Blocking unapproved system requests
-- Auto-suspending on repeated violations
-- Logging all decisions for audit
+The AI Gateway enforces governance:
+- Blocks requests to unapproved systems
+- Auto-suspends on repeated violations (5+ in 1 hour)
+- Logs all decisions for audit trail
+
+## Attestations
+
+Generate legal-grade attestations documenting:
+- Model evaluation results
+- EU AI Act control mappings
+- Cryptographic integrity proof
+- Digital signature placeholder
     `,
   },
   {
@@ -426,7 +494,7 @@ The AI Gateway enforces governance by:
 
 ## Policy DSL
 
-Define runtime policies using our domain-specific language:
+Define runtime policies using YAML-based DSL:
 
 \`\`\`yaml
 policy:
@@ -439,34 +507,201 @@ policy:
       severity: high
     - name: "Flag PII"
       condition: pii_detected = true
-      action: warn
-      severity: medium
+      action: redact
+      fields: [email, phone, ssn]
   exemptions:
     - model_id: "internal-test-model"
 \`\`\`
 
+## Policy Actions
+
+- **block** — Reject the request entirely
+- **warn** — Allow but flag for review
+- **redact** — Remove sensitive content
+- **throttle** — Rate limit the request
+
 ## Red Team Campaigns
 
-### Attack Types
-- **Jailbreak Attempts** - Bypass safety instructions
-- **PII Extraction** - Trick model into revealing data
-- **Harmful Content** - Generate dangerous outputs
-- **Hallucination Probes** - Induce factual errors
-- **Bias Exploitation** - Trigger discriminatory outputs
+### Attack Types Tested
+- **Jailbreak** — Bypass safety instructions
+- **Prompt Injection** — Hidden commands
+- **PII Extraction** — Reveal training data
+- **Toxicity Probes** — Generate harmful content
+- **Hallucination Induction** — Cause factual errors
+- **Policy Bypass** — Circumvent restrictions
 
 ### Running a Campaign
-1. Go to **Policy Studio** → **Red Team**
-2. Click **New Campaign**
-3. Select target model
-4. Choose attack types
-5. Set number of probes
-6. Run campaign
-7. Review findings and coverage
+1. Navigate to **Policy Studio**
+2. Click **Run Sample Red-Team Campaign**
+3. 30 adversarial prompts executed
+4. Coverage percentage calculated
+5. Findings added to review queue
+6. Policy violations logged
 
 ### Campaign Results
 - Attack success rate per category
+- Severity heatmap visualization
 - Specific prompts that bypassed guardrails
 - Recommendations for hardening
+    `,
+  },
+  {
+    id: 'golden-demo',
+    title: 'Golden Demo',
+    icon: PlayCircle,
+    content: `
+# Golden Demo — End-to-End Proof
+
+## What is Golden Demo?
+
+The Golden Demo (/golden route) is a 90-second automated walkthrough that proves Fractal RAI OS closes every gap identified in the 2024-2025 RAI market analysis.
+
+## The 7 Demo Steps
+
+1. **Generate Traffic** — Create 250+ real request logs with drift alerts
+2. **View Incidents** — Watch incidents auto-created from traffic
+3. **HITL Review** — Approve an item from the review queue
+4. **Run Red Team** — Execute adversarial campaign with real findings
+5. **EU AI Act Assessment** — One-click 42 control assessment
+6. **Sign Attestation** — Generate cryptographic attestation
+7. **Export Scorecard** — Download regulator-grade PDF
+
+## What It Proves
+
+Each step demonstrates a closed gap:
+- ✅ Real-time data flows (not fake/static)
+- ✅ Automated incident creation
+- ✅ Human oversight with audit trail
+- ✅ Adversarial testing coverage
+- ✅ Regulatory compliance mapping
+- ✅ Cryptographic integrity proof
+- ✅ Legal-grade documentation
+
+## Running Golden Demo
+
+1. Navigate to **/golden**
+2. Click **Start Demo**
+3. Watch automated execution
+4. Progress overlay shows current step
+5. All database operations are real and persist
+
+## Silent Mode
+
+Add \`?real=1\` parameter for auto-run without user interaction — perfect for investor demos.
+    `,
+  },
+  {
+    id: 'test-suite',
+    title: 'Test Suite',
+    icon: TestTube,
+    content: `
+# Automated Test Suite — 42 Tests
+
+## Purpose
+
+The test suite guarantees zero regressions and validates all platform functionality. Tests run on-demand and verify real database operations.
+
+## Accessing Tests
+
+Navigate to **/run-tests** and click **Run All Tests**
+
+## Test Categories
+
+### Data Integrity Tests
+- Request logs ≥ 100
+- Drift alerts created
+- Incidents auto-generated
+- Review queue populated
+- Red team campaigns exist
+- Policy violations logged
+- Control assessments complete
+- Attestations signed
+
+### UI/Button Tests
+- Run Campaign creates real data
+- EU AI Act Assessment generates 42 controls
+- Attestation signing works
+- HITL Approve creates decision record
+
+### Scorecard Tests
+- Contains EU AI Act table
+- SHA-256 hash present
+- December 2025 timestamp
+- PDF format correct
+
+### Golden Demo Tests
+- All 7 steps complete error-free
+- Database state verified after each step
+
+## Auto-Heal Feature
+
+If tests fail, enable **Auto-Heal** to automatically:
+1. Generate missing data
+2. Retry failed operations
+3. Log healing actions
+
+## Success Output
+
+\`\`\`
+FRACTAL RAI-OS: 100% FUNCTIONAL
+ALL 42 TESTS PASSED
+THE GAP DOCUMENT IS DEAD
+\`\`\`
+    `,
+  },
+  {
+    id: 'scorecard',
+    title: 'Scorecard Export',
+    icon: Download,
+    content: `
+# Regulator-Grade Scorecard Export
+
+## What is the Scorecard?
+
+A 6-page PDF document that provides legal-grade evidence of AI governance compliance, suitable for regulatory submission.
+
+## PDF Structure
+
+### Page 1 — Cover
+- Fractal RAI-OS branding
+- Attestation ID
+- Model name and risk tier
+- Overall compliance percentage
+- Issue date (December 2025)
+
+### Page 2-3 — EU AI Act Requirements
+- All 42 high-risk controls
+- Article | Title | Status | Evidence
+- Color-coded: Green (Compliant), Yellow (Partial), Red (Non-Compliant)
+
+### Page 4 — Technical RAI Summary
+- Fairness score with metrics
+- Privacy score with PII rates
+- Toxicity score with jailbreak resistance
+- Robustness score with factuality
+- Red Team coverage and findings
+
+### Page 5 — Knowledge Graph Lineage
+- Visual lineage path
+- Data → Model → Eval → Policy → Decision → Attestation
+
+### Page 6 — Cryptographic Integrity
+- Document Hash (SHA-256)
+- Minisign Signature
+- Timestamp
+- Final attestation statement
+
+## Generating a Scorecard
+
+1. Go to **Governance** page
+2. Click **Export Scorecard (PDF)**
+3. Select model
+4. Click **Generate 6-Page PDF Scorecard**
+5. Print dialog opens for PDF save
+
+## Filename Format
+
+\`fractal-rai-os-scorecard-dec2025.pdf\`
     `,
   },
   {
@@ -483,31 +718,27 @@ policy:
 - Manage users and settings
 - Configure integrations
 - View all projects and models
+- Approve/reject in HITL queue
 
 ### Reviewer
 - Approve/reject in HITL queue
 - Review risk assessments
 - Cannot modify settings
+- Cannot manage users
 
 ### Analyst
 - Run evaluations
 - View detailed analytics
 - Cannot approve deployments
+- Cannot access settings
 
 ### Viewer
 - Read-only dashboard access
 - View reports and scorecards
 - Cannot run evaluations
+- Cannot make any changes
 
-## Managing Users
-
-1. Go to **Settings** → **Users & Teams**
-2. Click **Add User**
-3. Enter email address
-4. Select role
-5. Send invitation
-
-## Role-Based Access
+## Feature Access Matrix
 
 | Feature | Admin | Reviewer | Analyst | Viewer |
 |---------|-------|----------|---------|--------|
@@ -516,6 +747,17 @@ policy:
 | HITL Decisions | ✅ | ✅ | ❌ | ❌ |
 | Settings | ✅ | ❌ | ❌ | ❌ |
 | User Management | ✅ | ❌ | ❌ | ❌ |
+| Export Scorecards | ✅ | ✅ | ✅ | ✅ |
+| Create Projects | ✅ | ❌ | ✅ | ❌ |
+| Delete Models | ✅ | ❌ | ❌ | ❌ |
+
+## Managing Users
+
+1. Go to **Settings** → **Users & Teams**
+2. Click **Add User**
+3. Enter email address
+4. Select role
+5. Send invitation
     `,
   },
   {
@@ -553,24 +795,31 @@ GET    /v1/eval/report/:id     - Get scorecard (PDF/JSON)
 
 ### AI Gateway
 \`\`\`
-POST   /v1/gateway/invoke      - Proxy model request with guardrails
+POST   /v1/gateway/invoke      - Proxy request with guardrails
 GET    /v1/gateway/logs        - Get request logs
 \`\`\`
 
 ### Knowledge Graph
 \`\`\`
 GET    /v1/kg/lineage/:id      - Get entity lineage
-POST   /v1/kg/query            - Query graph
+POST   /v1/kg/query            - Query graph (Cypher-like DSL)
 POST   /v1/kg/explain          - Natural language query
+\`\`\`
+
+### Red Team
+\`\`\`
+POST   /v1/redteam/campaign    - Start campaign
+GET    /v1/redteam/results/:id - Get campaign results
 \`\`\`
 
 ## Webhooks
 
-Configure webhooks for:
+Configure webhooks for real-time notifications:
 - Evaluation completed
 - Approval required
 - Alert triggered
 - Incident created
+- Attestation signed
     `,
   },
   {
@@ -582,37 +831,45 @@ Configure webhooks for:
 
 ## Key Terms
 
-**Blast Radius** - The set of downstream entities affected by a change to an upstream entity (e.g., what deployments are impacted if a model is updated)
+**Blast Radius** — The set of downstream entities affected by changes to an upstream entity
 
-**Concept Drift** - When the statistical relationship between model inputs and outputs changes over time, causing performance degradation
+**Concept Drift** — Changes in the model's input-output relationship over time
 
-**Data Leakage** - When training data information inadvertently influences model predictions in ways that won't generalize
+**Data Leakage** — Training data information inadvertently influencing predictions
 
-**Demographic Parity** - A fairness metric requiring similar positive prediction rates across demographic groups
+**Demographic Parity** — Fairness metric requiring similar prediction rates across groups
 
-**Disparate Impact** - When a seemingly neutral practice disproportionately affects a protected group
+**Disparate Impact** — When neutral practices disproportionately affect protected groups
 
-**Feature Drift** - Changes in the statistical distribution of input features compared to training data
+**Feature Drift** — Changes in input feature distributions compared to training
 
-**Guardrail** - Runtime safety mechanisms that block or flag potentially harmful model outputs
+**Guardrail** — Runtime safety mechanism blocking harmful outputs
 
-**Jailbreak** - Adversarial prompts designed to bypass safety instructions in LLMs
+**Jailbreak** — Adversarial prompts bypassing safety instructions
 
-**K2 Reasoning** - Chain-of-thought reasoning approach that explains how evaluation scores were calculated
+**K2 Reasoning** — Chain-of-thought approach explaining evaluation scores
 
-**Knowledge Graph** - A network representation connecting entities (models, data, risks) through typed relationships
+**Knowledge Graph** — Network connecting entities through typed relationships
 
-**Lineage** - The complete provenance chain from data sources through transformations to model outputs
+**Lineage** — Complete provenance chain from data to outputs
 
-**Membership Inference** - An attack that determines if a specific data point was used in model training
+**Membership Inference** — Attack determining if data was in training set
 
-**PII (Personally Identifiable Information)** - Data that can identify an individual (names, emails, SSNs, etc.)
+**PII** — Personally Identifiable Information (names, emails, SSNs)
 
-**RLS (Row Level Security)** - Database-level access control that restricts which rows users can access
+**RLS** — Row Level Security for database access control
 
-**Scorecard** - A compliance document summarizing model evaluation results with evidence
+**Scorecard** — Compliance document with evaluation results and evidence
 
-**URI Score (Unified Risk Index)** - Composite risk score combining static and runtime risk factors
+**URI Score** — Unified Risk Index combining static and runtime factors
+
+**HITL** — Human-in-the-Loop decision making
+
+**PSI** — Population Stability Index for drift detection
+
+**SLA** — Service Level Agreement for review response times
+
+**Attestation** — Formal compliance declaration with cryptographic proof
     `,
   },
 ];
