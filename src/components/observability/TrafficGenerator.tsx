@@ -34,7 +34,7 @@ export function TrafficGenerator() {
     try {
       const { data, error } = await supabase.functions.invoke('generate-test-traffic', {
         body: { 
-          systemId: selectedSystem || undefined,
+          systemId: selectedSystem === 'all' ? undefined : selectedSystem || undefined,
           count,
         },
       });
@@ -91,7 +91,7 @@ export function TrafficGenerator() {
                   <SelectValue placeholder="All systems" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All systems</SelectItem>
+                  <SelectItem value="all">All systems</SelectItem>
                   {systems?.map((system) => (
                     <SelectItem key={system.id} value={system.id}>
                       {system.name}
