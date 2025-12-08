@@ -244,21 +244,31 @@ export const ALL_TESTS: TestDefinition[] = [
     }
   },
 
-  // 21-22: Realtime Tests
+  // 21-22: Realtime Tests - COMPREHENSIVE with actual data insertion
   {
     id: 21,
-    name: 'Realtime: New request_log updates Observability within 2s',
+    name: 'Realtime: New request_log updates within 2s',
     category: TEST_CATEGORIES.REALTIME,
     test: async () => {
-      return { passed: true }; // Would need actual realtime test
+      const { testRealtimeRequestLogs } = await import('../utils/test-helpers');
+      const result = await testRealtimeRequestLogs();
+      return { 
+        passed: result.passed, 
+        error: result.passed ? undefined : `Realtime latency: ${result.latencyMs}ms (>2000ms or failed)` 
+      };
     }
   },
   {
     id: 22,
-    name: 'Realtime: New drift_alert shows in Alerts instantly',
+    name: 'Realtime: New drift_alert shows within 2s',
     category: TEST_CATEGORIES.REALTIME,
     test: async () => {
-      return { passed: true };
+      const { testRealtimeDriftAlerts } = await import('../utils/test-helpers');
+      const result = await testRealtimeDriftAlerts();
+      return { 
+        passed: result.passed, 
+        error: result.passed ? undefined : `Realtime latency: ${result.latencyMs}ms (>2000ms or failed)` 
+      };
     }
   },
 
