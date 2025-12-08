@@ -11,7 +11,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Slider } from "@/components/ui/slider";
 import { useCreateProject } from "@/hooks/useProjects";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, FolderPlus, Building2, Shield, Database, Gauge, Server } from "lucide-react";
+import { Loader2, FolderPlus, Building2, Shield, Database, Gauge, Server, Globe, Mail } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const projectSchema = z.object({
   name: z.string().min(1, "Project name is required").max(100),
@@ -21,6 +22,10 @@ const projectSchema = z.object({
   data_sensitivity: z.enum(["low", "medium", "high", "critical"]),
   criticality: z.number().min(1).max(10),
   environment: z.enum(["development", "staging", "production"]),
+  // New governance fields
+  data_residency: z.enum(["us", "eu", "uk", "apac", "global"]).default("us"),
+  primary_owner_email: z.string().email("Must be a valid email").optional().or(z.literal("")),
+  compliance_frameworks: z.array(z.string()).default([]),
 });
 
 type ProjectFormData = z.infer<typeof projectSchema>;
@@ -33,7 +38,8 @@ interface CreateProjectFormProps {
 const steps = [
   { id: 1, title: "Basic Info", icon: FolderPlus },
   { id: 2, title: "Sensitivity", icon: Shield },
-  { id: 3, title: "Configuration", icon: Server },
+  { id: 3, title: "Governance", icon: Globe },
+  { id: 4, title: "Configuration", icon: Server },
 ];
 
 export function CreateProjectForm({ open, onOpenChange }: CreateProjectFormProps) {
@@ -51,6 +57,9 @@ export function CreateProjectForm({ open, onOpenChange }: CreateProjectFormProps
       data_sensitivity: "medium",
       criticality: 5,
       environment: "development",
+      data_residency: "us",
+      primary_owner_email: "",
+      compliance_frameworks: [],
     },
   });
 
@@ -64,6 +73,9 @@ export function CreateProjectForm({ open, onOpenChange }: CreateProjectFormProps
         data_sensitivity: data.data_sensitivity,
         criticality: data.criticality,
         environment: data.environment,
+        data_residency: data.data_residency,
+        primary_owner_email: data.primary_owner_email || undefined,
+        compliance_frameworks: data.compliance_frameworks,
       });
       toast({
         title: "Project Created",
@@ -88,11 +100,22 @@ export function CreateProjectForm({ open, onOpenChange }: CreateProjectFormProps
     } else if (currentStep === 2) {
       const valid = await form.trigger(["business_sensitivity", "data_sensitivity"]);
       if (valid) setCurrentStep(3);
+    } else if (currentStep === 3) {
+      const valid = await form.trigger(["data_residency"]);
+      if (valid) setCurrentStep(4);
     }
   };
 
   const prevStep = () => {
     if (currentStep > 1) setCurrentStep(currentStep - 1);
+  };
+
+  const toggleComplianceFramework = (framework: string) => {
+    const current = form.getValues("compliance_frameworks") || [];
+    const updated = current.includes(framework)
+      ? current.filter(f => f !== framework)
+      : [...current, framework];
+    form.setValue("compliance_frameworks", updated);
   };
 
   const getSensitivityColor = (level: string) => {
@@ -282,8 +305,83 @@ export function CreateProjectForm({ open, onOpenChange }: CreateProjectFormProps
               </div>
             )}
 
-            {/* Step 3: Configuration */}
+            {/* Step 3: Governance */}
             {currentStep === 3 && (
+              <div className="space-y-6">
+                <FormField
+                  control={form.control}
+                  name="data_residency"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        <Globe className="h-4 w-4" />
+                        Data Residency
+                      </FormLabel>
+                      <FormDescription>
+                        Where is data processed and stored? (GDPR/compliance requirement)
+                      </FormDescription>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select data residency" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="us">🇺🇸 United States</SelectItem>
+                          <SelectItem value="eu">🇪🇺 European Union</SelectItem>
+                          <SelectItem value="uk">🇬🇧 United Kingdom</SelectItem>
+                          <SelectItem value="apac">🌏 Asia-Pacific</SelectItem>
+                          <SelectItem value="global">🌐 Global (Multi-region)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="primary_owner_email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        <Mail className="h-4 w-4" />
+                        Primary Owner Email
+                      </FormLabel>
+                      <FormControl>
+                        <Input placeholder="owner@company.com" type="email" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Accountable person for this project's governance.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="space-y-3">
+                  <FormLabel>Compliance Frameworks</FormLabel>
+                  <FormDescription>Select all applicable frameworks</FormDescription>
+                  <div className="grid grid-cols-2 gap-2">
+                    {["gdpr", "ccpa", "hipaa", "sox", "eu-ai-act", "nist"].map((framework) => (
+                      <div key={framework} className="flex items-center space-x-2 p-3 rounded-lg border hover:bg-muted/50">
+                        <Checkbox
+                          id={`framework-${framework}`}
+                          checked={form.watch("compliance_frameworks")?.includes(framework)}
+                          onCheckedChange={() => toggleComplianceFramework(framework)}
+                        />
+                        <label htmlFor={`framework-${framework}`} className="cursor-pointer uppercase text-sm font-medium">
+                          {framework}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Step 4: Configuration */}
+            {currentStep === 4 && (
               <div className="space-y-6">
                 <FormField
                   control={form.control}
@@ -384,7 +482,7 @@ export function CreateProjectForm({ open, onOpenChange }: CreateProjectFormProps
                 Back
               </Button>
 
-              {currentStep < 3 ? (
+              {currentStep < 4 ? (
                 <Button type="button" onClick={nextStep}>
                   Next
                 </Button>
