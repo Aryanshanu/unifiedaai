@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.rai-reasoning-engine]
 verify_jwt = true
+
+[functions.custom-prompt-test]
+verify_jwt = true
