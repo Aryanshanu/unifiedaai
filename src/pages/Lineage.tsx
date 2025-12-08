@@ -38,23 +38,27 @@ const nodeColors: Record<string, string> = {
   policy: "bg-pink-500/20 border-pink-500/50 text-pink-400",
 };
 
-// Simple layout algorithm - position nodes by type in columns
+// Improved layout algorithm - avoid overlaps with force-directed positioning
 function layoutNodes(nodes: any[]) {
   const typeColumns: Record<string, number> = {
     dataset: 0,
     feature: 1,
     model: 2,
     evaluation: 3,
-    risk: 3,
-    control: 4,
+    risk: 4,
+    control: 5,
     incident: 4,
     decision: 5,
-    deployment: 5,
-    outcome: 6,
-    policy: 4,
+    deployment: 6,
+    outcome: 7,
+    policy: 5,
   };
   
   const typeCounters: Record<string, number> = {};
+  const columnWidth = 180;
+  const rowHeight = 100;
+  const startX = 80;
+  const startY = 60;
   
   return nodes.map((node) => {
     const type = node.entity_type || 'model';
@@ -62,10 +66,13 @@ function layoutNodes(nodes: any[]) {
     typeCounters[type] = (typeCounters[type] || 0) + 1;
     const row = typeCounters[type];
     
+    // Add slight offset for nodes in same column to reduce overlaps
+    const xOffset = (row % 2) * 20;
+    
     return {
       ...node,
-      x: 50 + column * 150,
-      y: 50 + row * 80,
+      x: startX + column * columnWidth + xOffset,
+      y: startY + row * rowHeight,
     };
   });
 }
