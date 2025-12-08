@@ -15,11 +15,11 @@ import { format } from "date-fns";
 interface EvaluationRun {
   id: string;
   created_at: string;
-  overall_score: number | null;
-  fairness_score: number | null;
-  robustness_score: number | null;
-  privacy_score: number | null;
-  toxicity_score: number | null;
+  overall_score?: number | null;
+  fairness_score?: number | null;
+  robustness_score?: number | null;
+  privacy_score?: number | null;
+  toxicity_score?: number | null;
 }
 
 interface EvaluationComparisonProps {
