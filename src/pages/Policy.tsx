@@ -1,16 +1,21 @@
+import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { Button } from "@/components/ui/button";
 import { Lock, Shield, Play, Plus, AlertTriangle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { usePolicyPacks, useRedTeamCampaigns, usePolicyStats } from "@/hooks/usePolicies";
+import { usePolicyPacks, useRedTeamCampaigns, usePolicyStats, useCreatePolicyPack } from "@/hooks/usePolicies";
 import { useModels } from "@/hooks/useModels";
+import { PolicyDSLEditor } from "@/components/policy/PolicyDSLEditor";
+import { RedTeamCampaignForm } from "@/components/policy/RedTeamCampaignForm";
 
 export default function Policy() {
   const { data: policies, isLoading: policiesLoading } = usePolicyPacks();
   const { data: campaigns, isLoading: campaignsLoading } = useRedTeamCampaigns();
   const { data: stats, isLoading: statsLoading } = usePolicyStats();
   const { data: models } = useModels();
+  const [showPolicyEditor, setShowPolicyEditor] = useState(false);
+  const [showCampaignForm, setShowCampaignForm] = useState(false);
 
   const getModelName = (modelId: string | null) => {
     if (!modelId || !models) return 'Unknown Model';
@@ -59,7 +64,7 @@ export default function Policy() {
               <Lock className="w-4 h-4 text-primary" />
               Policy Packs
             </h2>
-            <Button variant="gradient" size="sm">
+            <Button variant="gradient" size="sm" onClick={() => setShowPolicyEditor(true)}>
               <Plus className="w-4 h-4 mr-2" />
               New Policy
             </Button>
@@ -117,7 +122,7 @@ export default function Policy() {
               <AlertTriangle className="w-4 h-4 text-warning" />
               Red Team Campaigns
             </h2>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={() => setShowCampaignForm(true)}>
               <Play className="w-4 h-4 mr-2" />
               New Campaign
             </Button>
@@ -179,6 +184,18 @@ export default function Policy() {
           )}
         </div>
       </div>
+
+      {/* Policy Editor Dialog */}
+      <PolicyDSLEditor 
+        open={showPolicyEditor} 
+        onOpenChange={setShowPolicyEditor} 
+      />
+
+      {/* Red Team Campaign Form Dialog */}
+      <RedTeamCampaignForm 
+        open={showCampaignForm} 
+        onOpenChange={setShowCampaignForm} 
+      />
     </MainLayout>
   );
 }

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Check, X, AlertTriangle, Code, Play, Save, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -57,8 +57,16 @@ interface CompiledResult {
   errors?: string[];
 }
 
-export function PolicyDSLEditor() {
-  const [isOpen, setIsOpen] = useState(false);
+interface PolicyDSLEditorProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+export function PolicyDSLEditor({ open, onOpenChange }: PolicyDSLEditorProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isOpen = open !== undefined ? open : internalOpen;
+  const setIsOpen = onOpenChange || setInternalOpen;
+  
   const [dsl, setDsl] = useState(defaultPolicy);
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [compiled, setCompiled] = useState<CompiledResult | null>(null);
@@ -134,12 +142,6 @@ export function PolicyDSLEditor() {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button variant="gradient" size="sm">
-          <Code className="w-4 h-4 mr-2" />
-          New Policy
-        </Button>
-      </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
