@@ -15,6 +15,8 @@ import { telemetry, traceAsync, instrumentPageLoad } from "@/lib/telemetry";
 import { useRAIReasoning } from "@/hooks/useRAIReasoning";
 import { ReasoningChainDisplay } from "@/components/engines/ReasoningChainDisplay";
 import { CustomPromptTest } from "@/components/engines/CustomPromptTest";
+import { HealthIndicator } from "@/components/shared/HealthIndicator";
+import { useDataHealth } from "@/components/shared/DataHealthWrapper";
 
 interface ExplainabilityMetrics {
   reasoning_quality: number;
@@ -51,7 +53,7 @@ interface ExplainabilityResult {
 
 export default function ExplainabilityEngine() {
   const [selectedModelId, setSelectedModelId] = useState<string>("");
-  const { data: models } = useModels();
+  const { data: models, isLoading: modelsLoading, refetch: refetchModels } = useModels();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { runReasoningEvaluation, isEvaluating } = useRAIReasoning();
@@ -61,7 +63,7 @@ export default function ExplainabilityEngine() {
     return () => endTrace();
   }, []);
 
-  const { data: results, isLoading: loadingResults } = useQuery({
+  const { data: results, isLoading: loadingResults, isError: resultsError, refetch: refetchResults } = useQuery({
     queryKey: ["explainability-results", selectedModelId],
     queryFn: async () => {
       if (!selectedModelId) return [];
@@ -79,6 +81,14 @@ export default function ExplainabilityEngine() {
   });
 
   const latestResult = results?.[0];
+  
+  const isLoading = modelsLoading || loadingResults;
+  const { status, lastUpdated } = useDataHealth(isLoading, resultsError);
+  
+  const handleRetry = () => {
+    refetchModels();
+    if (selectedModelId) refetchResults();
+  };
 
   const runEvaluation = async () => {
     if (!selectedModelId) {
@@ -133,6 +143,14 @@ export default function ExplainabilityEngine() {
     <MainLayout 
       title="Explainability Engine" 
       subtitle="Analyze reasoning quality, transparency, and decision clarity with K2 Chain-of-Thought"
+      headerActions={
+        <HealthIndicator 
+          status={status} 
+          lastUpdated={lastUpdated} 
+          onRetry={handleRetry}
+          showLabel 
+        />
+      }
     >
       {/* Header Badge */}
       <div className="flex items-center gap-2 mb-4">

@@ -15,6 +15,8 @@ import { telemetry, traceAsync, instrumentPageLoad } from "@/lib/telemetry";
 import { useRAIReasoning } from "@/hooks/useRAIReasoning";
 import { ReasoningChainDisplay } from "@/components/engines/ReasoningChainDisplay";
 import { CustomPromptTest } from "@/components/engines/CustomPromptTest";
+import { HealthIndicator } from "@/components/shared/HealthIndicator";
+import { useDataHealth } from "@/components/shared/DataHealthWrapper";
 
 interface PrivacyMetrics {
   pii_detection: number;
@@ -52,7 +54,7 @@ interface PrivacyResult {
 
 export default function PrivacyEngine() {
   const [selectedModelId, setSelectedModelId] = useState<string>("");
-  const { data: models } = useModels();
+  const { data: models, isLoading: modelsLoading, refetch: refetchModels } = useModels();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { runReasoningEvaluation, isEvaluating } = useRAIReasoning();
@@ -62,7 +64,7 @@ export default function PrivacyEngine() {
     return () => endTrace();
   }, []);
 
-  const { data: results, isLoading: loadingResults } = useQuery({
+  const { data: results, isLoading: loadingResults, isError: resultsError, refetch: refetchResults } = useQuery({
     queryKey: ["privacy-results", selectedModelId],
     queryFn: async () => {
       if (!selectedModelId) return [];
@@ -80,6 +82,14 @@ export default function PrivacyEngine() {
   });
 
   const latestResult = results?.[0];
+  
+  const isLoading = modelsLoading || loadingResults;
+  const { status, lastUpdated } = useDataHealth(isLoading, resultsError);
+  
+  const handleRetry = () => {
+    refetchModels();
+    if (selectedModelId) refetchResults();
+  };
 
   const runEvaluation = async () => {
     if (!selectedModelId) {
@@ -134,6 +144,14 @@ export default function PrivacyEngine() {
     <MainLayout 
       title="Privacy Engine" 
       subtitle="Detect PII leakage, data memorization, and privacy risks with K2 Chain-of-Thought"
+      headerActions={
+        <HealthIndicator 
+          status={status} 
+          lastUpdated={lastUpdated} 
+          onRetry={handleRetry}
+          showLabel 
+        />
+      }
     >
       {/* Header Badge */}
       <div className="flex items-center gap-2 mb-4">

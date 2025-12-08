@@ -8,12 +8,24 @@ import { cn } from "@/lib/utils";
 import { useControlFrameworks, useControls, useComplianceStats, useAttestations } from "@/hooks/useGovernance";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
+import { HealthIndicator } from "@/components/shared/HealthIndicator";
+import { useDataHealth } from "@/components/shared/DataHealthWrapper";
 
 export default function Governance() {
-  const { data: frameworks, isLoading: frameworksLoading } = useControlFrameworks();
-  const { data: controls } = useControls();
-  const { data: complianceStats } = useComplianceStats();
-  const { data: attestations, isLoading: attestationsLoading } = useAttestations();
+  const { data: frameworks, isLoading: frameworksLoading, isError: frameworksError, refetch: refetchFrameworks } = useControlFrameworks();
+  const { data: controls, isLoading: controlsLoading, refetch: refetchControls } = useControls();
+  const { data: complianceStats, isLoading: statsLoading, refetch: refetchStats } = useComplianceStats();
+  const { data: attestations, isLoading: attestationsLoading, refetch: refetchAttestations } = useAttestations();
+
+  const isLoading = frameworksLoading || controlsLoading || statsLoading || attestationsLoading;
+  const { status, lastUpdated } = useDataHealth(isLoading, frameworksError);
+  
+  const handleRetry = () => {
+    refetchFrameworks();
+    refetchControls();
+    refetchStats();
+    refetchAttestations();
+  };
 
   // Control groups for compliance gauge
   const controlGroups = frameworks?.map(f => ({
@@ -31,7 +43,18 @@ export default function Governance() {
   const recentAttestations = attestations?.slice(0, 3) || [];
 
   return (
-    <MainLayout title="Governance & Compliance" subtitle="Regulatory controls, risk assessments, and compliance attestations">
+    <MainLayout 
+      title="Governance & Compliance" 
+      subtitle="Regulatory controls, risk assessments, and compliance attestations"
+      headerActions={
+        <HealthIndicator 
+          status={status} 
+          lastUpdated={lastUpdated} 
+          onRetry={handleRetry}
+          showLabel 
+        />
+      }
+    >
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <MetricCard
@@ -89,14 +112,14 @@ export default function Governance() {
                 {frameworks?.map((framework) => {
                   const satisfied = Math.round((complianceStats?.complianceScore || 0) / 100 * framework.total_controls);
                   const pct = framework.total_controls > 0 ? Math.round((satisfied / framework.total_controls) * 100) : 0;
-                  const status = pct >= 90 ? "success" : pct >= 70 ? "warning" : "danger";
+                  const fwStatus = pct >= 90 ? "success" : pct >= 70 ? "warning" : "danger";
                   return (
                     <div key={framework.id} className="bg-secondary/30 rounded-xl p-4">
                       <div className="flex items-center justify-between mb-3">
                         <span className="font-medium text-foreground">{framework.name}</span>
                         <span className={cn(
                           "text-2xl font-bold font-mono",
-                          status === "success" ? "text-success" : status === "warning" ? "text-warning" : "text-danger"
+                          fwStatus === "success" ? "text-success" : fwStatus === "warning" ? "text-warning" : "text-danger"
                         )}>
                           {pct}%
                         </span>
@@ -105,7 +128,7 @@ export default function Governance() {
                         <div
                           className={cn(
                             "h-full rounded-full transition-all",
-                            status === "success" ? "bg-success" : status === "warning" ? "bg-warning" : "bg-danger"
+                            fwStatus === "success" ? "bg-success" : fwStatus === "warning" ? "bg-warning" : "bg-danger"
                           )}
                           style={{ width: `${pct}%` }}
                         />

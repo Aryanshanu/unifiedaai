@@ -7,12 +7,23 @@ import { PlatformHealthCards } from "@/components/dashboard/PlatformHealthCards"
 import { useUnsafeDeployments, usePlatformMetrics } from "@/hooks/usePlatformMetrics";
 import { Database, Scale, AlertCircle, ShieldAlert, Lock, Eye, Plus, AlertOctagon, ArrowRight, Shield } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { HealthIndicator } from "@/components/shared/HealthIndicator";
+import { useDataHealth } from "@/components/shared/DataHealthWrapper";
 
 export default function Index() {
-  const { data: models } = useModels();
-  const { data: unsafeDeployments } = useUnsafeDeployments();
-  const { data: metrics } = usePlatformMetrics();
+  const { data: models, isLoading: modelsLoading, isError: modelsError, refetch: refetchModels } = useModels();
+  const { data: unsafeDeployments, isLoading: deploymentsLoading } = useUnsafeDeployments();
+  const { data: metrics, isLoading: metricsLoading, isError: metricsError, refetch: refetchMetrics } = usePlatformMetrics();
   const navigate = useNavigate();
+  
+  const isLoading = modelsLoading || deploymentsLoading || metricsLoading;
+  const isError = modelsError || metricsError;
+  const { status, lastUpdated } = useDataHealth(isLoading, isError);
+  
+  const handleRetry = () => {
+    refetchModels();
+    refetchMetrics();
+  };
 
   const engines = [
     { 
@@ -53,7 +64,18 @@ export default function Index() {
   ];
 
   return (
-    <MainLayout title="Dashboard" subtitle="Fractal RAI Platform Overview">
+    <MainLayout 
+      title="Dashboard" 
+      subtitle="Fractal RAI Platform Overview"
+      headerActions={
+        <HealthIndicator 
+          status={status} 
+          lastUpdated={lastUpdated} 
+          onRetry={handleRetry}
+          showLabel 
+        />
+      }
+    >
       {/* Unsafe Deployment Alert */}
       {(unsafeDeployments?.length || 0) > 0 && (
         <div className="p-4 mb-6 rounded-xl border-2 border-destructive bg-destructive/5 flex items-start gap-4">

@@ -1,3 +1,4 @@
+import { ReactNode } from "react";
 import { Bell, Search, User, LogOut, Settings, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,9 +18,10 @@ import { useNavigate } from "react-router-dom";
 interface HeaderProps {
   title: string;
   subtitle?: string;
+  headerActions?: ReactNode;
 }
 
-export function Header({ title, subtitle }: HeaderProps) {
+export function Header({ title, subtitle, headerActions }: HeaderProps) {
   const { user, profile, roles, signOut } = useAuth();
   const navigate = useNavigate();
 
@@ -43,6 +45,9 @@ export function Header({ title, subtitle }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-4">
+        {/* Header Actions (Health Indicators, etc.) */}
+        {headerActions}
+        
         {/* Search */}
         <div className="relative hidden md:block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
