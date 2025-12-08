@@ -274,8 +274,16 @@ ${hash}
     toast.info('Generating compliance scorecard...');
     
     try {
+      // Get a real model ID for scorecard generation
+      const { data: models } = await supabase.from('models').select('id').limit(1);
+      const modelId = models?.[0]?.id;
+      
+      if (!modelId) {
+        throw new Error('No model available');
+      }
+      
       const { data } = await supabase.functions.invoke('generate-scorecard', {
-        body: { format: 'json' }
+        body: { modelId, format: 'json' }
       });
       
       const scorecardContent = JSON.stringify({
