@@ -12,11 +12,11 @@ import {
   Maximize, 
   Loader2,
   Target,
-  MessageSquare,
-  X
+  X,
+  RefreshCw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useKGNodes, useKGEdges, useKnowledgeGraphStats, useKGLineage, useKGExplain } from "@/hooks/useKnowledgeGraph";
+import { useKGNodes, useKGEdges, useKnowledgeGraphStats, useKGLineage, useKGExplain, useKGSync } from "@/hooks/useKnowledgeGraph";
 import { useMemo, useState, useCallback } from "react";
 import { NodeDetailPanel } from "@/components/lineage/NodeDetailPanel";
 import { ExplainDialog } from "@/components/lineage/ExplainDialog";
@@ -69,9 +69,9 @@ function layoutNodes(nodes: any[]) {
 }
 
 export default function Lineage() {
-  const { data: nodes, isLoading: nodesLoading } = useKGNodes();
-  const { data: edges, isLoading: edgesLoading } = useKGEdges();
-  const { data: stats, isLoading: statsLoading } = useKnowledgeGraphStats();
+  const { data: nodes, isLoading: nodesLoading, refetch: refetchNodes } = useKGNodes();
+  const { data: edges, isLoading: edgesLoading, refetch: refetchEdges } = useKGEdges();
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useKnowledgeGraphStats();
   
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedNode, setSelectedNode] = useState<any>(null);
@@ -86,8 +86,25 @@ export default function Lineage() {
   );
 
   const { mutate: explain, isPending: isExplaining, data: explanation } = useKGExplain();
+  const { mutate: syncKG, isPending: isSyncing } = useKGSync();
 
   const isLoading = nodesLoading || edgesLoading;
+
+  const handleSync = useCallback(() => {
+    syncKG(undefined, {
+      onSuccess: (data: any) => {
+        toast.success("Knowledge Graph synced!", {
+          description: data.message || `Synced ${data.stats?.nodes_created || 0} nodes and ${data.stats?.edges_created || 0} edges`
+        });
+        refetchNodes();
+        refetchEdges();
+        refetchStats();
+      },
+      onError: (error) => {
+        toast.error("Sync failed", { description: error.message });
+      }
+    });
+  }, [syncKG, refetchNodes, refetchEdges, refetchStats]);
 
   const layoutedNodes = useMemo(() => {
     if (!nodes) return [];
@@ -247,6 +264,15 @@ export default function Lineage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleSync}
+              disabled={isSyncing}
+            >
+              <RefreshCw className={cn("w-4 h-4 mr-2", isSyncing && "animate-spin")} />
+              {isSyncing ? "Syncing..." : "Sync Graph"}
+            </Button>
             <Button variant="ghost" size="iconSm">
               <ZoomOut className="w-4 h-4" />
             </Button>

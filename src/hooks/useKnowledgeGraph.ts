@@ -139,3 +139,21 @@ export function useKGUpsert() {
     },
   });
 }
+
+export function useKGSync() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('kg-sync', {
+        body: {},
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['kg-nodes'] });
+      queryClient.invalidateQueries({ queryKey: ['kg-edges'] });
+      queryClient.invalidateQueries({ queryKey: ['kg', 'stats'] });
+    },
+  });
+}
