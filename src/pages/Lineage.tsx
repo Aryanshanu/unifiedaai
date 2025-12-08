@@ -17,11 +17,13 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useKGNodes, useKGEdges, useKnowledgeGraphStats, useKGLineage, useKGExplain, useKGSync } from "@/hooks/useKnowledgeGraph";
-import { useMemo, useState, useCallback, useEffect } from "react";
+import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { NodeDetailPanel } from "@/components/lineage/NodeDetailPanel";
 import { ExplainDialog } from "@/components/lineage/ExplainDialog";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { HealthIndicator } from "@/components/shared/HealthIndicator";
+import { HealthStatus } from "@/hooks/useSelfHealing";
 const nodeColors: Record<string, string> = {
   dataset: "bg-blue-500/20 border-blue-500/50 text-blue-400",
   feature: "bg-purple-500/20 border-purple-500/50 text-purple-400",
@@ -89,8 +91,39 @@ export default function Lineage() {
   const { mutate: syncKG, isPending: isSyncing } = useKGSync();
 
   const isLoading = nodesLoading || edgesLoading;
+  
+  // Health status tracking
+  const [healthStatus, setHealthStatus] = useState<HealthStatus>('healthy');
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  
+  // Debounce timer ref for auto-sync
+  const syncDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const DEBOUNCE_DELAY = 2000; // 2 seconds
 
-  // Auto-sync when models or evaluations change
+  // Debounced sync function
+  const debouncedSync = useCallback(() => {
+    if (syncDebounceRef.current) {
+      clearTimeout(syncDebounceRef.current);
+    }
+    
+    syncDebounceRef.current = setTimeout(() => {
+      setHealthStatus('loading');
+      syncKG(undefined, {
+        onSuccess: () => {
+          refetchNodes();
+          refetchEdges();
+          refetchStats();
+          setHealthStatus('healthy');
+          setLastUpdated(new Date());
+        },
+        onError: () => {
+          setHealthStatus('failed');
+        }
+      });
+    }, DEBOUNCE_DELAY);
+  }, [syncKG, refetchNodes, refetchEdges, refetchStats]);
+
+  // Auto-sync when models or evaluations change (with debouncing)
   useEffect(() => {
     const channel = supabase
       .channel('kg-auto-sync')
@@ -98,52 +131,65 @@ export default function Lineage() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'models' },
         () => {
-          toast.info("Model changed, syncing Knowledge Graph...");
-          syncKG(undefined, {
-            onSuccess: () => {
-              refetchNodes();
-              refetchEdges();
-              refetchStats();
-            }
-          });
+          toast.info("Model changed, syncing...", { duration: 1500 });
+          debouncedSync();
         }
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'evaluation_runs' },
         () => {
-          toast.info("Evaluation updated, syncing Knowledge Graph...");
-          syncKG(undefined, {
-            onSuccess: () => {
-              refetchNodes();
-              refetchEdges();
-              refetchStats();
-            }
-          });
+          toast.info("Evaluation updated, syncing...", { duration: 1500 });
+          debouncedSync();
         }
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
+      if (syncDebounceRef.current) {
+        clearTimeout(syncDebounceRef.current);
+      }
     };
-  }, [syncKG, refetchNodes, refetchEdges, refetchStats]);
+  }, [debouncedSync]);
+  
+  // Set initial health status based on data loading
+  useEffect(() => {
+    if (nodesLoading || edgesLoading) {
+      setHealthStatus('loading');
+    } else if (nodes && edges) {
+      setHealthStatus('healthy');
+      if (!lastUpdated) {
+        setLastUpdated(new Date());
+      }
+    }
+  }, [nodesLoading, edgesLoading, nodes, edges, lastUpdated]);
 
   const handleSync = useCallback(() => {
+    setHealthStatus('loading');
+    const startTime = Date.now();
+    
     syncKG(undefined, {
       onSuccess: (data: any) => {
-        toast.success("Knowledge Graph synced!", {
-          description: data.message || `Synced ${data.stats?.nodes_created || 0} nodes and ${data.stats?.edges_created || 0} edges`
-        });
+        const duration = data?.duration_ms || (Date.now() - startTime);
+        toast.success(`Synced in ${duration}ms`);
         refetchNodes();
         refetchEdges();
         refetchStats();
+        setHealthStatus('healthy');
+        setLastUpdated(new Date());
       },
       onError: (error) => {
-        toast.error("Sync failed", { description: error.message });
+        toast.error("Sync failed");
+        console.error("KG Sync error:", error);
+        setHealthStatus('failed');
       }
     });
   }, [syncKG, refetchNodes, refetchEdges, refetchStats]);
+  
+  const handleRetry = useCallback(() => {
+    handleSync();
+  }, [handleSync]);
 
   const layoutedNodes = useMemo(() => {
     if (!nodes) return [];
@@ -302,7 +348,13 @@ export default function Lineage() {
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <HealthIndicator 
+              status={healthStatus}
+              lastUpdated={lastUpdated}
+              onRetry={handleRetry}
+              showLabel
+            />
             <Button 
               variant="outline" 
               size="sm" 
@@ -310,7 +362,7 @@ export default function Lineage() {
               disabled={isSyncing}
             >
               <RefreshCw className={cn("w-4 h-4 mr-2", isSyncing && "animate-spin")} />
-              {isSyncing ? "Syncing..." : "Sync Graph"}
+              {isSyncing ? "Syncing..." : "Sync"}
             </Button>
             <Button variant="ghost" size="iconSm">
               <ZoomOut className="w-4 h-4" />
