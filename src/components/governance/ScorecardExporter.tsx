@@ -63,22 +63,38 @@ export function ScorecardExporter() {
     setIsGenerating(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke('generate-scorecard', {
-        body: { modelId: selectedModel, format: 'pdf' },
-      });
+      // Call the edge function directly via fetch to get raw HTML
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-scorecard`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ modelId: selectedModel, format: 'pdf' }),
+        }
+      );
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error('Failed to generate scorecard');
+      }
 
-      // Open HTML in new window for PDF printing
-      const printWindow = window.open('', '_blank');
+      // Get the raw HTML text
+      const htmlContent = await response.text();
+      
+      // Open in new window and write the HTML directly
+      const printWindow = window.open('', '_blank', 'width=900,height=700');
       if (printWindow) {
-        printWindow.document.write(data);
+        printWindow.document.open();
+        printWindow.document.write(htmlContent);
         printWindow.document.close();
-        printWindow.focus();
       }
       
       toast.success('Legal-grade EU AI Act Scorecard exported — ready for regulators');
     } catch (error: any) {
+      console.error('PDF generation error:', error);
       toast.error('PDF generation failed: ' + error.message);
     } finally {
       setIsGenerating(false);
