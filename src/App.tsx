@@ -26,7 +26,11 @@ import PrivacyEngine from "./pages/engines/PrivacyEngine";
 import ExplainabilityEngine from "./pages/engines/ExplainabilityEngine";
 import Settings from "./pages/Settings";
 import Documentation from "./pages/Documentation";
+import Governance from "./pages/Governance";
+import Evaluation from "./pages/Evaluation";
+import GoldenDemo from "./pages/GoldenDemo";
 import NotFound from "./pages/NotFound";
+import { GlobalBanner } from "./components/layout/GlobalBanner";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +41,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <GlobalBanner />
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
@@ -47,6 +52,7 @@ const App = () => (
             <Route path="/models" element={<ProtectedRoute><Models /></ProtectedRoute>} />
             <Route path="/models/:id" element={<ProtectedRoute><ModelDetail /></ProtectedRoute>} />
             {/* Governance */}
+            <Route path="/governance" element={<ProtectedRoute><Governance /></ProtectedRoute>} />
             <Route path="/governance/approvals" element={
               <ProtectedRoute requiredRoles={['admin', 'reviewer']}>
                 <Approvals />
@@ -59,6 +65,7 @@ const App = () => (
             {/* Monitoring */}
             <Route path="/observability" element={<ProtectedRoute><Observability /></ProtectedRoute>} />
             <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
+            <Route path="/evaluation" element={<ProtectedRoute><Evaluation /></ProtectedRoute>} />
             {/* Core RAI Engines */}
             <Route path="/engine/fairness" element={<ProtectedRoute><FairnessEngine /></ProtectedRoute>} />
             <Route path="/engine/hallucination" element={<ProtectedRoute><HallucinationEngine /></ProtectedRoute>} />
@@ -74,6 +81,8 @@ const App = () => (
               </ProtectedRoute>
             } />
             <Route path="/docs" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
+            {/* Golden Demo (hidden) */}
+            <Route path="/golden" element={<GoldenDemo />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
