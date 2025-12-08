@@ -118,27 +118,75 @@ async function callLovableAI(systemPrompt: string, userPrompt: string): Promise<
 async function callTargetModel(endpoint: string, apiToken: string, prompt: string): Promise<string> {
   console.log("Calling target model at:", endpoint);
   
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+  // Detect endpoint type and format request accordingly
+  const isOpenRouter = endpoint.includes("openrouter.ai");
+  const isHuggingFace = endpoint.includes("huggingface.co") || endpoint.includes("api-inference.huggingface.co");
+  
+  let requestUrl = endpoint;
+  let requestBody: any;
+  let requestHeaders: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (isOpenRouter) {
+    // OpenRouter uses OpenAI-compatible format
+    // Extract model ID from URL like https://openrouter.ai/meta-llama/llama-3.3-70b-instruct:free
+    const modelMatch = endpoint.match(/openrouter\.ai\/(.+)$/);
+    const modelId = modelMatch ? modelMatch[1] : "meta-llama/llama-3.3-70b-instruct:free";
+    
+    requestUrl = "https://openrouter.ai/api/v1/chat/completions";
+    requestHeaders["Authorization"] = `Bearer ${apiToken}`;
+    requestHeaders["HTTP-Referer"] = "https://fractal-rai.lovable.app";
+    requestHeaders["X-Title"] = "Fractal RAI Platform";
+    requestBody = {
+      model: modelId,
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 500,
+      temperature: 0.7,
+    };
+    console.log("Using OpenRouter format with model:", modelId);
+  } else if (isHuggingFace) {
+    // HuggingFace Inference API format
+    requestHeaders["Authorization"] = `Bearer ${apiToken}`;
+    requestBody = {
       inputs: prompt,
       parameters: { max_new_tokens: 500, temperature: 0.7 },
-    }),
+    };
+    console.log("Using HuggingFace format");
+  } else {
+    // Default: try OpenAI-compatible format
+    requestHeaders["Authorization"] = `Bearer ${apiToken}`;
+    requestBody = {
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 500,
+      temperature: 0.7,
+    };
+    console.log("Using default OpenAI-compatible format");
+  }
+
+  console.log("Request URL:", requestUrl);
+  
+  const response = await fetch(requestUrl, {
+    method: "POST",
+    headers: requestHeaders,
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
     console.error("Target model error:", response.status, errorText);
-    throw new Error(`Model call failed: ${response.status}`);
+    throw new Error(`Model call failed: ${response.status} - ${errorText.substring(0, 200)}`);
   }
 
   const data = await response.json();
+  console.log("Model response structure:", Object.keys(data));
   
-  if (Array.isArray(data) && data[0]?.generated_text) {
+  // Handle different response formats
+  if (data.choices?.[0]?.message?.content) {
+    // OpenAI/OpenRouter format
+    return data.choices[0].message.content;
+  } else if (Array.isArray(data) && data[0]?.generated_text) {
+    // HuggingFace format
     return data[0].generated_text;
   } else if (typeof data === "string") {
     return data;
@@ -146,8 +194,8 @@ async function callTargetModel(endpoint: string, apiToken: string, prompt: strin
     return data.generated_text;
   } else if (data.text) {
     return data.text;
-  } else if (data.choices?.[0]?.message?.content) {
-    return data.choices[0].message.content;
+  } else if (data.output) {
+    return data.output;
   }
   
   return JSON.stringify(data);
