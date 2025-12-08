@@ -226,14 +226,22 @@ export default function Lineage() {
   useMemo(() => {
     if (lineageData?.blast_radius) {
       const affectedIds = new Set<string>();
-      lineageData.blast_radius.forEach((item: any) => {
-        if (item.node_id) affectedIds.add(item.node_id);
-        if (item.id) affectedIds.add(item.id);
-      });
-      // Also add downstream nodes
-      lineageData.downstream?.forEach((item: any) => {
-        if (item.id) affectedIds.add(item.id);
-      });
+      // blast_radius is an object with critical_paths array, not an array itself
+      const criticalPaths = lineageData.blast_radius.critical_paths;
+      if (Array.isArray(criticalPaths)) {
+        criticalPaths.forEach((item: any) => {
+          if (item.node_id) affectedIds.add(item.node_id);
+          if (item.id) affectedIds.add(item.id);
+        });
+      }
+      // Also add downstream nodes from lineage
+      if (Array.isArray(lineageData.nodes)) {
+        lineageData.nodes.forEach((node: any) => {
+          if (node.direction === 'downstream' && node.id) {
+            affectedIds.add(node.id);
+          }
+        });
+      }
       setBlastRadiusNodes(affectedIds);
     }
   }, [lineageData]);
