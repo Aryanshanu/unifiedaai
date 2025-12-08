@@ -2,12 +2,19 @@ import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Settings as SettingsIcon, User, Shield, Bell, Database, Key, Globe, Loader2, Check } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Settings as SettingsIcon, User, Shield, Bell, Database, Key, Globe, Loader2, Check, Plus, Trash2, Copy, Eye, EyeOff, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings, useUpdateSettings } from "@/hooks/useSettings";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UsersTeamsSection } from "@/components/settings/UsersTeamsSection";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { toast } from "sonner";
 
 const settingsSections = [
   { id: "general", icon: SettingsIcon, label: "General", description: "Basic configuration and preferences" },
@@ -19,8 +26,14 @@ const settingsSections = [
   { id: "regions", icon: Globe, label: "Regions & Compliance", description: "Jurisdictional settings" },
 ];
 
+// Mock API keys for demonstration
+const MOCK_API_KEYS = [
+  { id: '1', name: 'Production API Key', key: 'fra_prod_****...8x2k', created: '2025-11-15', lastUsed: '2025-12-08', status: 'active' },
+  { id: '2', name: 'Development Key', key: 'fra_dev_****...j4mn', created: '2025-10-20', lastUsed: '2025-12-07', status: 'active' },
+];
+
 export default function Settings() {
-  const { toast } = useToast();
+  const { toast: toastHook } = useToast();
   const { data: settings, isLoading } = useSettings();
   const updateSettings = useUpdateSettings();
   const [activeSection, setActiveSection] = useState("general");
@@ -30,6 +43,44 @@ export default function Settings() {
     default_workspace: "",
     timezone: "",
     data_retention_days: 365,
+  });
+
+  // Security settings state
+  const [securitySettings, setSecuritySettings] = useState({
+    mfaEnabled: false,
+    sessionTimeout: 60,
+    passwordMinLength: 12,
+    requireSpecialChars: true,
+    ssoEnabled: false,
+    ipWhitelist: "",
+  });
+
+  // Notification settings state
+  const [notificationSettings, setNotificationSettings] = useState({
+    slackWebhookUrl: "",
+    emailAlerts: true,
+    criticalAlertsOnly: false,
+    dailyDigest: true,
+    incidentNotifications: true,
+    reviewReminders: true,
+  });
+
+  // Integration settings state
+  const [integrations, setIntegrations] = useState({
+    huggingFaceConnected: true,
+    mlflowEnabled: false,
+    openTelemetryEnabled: true,
+    slackConnected: false,
+    pagerDutyConnected: false,
+  });
+
+  // Compliance settings
+  const [complianceSettings, setComplianceSettings] = useState({
+    dataResidency: "eu-west-1",
+    frameworks: ["eu-ai-act", "nist-ai-rmf"],
+    gdprEnabled: true,
+    ccpaEnabled: false,
+    auditRetentionYears: 7,
   });
 
   // Initialize form with loaded settings
@@ -47,17 +98,35 @@ export default function Settings() {
   const handleSave = async () => {
     try {
       await updateSettings.mutateAsync(formData);
-      toast({
+      toastHook({
         title: "Settings saved",
         description: "Your settings have been saved successfully.",
       });
     } catch (error: any) {
-      toast({
+      toastHook({
         title: "Failed to save settings",
         description: error.message || "An error occurred while saving settings.",
         variant: "destructive",
       });
     }
+  };
+
+  const handleSecuritySave = () => {
+    toast.success("Security settings updated", {
+      description: "Your security preferences have been saved.",
+    });
+  };
+
+  const handleNotificationSave = () => {
+    toast.success("Notification settings updated", {
+      description: "Your notification preferences have been saved.",
+    });
+  };
+
+  const handleGenerateApiKey = () => {
+    toast.success("API key generated", {
+      description: "Your new API key has been created. Copy it now - it won't be shown again.",
+    });
   };
 
   return (
@@ -90,6 +159,7 @@ export default function Settings() {
         {/* Content */}
         <div className="lg:col-span-3">
           <div className="bg-card border border-border rounded-xl p-6">
+            {/* General Section */}
             {activeSection === "general" && (
               <>
                 <h2 className="text-lg font-semibold text-foreground mb-6">General Settings</h2>
@@ -105,11 +175,10 @@ export default function Settings() {
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    {/* Organization */}
                     <div>
-                      <label className="text-sm font-medium text-foreground mb-2 block">
+                      <Label className="text-sm font-medium text-foreground mb-2 block">
                         Organization Name
-                      </label>
+                      </Label>
                       <Input
                         value={formData.organization_name}
                         onChange={(e) => setFormData(prev => ({ ...prev, organization_name: e.target.value }))}
@@ -118,11 +187,10 @@ export default function Settings() {
                       />
                     </div>
 
-                    {/* Workspace */}
                     <div>
-                      <label className="text-sm font-medium text-foreground mb-2 block">
+                      <Label className="text-sm font-medium text-foreground mb-2 block">
                         Default Workspace
-                      </label>
+                      </Label>
                       <Input
                         value={formData.default_workspace}
                         onChange={(e) => setFormData(prev => ({ ...prev, default_workspace: e.target.value }))}
@@ -131,24 +199,33 @@ export default function Settings() {
                       />
                     </div>
 
-                    {/* Timezone */}
                     <div>
-                      <label className="text-sm font-medium text-foreground mb-2 block">
+                      <Label className="text-sm font-medium text-foreground mb-2 block">
                         Timezone
-                      </label>
-                      <Input
-                        value={formData.timezone}
-                        onChange={(e) => setFormData(prev => ({ ...prev, timezone: e.target.value }))}
-                        placeholder="e.g., UTC, America/New_York"
-                        className="max-w-md bg-secondary border-border"
-                      />
+                      </Label>
+                      <Select 
+                        value={formData.timezone || "UTC"} 
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, timezone: value }))}
+                      >
+                        <SelectTrigger className="max-w-md bg-secondary border-border">
+                          <SelectValue placeholder="Select timezone" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="UTC">UTC</SelectItem>
+                          <SelectItem value="America/New_York">Eastern Time (US)</SelectItem>
+                          <SelectItem value="America/Los_Angeles">Pacific Time (US)</SelectItem>
+                          <SelectItem value="Europe/London">London (GMT)</SelectItem>
+                          <SelectItem value="Europe/Paris">Paris (CET)</SelectItem>
+                          <SelectItem value="Asia/Tokyo">Tokyo (JST)</SelectItem>
+                          <SelectItem value="Asia/Singapore">Singapore (SGT)</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
 
-                    {/* Data Retention */}
                     <div>
-                      <label className="text-sm font-medium text-foreground mb-2 block">
+                      <Label className="text-sm font-medium text-foreground mb-2 block">
                         Data Retention (days)
-                      </label>
+                      </Label>
                       <Input
                         type="number"
                         value={formData.data_retention_days}
@@ -186,58 +263,444 @@ export default function Settings() {
               </>
             )}
 
-            {activeSection === "users" && (
-              <>
-                <UsersTeamsSection />
-              </>
-            )}
+            {/* Users & Teams Section */}
+            {activeSection === "users" && <UsersTeamsSection />}
 
+            {/* Security Section */}
             {activeSection === "security" && (
               <>
-                <h2 className="text-lg font-semibold text-foreground mb-6">Security</h2>
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <Shield className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">Security settings coming soon</p>
+                <h2 className="text-lg font-semibold text-foreground mb-6">Security Settings</h2>
+                <div className="space-y-6">
+                  <Card className="border-border">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">Multi-Factor Authentication</CardTitle>
+                      <CardDescription>Add an extra layer of security to your account</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge variant={securitySettings.mfaEnabled ? "default" : "secondary"}>
+                          {securitySettings.mfaEnabled ? "Enabled" : "Disabled"}
+                        </Badge>
+                      </div>
+                      <Switch
+                        checked={securitySettings.mfaEnabled}
+                        onCheckedChange={(checked) => setSecuritySettings(prev => ({ ...prev, mfaEnabled: checked }))}
+                      />
+                    </CardContent>
+                  </Card>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="mb-2 block">Session Timeout (minutes)</Label>
+                      <Select 
+                        value={String(securitySettings.sessionTimeout)}
+                        onValueChange={(v) => setSecuritySettings(prev => ({ ...prev, sessionTimeout: Number(v) }))}
+                      >
+                        <SelectTrigger className="bg-secondary">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="15">15 minutes</SelectItem>
+                          <SelectItem value="30">30 minutes</SelectItem>
+                          <SelectItem value="60">1 hour</SelectItem>
+                          <SelectItem value="120">2 hours</SelectItem>
+                          <SelectItem value="480">8 hours</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label className="mb-2 block">Minimum Password Length</Label>
+                      <Input
+                        type="number"
+                        value={securitySettings.passwordMinLength}
+                        onChange={(e) => setSecuritySettings(prev => ({ ...prev, passwordMinLength: Number(e.target.value) }))}
+                        className="bg-secondary"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between py-3">
+                    <div>
+                      <p className="font-medium">Require Special Characters</p>
+                      <p className="text-sm text-muted-foreground">Passwords must contain special characters</p>
+                    </div>
+                    <Switch
+                      checked={securitySettings.requireSpecialChars}
+                      onCheckedChange={(checked) => setSecuritySettings(prev => ({ ...prev, requireSpecialChars: checked }))}
+                    />
+                  </div>
+
+                  <Separator />
+
+                  <div className="flex items-center justify-between py-3">
+                    <div>
+                      <p className="font-medium">Single Sign-On (SSO)</p>
+                      <p className="text-sm text-muted-foreground">Enable SSO with your identity provider</p>
+                    </div>
+                    <Switch
+                      checked={securitySettings.ssoEnabled}
+                      onCheckedChange={(checked) => setSecuritySettings(prev => ({ ...prev, ssoEnabled: checked }))}
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="mb-2 block">IP Whitelist (optional)</Label>
+                    <Input
+                      value={securitySettings.ipWhitelist}
+                      onChange={(e) => setSecuritySettings(prev => ({ ...prev, ipWhitelist: e.target.value }))}
+                      placeholder="e.g., 192.168.1.0/24, 10.0.0.0/8"
+                      className="bg-secondary"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Comma-separated list of allowed IP ranges</p>
+                  </div>
+
+                  <div className="pt-4 border-t border-border">
+                    <Button variant="gradient" onClick={handleSecuritySave}>
+                      Save Security Settings
+                    </Button>
+                  </div>
                 </div>
               </>
             )}
 
+            {/* Notifications Section */}
             {activeSection === "notifications" && (
               <>
-                <h2 className="text-lg font-semibold text-foreground mb-6">Notifications</h2>
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <Bell className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">Notification settings coming soon</p>
+                <h2 className="text-lg font-semibold text-foreground mb-6">Notification Settings</h2>
+                <div className="space-y-6">
+                  <div>
+                    <Label className="mb-2 block">Slack Webhook URL</Label>
+                    <Input
+                      value={notificationSettings.slackWebhookUrl}
+                      onChange={(e) => setNotificationSettings(prev => ({ ...prev, slackWebhookUrl: e.target.value }))}
+                      placeholder="https://hooks.slack.com/services/..."
+                      className="bg-secondary"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Receive alerts and notifications in your Slack channel
+                    </p>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-4">
+                    <h3 className="font-medium">Alert Preferences</h3>
+                    
+                    <div className="flex items-center justify-between py-2">
+                      <div>
+                        <p className="font-medium">Email Alerts</p>
+                        <p className="text-sm text-muted-foreground">Receive alerts via email</p>
+                      </div>
+                      <Switch
+                        checked={notificationSettings.emailAlerts}
+                        onCheckedChange={(checked) => setNotificationSettings(prev => ({ ...prev, emailAlerts: checked }))}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between py-2">
+                      <div>
+                        <p className="font-medium">Critical Alerts Only</p>
+                        <p className="text-sm text-muted-foreground">Only receive critical severity alerts</p>
+                      </div>
+                      <Switch
+                        checked={notificationSettings.criticalAlertsOnly}
+                        onCheckedChange={(checked) => setNotificationSettings(prev => ({ ...prev, criticalAlertsOnly: checked }))}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between py-2">
+                      <div>
+                        <p className="font-medium">Daily Digest</p>
+                        <p className="text-sm text-muted-foreground">Receive a daily summary of platform activity</p>
+                      </div>
+                      <Switch
+                        checked={notificationSettings.dailyDigest}
+                        onCheckedChange={(checked) => setNotificationSettings(prev => ({ ...prev, dailyDigest: checked }))}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between py-2">
+                      <div>
+                        <p className="font-medium">Incident Notifications</p>
+                        <p className="text-sm text-muted-foreground">Get notified when new incidents are created</p>
+                      </div>
+                      <Switch
+                        checked={notificationSettings.incidentNotifications}
+                        onCheckedChange={(checked) => setNotificationSettings(prev => ({ ...prev, incidentNotifications: checked }))}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between py-2">
+                      <div>
+                        <p className="font-medium">Review Reminders</p>
+                        <p className="text-sm text-muted-foreground">Remind about pending HITL reviews approaching SLA</p>
+                      </div>
+                      <Switch
+                        checked={notificationSettings.reviewReminders}
+                        onCheckedChange={(checked) => setNotificationSettings(prev => ({ ...prev, reviewReminders: checked }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-border">
+                    <Button variant="gradient" onClick={handleNotificationSave}>
+                      Save Notification Settings
+                    </Button>
+                  </div>
                 </div>
               </>
             )}
 
+            {/* Integrations Section */}
             {activeSection === "integrations" && (
               <>
                 <h2 className="text-lg font-semibold text-foreground mb-6">Integrations</h2>
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <Database className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">Integration settings coming soon</p>
+                <div className="space-y-4">
+                  <Card className="border-border">
+                    <CardContent className="flex items-center justify-between py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">
+                          <Database className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="font-medium">Hugging Face</p>
+                          <p className="text-sm text-muted-foreground">Model registry and inference endpoints</p>
+                        </div>
+                      </div>
+                      <Badge variant={integrations.huggingFaceConnected ? "default" : "outline"} className="bg-success/10 text-success">
+                        Connected
+                      </Badge>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-border">
+                    <CardContent className="flex items-center justify-between py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">
+                          <Database className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="font-medium">MLflow</p>
+                          <p className="text-sm text-muted-foreground">Experiment tracking and model registry</p>
+                        </div>
+                      </div>
+                      <Button variant="outline" size="sm">Connect</Button>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-border">
+                    <CardContent className="flex items-center justify-between py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">
+                          <Bell className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="font-medium">Slack</p>
+                          <p className="text-sm text-muted-foreground">Alerts and notifications</p>
+                        </div>
+                      </div>
+                      <Button variant="outline" size="sm">Connect</Button>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-border">
+                    <CardContent className="flex items-center justify-between py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">
+                          <AlertTriangle className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="font-medium">PagerDuty</p>
+                          <p className="text-sm text-muted-foreground">Incident management and on-call</p>
+                        </div>
+                      </div>
+                      <Button variant="outline" size="sm">Connect</Button>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-border">
+                    <CardContent className="flex items-center justify-between py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">
+                          <Globe className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="font-medium">OpenTelemetry</p>
+                          <p className="text-sm text-muted-foreground">Observability and tracing</p>
+                        </div>
+                      </div>
+                      <Badge variant="default" className="bg-success/10 text-success">
+                        Enabled
+                      </Badge>
+                    </CardContent>
+                  </Card>
                 </div>
               </>
             )}
 
+            {/* API Keys Section */}
             {activeSection === "api" && (
               <>
-                <h2 className="text-lg font-semibold text-foreground mb-6">API Keys</h2>
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <Key className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">API key management coming soon</p>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-lg font-semibold text-foreground">API Keys</h2>
+                  <Button variant="gradient" size="sm" onClick={handleGenerateApiKey}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Generate New Key
+                  </Button>
+                </div>
+
+                <div className="space-y-4">
+                  {MOCK_API_KEYS.map((apiKey) => (
+                    <Card key={apiKey.id} className="border-border">
+                      <CardContent className="flex items-center justify-between py-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="font-medium">{apiKey.name}</p>
+                            <Badge variant="outline" className="text-success bg-success/10">
+                              {apiKey.status}
+                            </Badge>
+                          </div>
+                          <code className="text-sm text-muted-foreground font-mono">{apiKey.key}</code>
+                          <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
+                            <span>Created: {apiKey.created}</span>
+                            <span>Last used: {apiKey.lastUsed}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button variant="ghost" size="icon">
+                            <Copy className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="text-danger hover:text-danger">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+
+                  <div className="p-4 rounded-lg bg-warning/10 border border-warning/20 text-sm">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 text-warning mt-0.5" />
+                      <div>
+                        <p className="font-medium text-warning">Security Notice</p>
+                        <p className="text-muted-foreground">
+                          API keys grant full access to your organization's data. Keep them secure and rotate them regularly.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </>
             )}
 
+            {/* Regions & Compliance Section */}
             {activeSection === "regions" && (
               <>
                 <h2 className="text-lg font-semibold text-foreground mb-6">Regions & Compliance</h2>
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <Globe className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">Regional settings coming soon</p>
+                <div className="space-y-6">
+                  <div>
+                    <Label className="mb-2 block">Data Residency Region</Label>
+                    <Select 
+                      value={complianceSettings.dataResidency}
+                      onValueChange={(v) => setComplianceSettings(prev => ({ ...prev, dataResidency: v }))}
+                    >
+                      <SelectTrigger className="max-w-md bg-secondary">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="us-east-1">US East (Virginia)</SelectItem>
+                        <SelectItem value="us-west-2">US West (Oregon)</SelectItem>
+                        <SelectItem value="eu-west-1">EU West (Ireland)</SelectItem>
+                        <SelectItem value="eu-central-1">EU Central (Frankfurt)</SelectItem>
+                        <SelectItem value="ap-southeast-1">Asia Pacific (Singapore)</SelectItem>
+                        <SelectItem value="ap-northeast-1">Asia Pacific (Tokyo)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      All data will be stored and processed in this region
+                    </p>
+                  </div>
+
+                  <Separator />
+
+                  <div>
+                    <h3 className="font-medium mb-4">Compliance Frameworks</h3>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between py-2">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="default">EU AI Act</Badge>
+                          <span className="text-sm text-muted-foreground">High-risk AI requirements</span>
+                        </div>
+                        <Switch checked={true} disabled />
+                      </div>
+                      <div className="flex items-center justify-between py-2">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">NIST AI RMF</Badge>
+                          <span className="text-sm text-muted-foreground">Risk management framework</span>
+                        </div>
+                        <Switch checked={true} />
+                      </div>
+                      <div className="flex items-center justify-between py-2">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">ISO/IEC 42001</Badge>
+                          <span className="text-sm text-muted-foreground">AI management systems</span>
+                        </div>
+                        <Switch checked={false} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-4">
+                    <h3 className="font-medium">Privacy Regulations</h3>
+                    <div className="flex items-center justify-between py-2">
+                      <div>
+                        <p className="font-medium">GDPR Compliance Mode</p>
+                        <p className="text-sm text-muted-foreground">Enable EU General Data Protection Regulation controls</p>
+                      </div>
+                      <Switch
+                        checked={complianceSettings.gdprEnabled}
+                        onCheckedChange={(checked) => setComplianceSettings(prev => ({ ...prev, gdprEnabled: checked }))}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between py-2">
+                      <div>
+                        <p className="font-medium">CCPA Compliance Mode</p>
+                        <p className="text-sm text-muted-foreground">Enable California Consumer Privacy Act controls</p>
+                      </div>
+                      <Switch
+                        checked={complianceSettings.ccpaEnabled}
+                        onCheckedChange={(checked) => setComplianceSettings(prev => ({ ...prev, ccpaEnabled: checked }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="mb-2 block">Audit Log Retention (years)</Label>
+                    <Select 
+                      value={String(complianceSettings.auditRetentionYears)}
+                      onValueChange={(v) => setComplianceSettings(prev => ({ ...prev, auditRetentionYears: Number(v) }))}
+                    >
+                      <SelectTrigger className="max-w-md bg-secondary">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">1 year</SelectItem>
+                        <SelectItem value="3">3 years</SelectItem>
+                        <SelectItem value="5">5 years</SelectItem>
+                        <SelectItem value="7">7 years (recommended)</SelectItem>
+                        <SelectItem value="10">10 years</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="pt-4 border-t border-border">
+                    <Button variant="gradient">
+                      Save Compliance Settings
+                    </Button>
+                  </div>
                 </div>
               </>
             )}

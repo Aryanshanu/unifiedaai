@@ -139,12 +139,8 @@ export function useDemoMode() {
     }
   }, [isDemoMode, isInitializing]);
 
-  // Auto-initialize on mount if demo mode is on
-  useEffect(() => {
-    if (isDemoMode) {
-      initializeDemoData();
-    }
-  }, [isDemoMode, initializeDemoData]);
+  // Note: Auto-initialization disabled - demo data only seeded from Golden Demo page
+  // This prevents fake/demo data from appearing on main pages
 
   return {
     isDemoMode,

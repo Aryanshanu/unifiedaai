@@ -14,7 +14,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { DemoModeToggle } from "./DemoModeToggle";
 
 interface HeaderProps {
   title: string;
@@ -46,9 +45,6 @@ export function Header({ title, subtitle, headerActions }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-4">
-        {/* Demo Mode Toggle */}
-        <DemoModeToggle />
-        
         {/* Header Actions (Health Indicators, etc.) */}
         {headerActions}
         
