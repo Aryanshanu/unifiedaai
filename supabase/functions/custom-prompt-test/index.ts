@@ -175,7 +175,17 @@ async function callTargetModel(endpoint: string, apiToken: string, prompt: strin
   if (!response.ok) {
     const errorText = await response.text();
     console.error("Target model error:", response.status, errorText);
-    throw new Error(`Model call failed: ${response.status} - ${errorText.substring(0, 200)}`);
+    
+    // Provide user-friendly error messages
+    if (response.status === 401) {
+      throw new Error(`API authentication failed. Please check that your API token is valid and properly configured in the System Settings. The token may be expired or incorrectly entered.`);
+    } else if (response.status === 403) {
+      throw new Error(`API access denied. Your API key may not have permission to use this model.`);
+    } else if (response.status === 429) {
+      throw new Error(`Rate limit exceeded. Please wait a moment and try again.`);
+    }
+    
+    throw new Error(`Model call failed (${response.status}): ${errorText.substring(0, 100)}`);
   }
 
   const data = await response.json();
