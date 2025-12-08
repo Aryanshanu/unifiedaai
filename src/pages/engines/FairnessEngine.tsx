@@ -288,8 +288,7 @@ export default function FairnessEngine() {
           </CardHeader>
           <CardContent>
             <CohortSelector 
-              selectedCohorts={selectedCohorts}
-              onCohortChange={setSelectedCohorts}
+              onCohortChange={(cohort, value) => setSelectedCohorts(prev => ({ ...prev, [cohort]: value }))}
             />
             
             {/* Cohort Disparity Display */}
@@ -349,7 +348,7 @@ export default function FairnessEngine() {
       {/* Evaluation Comparison */}
       {showComparison && selectedModelId && (
         <div className="mb-6">
-          <EvaluationComparison modelId={selectedModelId} engineType="fairness" />
+          <EvaluationComparison evaluations={results || []} />
         </div>
       )}
 
