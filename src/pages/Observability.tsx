@@ -10,6 +10,7 @@ import { useModels, Model } from "@/hooks/useModels";
 import { usePlatformMetrics, useSystemHealthSummary } from "@/hooks/usePlatformMetrics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
+import { TrafficGenerator } from "@/components/observability/TrafficGenerator";
 
 function getModelStatus(model: Model): "healthy" | "warning" | "critical" {
   const fairness = model.fairness_score ?? 100;
@@ -266,6 +267,7 @@ export default function Observability() {
           <div className="bg-card border border-border rounded-xl p-4">
             <h3 className="text-sm font-semibold text-foreground mb-4">Quick Actions</h3>
             <div className="space-y-2">
+              <TrafficGenerator />
               <Button variant="outline" className="w-full justify-start">
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Force Model Refresh

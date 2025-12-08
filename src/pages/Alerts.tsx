@@ -15,13 +15,35 @@ import {
   Slack,
   MessageSquare,
   Filter,
-  Loader2
+  Loader2,
+  Trash2,
+  Globe
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDriftAlerts } from "@/hooks/useDriftAlerts";
 import { useIncidents } from "@/hooks/useIncidents";
+import { 
+  useNotificationChannels, 
+  useCreateNotificationChannel, 
+  useUpdateNotificationChannel,
+  useDeleteNotificationChannel 
+} from "@/hooks/useNotificationChannels";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 const severityColors = {
   critical: "bg-danger/10 text-danger border-danger/30",
@@ -34,24 +56,22 @@ const channelIcons = {
   email: Mail,
   slack: Slack,
   teams: MessageSquare,
+  webhook: Globe,
 };
-
-interface NotificationChannel {
-  id: string;
-  type: 'email' | 'slack' | 'teams';
-  name: string;
-  enabled: boolean;
-  config: Record<string, string>;
-}
 
 export default function Alerts() {
   const { data: driftAlerts, isLoading: driftLoading } = useDriftAlerts();
   const { data: incidents, isLoading: incidentsLoading } = useIncidents();
+  const { data: channels, isLoading: channelsLoading } = useNotificationChannels();
+  const createChannel = useCreateNotificationChannel();
+  const updateChannel = useUpdateNotificationChannel();
+  const deleteChannel = useDeleteNotificationChannel();
+  
   const [activeTab, setActiveTab] = useState<'alerts' | 'channels' | 'rules'>('alerts');
-  const [channels, setChannels] = useState<NotificationChannel[]>([
-    { id: '1', type: 'email', name: 'Admin Emails', enabled: true, config: { email: 'admin@company.com' } },
-    { id: '2', type: 'slack', name: 'AI Ops Channel', enabled: true, config: { webhook: 'https://hooks.slack.com/...' } },
-  ]);
+  const [showAddChannel, setShowAddChannel] = useState(false);
+  const [newChannelType, setNewChannelType] = useState<'email' | 'slack' | 'teams' | 'webhook'>('email');
+  const [newChannelName, setNewChannelName] = useState('');
+  const [newChannelConfig, setNewChannelConfig] = useState('');
 
   const allAlerts = [
     ...(driftAlerts || []).map(a => ({
@@ -74,11 +94,43 @@ export default function Alerts() {
     })),
   ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-  const toggleChannel = (channelId: string) => {
-    setChannels(prev => prev.map(ch => 
-      ch.id === channelId ? { ...ch, enabled: !ch.enabled } : ch
-    ));
-    toast.success("Channel updated");
+  const toggleChannel = async (channelId: string, enabled: boolean) => {
+    try {
+      await updateChannel.mutateAsync({ id: channelId, enabled: !enabled });
+      toast.success("Channel updated");
+    } catch (error: any) {
+      toast.error("Failed to update: " + error.message);
+    }
+  };
+
+  const handleDeleteChannel = async (channelId: string) => {
+    try {
+      await deleteChannel.mutateAsync(channelId);
+      toast.success("Channel deleted");
+    } catch (error: any) {
+      toast.error("Failed to delete: " + error.message);
+    }
+  };
+
+  const handleAddChannel = async () => {
+    if (!newChannelName.trim()) {
+      toast.error("Channel name is required");
+      return;
+    }
+    
+    try {
+      await createChannel.mutateAsync({
+        channel_type: newChannelType,
+        name: newChannelName,
+        config: { endpoint: newChannelConfig },
+      });
+      toast.success("Channel created");
+      setShowAddChannel(false);
+      setNewChannelName('');
+      setNewChannelConfig('');
+    } catch (error: any) {
+      toast.error("Failed to create: " + error.message);
+    }
   };
 
   const isLoading = driftLoading || incidentsLoading;
@@ -204,45 +256,117 @@ export default function Alerts() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Notification Channels</h2>
-            <Button variant="gradient" size="sm" className="gap-2">
+            <Button variant="gradient" size="sm" className="gap-2" onClick={() => setShowAddChannel(true)}>
               <Plus className="w-4 h-4" />
               Add Channel
             </Button>
           </div>
 
-          <div className="grid gap-4">
-            {channels.map(channel => {
-              const Icon = channelIcons[channel.type];
-              return (
-                <div
-                  key={channel.id}
-                  className="bg-card border border-border rounded-xl p-4 flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <Icon className="w-5 h-5 text-primary" />
+          {channelsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : !channels?.length ? (
+            <div className="text-center py-12 bg-card border border-border rounded-xl">
+              <Bell className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-foreground font-medium">No notification channels</p>
+              <p className="text-sm text-muted-foreground mt-1">Add a channel to receive alerts</p>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {channels.map(channel => {
+                const Icon = channelIcons[channel.channel_type];
+                return (
+                  <div
+                    key={channel.id}
+                    className="bg-card border border-border rounded-xl p-4 flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <Icon className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground">{channel.name}</p>
+                        <p className="text-sm text-muted-foreground capitalize">{channel.channel_type}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-foreground">{channel.name}</p>
-                      <p className="text-sm text-muted-foreground capitalize">{channel.type}</p>
+                    <div className="flex items-center gap-4">
+                      <Badge variant={channel.enabled ? "default" : "secondary"}>
+                        {channel.enabled ? "Active" : "Disabled"}
+                      </Badge>
+                      <Switch 
+                        checked={channel.enabled} 
+                        onCheckedChange={() => toggleChannel(channel.id, channel.enabled)}
+                      />
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => handleDeleteChannel(channel.id)}
+                      >
+                        <Trash2 className="w-4 h-4 text-danger" />
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <Badge variant={channel.enabled ? "default" : "secondary"}>
-                      {channel.enabled ? "Active" : "Disabled"}
-                    </Badge>
-                    <Switch 
-                      checked={channel.enabled} 
-                      onCheckedChange={() => toggleChannel(channel.id)}
-                    />
-                    <Button variant="ghost" size="sm">
-                      <Settings className="w-4 h-4" />
-                    </Button>
-                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Add Channel Dialog */}
+          <Dialog open={showAddChannel} onOpenChange={setShowAddChannel}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add Notification Channel</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Channel Type</Label>
+                  <Select value={newChannelType} onValueChange={(v) => setNewChannelType(v as any)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="email">Email</SelectItem>
+                      <SelectItem value="slack">Slack</SelectItem>
+                      <SelectItem value="teams">Microsoft Teams</SelectItem>
+                      <SelectItem value="webhook">Webhook</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              );
-            })}
-          </div>
+                <div className="space-y-2">
+                  <Label>Channel Name</Label>
+                  <Input 
+                    value={newChannelName}
+                    onChange={(e) => setNewChannelName(e.target.value)}
+                    placeholder="e.g., Admin Alerts"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>
+                    {newChannelType === 'email' ? 'Email Address' : 
+                     newChannelType === 'slack' ? 'Webhook URL' :
+                     newChannelType === 'teams' ? 'Webhook URL' : 'Endpoint URL'}
+                  </Label>
+                  <Input 
+                    value={newChannelConfig}
+                    onChange={(e) => setNewChannelConfig(e.target.value)}
+                    placeholder={
+                      newChannelType === 'email' ? 'admin@company.com' : 'https://...'
+                    }
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowAddChannel(false)}>
+                  Cancel
+                </Button>
+                <Button variant="gradient" onClick={handleAddChannel} disabled={createChannel.isPending}>
+                  {createChannel.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Add Channel
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       )}
 

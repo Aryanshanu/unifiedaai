@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Play, Loader2, AlertTriangle } from "lucide-react";
 import { useModels } from "@/hooks/useModels";
@@ -23,8 +23,16 @@ const attackTypes = [
   { id: 'system_prompt', label: 'System Prompt Extraction', description: 'Attempts to reveal system prompts' },
 ];
 
-export function RedTeamCampaignForm() {
-  const [isOpen, setIsOpen] = useState(false);
+interface RedTeamCampaignFormProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+export function RedTeamCampaignForm({ open, onOpenChange }: RedTeamCampaignFormProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isOpen = open !== undefined ? open : internalOpen;
+  const setIsOpen = onOpenChange || setInternalOpen;
+  
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedModel, setSelectedModel] = useState<string>("");
@@ -95,12 +103,6 @@ export function RedTeamCampaignForm() {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Play className="w-4 h-4 mr-2" />
-          New Campaign
-        </Button>
-      </DialogTrigger>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
