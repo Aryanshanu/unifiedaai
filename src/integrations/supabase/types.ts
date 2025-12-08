@@ -643,6 +643,8 @@ export type Database = {
       }
       models: {
         Row: {
+          base_model: string | null
+          business_owner_email: string | null
           created_at: string
           description: string | null
           endpoint: string | null
@@ -651,7 +653,9 @@ export type Database = {
           huggingface_endpoint: string | null
           huggingface_model_id: string | null
           id: string
+          license: string | null
           metadata: Json | null
+          model_card_url: string | null
           model_type: string
           name: string
           overall_score: number | null
@@ -668,6 +672,8 @@ export type Database = {
           version: string
         }
         Insert: {
+          base_model?: string | null
+          business_owner_email?: string | null
           created_at?: string
           description?: string | null
           endpoint?: string | null
@@ -676,7 +682,9 @@ export type Database = {
           huggingface_endpoint?: string | null
           huggingface_model_id?: string | null
           id?: string
+          license?: string | null
           metadata?: Json | null
+          model_card_url?: string | null
           model_type: string
           name: string
           overall_score?: number | null
@@ -693,6 +701,8 @@ export type Database = {
           version?: string
         }
         Update: {
+          base_model?: string | null
+          business_owner_email?: string | null
           created_at?: string
           description?: string | null
           endpoint?: string | null
@@ -701,7 +711,9 @@ export type Database = {
           huggingface_endpoint?: string | null
           huggingface_model_id?: string | null
           id?: string
+          license?: string | null
           metadata?: Json | null
+          model_card_url?: string | null
           model_type?: string
           name?: string
           overall_score?: number | null
@@ -881,8 +893,10 @@ export type Database = {
       projects: {
         Row: {
           business_sensitivity: Database["public"]["Enums"]["sensitivity_level"]
+          compliance_frameworks: string[] | null
           created_at: string
           criticality: number
+          data_residency: string | null
           data_sensitivity: Database["public"]["Enums"]["sensitivity_level"]
           description: string | null
           environment: Database["public"]["Enums"]["environment_type"]
@@ -890,12 +904,15 @@ export type Database = {
           name: string
           organization: string | null
           owner_id: string | null
+          primary_owner_email: string | null
           updated_at: string
         }
         Insert: {
           business_sensitivity?: Database["public"]["Enums"]["sensitivity_level"]
+          compliance_frameworks?: string[] | null
           created_at?: string
           criticality?: number
+          data_residency?: string | null
           data_sensitivity?: Database["public"]["Enums"]["sensitivity_level"]
           description?: string | null
           environment?: Database["public"]["Enums"]["environment_type"]
@@ -903,12 +920,15 @@ export type Database = {
           name: string
           organization?: string | null
           owner_id?: string | null
+          primary_owner_email?: string | null
           updated_at?: string
         }
         Update: {
           business_sensitivity?: Database["public"]["Enums"]["sensitivity_level"]
+          compliance_frameworks?: string[] | null
           created_at?: string
           criticality?: number
+          data_residency?: string | null
           data_sensitivity?: Database["public"]["Enums"]["sensitivity_level"]
           description?: string | null
           environment?: Database["public"]["Enums"]["environment_type"]
@@ -916,6 +936,7 @@ export type Database = {
           name?: string
           organization?: string | null
           owner_id?: string | null
+          primary_owner_email?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1313,13 +1334,19 @@ export type Database = {
       }
       systems: {
         Row: {
+          access_tier: string | null
           api_headers: Json | null
           api_token_encrypted: string | null
+          base_model: string | null
+          business_owner_email: string | null
           created_at: string
+          data_residency: string | null
           deployment_status: Database["public"]["Enums"]["deployment_status"]
           endpoint: string | null
           id: string
           last_risk_calculation: string | null
+          license: string | null
+          model_card_url: string | null
           model_name: string | null
           name: string
           owner_id: string | null
@@ -1327,20 +1354,28 @@ export type Database = {
           provider: string
           requires_approval: boolean
           runtime_risk_score: number | null
+          sla_tier: string | null
           status: Database["public"]["Enums"]["model_status"]
           system_type: Database["public"]["Enums"]["system_type"]
+          technical_owner: string | null
           updated_at: string
           uri_score: number | null
           use_case: string | null
         }
         Insert: {
+          access_tier?: string | null
           api_headers?: Json | null
           api_token_encrypted?: string | null
+          base_model?: string | null
+          business_owner_email?: string | null
           created_at?: string
+          data_residency?: string | null
           deployment_status?: Database["public"]["Enums"]["deployment_status"]
           endpoint?: string | null
           id?: string
           last_risk_calculation?: string | null
+          license?: string | null
+          model_card_url?: string | null
           model_name?: string | null
           name: string
           owner_id?: string | null
@@ -1348,20 +1383,28 @@ export type Database = {
           provider: string
           requires_approval?: boolean
           runtime_risk_score?: number | null
+          sla_tier?: string | null
           status?: Database["public"]["Enums"]["model_status"]
           system_type?: Database["public"]["Enums"]["system_type"]
+          technical_owner?: string | null
           updated_at?: string
           uri_score?: number | null
           use_case?: string | null
         }
         Update: {
+          access_tier?: string | null
           api_headers?: Json | null
           api_token_encrypted?: string | null
+          base_model?: string | null
+          business_owner_email?: string | null
           created_at?: string
+          data_residency?: string | null
           deployment_status?: Database["public"]["Enums"]["deployment_status"]
           endpoint?: string | null
           id?: string
           last_risk_calculation?: string | null
+          license?: string | null
+          model_card_url?: string | null
           model_name?: string | null
           name?: string
           owner_id?: string | null
@@ -1369,8 +1412,10 @@ export type Database = {
           provider?: string
           requires_approval?: boolean
           runtime_risk_score?: number | null
+          sla_tier?: string | null
           status?: Database["public"]["Enums"]["model_status"]
           system_type?: Database["public"]["Enums"]["system_type"]
+          technical_owner?: string | null
           updated_at?: string
           uri_score?: number | null
           use_case?: string | null

@@ -18,6 +18,10 @@ export interface Project {
   owner_id: string | null;
   created_at: string;
   updated_at: string;
+  // Governance fields
+  data_residency?: string | null;
+  primary_owner_email?: string | null;
+  compliance_frameworks?: string[] | null;
 }
 
 export interface CreateProjectInput {
@@ -28,6 +32,10 @@ export interface CreateProjectInput {
   data_sensitivity?: SensitivityLevel;
   criticality?: number;
   environment?: EnvironmentType;
+  // Governance fields
+  data_residency?: string;
+  primary_owner_email?: string;
+  compliance_frameworks?: string[];
 }
 
 export function useProjects() {

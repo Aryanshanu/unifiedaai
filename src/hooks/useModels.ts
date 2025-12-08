@@ -31,6 +31,11 @@ export interface Model {
   huggingface_api_token: string | null;
   project_id: string | null;
   system_id: string | null;
+  // Governance fields
+  business_owner_email?: string | null;
+  license?: string | null;
+  base_model?: string | null;
+  model_card_url?: string | null;
 }
 
 // Extended model with joined system data
@@ -38,7 +43,7 @@ export interface ModelWithSystem extends Model {
   system?: {
     id: string;
     name: string;
-    risk_tier: RiskTier | null;
+    risk_tier?: RiskTier | null;
     uri_score: number | null;
     runtime_risk_score: number | null;
     deployment_status: DeploymentStatus;
@@ -46,11 +51,23 @@ export interface ModelWithSystem extends Model {
     status: ModelStatus;
     endpoint: string | null;
     api_token_encrypted: string | null;
+    // Governance fields
+    business_owner_email?: string | null;
+    technical_owner?: string | null;
+    license?: string | null;
+    access_tier?: string | null;
+    sla_tier?: string | null;
+    base_model?: string | null;
+    model_card_url?: string | null;
   } | null;
   project?: {
     id: string;
     name: string;
     environment: string;
+    data_residency?: string | null;
+    criticality?: number;
+    business_sensitivity?: string;
+    data_sensitivity?: string;
   } | null;
 }
 
@@ -67,6 +84,13 @@ export interface CreateModelInput {
   huggingface_api_token?: string;
   api_token?: string; // Generic API token for non-HuggingFace models
   project_id: string; // Required - must select a project
+  // Governance fields
+  business_owner_email?: string;
+  license?: string;
+  base_model?: string;
+  model_card_url?: string;
+  access_tier?: string;
+  sla_tier?: string;
 }
 
 export function useModels() {
@@ -78,8 +102,8 @@ export function useModels() {
         .from('models')
         .select(`
           *,
-          system:systems(id, name, uri_score, runtime_risk_score, deployment_status, requires_approval, status, endpoint, api_token_encrypted),
-          project:projects(id, name, environment)
+          system:systems(id, name, uri_score, runtime_risk_score, deployment_status, requires_approval, status, endpoint, api_token_encrypted, business_owner_email, technical_owner, license, access_tier, sla_tier, base_model, model_card_url),
+          project:projects(id, name, environment, data_residency, criticality, business_sensitivity, data_sensitivity)
         `)
         .order('created_at', { ascending: false });
       
@@ -110,8 +134,8 @@ export function useModel(id: string) {
         .from('models')
         .select(`
           *,
-          system:systems(id, name, uri_score, runtime_risk_score, deployment_status, requires_approval, status, endpoint, api_token_encrypted),
-          project:projects(id, name, environment)
+          system:systems(id, name, uri_score, runtime_risk_score, deployment_status, requires_approval, status, endpoint, api_token_encrypted, business_owner_email, technical_owner, license, access_tier, sla_tier, base_model, model_card_url),
+          project:projects(id, name, environment, data_residency, criticality, business_sensitivity, data_sensitivity)
         `)
         .eq('id', id)
         .maybeSingle();
@@ -163,6 +187,13 @@ export function useCreateModel() {
           status: 'draft',
           deployment_status: 'draft',
           owner_id: user?.id,
+          // Governance fields
+          business_owner_email: input.business_owner_email || null,
+          license: input.license || null,
+          base_model: input.base_model || null,
+          model_card_url: input.model_card_url || null,
+          access_tier: input.access_tier || 'internal-only',
+          sla_tier: input.sla_tier || 'best-effort',
         })
         .select()
         .single();
@@ -187,6 +218,11 @@ export function useCreateModel() {
           system_id: systemData.id,
           owner_id: user?.id,
           status: 'draft',
+          // Governance fields on model too
+          business_owner_email: input.business_owner_email || null,
+          license: input.license || null,
+          base_model: input.base_model || null,
+          model_card_url: input.model_card_url || null,
         })
         .select()
         .single();
@@ -290,7 +326,7 @@ export function useProjectModels(projectId: string) {
         .from('models')
         .select(`
           *,
-          system:systems(id, name, uri_score, runtime_risk_score, deployment_status, requires_approval, status, endpoint, api_token_encrypted)
+          system:systems(id, name, uri_score, runtime_risk_score, deployment_status, requires_approval, status, endpoint, api_token_encrypted, business_owner_email, technical_owner, license, access_tier, sla_tier, base_model, model_card_url)
         `)
         .eq('project_id', projectId)
         .order('created_at', { ascending: false });

@@ -12,19 +12,26 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { useCreateModel } from "@/hooks/useModels";
 import { useProjects } from "@/hooks/useProjects";
 import { toast } from "sonner";
-import { Loader2, ChevronRight, ChevronLeft, Check, Brain, Server, Settings, FileCheck, FolderOpen } from "lucide-react";
+import { Loader2, ChevronRight, ChevronLeft, Check, Brain, Server, Settings, FileCheck, FolderOpen, Shield, Scale, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const modelSchema = z.object({
   name: z.string().min(2, "Model name must be at least 2 characters"),
-  description: z.string().optional(),
+  description: z.string().min(10, "Description must be at least 10 characters").max(500),
   model_type: z.enum(["LLM", "ML", "NLP", "Computer Vision", "Recommendation", "Other"]),
   provider: z.string().optional(),
-  version: z.string().default("1.0.0"),
+  version: z.string().regex(/^\d+\.\d+\.\d+$/, "Version must be in semver format (e.g., 1.0.0)").default("1.0.0"),
   use_case: z.string().optional(),
   endpoint: z.string().url("Must be a valid URL").optional().or(z.literal("")),
   api_token: z.string().optional(),
   project_id: z.string().min(1, "Project is required"),
+  // Governance fields
+  business_owner_email: z.string().email("Must be a valid email").optional().or(z.literal("")),
+  license: z.enum(["apache-2.0", "mit", "gpl-3.0", "proprietary", "restricted", "other", ""]).optional(),
+  base_model: z.string().optional(),
+  model_card_url: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+  access_tier: z.enum(["internal-only", "partner", "customer", "public"]).default("internal-only"),
+  sla_tier: z.enum(["best-effort", "standard", "premium", "mission-critical"]).default("best-effort"),
 });
 
 type ModelFormData = z.infer<typeof modelSchema>;
@@ -40,7 +47,8 @@ const steps = [
   { id: 2, name: "Basic Info", icon: Brain },
   { id: 3, name: "Provider", icon: Server },
   { id: 4, name: "Configuration", icon: Settings },
-  { id: 5, name: "Review", icon: FileCheck },
+  { id: 5, name: "Governance", icon: Shield },
+  { id: 6, name: "Review", icon: FileCheck },
 ];
 
 const modelTypes = [
@@ -94,6 +102,13 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
       endpoint: "",
       api_token: "",
       project_id: defaultProjectId || "",
+      // Governance defaults
+      business_owner_email: "",
+      license: "",
+      base_model: "",
+      model_card_url: "",
+      access_tier: "internal-only",
+      sla_tier: "best-effort",
     },
   });
 
@@ -109,6 +124,13 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
         endpoint: data.endpoint || undefined,
         api_token: data.api_token || undefined,
         project_id: data.project_id,
+        // Governance fields
+        business_owner_email: data.business_owner_email || undefined,
+        license: data.license || undefined,
+        base_model: data.base_model || undefined,
+        model_card_url: data.model_card_url || undefined,
+        access_tier: data.access_tier,
+        sla_tier: data.sla_tier,
       });
       
       toast.success("Model registered and system created!", {
@@ -130,10 +152,10 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
       if (!valid) return;
     }
     if (step === 2) {
-      const valid = await form.trigger(["name", "model_type"]);
+      const valid = await form.trigger(["name", "model_type", "description"]);
       if (!valid) return;
     }
-    if (step < 5) setStep(step + 1);
+    if (step < 6) setStep(step + 1);
   };
 
   const prevStep = () => {
@@ -459,8 +481,156 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
               </div>
             )}
 
-            {/* Step 5: Review */}
+            {/* Step 5: Governance */}
             {step === 5 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-foreground">Governance & Compliance</h3>
+                <p className="text-sm text-muted-foreground">
+                  Configure accountability, licensing, and access controls for this model.
+                </p>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="business_owner_email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Business Owner Email</FormLabel>
+                        <FormControl>
+                          <Input placeholder="owner@company.com" type="email" {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          Accountable person for governance decisions.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="license"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>License</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select license" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="apache-2.0">Apache 2.0</SelectItem>
+                            <SelectItem value="mit">MIT</SelectItem>
+                            <SelectItem value="gpl-3.0">GPL 3.0</SelectItem>
+                            <SelectItem value="proprietary">Proprietary</SelectItem>
+                            <SelectItem value="restricted">Restricted Use</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="base_model"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Base Model / Provenance</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., meta-llama/Llama-2-7b, gpt-4-base" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        If fine-tuned, specify the base model for traceability.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="model_card_url"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-1">
+                        Model Card URL
+                        <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                      </FormLabel>
+                      <FormControl>
+                        <Input placeholder="https://huggingface.co/..." {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Link to model documentation for transparency.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="access_tier"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-1">
+                          <Shield className="w-4 h-4" />
+                          Access Tier
+                        </FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Who can access?" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="internal-only">Internal Only</SelectItem>
+                            <SelectItem value="partner">Partners</SelectItem>
+                            <SelectItem value="customer">Customers</SelectItem>
+                            <SelectItem value="public">Public</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="sla_tier"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-1">
+                          <Scale className="w-4 h-4" />
+                          SLA Tier
+                        </FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Service level" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="best-effort">Best Effort</SelectItem>
+                            <SelectItem value="standard">Standard (99%)</SelectItem>
+                            <SelectItem value="premium">Premium (99.9%)</SelectItem>
+                            <SelectItem value="mission-critical">Mission Critical (99.99%)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Step 6: Review */}
+            {step === 6 && (
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-foreground">Review & Submit</h3>
                 <p className="text-sm text-muted-foreground">
@@ -468,6 +638,7 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                 </p>
 
                 <div className="bg-secondary/50 rounded-xl p-5 space-y-4">
+                  <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Basic Info</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-xs text-muted-foreground">Project</p>
@@ -489,15 +660,15 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                       <p className="text-xs text-muted-foreground">Version</p>
                       <p className="font-medium text-foreground">{formValues.version}</p>
                     </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Use Case</p>
-                        <p className="font-medium text-foreground">{formValues.use_case || "Not specified"}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">API Token</p>
-                        <p className="font-medium text-foreground">{formValues.api_token ? "••••••••" : "Not provided"}</p>
-                      </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Use Case</p>
+                      <p className="font-medium text-foreground">{formValues.use_case || "Not specified"}</p>
                     </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">API Token</p>
+                      <p className="font-medium text-foreground">{formValues.api_token ? "••••••••" : "Not provided"}</p>
+                    </div>
+                  </div>
                   
                   {formValues.description && (
                     <div>
@@ -505,6 +676,36 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                       <p className="text-sm text-foreground">{formValues.description}</p>
                     </div>
                   )}
+
+                  <div className="border-t border-border pt-4 mt-4">
+                    <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">Governance</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Business Owner</p>
+                        <p className="font-medium text-foreground">{formValues.business_owner_email || "Not specified"}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">License</p>
+                        <p className="font-medium text-foreground">{formValues.license || "Not specified"}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Base Model</p>
+                        <p className="font-medium text-foreground">{formValues.base_model || "Not specified"}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Model Card</p>
+                        <p className="font-medium text-foreground truncate">{formValues.model_card_url || "Not provided"}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Access Tier</p>
+                        <p className="font-medium text-foreground capitalize">{formValues.access_tier?.replace("-", " ") || "Internal only"}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">SLA Tier</p>
+                        <p className="font-medium text-foreground capitalize">{formValues.sla_tier?.replace("-", " ") || "Best effort"}</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="bg-primary/10 border border-primary/20 rounded-xl p-4">
@@ -528,7 +729,7 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                 Back
               </Button>
 
-              {step < 5 ? (
+              {step < 6 ? (
                 <Button type="button" onClick={nextStep}>
                   Next
                   <ChevronRight className="w-4 h-4 ml-2" />
