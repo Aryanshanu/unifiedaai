@@ -2,10 +2,25 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { GitBranch, Search, Filter, ZoomIn, ZoomOut, Maximize, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { 
+  GitBranch, 
+  Search, 
+  Filter, 
+  ZoomIn, 
+  ZoomOut, 
+  Maximize, 
+  Loader2,
+  Target,
+  MessageSquare,
+  X
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useKGNodes, useKGEdges, useKnowledgeGraphStats } from "@/hooks/useKnowledgeGraph";
-import { useMemo, useState } from "react";
+import { useKGNodes, useKGEdges, useKnowledgeGraphStats, useKGLineage, useKGExplain } from "@/hooks/useKnowledgeGraph";
+import { useMemo, useState, useCallback } from "react";
+import { NodeDetailPanel } from "@/components/lineage/NodeDetailPanel";
+import { ExplainDialog } from "@/components/lineage/ExplainDialog";
+import { toast } from "sonner";
 
 const nodeColors: Record<string, string> = {
   dataset: "bg-blue-500/20 border-blue-500/50 text-blue-400",
@@ -14,8 +29,11 @@ const nodeColors: Record<string, string> = {
   evaluation: "bg-warning/20 border-warning/50 text-warning",
   control: "bg-success/20 border-success/50 text-success",
   deployment: "bg-accent/20 border-accent/50 text-accent",
-  incident: "bg-danger/20 border-danger/50 text-danger",
-  policy: "bg-orange-500/20 border-orange-500/50 text-orange-400",
+  incident: "bg-destructive/20 border-destructive/50 text-destructive",
+  risk: "bg-orange-500/20 border-orange-500/50 text-orange-400",
+  decision: "bg-cyan-500/20 border-cyan-500/50 text-cyan-400",
+  outcome: "bg-emerald-500/20 border-emerald-500/50 text-emerald-400",
+  policy: "bg-pink-500/20 border-pink-500/50 text-pink-400",
 };
 
 // Simple layout algorithm - position nodes by type in columns
@@ -25,10 +43,13 @@ function layoutNodes(nodes: any[]) {
     feature: 1,
     model: 2,
     evaluation: 3,
-    policy: 3,
+    risk: 3,
     control: 4,
     incident: 4,
+    decision: 5,
     deployment: 5,
+    outcome: 6,
+    policy: 4,
   };
   
   const typeCounters: Record<string, number> = {};
@@ -51,7 +72,20 @@ export default function Lineage() {
   const { data: nodes, isLoading: nodesLoading } = useKGNodes();
   const { data: edges, isLoading: edgesLoading } = useKGEdges();
   const { data: stats, isLoading: statsLoading } = useKnowledgeGraphStats();
+  
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedNode, setSelectedNode] = useState<any>(null);
+  const [blastRadiusNodes, setBlastRadiusNodes] = useState<Set<string>>(new Set());
+  const [blastRadiusEntityId, setBlastRadiusEntityId] = useState<string | null>(null);
+  const [explainDialogOpen, setExplainDialogOpen] = useState(false);
+  const [explainNodeId, setExplainNodeId] = useState<string | null>(null);
+
+  const { data: lineageData, isLoading: lineageLoading } = useKGLineage(
+    blastRadiusEntityId || '',
+    selectedNode?.entity_type || 'model'
+  );
+
+  const { mutate: explain, isPending: isExplaining, data: explanation } = useKGExplain();
 
   const isLoading = nodesLoading || edgesLoading;
 
@@ -86,6 +120,69 @@ export default function Lineage() {
     return map;
   }, [filteredNodes]);
 
+  // Update blast radius when lineage data changes
+  useMemo(() => {
+    if (lineageData?.blast_radius) {
+      const affectedIds = new Set<string>();
+      lineageData.blast_radius.forEach((item: any) => {
+        if (item.node_id) affectedIds.add(item.node_id);
+        if (item.id) affectedIds.add(item.id);
+      });
+      // Also add downstream nodes
+      lineageData.downstream?.forEach((item: any) => {
+        if (item.id) affectedIds.add(item.id);
+      });
+      setBlastRadiusNodes(affectedIds);
+    }
+  }, [lineageData]);
+
+  const handleNodeClick = useCallback((node: any) => {
+    setSelectedNode(node);
+  }, []);
+
+  const handleClosePanel = useCallback(() => {
+    setSelectedNode(null);
+    setBlastRadiusNodes(new Set());
+    setBlastRadiusEntityId(null);
+  }, []);
+
+  const handleExplain = useCallback((nodeId: string) => {
+    const node = nodes?.find(n => n.id === nodeId);
+    if (!node) return;
+
+    setExplainNodeId(nodeId);
+    setExplainDialogOpen(true);
+    
+    explain({
+      entity_id: node.entity_id,
+      entity_type: node.entity_type,
+      question: `Why is this ${node.entity_type} "${node.label}" in its current state? What are its relationships and any compliance issues?`
+    }, {
+      onError: (error) => {
+        toast.error("Failed to get explanation", {
+          description: error.message
+        });
+      }
+    });
+  }, [nodes, explain]);
+
+  const handleBlastRadius = useCallback((nodeId: string) => {
+    const node = nodes?.find(n => n.id === nodeId);
+    if (!node) return;
+
+    setBlastRadiusEntityId(node.entity_id);
+    toast.info("Calculating blast radius...", {
+      description: `Analyzing impact for ${node.label}`
+    });
+  }, [nodes]);
+
+  const clearBlastRadius = useCallback(() => {
+    setBlastRadiusNodes(new Set());
+    setBlastRadiusEntityId(null);
+  }, []);
+
+  const explainNode = nodes?.find(n => n.id === explainNodeId);
+
   return (
     <MainLayout title="Knowledge Graph" subtitle="End-to-end lineage from data to models to risks to deployments">
       {/* KPIs */}
@@ -114,7 +211,7 @@ export default function Lineage() {
       </div>
 
       {/* Graph Container */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
+      <div className="bg-card border border-border rounded-xl overflow-hidden relative">
         {/* Toolbar */}
         <div className="flex items-center justify-between p-4 border-b border-border">
           <div className="flex items-center gap-4">
@@ -131,6 +228,22 @@ export default function Lineage() {
               <Filter className="w-4 h-4 mr-2" />
               Filter
             </Button>
+            
+            {/* Blast Radius Indicator */}
+            {blastRadiusNodes.size > 0 && (
+              <Badge variant="destructive" className="gap-1">
+                <Target className="w-3 h-3" />
+                Blast Radius: {blastRadiusNodes.size} nodes
+                <Button
+                  variant="ghost"
+                  size="iconSm"
+                  className="h-4 w-4 ml-1 hover:bg-destructive/20"
+                  onClick={clearBlastRadius}
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              </Badge>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -147,7 +260,10 @@ export default function Lineage() {
         </div>
 
         {/* Graph Visualization */}
-        <div className="relative h-[500px] bg-background grid-bg overflow-auto">
+        <div className={cn(
+          "relative h-[500px] bg-background grid-bg overflow-auto transition-all",
+          selectedNode && "mr-80"
+        )}>
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
               <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -166,6 +282,11 @@ export default function Lineage() {
                   const fromPos = nodePositions.get(edge.source_node_id);
                   const toPos = nodePositions.get(edge.target_node_id);
                   if (!fromPos || !toPos) return null;
+                  
+                  const isInBlastRadius = 
+                    blastRadiusNodes.has(edge.source_node_id) || 
+                    blastRadiusNodes.has(edge.target_node_id);
+                  
                   return (
                     <line
                       key={edge.id}
@@ -173,31 +294,55 @@ export default function Lineage() {
                       y1={fromPos.y + 20}
                       x2={toPos.x}
                       y2={toPos.y + 20}
-                      stroke="hsl(var(--border))"
-                      strokeWidth="2"
-                      strokeDasharray="4"
+                      stroke={isInBlastRadius ? "hsl(var(--destructive))" : "hsl(var(--border))"}
+                      strokeWidth={isInBlastRadius ? "3" : "2"}
+                      strokeDasharray={isInBlastRadius ? "0" : "4"}
+                      className={isInBlastRadius ? "animate-pulse" : ""}
                     />
                   );
                 })}
               </svg>
 
               {/* Nodes */}
-              {filteredNodes.map((node) => (
-                <div
-                  key={node.id}
-                  className={cn(
-                    "absolute px-4 py-2 rounded-lg border-2 cursor-pointer transition-all hover:scale-105 hover:shadow-lg",
-                    nodeColors[node.entity_type] || nodeColors.model
-                  )}
-                  style={{ left: node.x, top: node.y }}
-                >
-                  <p className="text-xs font-medium whitespace-nowrap">{node.label}</p>
-                  <p className="text-[10px] opacity-70 capitalize">{node.entity_type}</p>
-                </div>
-              ))}
+              {filteredNodes.map((node) => {
+                const isSelected = selectedNode?.id === node.id;
+                const isInBlastRadius = blastRadiusNodes.has(node.id);
+                
+                return (
+                  <div
+                    key={node.id}
+                    onClick={() => handleNodeClick(node)}
+                    className={cn(
+                      "absolute px-4 py-2 rounded-lg border-2 cursor-pointer transition-all hover:scale-105 hover:shadow-lg",
+                      nodeColors[node.entity_type] || nodeColors.model,
+                      isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+                      isInBlastRadius && "ring-2 ring-destructive ring-offset-1 ring-offset-background animate-pulse"
+                    )}
+                    style={{ left: node.x, top: node.y }}
+                  >
+                    <div className="flex items-center gap-1">
+                      {isInBlastRadius && <Target className="w-3 h-3 text-destructive" />}
+                      <p className="text-xs font-medium whitespace-nowrap">{node.label}</p>
+                    </div>
+                    <p className="text-[10px] opacity-70 capitalize">{node.entity_type}</p>
+                  </div>
+                );
+              })}
             </>
           )}
         </div>
+
+        {/* Node Detail Panel */}
+        <NodeDetailPanel
+          node={selectedNode}
+          edges={edges || []}
+          allNodes={nodes || []}
+          onClose={handleClosePanel}
+          onExplain={handleExplain}
+          onBlastRadius={handleBlastRadius}
+          isExplaining={isExplaining}
+          blastRadiusNodes={blastRadiusNodes}
+        />
 
         {/* Legend */}
         <div className="flex items-center gap-6 p-4 border-t border-border flex-wrap">
@@ -210,6 +355,15 @@ export default function Lineage() {
           ))}
         </div>
       </div>
+
+      {/* Explain Dialog */}
+      <ExplainDialog
+        open={explainDialogOpen}
+        onOpenChange={setExplainDialogOpen}
+        explanation={explanation}
+        isLoading={isExplaining}
+        nodeName={explainNode?.label}
+      />
     </MainLayout>
   );
 }
