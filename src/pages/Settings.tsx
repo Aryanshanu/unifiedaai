@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useSettings, useUpdateSettings } from "@/hooks/useSettings";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { UsersTeamsSection } from "@/components/settings/UsersTeamsSection";
 
 const settingsSections = [
   { id: "general", icon: SettingsIcon, label: "General", description: "Basic configuration and preferences" },
@@ -187,11 +188,7 @@ export default function Settings() {
 
             {activeSection === "users" && (
               <>
-                <h2 className="text-lg font-semibold text-foreground mb-6">Users & Teams</h2>
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <User className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">User management coming soon</p>
-                </div>
+                <UsersTeamsSection />
               </>
             )}
 

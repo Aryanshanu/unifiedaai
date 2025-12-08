@@ -18,6 +18,11 @@ import {
   ChevronRight,
   Shield,
   GitBranch,
+  Users,
+  Activity,
+  FileText,
+  Bell,
+  BookOpen,
 } from "lucide-react";
 
 const navItems = [
@@ -27,15 +32,22 @@ const navItems = [
   { path: "/models", icon: Database, label: "Model Registry" },
   { divider: true, label: "Governance" },
   { path: "/governance/approvals", icon: Shield, label: "Approvals", showBadge: true },
+  { path: "/hitl", icon: Users, label: "HITL Console" },
   { path: "/lineage", icon: GitBranch, label: "Knowledge Graph" },
+  { divider: true, label: "Monitoring" },
+  { path: "/observability", icon: Activity, label: "Observability" },
+  { path: "/alerts", icon: Bell, label: "Alerts & Notifications" },
   { divider: true, label: "Core RAI Engines" },
   { path: "/engine/fairness", icon: Scale, label: "Fairness Engine" },
   { path: "/engine/hallucination", icon: AlertCircle, label: "Hallucination Engine" },
   { path: "/engine/toxicity", icon: ShieldAlert, label: "Toxicity Engine" },
   { path: "/engine/privacy", icon: Lock, label: "Privacy Engine" },
   { path: "/engine/explainability", icon: Eye, label: "Explainability Engine" },
+  { divider: true, label: "Policy & Red Team" },
+  { path: "/policy", icon: FileText, label: "Policy Studio" },
   { divider: true, label: "System" },
   { path: "/settings", icon: Settings, label: "Settings" },
+  { path: "/docs", icon: BookOpen, label: "Documentation" },
 ];
 
 export function Sidebar() {
