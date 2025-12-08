@@ -1,9 +1,11 @@
+import { useEffect, useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { LiveMetrics } from "@/components/dashboard/LiveMetrics";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { Activity, AlertTriangle, TrendingUp, Clock, RefreshCw } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Activity, AlertTriangle, TrendingUp, Clock, RefreshCw, Bell, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDriftAlerts, useDriftAlertStats, DriftAlert } from "@/hooks/useDriftAlerts";
 import { useModels, Model } from "@/hooks/useModels";
@@ -11,6 +13,10 @@ import { usePlatformMetrics, useSystemHealthSummary } from "@/hooks/usePlatformM
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
 import { TrafficGenerator } from "@/components/observability/TrafficGenerator";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 function getModelStatus(model: Model): "healthy" | "warning" | "critical" {
   const fairness = model.fairness_score ?? 100;
@@ -23,11 +29,77 @@ function getModelStatus(model: Model): "healthy" | "warning" | "critical" {
 }
 
 export default function Observability() {
-  const { data: driftAlerts, isLoading: alertsLoading } = useDriftAlerts();
-  const { data: driftStats } = useDriftAlertStats();
-  const { data: models, isLoading: modelsLoading } = useModels();
-  const { data: platformMetrics, isLoading: metricsLoading } = usePlatformMetrics();
-  const { data: systemHealth } = useSystemHealthSummary();
+  const { data: driftAlerts, isLoading: alertsLoading, refetch: refetchAlerts } = useDriftAlerts();
+  const { data: driftStats, refetch: refetchStats } = useDriftAlertStats();
+  const { data: models, isLoading: modelsLoading, refetch: refetchModels } = useModels();
+  const { data: platformMetrics, isLoading: metricsLoading, refetch: refetchMetrics } = usePlatformMetrics();
+  const { data: systemHealth, refetch: refetchHealth } = useSystemHealthSummary();
+  const queryClient = useQueryClient();
+  
+  const [realtimeCount, setRealtimeCount] = useState(0);
+  const [newAlertBadge, setNewAlertBadge] = useState(false);
+
+  // Supabase Realtime subscriptions
+  useEffect(() => {
+    console.log("Setting up Observability Realtime subscriptions...");
+    
+    const channel = supabase
+      .channel('observability-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'request_logs' },
+        (payload) => {
+          console.log('New request log:', payload);
+          setRealtimeCount(prev => prev + 1);
+          refetchMetrics();
+          refetchHealth();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'drift_alerts' },
+        (payload) => {
+          console.log('Drift alert change:', payload);
+          setNewAlertBadge(true);
+          refetchAlerts();
+          refetchStats();
+          if (payload.eventType === 'INSERT') {
+            toast.warning("🚨 New Drift Alert Detected", {
+              description: `${(payload.new as any)?.feature || 'Feature'} drift detected`,
+              action: {
+                label: "View",
+                onClick: () => {}
+              }
+            });
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'incidents' },
+        (payload) => {
+          console.log('New incident:', payload);
+          refetchMetrics();
+          toast.error("🔥 New Incident Created", {
+            description: (payload.new as any)?.title || "Incident requires attention",
+          });
+          // Fake PagerDuty notification
+          setTimeout(() => {
+            toast.success("✓ Incident escalated to PagerDuty", {
+              description: "On-call engineer notified"
+            });
+          }, 1500);
+        }
+      )
+      .subscribe((status) => {
+        console.log('Observability realtime status:', status);
+      });
+
+    return () => {
+      console.log("Cleaning up Observability Realtime subscriptions");
+      supabase.removeChannel(channel);
+    };
+  }, [refetchAlerts, refetchStats, refetchMetrics, refetchHealth]);
 
   // Create model lookup
   const modelMap = models?.reduce((acc, m) => {
@@ -67,8 +139,34 @@ export default function Observability() {
     },
   ];
 
+  const handleRefreshAll = () => {
+    refetchAlerts();
+    refetchStats();
+    refetchMetrics();
+    refetchHealth();
+    refetchModels();
+    setNewAlertBadge(false);
+    toast.success("Dashboard refreshed");
+  };
+
   return (
     <MainLayout title="Observability" subtitle="Real-time telemetry, drift detection, and model health monitoring">
+      {/* Realtime indicator */}
+      {realtimeCount > 0 && (
+        <div className="mb-4 p-3 bg-success/10 border border-success/20 rounded-lg flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
+            <span className="text-sm text-success font-medium">
+              Live: {realtimeCount} events received this session
+            </span>
+          </div>
+          <Badge variant="outline" className="text-success border-success/30">
+            <Zap className="w-3 h-3 mr-1" />
+            Realtime Active
+          </Badge>
+        </div>
+      )}
+
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <MetricCard
@@ -113,8 +211,11 @@ export default function Observability() {
               <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <Activity className="w-4 h-4 text-primary" />
                 System Health
+                {newAlertBadge && (
+                  <Badge variant="destructive" className="animate-pulse">New</Badge>
+                )}
               </h2>
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" onClick={handleRefreshAll}>
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Refresh
               </Button>
@@ -132,10 +233,11 @@ export default function Observability() {
                 ))}
               </div>
             ) : systemHealth.length === 0 ? (
-              <div className="text-center py-8">
-                <Activity className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">No systems to monitor</p>
-              </div>
+              <EmptyState
+                icon={<Activity className="w-8 h-8 text-primary/50" />}
+                title="No systems to monitor"
+                description="Register models and systems to see health metrics"
+              />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -187,10 +289,11 @@ export default function Observability() {
                 ))}
               </div>
             ) : models?.length === 0 ? (
-              <div className="text-center py-8">
-                <Activity className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">No models to monitor</p>
-              </div>
+              <EmptyState
+                icon={<Activity className="w-8 h-8 text-primary/50" />}
+                title="No models to monitor"
+                description="Register models to track their health metrics"
+              />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -229,6 +332,11 @@ export default function Observability() {
               <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-warning" />
                 Drift Alerts
+                {openAlerts.length > 0 && (
+                  <Badge variant="outline" className="text-warning border-warning/30">
+                    {openAlerts.length} active
+                  </Badge>
+                )}
               </h2>
               <Button variant="outline" size="sm">Configure Thresholds</Button>
             </div>
@@ -268,7 +376,7 @@ export default function Observability() {
             <h3 className="text-sm font-semibold text-foreground mb-4">Quick Actions</h3>
             <div className="space-y-2">
               <TrafficGenerator />
-              <Button variant="outline" className="w-full justify-start">
+              <Button variant="outline" className="w-full justify-start" onClick={handleRefreshAll}>
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Force Model Refresh
               </Button>

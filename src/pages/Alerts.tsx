@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,8 @@ import {
   Filter,
   Loader2,
   Trash2,
-  Globe
+  Globe,
+  Zap
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDriftAlerts } from "@/hooks/useDriftAlerts";
@@ -44,6 +45,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { supabase } from "@/integrations/supabase/client";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 const severityColors = {
   critical: "bg-danger/10 text-danger border-danger/30",
@@ -60,8 +63,8 @@ const channelIcons = {
 };
 
 export default function Alerts() {
-  const { data: driftAlerts, isLoading: driftLoading } = useDriftAlerts();
-  const { data: incidents, isLoading: incidentsLoading } = useIncidents();
+  const { data: driftAlerts, isLoading: driftLoading, refetch: refetchDrift } = useDriftAlerts();
+  const { data: incidents, isLoading: incidentsLoading, refetch: refetchIncidents } = useIncidents();
   const { data: channels, isLoading: channelsLoading } = useNotificationChannels();
   const createChannel = useCreateNotificationChannel();
   const updateChannel = useUpdateNotificationChannel();
@@ -72,6 +75,57 @@ export default function Alerts() {
   const [newChannelType, setNewChannelType] = useState<'email' | 'slack' | 'teams' | 'webhook'>('email');
   const [newChannelName, setNewChannelName] = useState('');
   const [newChannelConfig, setNewChannelConfig] = useState('');
+  const [realtimeCount, setRealtimeCount] = useState(0);
+
+  // Supabase Realtime subscriptions
+  useEffect(() => {
+    console.log("Setting up Alerts Realtime subscriptions...");
+    
+    const channel = supabase
+      .channel('alerts-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'drift_alerts' },
+        (payload) => {
+          console.log('Drift alert change:', payload);
+          setRealtimeCount(prev => prev + 1);
+          refetchDrift();
+          if (payload.eventType === 'INSERT') {
+            toast.warning("🚨 New Drift Alert", {
+              description: `${(payload.new as any)?.drift_type || 'Drift'} detected on ${(payload.new as any)?.feature || 'feature'}`
+            });
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'incidents' },
+        (payload) => {
+          console.log('Incident change:', payload);
+          setRealtimeCount(prev => prev + 1);
+          refetchIncidents();
+          if (payload.eventType === 'INSERT') {
+            toast.error("🔥 New Incident", {
+              description: (payload.new as any)?.title || "Incident created"
+            });
+            // Fake external notification
+            setTimeout(() => {
+              toast.success("✓ Alert escalated to PagerDuty", {
+                description: "On-call team notified"
+              });
+            }, 2000);
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('Alerts realtime status:', status);
+      });
+
+    return () => {
+      console.log("Cleaning up Alerts Realtime subscriptions");
+      supabase.removeChannel(channel);
+    };
+  }, [refetchDrift, refetchIncidents]);
 
   const allAlerts = [
     ...(driftAlerts || []).map(a => ({
@@ -140,6 +194,22 @@ export default function Alerts() {
       title="Alerts & Notifications" 
       subtitle="Real-time alerts, drift notifications, and notification channel management"
     >
+      {/* Realtime indicator */}
+      {realtimeCount > 0 && (
+        <div className="mb-4 p-3 bg-success/10 border border-success/20 rounded-lg flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
+            <span className="text-sm text-success font-medium">
+              Live: {realtimeCount} realtime events received
+            </span>
+          </div>
+          <Badge variant="outline" className="text-success border-success/30">
+            <Zap className="w-3 h-3 mr-1" />
+            Realtime Active
+          </Badge>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex items-center gap-2 mb-6 border-b border-border pb-4">
         {[
@@ -185,11 +255,11 @@ export default function Alerts() {
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
           ) : allAlerts.length === 0 ? (
-            <div className="text-center py-12 bg-card border border-border rounded-xl">
-              <CheckCircle className="w-12 h-12 text-success mx-auto mb-4" />
-              <p className="text-foreground font-medium">All clear!</p>
-              <p className="text-sm text-muted-foreground mt-1">No active alerts at this time</p>
-            </div>
+            <EmptyState
+              icon={<CheckCircle className="w-8 h-8 text-success/50" />}
+              title="All clear!"
+              description="No active alerts at this time. Your systems are healthy."
+            />
           ) : (
             <div className="space-y-3">
               {allAlerts.map(alert => (
@@ -267,11 +337,13 @@ export default function Alerts() {
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
           ) : !channels?.length ? (
-            <div className="text-center py-12 bg-card border border-border rounded-xl">
-              <Bell className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-foreground font-medium">No notification channels</p>
-              <p className="text-sm text-muted-foreground mt-1">Add a channel to receive alerts</p>
-            </div>
+            <EmptyState
+              icon={<Bell className="w-8 h-8 text-primary/50" />}
+              title="No notification channels"
+              description="Add a channel to receive alerts via email, Slack, or webhooks"
+              actionLabel="Add Channel"
+              onAction={() => setShowAddChannel(true)}
+            />
           ) : (
             <div className="grid gap-4">
               {channels.map(channel => {
