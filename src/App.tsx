@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { TestRunnerOverlay } from "@/components/tests/TestRunner";
 import Auth from "./pages/Auth";
 import Index from "./pages/Index";
 import Projects from "./pages/Projects";
@@ -29,6 +30,7 @@ import Documentation from "./pages/Documentation";
 import Governance from "./pages/Governance";
 import Evaluation from "./pages/Evaluation";
 import GoldenDemo from "./pages/GoldenDemo";
+import RunTests from "./pages/RunTests";
 import NotFound from "./pages/NotFound";
 import { GlobalBanner } from "./components/layout/GlobalBanner";
 
@@ -42,6 +44,8 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <GlobalBanner />
+          {/* Test Runner Overlay - only visible when ?test=1 in URL */}
+          <TestRunnerOverlay />
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
@@ -81,8 +85,9 @@ const App = () => (
               </ProtectedRoute>
             } />
             <Route path="/docs" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
-            {/* Golden Demo (hidden) */}
+            {/* Test & Demo Routes */}
             <Route path="/golden" element={<GoldenDemo />} />
+            <Route path="/run-tests" element={<RunTests />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
