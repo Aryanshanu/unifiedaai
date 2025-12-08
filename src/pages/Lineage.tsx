@@ -4,9 +4,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { 
   GitBranch, 
   Search, 
-  Filter, 
   ZoomIn, 
   ZoomOut, 
   Maximize, 
@@ -24,6 +36,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { HealthIndicator } from "@/components/shared/HealthIndicator";
 import { HealthStatus } from "@/hooks/useSelfHealing";
+
 const nodeColors: Record<string, string> = {
   dataset: "bg-blue-500/20 border-blue-500/50 text-blue-400",
   feature: "bg-purple-500/20 border-purple-500/50 text-purple-400",
@@ -51,7 +64,7 @@ const ENTITY_TYPE_OPTIONS = [
   { value: 'deployment', label: 'Deployment' },
 ];
 
-// Improved layout algorithm - 380px spacing with 3-pass collision detection
+// Improved layout algorithm - 420px spacing with 5-pass collision detection
 function layoutNodes(nodes: any[]) {
   const typeColumns: Record<string, number> = {
     dataset: 0,
@@ -68,8 +81,8 @@ function layoutNodes(nodes: any[]) {
   };
   
   const typeCounters: Record<string, number> = {};
-  const columnWidth = 380; // Increased to 380px as requested
-  const rowHeight = 100; // Increased row height
+  const columnWidth = 420; // Increased to 420px as required
+  const rowHeight = 110; // Increased row height
   const startX = 120;
   const startY = 100;
   const nodeWidth = 140;
@@ -83,8 +96,8 @@ function layoutNodes(nodes: any[]) {
     const row = typeCounters[type];
     
     // Stagger odd/even rows for visual separation
-    const xOffset = (row % 2) * 40;
-    const yOffset = (row % 3) * 25;
+    const xOffset = (row % 2) * 50;
+    const yOffset = (row % 3) * 30;
     
     return {
       ...node,
@@ -93,10 +106,10 @@ function layoutNodes(nodes: any[]) {
     };
   });
   
-  // 3-pass collision detection and resolution for better separation
-  const minDistance = Math.max(nodeWidth, nodeHeight) + 40;
+  // 5-pass collision detection and resolution for better separation
+  const minDistance = Math.max(nodeWidth, nodeHeight) + 50;
   
-  for (let pass = 0; pass < 3; pass++) {
+  for (let pass = 0; pass < 5; pass++) {
     for (let i = 0; i < positioned.length; i++) {
       for (let j = i + 1; j < positioned.length; j++) {
         const dx = positioned[j].x - positioned[i].x;
@@ -105,7 +118,7 @@ function layoutNodes(nodes: any[]) {
         
         if (distance < minDistance && distance > 0) {
           // Push nodes apart with stronger force on later passes
-          const force = 0.5 + (pass * 0.2);
+          const force = 0.5 + (pass * 0.15);
           const pushX = (dx / distance) * (minDistance - distance) * force;
           const pushY = (dy / distance) * (minDistance - distance) * force;
           positioned[j].x += pushX;
@@ -149,6 +162,7 @@ export default function Lineage() {
   const [explainNodeId, setExplainNodeId] = useState<string | null>(null);
   const [entityTypeFilter, setEntityTypeFilter] = useState<string>("all");
   const [zoomLevel, setZoomLevel] = useState(1);
+  const graphContainerRef = useRef<HTMLDivElement>(null);
 
   const { data: lineageData, isLoading: lineageLoading } = useKGLineage(
     blastRadiusEntityId || '',
@@ -167,6 +181,19 @@ export default function Lineage() {
   // Debounce timer ref for auto-sync
   const syncDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const DEBOUNCE_DELAY = 2000; // 2 seconds
+
+  // Zoom handlers
+  const handleZoomIn = useCallback(() => {
+    setZoomLevel(prev => Math.min(prev + 0.25, 2.0));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setZoomLevel(prev => Math.max(prev - 0.25, 0.5));
+  }, []);
+
+  const handleZoomReset = useCallback(() => {
+    setZoomLevel(1);
+  }, []);
 
   // Debounced sync function
   const debouncedSync = useCallback(() => {
@@ -286,11 +313,11 @@ export default function Lineage() {
   const filteredNodeIds = new Set(filteredNodes.map(n => n.id));
   const filteredEdges = useMemo(() => {
     if (!edges) return [];
-    if (!searchQuery) return edges;
+    if (!searchQuery && entityTypeFilter === 'all') return edges;
     return edges.filter(edge => 
       filteredNodeIds.has(edge.source_node_id) && filteredNodeIds.has(edge.target_node_id)
     );
-  }, [edges, searchQuery, filteredNodeIds]);
+  }, [edges, searchQuery, entityTypeFilter, filteredNodeIds]);
 
   // Get node position by ID for drawing edges
   const nodePositions = useMemo(() => {
@@ -370,6 +397,12 @@ export default function Lineage() {
     setBlastRadiusEntityId(null);
   }, []);
 
+  // Calculate blast radius percentage
+  const blastRadiusPercentage = useMemo(() => {
+    if (!nodes?.length || !blastRadiusNodes.size) return 0;
+    return Math.round((blastRadiusNodes.size / nodes.length) * 100);
+  }, [nodes, blastRadiusNodes]);
+
   const explainNode = nodes?.find(n => n.id === explainNodeId);
 
   return (
@@ -413,19 +446,29 @@ export default function Lineage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Button variant="outline" size="sm">
-              <Filter className="w-4 h-4 mr-2" />
-              Filter
-            </Button>
+            
+            {/* Entity Type Filter Dropdown */}
+            <Select value={entityTypeFilter} onValueChange={setEntityTypeFilter}>
+              <SelectTrigger className="w-40 bg-secondary border-border">
+                <SelectValue placeholder="Filter by type" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover border-border">
+                {ENTITY_TYPE_OPTIONS.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             
             {/* Blast Radius Indicator */}
             {blastRadiusNodes.size > 0 && (
               <Badge variant="destructive" className="gap-1">
                 <Target className="w-3 h-3" />
-                Blast Radius: {blastRadiusNodes.size} nodes
+                Blast Radius: {blastRadiusNodes.size} nodes ({blastRadiusPercentage}%)
                 <Button
                   variant="ghost"
-                  size="iconSm"
+                  size="icon"
                   className="h-4 w-4 ml-1 hover:bg-destructive/20"
                   onClick={clearBlastRadius}
                 >
@@ -451,15 +494,39 @@ export default function Lineage() {
               <RefreshCw className={cn("w-4 h-4 mr-2", isSyncing && "animate-spin")} />
               {isSyncing ? "Syncing..." : "Sync"}
             </Button>
-            <Button variant="ghost" size="iconSm">
-              <ZoomOut className="w-4 h-4" />
-            </Button>
-            <Button variant="ghost" size="iconSm">
-              <ZoomIn className="w-4 h-4" />
-            </Button>
-            <Button variant="ghost" size="iconSm">
-              <Maximize className="w-4 h-4" />
-            </Button>
+            
+            {/* Zoom Controls */}
+            <div className="flex items-center gap-1 bg-secondary rounded-md p-1">
+              <Button 
+                variant="ghost" 
+                size="icon"
+                className="h-7 w-7"
+                onClick={handleZoomOut}
+                disabled={zoomLevel <= 0.5}
+              >
+                <ZoomOut className="w-4 h-4" />
+              </Button>
+              <span className="text-xs font-mono px-2 min-w-[3rem] text-center">
+                {Math.round(zoomLevel * 100)}%
+              </span>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                className="h-7 w-7"
+                onClick={handleZoomIn}
+                disabled={zoomLevel >= 2.0}
+              >
+                <ZoomIn className="w-4 h-4" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                className="h-7 w-7"
+                onClick={handleZoomReset}
+              >
+                <Maximize className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -477,11 +544,29 @@ export default function Lineage() {
               <GitBranch className="w-12 h-12 mb-4 opacity-50" />
               <p className="text-lg font-medium">No lineage data yet</p>
               <p className="text-sm">Register models and run evaluations to build the knowledge graph</p>
+              <Button 
+                variant="outline" 
+                className="mt-4"
+                onClick={handleSync}
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Sync Knowledge Graph
+              </Button>
             </div>
           ) : (
-            <>
+            <div 
+              ref={graphContainerRef}
+              className="origin-top-left transition-transform duration-200"
+              style={{ 
+                transform: `scale(${zoomLevel})`,
+                width: `${100 / zoomLevel}%`,
+                height: `${100 / zoomLevel}%`,
+                minWidth: '1200px',
+                minHeight: '600px'
+              }}
+            >
               {/* SVG for edges */}
-              <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ minWidth: '1000px', minHeight: '600px' }}>
+              <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ minWidth: '1200px', minHeight: '600px' }}>
                 {filteredEdges.map((edge) => {
                   const fromPos = nodePositions.get(edge.source_node_id);
                   const toPos = nodePositions.get(edge.target_node_id);
@@ -508,31 +593,47 @@ export default function Lineage() {
               </svg>
 
               {/* Nodes */}
-              {filteredNodes.map((node) => {
-                const isSelected = selectedNode?.id === node.id;
-                const isInBlastRadius = blastRadiusNodes.has(node.id);
-                
-                return (
-                  <div
-                    key={node.id}
-                    onClick={() => handleNodeClick(node)}
-                    className={cn(
-                      "absolute px-4 py-2 rounded-lg border-2 cursor-pointer transition-all hover:scale-105 hover:shadow-lg",
-                      nodeColors[node.entity_type] || nodeColors.model,
-                      isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-background",
-                      isInBlastRadius && "ring-2 ring-destructive ring-offset-1 ring-offset-background animate-pulse"
-                    )}
-                    style={{ left: node.x, top: node.y }}
-                  >
-                    <div className="flex items-center gap-1">
-                      {isInBlastRadius && <Target className="w-3 h-3 text-destructive" />}
-                      <p className="text-xs font-medium whitespace-nowrap">{node.label}</p>
-                    </div>
-                    <p className="text-[10px] opacity-70 capitalize">{node.entity_type}</p>
-                  </div>
-                );
-              })}
-            </>
+              <TooltipProvider>
+                {filteredNodes.map((node) => {
+                  const isSelected = selectedNode?.id === node.id;
+                  const isInBlastRadius = blastRadiusNodes.has(node.id);
+                  
+                  return (
+                    <Tooltip key={node.id}>
+                      <TooltipTrigger asChild>
+                        <div
+                          onClick={() => handleNodeClick(node)}
+                          className={cn(
+                            "absolute px-4 py-2 rounded-lg border-2 cursor-pointer transition-all hover:scale-105 hover:shadow-lg",
+                            nodeColors[node.entity_type] || nodeColors.model,
+                            isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+                            isInBlastRadius && "ring-2 ring-destructive ring-offset-1 ring-offset-background animate-pulse"
+                          )}
+                          style={{ left: node.x, top: node.y }}
+                        >
+                          <div className="flex items-center gap-1">
+                            {isInBlastRadius && <Target className="w-3 h-3 text-destructive" />}
+                            <p className="text-xs font-medium whitespace-nowrap">{node.label}</p>
+                          </div>
+                          <p className="text-[10px] opacity-70 capitalize">{node.entity_type}</p>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="bg-popover border-border">
+                        <div className="text-xs">
+                          <p className="font-medium">{node.label}</p>
+                          <p className="text-muted-foreground capitalize">{node.entity_type}</p>
+                          {isInBlastRadius && (
+                            <p className="text-destructive mt-1">
+                              In blast radius ({blastRadiusPercentage}% of graph)
+                            </p>
+                          )}
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </TooltipProvider>
+            </div>
           )}
         </div>
 
