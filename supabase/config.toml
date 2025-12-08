@@ -17,3 +17,15 @@ verify_jwt = true
 
 [functions.custom-prompt-test]
 verify_jwt = true
+
+[functions.kg-upsert]
+verify_jwt = true
+
+[functions.kg-query]
+verify_jwt = true
+
+[functions.kg-lineage]
+verify_jwt = false
+
+[functions.kg-explain]
+verify_jwt = true
