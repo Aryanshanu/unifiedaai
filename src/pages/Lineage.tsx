@@ -38,7 +38,20 @@ const nodeColors: Record<string, string> = {
   policy: "bg-pink-500/20 border-pink-500/50 text-pink-400",
 };
 
-// Improved layout algorithm - force-directed simulation for non-overlapping nodes
+// Entity type filter options
+const ENTITY_TYPE_OPTIONS = [
+  { value: 'all', label: 'All Types' },
+  { value: 'model', label: 'Model' },
+  { value: 'dataset', label: 'Dataset' },
+  { value: 'evaluation', label: 'Evaluation' },
+  { value: 'incident', label: 'Incident' },
+  { value: 'control', label: 'Control' },
+  { value: 'decision', label: 'Decision' },
+  { value: 'risk', label: 'Risk' },
+  { value: 'deployment', label: 'Deployment' },
+];
+
+// Improved layout algorithm - 380px spacing with 3-pass collision detection
 function layoutNodes(nodes: any[]) {
   const typeColumns: Record<string, number> = {
     dataset: 0,
@@ -55,14 +68,14 @@ function layoutNodes(nodes: any[]) {
   };
   
   const typeCounters: Record<string, number> = {};
-  const columnWidth = 200; // Increased spacing
-  const rowHeight = 85; // Reduced to pack better but still visible
-  const startX = 100;
-  const startY = 80;
-  const nodeWidth = 120;
-  const nodeHeight = 50;
+  const columnWidth = 380; // Increased to 380px as requested
+  const rowHeight = 100; // Increased row height
+  const startX = 120;
+  const startY = 100;
+  const nodeWidth = 140;
+  const nodeHeight = 60;
   
-  // Initial placement
+  // Initial placement with larger spacing
   const positioned = nodes.map((node) => {
     const type = node.entity_type || 'model';
     const column = typeColumns[type] ?? 2;
@@ -70,8 +83,8 @@ function layoutNodes(nodes: any[]) {
     const row = typeCounters[type];
     
     // Stagger odd/even rows for visual separation
-    const xOffset = (row % 2) * 25;
-    const yOffset = (row % 3) * 15;
+    const xOffset = (row % 2) * 40;
+    const yOffset = (row % 3) * 25;
     
     return {
       ...node,
@@ -80,24 +93,44 @@ function layoutNodes(nodes: any[]) {
     };
   });
   
-  // Simple collision detection and resolution (single pass)
-  for (let i = 0; i < positioned.length; i++) {
-    for (let j = i + 1; j < positioned.length; j++) {
-      const dx = positioned[j].x - positioned[i].x;
-      const dy = positioned[j].y - positioned[i].y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      const minDistance = Math.max(nodeWidth, nodeHeight) + 20;
-      
-      if (distance < minDistance && distance > 0) {
-        // Push nodes apart
-        const pushX = (dx / distance) * (minDistance - distance) * 0.5;
-        const pushY = (dy / distance) * (minDistance - distance) * 0.5;
-        positioned[j].x += pushX;
-        positioned[j].y += pushY;
-        positioned[i].x -= pushX;
-        positioned[i].y -= pushY;
+  // 3-pass collision detection and resolution for better separation
+  const minDistance = Math.max(nodeWidth, nodeHeight) + 40;
+  
+  for (let pass = 0; pass < 3; pass++) {
+    for (let i = 0; i < positioned.length; i++) {
+      for (let j = i + 1; j < positioned.length; j++) {
+        const dx = positioned[j].x - positioned[i].x;
+        const dy = positioned[j].y - positioned[i].y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance < minDistance && distance > 0) {
+          // Push nodes apart with stronger force on later passes
+          const force = 0.5 + (pass * 0.2);
+          const pushX = (dx / distance) * (minDistance - distance) * force;
+          const pushY = (dy / distance) * (minDistance - distance) * force;
+          positioned[j].x += pushX;
+          positioned[j].y += pushY;
+          positioned[i].x -= pushX;
+          positioned[i].y -= pushY;
+        }
       }
     }
+  }
+  
+  // Ensure no negative positions
+  let minX = Infinity, minY = Infinity;
+  positioned.forEach(node => {
+    minX = Math.min(minX, node.x);
+    minY = Math.min(minY, node.y);
+  });
+  
+  if (minX < 50 || minY < 50) {
+    const offsetX = minX < 50 ? 50 - minX : 0;
+    const offsetY = minY < 50 ? 50 - minY : 0;
+    positioned.forEach(node => {
+      node.x += offsetX;
+      node.y += offsetY;
+    });
   }
   
   return positioned;
@@ -114,6 +147,8 @@ export default function Lineage() {
   const [blastRadiusEntityId, setBlastRadiusEntityId] = useState<string | null>(null);
   const [explainDialogOpen, setExplainDialogOpen] = useState(false);
   const [explainNodeId, setExplainNodeId] = useState<string | null>(null);
+  const [entityTypeFilter, setEntityTypeFilter] = useState<string>("all");
+  const [zoomLevel, setZoomLevel] = useState(1);
 
   const { data: lineageData, isLoading: lineageLoading } = useKGLineage(
     blastRadiusEntityId || '',
@@ -230,12 +265,23 @@ export default function Lineage() {
   }, [nodes]);
 
   const filteredNodes = useMemo(() => {
-    if (!searchQuery) return layoutedNodes;
-    return layoutedNodes.filter(node => 
-      node.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      node.entity_type.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [layoutedNodes, searchQuery]);
+    let result = layoutedNodes;
+    
+    // Filter by entity type
+    if (entityTypeFilter && entityTypeFilter !== 'all') {
+      result = result.filter(node => node.entity_type === entityTypeFilter);
+    }
+    
+    // Filter by search query
+    if (searchQuery) {
+      result = result.filter(node => 
+        node.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        node.entity_type.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    
+    return result;
+  }, [layoutedNodes, searchQuery, entityTypeFilter]);
 
   const filteredNodeIds = new Set(filteredNodes.map(n => n.id));
   const filteredEdges = useMemo(() => {

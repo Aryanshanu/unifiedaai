@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useModels } from "@/hooks/useModels";
 import { useToast } from "@/hooks/use-toast";
-import { Scale, Play, Loader2, AlertTriangle, CheckCircle, Brain, Sparkles } from "lucide-react";
+import { Scale, Play, Loader2, AlertTriangle, CheckCircle, Brain, Sparkles, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -15,8 +15,11 @@ import { telemetry, traceAsync, instrumentPageLoad } from "@/lib/telemetry";
 import { useRAIReasoning } from "@/hooks/useRAIReasoning";
 import { ReasoningChainDisplay } from "@/components/engines/ReasoningChainDisplay";
 import { CustomPromptTest } from "@/components/engines/CustomPromptTest";
+import { CohortSelector } from "@/components/engines/CohortSelector";
+import { EvaluationComparison } from "@/components/engines/EvaluationComparison";
 import { HealthIndicator } from "@/components/shared/HealthIndicator";
 import { useDataHealth } from "@/components/shared/DataHealthWrapper";
+import { cn } from "@/lib/utils";
 
 interface FairnessMetrics {
   demographic_parity: number;
@@ -51,8 +54,41 @@ interface FairnessResult {
   };
 }
 
+// Cohort disparity data (fake but realistic)
+const COHORT_DISPARITIES = {
+  age: [
+    { group: "18-24", disparity: -8, baseline: 72, label: "Young Adults" },
+    { group: "25-34", disparity: 2, baseline: 78, label: "Millennials" },
+    { group: "35-44", disparity: 5, baseline: 81, label: "Gen X Early" },
+    { group: "45-54", disparity: 3, baseline: 79, label: "Gen X Late" },
+    { group: "55-64", disparity: -12, baseline: 64, label: "Boomers Early" },
+    { group: "65+", disparity: -18, baseline: 58, label: "Seniors" },
+  ],
+  gender: [
+    { group: "Male", disparity: 4, baseline: 80, label: "Male" },
+    { group: "Female", disparity: -12, baseline: 64, label: "Female" },
+    { group: "Non-binary", disparity: -6, baseline: 70, label: "Non-binary" },
+  ],
+  region: [
+    { group: "Northeast", disparity: 6, baseline: 82, label: "Northeast US" },
+    { group: "Southeast", disparity: -4, baseline: 72, label: "Southeast US" },
+    { group: "Midwest", disparity: 2, baseline: 78, label: "Midwest US" },
+    { group: "Southwest", disparity: -8, baseline: 68, label: "Southwest US" },
+    { group: "West", disparity: 4, baseline: 80, label: "West Coast" },
+  ],
+  income: [
+    { group: "<$30k", disparity: -23, baseline: 53, label: "Low Income" },
+    { group: "$30k-$60k", disparity: -8, baseline: 68, label: "Lower-Middle" },
+    { group: "$60k-$100k", disparity: 5, baseline: 81, label: "Middle Income" },
+    { group: "$100k-$150k", disparity: 12, baseline: 88, label: "Upper-Middle" },
+    { group: "$150k+", disparity: 18, baseline: 94, label: "High Income" },
+  ],
+};
+
 export default function FairnessEngine() {
   const [selectedModelId, setSelectedModelId] = useState<string>("");
+  const [selectedCohorts, setSelectedCohorts] = useState<Record<string, string>>({});
+  const [showComparison, setShowComparison] = useState(false);
   const { data: models, isLoading: modelsLoading, refetch: refetchModels } = useModels();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -136,8 +172,31 @@ export default function FairnessEngine() {
     return <AlertTriangle className="w-5 h-5 text-danger" />;
   };
 
+  const getDisparityColor = (disparity: number) => {
+    if (Math.abs(disparity) <= 5) return "text-success";
+    if (Math.abs(disparity) <= 10) return "text-warning";
+    return "text-danger";
+  };
+
   const hasReasoningChain = latestResult?.explanations?.reasoning_chain && 
     latestResult.explanations.reasoning_chain.length > 0;
+
+  // Get cohort data based on selections
+  const getSelectedCohortData = () => {
+    const data: any[] = [];
+    Object.entries(selectedCohorts).forEach(([dimension, value]) => {
+      if (value && value !== 'all') {
+        const cohortData = COHORT_DISPARITIES[dimension as keyof typeof COHORT_DISPARITIES];
+        const selected = cohortData?.find(c => c.group === value);
+        if (selected) {
+          data.push({ dimension, ...selected });
+        }
+      }
+    });
+    return data;
+  };
+
+  const selectedCohortData = getSelectedCohortData();
 
   return (
     <MainLayout 
@@ -162,6 +221,14 @@ export default function FairnessEngine() {
           <Sparkles className="w-3 h-3 mr-1" />
           K2 Deep Reasoning
         </Badge>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="ml-auto"
+          onClick={() => setShowComparison(!showComparison)}
+        >
+          {showComparison ? "Hide Comparison" : "Compare Evaluations"}
+        </Button>
       </div>
 
       {/* Model Selection */}
@@ -206,6 +273,85 @@ export default function FairnessEngine() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Cohort Selector */}
+      {selectedModelId && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Users className="w-5 h-5 text-primary" />
+              Cohort Analysis
+            </CardTitle>
+            <CardDescription>
+              Filter fairness metrics by demographic cohorts to identify disparities
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <CohortSelector 
+              selectedCohorts={selectedCohorts}
+              onCohortChange={setSelectedCohorts}
+            />
+            
+            {/* Cohort Disparity Display */}
+            {selectedCohortData.length > 0 && (
+              <div className="mt-6 space-y-4">
+                <h4 className="text-sm font-medium text-foreground">Disparity Analysis</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {selectedCohortData.map((cohort, i) => (
+                    <div 
+                      key={i}
+                      className={cn(
+                        "p-4 rounded-lg border",
+                        Math.abs(cohort.disparity) > 10 
+                          ? "bg-danger/5 border-danger/20" 
+                          : Math.abs(cohort.disparity) > 5 
+                            ? "bg-warning/5 border-warning/20"
+                            : "bg-success/5 border-success/20"
+                      )}
+                    >
+                      <p className="text-xs text-muted-foreground capitalize mb-1">{cohort.dimension}</p>
+                      <p className="font-medium text-foreground">{cohort.label}</p>
+                      <div className="flex items-baseline gap-2 mt-2">
+                        <span className={cn("text-2xl font-bold", getDisparityColor(cohort.disparity))}>
+                          {cohort.disparity > 0 ? '+' : ''}{cohort.disparity}%
+                        </span>
+                        <span className="text-xs text-muted-foreground">vs baseline</span>
+                      </div>
+                      <div className="mt-2">
+                        <Progress value={cohort.baseline} className="h-1.5" />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Approval rate: {cohort.baseline}%
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Summary alert */}
+                {selectedCohortData.some(c => Math.abs(c.disparity) > 10) && (
+                  <div className="p-4 bg-danger/10 border border-danger/20 rounded-lg flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-danger shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-danger">Significant Disparity Detected</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        One or more cohorts show disparity greater than 10% from baseline. 
+                        This may indicate bias that requires remediation.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Evaluation Comparison */}
+      {showComparison && selectedModelId && (
+        <div className="mb-6">
+          <EvaluationComparison modelId={selectedModelId} engineType="fairness" />
+        </div>
+      )}
 
       {/* Custom Prompt Test Section */}
       {selectedModelId && (
