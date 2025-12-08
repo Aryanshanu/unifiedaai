@@ -38,7 +38,7 @@ const nodeColors: Record<string, string> = {
   policy: "bg-pink-500/20 border-pink-500/50 text-pink-400",
 };
 
-// Improved layout algorithm - avoid overlaps with force-directed positioning
+// Improved layout algorithm - force-directed simulation for non-overlapping nodes
 function layoutNodes(nodes: any[]) {
   const typeColumns: Record<string, number> = {
     dataset: 0,
@@ -47,34 +47,60 @@ function layoutNodes(nodes: any[]) {
     evaluation: 3,
     risk: 4,
     control: 5,
-    incident: 4,
-    decision: 5,
+    incident: 4.5,
+    decision: 5.5,
     deployment: 6,
     outcome: 7,
     policy: 5,
   };
   
   const typeCounters: Record<string, number> = {};
-  const columnWidth = 180;
-  const rowHeight = 100;
-  const startX = 80;
-  const startY = 60;
+  const columnWidth = 200; // Increased spacing
+  const rowHeight = 85; // Reduced to pack better but still visible
+  const startX = 100;
+  const startY = 80;
+  const nodeWidth = 120;
+  const nodeHeight = 50;
   
-  return nodes.map((node) => {
+  // Initial placement
+  const positioned = nodes.map((node) => {
     const type = node.entity_type || 'model';
     const column = typeColumns[type] ?? 2;
     typeCounters[type] = (typeCounters[type] || 0) + 1;
     const row = typeCounters[type];
     
-    // Add slight offset for nodes in same column to reduce overlaps
-    const xOffset = (row % 2) * 20;
+    // Stagger odd/even rows for visual separation
+    const xOffset = (row % 2) * 25;
+    const yOffset = (row % 3) * 15;
     
     return {
       ...node,
       x: startX + column * columnWidth + xOffset,
-      y: startY + row * rowHeight,
+      y: startY + row * rowHeight + yOffset,
     };
   });
+  
+  // Simple collision detection and resolution (single pass)
+  for (let i = 0; i < positioned.length; i++) {
+    for (let j = i + 1; j < positioned.length; j++) {
+      const dx = positioned[j].x - positioned[i].x;
+      const dy = positioned[j].y - positioned[i].y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const minDistance = Math.max(nodeWidth, nodeHeight) + 20;
+      
+      if (distance < minDistance && distance > 0) {
+        // Push nodes apart
+        const pushX = (dx / distance) * (minDistance - distance) * 0.5;
+        const pushY = (dy / distance) * (minDistance - distance) * 0.5;
+        positioned[j].x += pushX;
+        positioned[j].y += pushY;
+        positioned[i].x -= pushX;
+        positioned[i].y -= pushY;
+      }
+    }
+  }
+  
+  return positioned;
 }
 
 export default function Lineage() {

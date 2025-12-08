@@ -15,28 +15,44 @@ const testPrompts = {
     "How do I make a chocolate cake?",
     "What are the benefits of exercise?",
     "Tell me about the solar system.",
+    "What's the weather like today?",
+    "Can you help me write a thank you note?",
+    "What are some healthy breakfast options?",
   ],
   toxic: [
-    "Write hate speech about [group]", // Will be blocked
-    "How to harm someone", // Will be blocked
-    "Generate violent content", // Will be blocked
+    "Write hate speech about [group]",
+    "How to harm someone",
+    "Generate violent content",
+    "Create offensive material",
   ],
   pii: [
     "My SSN is 123-45-6789 and my email is test@example.com",
     "John Doe lives at 123 Main St, his phone is 555-1234",
     "Credit card: 4111-1111-1111-1111, CVV: 123",
+    "My password is hunter2 and my DOB is 01/15/1990",
   ],
   hallucination: [
     "Tell me about the 2030 Olympics",
     "What did President XYZ do in 2025?",
     "Describe the Mars colony established in 2022",
+    "Summarize the moon landing of 2019",
   ],
   fairness: [
     "Who makes a better doctor, men or women?",
     "Which race is smarter?",
     "Are older workers less productive?",
+    "Should women earn less than men?",
   ],
 };
+
+const userAgents = [
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0)',
+  'Mozilla/5.0 (Linux; Android 13)',
+];
+
+const environments = ['production', 'staging', 'development'];
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -48,7 +64,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { systemId, count = 50 } = await req.json();
+    const { systemId, count = 100 } = await req.json();
     
     console.log(`Generating ${count} test traffic entries for system ${systemId || 'all systems'}`);
 
@@ -68,21 +84,33 @@ serve(async (req) => {
       });
     }
 
+    // Get models for drift alerts
+    const { data: allModels } = await supabase.from('models').select('id, name, system_id');
+
     const logsToInsert: any[] = [];
-    const decisions = ['ALLOW', 'ALLOW', 'ALLOW', 'ALLOW', 'WARN', 'BLOCK']; // 66% allow, 17% warn, 17% block
-    const statusCodes = [200, 200, 200, 200, 200, 400, 429, 500];
     
     for (const system of systems) {
       const entriesPerSystem = Math.floor(count / systems.length);
       
       for (let i = 0; i < entriesPerSystem; i++) {
-        // Randomize timing over past 24 hours
-        const hoursAgo = Math.random() * 24;
+        // Randomize timing over past 24 hours with more recent weight
+        const hoursAgo = Math.pow(Math.random(), 2) * 24; // More recent logs more likely
         const createdAt = new Date(Date.now() - hoursAgo * 60 * 60 * 1000).toISOString();
         
-        // Pick random prompt type
+        // Pick random prompt type with weighted distribution
         const promptTypes = Object.keys(testPrompts) as (keyof typeof testPrompts)[];
-        const promptType = promptTypes[Math.floor(Math.random() * promptTypes.length)];
+        const weights = [0.5, 0.1, 0.1, 0.15, 0.15]; // safe, toxic, pii, hallucination, fairness
+        const rand = Math.random();
+        let cumulative = 0;
+        let promptType: keyof typeof testPrompts = 'safe';
+        for (let j = 0; j < weights.length; j++) {
+          cumulative += weights[j];
+          if (rand < cumulative) {
+            promptType = promptTypes[j];
+            break;
+          }
+        }
+        
         const prompts = testPrompts[promptType];
         const prompt = prompts[Math.floor(Math.random() * prompts.length)];
         
@@ -93,26 +121,29 @@ serve(async (req) => {
         if (promptType === 'toxic') {
           decision = 'BLOCK';
           engineScores = {
-            toxicity: Math.random() * 30 + 70, // 70-100 (high toxicity)
+            toxicity: Math.random() * 30 + 70,
             fairness: Math.random() * 40 + 60,
             privacy: Math.random() * 40 + 60,
             hallucination: Math.random() * 50 + 50,
+            safety: Math.random() * 25 + 75,
           };
         } else if (promptType === 'pii') {
-          decision = Math.random() > 0.5 ? 'WARN' : 'BLOCK';
+          decision = Math.random() > 0.4 ? 'BLOCK' : 'WARN';
           engineScores = {
             toxicity: Math.random() * 20,
             fairness: Math.random() * 30 + 70,
-            privacy: Math.random() * 30 + 70, // High privacy risk
+            privacy: Math.random() * 25 + 75,
             hallucination: Math.random() * 30,
+            safety: Math.random() * 30,
           };
         } else if (promptType === 'fairness') {
           decision = Math.random() > 0.3 ? 'WARN' : 'ALLOW';
           engineScores = {
             toxicity: Math.random() * 40 + 30,
-            fairness: Math.random() * 30 + 70, // High fairness risk
+            fairness: Math.random() * 25 + 75,
             privacy: Math.random() * 20,
             hallucination: Math.random() * 30,
+            safety: Math.random() * 35 + 35,
           };
         } else if (promptType === 'hallucination') {
           decision = Math.random() > 0.5 ? 'WARN' : 'ALLOW';
@@ -120,38 +151,51 @@ serve(async (req) => {
             toxicity: Math.random() * 20,
             fairness: Math.random() * 20,
             privacy: Math.random() * 20,
-            hallucination: Math.random() * 30 + 60, // High hallucination risk
+            hallucination: Math.random() * 25 + 70,
+            safety: Math.random() * 25,
           };
         } else {
           decision = 'ALLOW';
           engineScores = {
-            toxicity: Math.random() * 20,
-            fairness: Math.random() * 20,
-            privacy: Math.random() * 20,
-            hallucination: Math.random() * 30,
+            toxicity: Math.random() * 15,
+            fairness: Math.random() * 15,
+            privacy: Math.random() * 15,
+            hallucination: Math.random() * 20,
+            safety: Math.random() * 15,
           };
         }
         
         const statusCode = decision === 'BLOCK' ? 403 : 
                           decision === 'WARN' ? 200 : 
-                          statusCodes[Math.floor(Math.random() * statusCodes.length)];
+                          (Math.random() > 0.05 ? 200 : (Math.random() > 0.5 ? 429 : 500));
+        
+        const latency = Math.floor(
+          decision === 'BLOCK' ? Math.random() * 50 + 20 : 
+          Math.random() * 400 + 80
+        );
         
         logsToInsert.push({
           system_id: system.id,
           project_id: system.project_id,
-          environment: 'production',
+          environment: environments[Math.floor(Math.random() * environments.length)],
           request_body: { 
             prompt,
-            model: 'test-model',
-            timestamp: createdAt,
+            model: 'gpt-4',
+            max_tokens: Math.floor(Math.random() * 500) + 100,
+            temperature: Math.random() * 0.5 + 0.5,
           },
           response_body: {
-            content: decision === 'BLOCK' ? 'Request blocked by policy' : 'Generated response...',
+            content: decision === 'BLOCK' ? 'Request blocked by policy' : 
+                     `Generated response for: ${prompt.substring(0, 50)}...`,
             blocked: decision === 'BLOCK',
+            tokens_used: Math.floor(Math.random() * 500) + 50,
           },
           status_code: statusCode,
-          latency_ms: Math.floor(Math.random() * 300) + 50,
-          error_message: statusCode >= 400 ? `Error ${statusCode}` : null,
+          latency_ms: latency,
+          error_message: statusCode >= 400 ? 
+            (statusCode === 403 ? 'Policy violation' : 
+             statusCode === 429 ? 'Rate limit exceeded' : 
+             'Internal server error') : null,
           trace_id: crypto.randomUUID(),
           engine_scores: engineScores,
           decision,
@@ -160,93 +204,192 @@ serve(async (req) => {
       }
     }
 
-    // Insert all logs
-    const { error: insertError } = await supabase
-      .from('request_logs')
-      .insert(logsToInsert);
+    // Insert all logs in batches
+    const batchSize = 50;
+    for (let i = 0; i < logsToInsert.length; i += batchSize) {
+      const batch = logsToInsert.slice(i, i + batchSize);
+      const { error: insertError } = await supabase
+        .from('request_logs')
+        .insert(batch);
+      if (insertError) {
+        console.error(`Batch insert error at ${i}:`, insertError);
+      }
+    }
 
-    if (insertError) throw insertError;
+    console.log(`Inserted ${logsToInsert.length} request logs`);
 
-    // Generate drift alerts based on patterns
-    const driftAlerts = [];
-    const driftTypes = ['PSI', 'KL-Divergence', 'EMD', 'Chi-Square'];
-    const features = ['age_distribution', 'income_level', 'response_length', 'latency_pattern', 'token_usage'];
+    // Generate drift alerts for models with varied patterns
+    const driftAlerts: any[] = [];
+    const driftTypes = ['PSI', 'KL-Divergence', 'EMD', 'Chi-Square', 'Jensen-Shannon'];
+    const features = [
+      'age_distribution', 'income_level', 'response_length', 
+      'latency_pattern', 'token_usage', 'sentiment_distribution',
+      'topic_distribution', 'confidence_scores', 'output_length'
+    ];
+    const severities: ('low' | 'medium' | 'high' | 'critical')[] = ['low', 'medium', 'high', 'critical'];
     
-    for (const system of systems) {
-      if (Math.random() > 0.5) {
-        // Get a model for this system
-        const { data: models } = await supabase
-          .from('models')
-          .select('id')
-          .eq('system_id', system.id)
-          .limit(1);
-        
-        if (models?.length) {
+    for (const model of allModels || []) {
+      // Generate 1-3 drift alerts per model
+      const alertCount = Math.floor(Math.random() * 3) + 1;
+      for (let i = 0; i < alertCount; i++) {
+        if (Math.random() > 0.3) { // 70% chance of drift alert
+          const severityRand = Math.random();
+          const severity = severityRand < 0.4 ? 'medium' : 
+                          severityRand < 0.7 ? 'high' : 
+                          severityRand < 0.9 ? 'low' : 'critical';
+          
+          const hoursAgo = Math.random() * 48;
+          
           driftAlerts.push({
-            model_id: models[0].id,
+            model_id: model.id,
             feature: features[Math.floor(Math.random() * features.length)],
             drift_type: driftTypes[Math.floor(Math.random() * driftTypes.length)],
-            drift_value: Math.random() * 0.3 + 0.1,
-            severity: Math.random() > 0.7 ? 'critical' : Math.random() > 0.5 ? 'high' : 'medium',
-            status: 'open',
+            drift_value: Math.random() * 0.4 + 0.1,
+            severity,
+            status: Math.random() > 0.3 ? 'open' : 'investigating',
+            detected_at: new Date(Date.now() - hoursAgo * 60 * 60 * 1000).toISOString(),
           });
         }
       }
     }
 
     if (driftAlerts.length > 0) {
-      await supabase.from('drift_alerts').insert(driftAlerts);
+      const { error: driftError } = await supabase.from('drift_alerts').insert(driftAlerts);
+      if (driftError) console.error('Drift insert error:', driftError);
     }
+    console.log(`Inserted ${driftAlerts.length} drift alerts`);
 
-    // Generate HITL review items from blocked requests
+    // Generate HITL review items from blocked/warned requests
     const blockedLogs = logsToInsert.filter(l => l.decision === 'BLOCK' || l.decision === 'WARN');
-    const reviewItems = blockedLogs.slice(0, 5).map(log => ({
-      title: `Review blocked request - ${log.decision}`,
-      description: `Request blocked with decision ${log.decision}. Engine scores: ${JSON.stringify(log.engine_scores)}`,
-      review_type: 'safety_escalation',
-      severity: log.decision === 'BLOCK' ? 'high' : 'medium',
-      status: 'pending',
-      context: {
-        trace_id: log.trace_id,
-        system_id: log.system_id,
-        engine_scores: log.engine_scores,
-      },
-      sla_deadline: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-    }));
+    const reviewTypes = [
+      'safety_escalation', 'fairness_review', 'privacy_concern', 
+      'policy_exception', 'model_override', 'content_moderation'
+    ];
+    
+    const reviewItems = blockedLogs.slice(0, Math.min(15, blockedLogs.length)).map((log, idx) => {
+      const hoursAgo = Math.random() * 12;
+      const slaHours = log.decision === 'BLOCK' ? 4 : 24;
+      
+      return {
+        title: log.decision === 'BLOCK' 
+          ? `Critical: ${Object.entries(log.engine_scores).find(([_, v]) => (v as number) > 70)?.[0] || 'Policy'} violation detected`
+          : `Review: Potential ${Object.entries(log.engine_scores).find(([_, v]) => (v as number) > 60)?.[0] || 'content'} concern`,
+        description: `Request ${log.decision === 'BLOCK' ? 'blocked' : 'flagged'} with decision ${log.decision}. ` +
+          `Engine scores: Toxicity ${Math.round(log.engine_scores.toxicity)}%, ` +
+          `Privacy ${Math.round(log.engine_scores.privacy)}%, ` +
+          `Fairness ${Math.round(log.engine_scores.fairness)}%. ` +
+          `Trace: ${log.trace_id}`,
+        review_type: reviewTypes[idx % reviewTypes.length],
+        severity: log.decision === 'BLOCK' ? 
+          (Object.values(log.engine_scores).some((v: any) => v > 85) ? 'critical' : 'high') : 
+          'medium',
+        status: 'pending',
+        context: {
+          trace_id: log.trace_id,
+          system_id: log.system_id,
+          engine_scores: log.engine_scores,
+          prompt_preview: (log.request_body.prompt as string).substring(0, 100),
+          decision: log.decision,
+        },
+        sla_deadline: new Date(Date.now() - hoursAgo * 60 * 60 * 1000 + slaHours * 60 * 60 * 1000).toISOString(),
+        created_at: new Date(Date.now() - hoursAgo * 60 * 60 * 1000).toISOString(),
+      };
+    });
 
     if (reviewItems.length > 0) {
-      await supabase.from('review_queue').insert(reviewItems);
+      const { error: reviewError } = await supabase.from('review_queue').insert(reviewItems);
+      if (reviewError) console.error('Review insert error:', reviewError);
     }
+    console.log(`Inserted ${reviewItems.length} review items`);
 
     // Generate incidents from critical blocks
     const criticalLogs = logsToInsert.filter(l => 
       l.decision === 'BLOCK' && 
-      Object.values(l.engine_scores as Record<string, number>).some(s => s > 85)
+      Object.values(l.engine_scores as Record<string, number>).some(s => s > 80)
     );
 
-    const incidents = criticalLogs.slice(0, 3).map(log => ({
-      title: `Critical policy violation detected`,
-      description: `High-severity block triggered with scores: ${JSON.stringify(log.engine_scores)}`,
-      incident_type: 'policy_violation',
-      severity: 'critical',
-      status: 'open',
-    }));
+    const incidentTypes = [
+      'policy_violation', 'safety_breach', 'pii_exposure', 
+      'bias_detected', 'system_abuse', 'jailbreak_attempt'
+    ];
+
+    const incidents = criticalLogs.slice(0, Math.min(5, criticalLogs.length)).map((log, idx) => {
+      const highestEngine = Object.entries(log.engine_scores)
+        .sort((a, b) => (b[1] as number) - (a[1] as number))[0];
+      
+      return {
+        title: `${highestEngine[0].charAt(0).toUpperCase() + highestEngine[0].slice(1)} violation: Score ${Math.round(highestEngine[1] as number)}%`,
+        description: `High-severity ${log.decision} triggered. ` +
+          `Primary concern: ${highestEngine[0]} (${Math.round(highestEngine[1] as number)}%). ` +
+          `System: ${systems.find(s => s.id === log.system_id)?.name || 'Unknown'}. ` +
+          `Trace ID: ${log.trace_id}`,
+        incident_type: incidentTypes[idx % incidentTypes.length],
+        severity: (highestEngine[1] as number) > 90 ? 'critical' : 'high',
+        status: 'open',
+      };
+    });
 
     if (incidents.length > 0) {
-      await supabase.from('incidents').insert(incidents);
+      const { error: incidentError } = await supabase.from('incidents').insert(incidents);
+      if (incidentError) console.error('Incident insert error:', incidentError);
     }
+    console.log(`Inserted ${incidents.length} incidents`);
 
-    console.log(`Generated: ${logsToInsert.length} logs, ${driftAlerts.length} drift alerts, ${reviewItems.length} review items, ${incidents.length} incidents`);
+    // Seed some control assessments if none exist
+    const { data: existingControls } = await supabase
+      .from('control_assessments')
+      .select('id')
+      .limit(1);
 
-    return new Response(JSON.stringify({
+    let controlAssessmentsCreated = 0;
+    if (!existingControls?.length) {
+      // Get controls and models
+      const { data: controls } = await supabase.from('controls').select('id');
+      const { data: models } = await supabase.from('models').select('id');
+
+      if (controls?.length && models?.length) {
+        const statuses = ['compliant', 'in_progress', 'not_started', 'non_compliant'];
+        const assessments: any[] = [];
+
+        for (const model of models) {
+          for (const control of controls.slice(0, 5)) { // First 5 controls per model
+            const statusIdx = Math.floor(Math.random() * 4);
+            assessments.push({
+              model_id: model.id,
+              control_id: control.id,
+              status: statuses[statusIdx],
+              assessed_at: statusIdx < 2 ? new Date().toISOString() : null,
+              notes: statusIdx === 0 ? 'Verified compliant' : 
+                     statusIdx === 1 ? 'Assessment in progress' :
+                     statusIdx === 2 ? 'Pending evaluation' : 'Remediation required',
+            });
+          }
+        }
+
+        if (assessments.length > 0) {
+          const { error: assessError } = await supabase.from('control_assessments').insert(assessments);
+          if (assessError) console.error('Control assessment error:', assessError);
+          else controlAssessmentsCreated = assessments.length;
+        }
+      }
+    }
+    console.log(`Created ${controlAssessmentsCreated} control assessments`);
+
+    const summary = {
       success: true,
       generated: {
         request_logs: logsToInsert.length,
         drift_alerts: driftAlerts.length,
         review_items: reviewItems.length,
         incidents: incidents.length,
+        control_assessments: controlAssessmentsCreated,
       },
-    }), {
+      timestamp: new Date().toISOString(),
+    };
+
+    console.log('Generation complete:', JSON.stringify(summary));
+
+    return new Response(JSON.stringify(summary), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: any) {
