@@ -23,6 +23,8 @@ import {
   FileText,
   Bell,
   BookOpen,
+  Play,
+  FlaskConical,
 } from "lucide-react";
 
 const navItems = [
@@ -46,6 +48,9 @@ const navItems = [
   { path: "/engine/explainability", icon: Eye, label: "Explainability Engine" },
   { divider: true, label: "Policy & Red Team" },
   { path: "/policy", icon: FileText, label: "Policy Studio" },
+  { divider: true, label: "Demo & Testing" },
+  { path: "/golden", icon: Play, label: "Golden Demo" },
+  { path: "/run-tests", icon: FlaskConical, label: "Run Tests" },
   { divider: true, label: "System" },
   { path: "/settings", icon: Settings, label: "Settings" },
   { path: "/docs", icon: BookOpen, label: "Documentation" },
