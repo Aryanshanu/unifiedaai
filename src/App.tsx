@@ -32,6 +32,7 @@ import Evaluation from "./pages/Evaluation";
 import GoldenDemo from "./pages/GoldenDemo";
 import RunTests from "./pages/RunTests";
 import GapsClosed from "./pages/GapsClosed";
+import Architecture from "./pages/Architecture";
 import NotFound from "./pages/NotFound";
 import { GlobalBanner } from "./components/layout/GlobalBanner";
 
@@ -89,6 +90,7 @@ const App = () => (
             <Route path="/golden" element={<GoldenDemo />} />
             <Route path="/run-tests" element={<RunTests />} />
             <Route path="/gaps-closed" element={<GapsClosed />} />
+            <Route path="/architecture" element={<ProtectedRoute><Architecture /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

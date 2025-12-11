@@ -51,6 +51,7 @@ const navItems = [
   { divider: true, label: "Demo & Testing" },
   { path: "/golden", icon: Play, label: "Golden Demo" },
   { path: "/run-tests", icon: FlaskConical, label: "Run Tests" },
+  { path: "/architecture", icon: GitBranch, label: "Architecture" },
   { divider: true, label: "System" },
   { path: "/settings", icon: Settings, label: "Settings" },
   { path: "/docs", icon: BookOpen, label: "Documentation" },
