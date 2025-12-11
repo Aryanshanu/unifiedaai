@@ -305,6 +305,7 @@ export default function ToxicityEngine() {
             <div className="mb-6">
               <ComputationBreakdown 
                 steps={computationSteps}
+                overallScore={overallScore}
                 engineType="toxicity"
               />
             </div>
@@ -327,11 +328,14 @@ export default function ToxicityEngine() {
           {/* Evidence Package */}
           <div className="mb-6">
             <EvidencePackage
-              modelId={selectedModelId}
-              engineType="toxicity"
-              score={overallScore}
-              metricDetails={realEvalResult?.metricDetails || latestResult?.metric_details}
-              timestamp={latestResult?.created_at || new Date().toISOString()}
+              data={{
+                results: realEvalResult?.metricDetails || latestResult?.metric_details,
+                rawLogs: [],
+                modelId: selectedModelId,
+                evaluationType: "toxicity",
+                overallScore: overallScore,
+                isCompliant: overallScore >= 70
+              }}
             />
           </div>
 

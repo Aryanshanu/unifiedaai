@@ -305,6 +305,7 @@ export default function PrivacyEngine() {
             <div className="mb-6">
               <ComputationBreakdown 
                 steps={computationSteps}
+                overallScore={overallScore}
                 engineType="privacy"
               />
             </div>
@@ -327,11 +328,14 @@ export default function PrivacyEngine() {
           {/* Evidence Package */}
           <div className="mb-6">
             <EvidencePackage
-              modelId={selectedModelId}
-              engineType="privacy"
-              score={overallScore}
-              metricDetails={realEvalResult?.metricDetails || latestResult?.metric_details}
-              timestamp={latestResult?.created_at || new Date().toISOString()}
+              data={{
+                results: realEvalResult?.metricDetails || latestResult?.metric_details,
+                rawLogs: [],
+                modelId: selectedModelId,
+                evaluationType: "privacy",
+                overallScore: overallScore,
+                isCompliant: overallScore >= 70
+              }}
             />
           </div>
 

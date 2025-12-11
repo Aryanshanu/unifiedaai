@@ -277,7 +277,7 @@ export async function runEvaluation(config: EvaluationConfig): Promise<Evaluatio
   computationSteps.push({
     step: 3,
     description: `Slow layer LLM-as-judge analysis via eval-${engine}`,
-    inputs: { modelId },
+    inputs: { modelId: 1 },
     output: edgeFunctionResult?.overallScore ?? 0,
   });
   
@@ -287,12 +287,14 @@ export async function runEvaluation(config: EvaluationConfig): Promise<Evaluatio
   
   if (edgeFunctionResult?.metricDetails) {
     Object.entries(edgeFunctionResult.metricDetails).forEach(([key, value]) => {
-      const weight = weights[key] ?? 0;
+      const numValue = value as number;
       metricResults[key] = {
-        score: value as number,
-        weight,
-        normalizedScore: (value as number) / 100,
-        explanation: `${key} calculated with weight ${weight}`,
+        value: numValue / 100,
+        score: numValue / 100,
+        status: numValue >= 70 ? "pass" : numValue >= 50 ? "warn" : "fail",
+        threshold: 0.7,
+        formula: `${key} = ${numValue}%`,
+        whyExplanation: `${key} calculated with weight ${weights[key] ?? 0}`,
       };
     });
   }
