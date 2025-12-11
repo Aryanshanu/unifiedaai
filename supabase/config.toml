@@ -44,3 +44,12 @@ verify_jwt = true
 
 [functions.eval-fairness]
 verify_jwt = true
+
+[functions.realtime-chat]
+verify_jwt = false
+
+[functions.detect-drift]
+verify_jwt = false
+
+[functions.ml-detection]
+verify_jwt = false
