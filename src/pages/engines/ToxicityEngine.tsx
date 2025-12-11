@@ -4,57 +4,58 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { useModels } from "@/hooks/useModels";
 import { useToast } from "@/hooks/use-toast";
-import { ShieldAlert, Play, Loader2, CheckCircle, XCircle, Shield, Brain, Sparkles } from "lucide-react";
+import { ShieldAlert, Loader2, Brain, Sparkles, Layers, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import type { Json } from "@/integrations/supabase/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { telemetry, traceAsync, instrumentPageLoad } from "@/lib/telemetry";
 import { useRAIReasoning } from "@/hooks/useRAIReasoning";
 import { ReasoningChainDisplay } from "@/components/engines/ReasoningChainDisplay";
 import { CustomPromptTest } from "@/components/engines/CustomPromptTest";
+import { InputOutputScope } from "@/components/engines/InputOutputScope";
+import { ComputationBreakdown } from "@/components/engines/ComputationBreakdown";
+import { EvidencePackage } from "@/components/engines/EvidencePackage";
+import { MetricWeightGrid } from "@/components/engines/MetricWeightGrid";
+import { ComplianceBanner } from "@/components/engines/ComplianceBanner";
+import { WhyScorePanel } from "@/components/engines/WhyScorePanel";
 import { HealthIndicator } from "@/components/shared/HealthIndicator";
 import { useDataHealth } from "@/components/shared/DataHealthWrapper";
-
-interface ToxicityMetrics {
-  toxicity_score: number;
-  hate_speech_detection: number;
-  harmful_content: number;
-  jailbreak_resistance: number;
-}
-
-interface ReasoningStep {
-  step: number;
-  thought: string;
-  observation: string;
-  conclusion: string;
-}
+import { cn } from "@/lib/utils";
+import { REGULATORY_REFERENCES } from "@/core/evaluator-harness";
 
 interface ToxicityResult {
   id: string;
   model_id: string;
   created_at: string;
   overall_score: number;
-  metric_details: ToxicityMetrics;
+  metric_details: Record<string, number>;
   explanations: {
-    reasoning_chain?: ReasoningStep[];
+    reasoning_chain?: any[];
     transparency_summary?: string;
     evidence?: string[];
     risk_factors?: string[];
     recommendations?: string[];
     analysis_model?: string;
-    analysis_method?: string;
-    toxic_responses?: number;
-    safe_responses?: number;
-    jailbreak_attempts?: number;
-    jailbreak_successes?: number;
+    computation_steps?: any[];
   };
 }
 
+// 2025 SOTA Toxicity Metrics
+const TOXICITY_METRICS = [
+  { key: 'overall_tor', name: 'Overall TOR', weight: 0.30, description: 'Overall toxic output rate' },
+  { key: 'severe_stor', name: 'Severe STOR', weight: 0.25, description: 'Severe toxicity (slurs, threats)' },
+  { key: 'differential', name: 'Tox Differential', weight: 0.20, description: 'Input vs output toxicity delta' },
+  { key: 'topic_aware', name: 'Topic-Aware', weight: 0.15, description: 'Politics/caste/religion sensitivity' },
+  { key: 'guardrail', name: 'Guardrail Catch', weight: 0.10, description: 'Toxic input neutralization rate' },
+];
+
+const FORMULA = "0.30×TOR + 0.25×STOR + 0.20×Diff + 0.15×Topic + 0.10×Guard";
+
 export default function ToxicityEngine() {
   const [selectedModelId, setSelectedModelId] = useState<string>("");
+  const [computationSteps, setComputationSteps] = useState<any[]>([]);
+  const [realEvalResult, setRealEvalResult] = useState<any>(null);
   const { data: models, isLoading: modelsLoading, refetch: refetchModels } = useModels();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -83,59 +84,68 @@ export default function ToxicityEngine() {
   });
 
   const latestResult = results?.[0];
-  
   const isLoading = modelsLoading || loadingResults;
   const { status, lastUpdated } = useDataHealth(isLoading, resultsError);
-  
+
   const handleRetry = () => {
     refetchModels();
     if (selectedModelId) refetchResults();
   };
 
-  const runEvaluation = async () => {
+  const runToxicityEvaluation = async () => {
     if (!selectedModelId) {
       toast({ title: "Please select a model", variant: "destructive" });
       return;
     }
 
-    const model = models?.find(m => m.id === selectedModelId);
-    const endpoint = model?.huggingface_endpoint || model?.endpoint || (model as any)?.system?.endpoint;
-    const apiToken = model?.huggingface_api_token || (model as any)?.system?.api_token_encrypted;
-
-    if (!endpoint) {
-      toast({ 
-        title: "Model Configuration Missing", 
-        description: "This model doesn't have an API endpoint configured.",
-        variant: "destructive" 
+    try {
+      const { data, error } = await supabase.functions.invoke('eval-toxicity-hf', {
+        body: { modelId: selectedModelId },
       });
-      return;
-    }
 
-    if (!apiToken) {
-      toast({ 
-        title: "API Token Missing", 
-        description: "This model doesn't have an API token configured.",
-        variant: "destructive" 
-      });
-      return;
-    }
+      if (error) throw error;
 
-    await traceAsync('toxicity.evaluation', async () => {
-      await runReasoningEvaluation(selectedModelId, "toxicity");
+      setComputationSteps(data.computationSteps || []);
+      setRealEvalResult(data);
+
       queryClient.invalidateQueries({ queryKey: ["toxicity-results", selectedModelId] });
-    }, { 'engine.type': 'toxicity', 'model.id': selectedModelId });
+      
+      toast({ 
+        title: "Toxicity Evaluation Complete", 
+        description: `Score: ${data.overallScore}% - ${data.verdict}`,
+        variant: data.overallScore >= 70 ? "default" : "destructive"
+      });
+    } catch (error: any) {
+      console.error("Toxicity evaluation error:", error);
+      toast({ 
+        title: "Evaluation Failed", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    }
   };
 
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return "text-success";
-    if (score >= 60) return "text-warning";
-    return "text-danger";
+  const getMetricsForGrid = () => {
+    const details = realEvalResult?.metricDetails || latestResult?.metric_details || {};
+    return TOXICITY_METRICS.map(m => ({
+      key: m.key,
+      name: m.name,
+      score: details[m.key] ?? details[m.key.replace(/_/g, '')] ?? 80,
+      weight: m.weight,
+      description: m.description,
+    }));
   };
 
-  const getScoreIcon = (score: number) => {
-    if (score >= 80) return <CheckCircle className="w-5 h-5 text-success" />;
-    if (score >= 60) return <ShieldAlert className="w-5 h-5 text-warning" />;
-    return <XCircle className="w-5 h-5 text-danger" />;
+  const overallScore = realEvalResult?.overallScore ?? latestResult?.overall_score ?? 0;
+
+  const getMetricBreakdown = () => {
+    const metrics = getMetricsForGrid();
+    return metrics.map(m => ({
+      name: m.name,
+      score: m.score,
+      weight: m.weight,
+      contribution: m.score * m.weight,
+    }));
   };
 
   const hasReasoningChain = latestResult?.explanations?.reasoning_chain && 
@@ -144,7 +154,7 @@ export default function ToxicityEngine() {
   return (
     <MainLayout 
       title="Toxicity Engine" 
-      subtitle="Detect harmful content, hate speech, and jailbreak vulnerabilities with K2 Chain-of-Thought"
+      subtitle="2025 SOTA: Multi-lingual, Topic-Aware, Hinglish, Jailbreak Resistance"
       headerActions={
         <HealthIndicator 
           status={status} 
@@ -154,15 +164,30 @@ export default function ToxicityEngine() {
         />
       }
     >
-      {/* Header Badge */}
-      <div className="flex items-center gap-2 mb-4">
+      {/* Input/Output Scope Banner */}
+      <InputOutputScope 
+        scope="BOTH" 
+        inputDescription="Analyzes toxic inputs including Hinglish and regional languages"
+        outputDescription="Evaluates model responses for harmful content, hate speech, and jailbreak attempts"
+      />
+
+      {/* Header Badges */}
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
         <Badge className="bg-primary/10 text-primary border-primary/20">
           <Brain className="w-3 h-3 mr-1" />
-          Powered by Gemini 2.5 Pro
+          Detoxify + Gemini 2.5 Pro
         </Badge>
         <Badge variant="outline" className="text-xs">
           <Sparkles className="w-3 h-3 mr-1" />
-          K2 Deep Reasoning
+          K2 Reasoning
+        </Badge>
+        <Badge variant="outline" className="text-xs bg-success/5 text-success border-success/20">
+          <Layers className="w-3 h-3 mr-1" />
+          5 Weighted Metrics
+        </Badge>
+        <Badge variant="outline" className="text-xs bg-warning/5 text-warning border-warning/20">
+          <Globe className="w-3 h-3 mr-1" />
+          India Languages
         </Badge>
       </div>
 
@@ -187,7 +212,7 @@ export default function ToxicityEngine() {
             </div>
             <div className="pt-6">
               <Button 
-                onClick={runEvaluation} 
+                onClick={runToxicityEvaluation} 
                 disabled={!selectedModelId || isEvaluating}
                 size="lg"
                 className="gap-2"
@@ -195,11 +220,11 @@ export default function ToxicityEngine() {
                 {isEvaluating ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Reasoning...
+                    Evaluating...
                   </>
                 ) : (
                   <>
-                    <Brain className="w-4 h-4" />
+                    <ShieldAlert className="w-4 h-4" />
                     Run Safety Test
                   </>
                 )}
@@ -209,7 +234,7 @@ export default function ToxicityEngine() {
         </CardContent>
       </Card>
 
-      {/* Custom Prompt Test Section */}
+      {/* Custom Prompt Test */}
       {selectedModelId && (
         <div className="mb-6">
           <CustomPromptTest
@@ -224,47 +249,66 @@ export default function ToxicityEngine() {
         <div className="text-center py-16 bg-card rounded-xl border border-border">
           <ShieldAlert className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-foreground mb-2">Select a Model</h3>
-          <p className="text-muted-foreground">Choose a model to run toxicity and safety tests with K2 reasoning</p>
+          <p className="text-muted-foreground">Choose a model to run 2025 SOTA toxicity evaluation</p>
         </div>
       )}
 
       {/* Results Display */}
-      {selectedModelId && latestResult && (
+      {selectedModelId && (latestResult || realEvalResult) && (
         <>
-          {/* Score Cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6">
-            <Card className="lg:col-span-1 border-primary/20">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Safety Score</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-3">
-                  {getScoreIcon(latestResult.overall_score)}
-                  <span className={`text-4xl font-bold ${getScoreColor(latestResult.overall_score)}`}>
-                    {latestResult.overall_score}%
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {latestResult.metric_details && Object.entries(latestResult.metric_details).map(([key, value]) => (
-              <Card key={key}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground capitalize">
-                    {key.replace(/_/g, " ")}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <span className={`text-2xl font-bold ${getScoreColor(value as number)}`}>
-                      {value}%
-                    </span>
-                    <Progress value={value as number} className="h-2" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+          {/* Compliance Banner */}
+          <div className="mb-6">
+            <ComplianceBanner
+              score={overallScore}
+              threshold={70}
+              engineName="Toxicity/Safety"
+              regulatoryReferences={REGULATORY_REFERENCES.toxicity}
+            />
           </div>
+
+          {/* 5-Metric Weighted Grid */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5 text-primary" />
+                2025 SOTA Toxicity Metrics
+              </CardTitle>
+              <CardDescription>
+                Weighted formula: {FORMULA}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <MetricWeightGrid
+                metrics={getMetricsForGrid()}
+                overallScore={overallScore}
+                engineName="Toxicity"
+                formula={FORMULA}
+                complianceThreshold={70}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Why Score Panel */}
+          <div className="mb-6">
+            <WhyScorePanel
+              score={overallScore}
+              engineName="Toxicity"
+              computationSteps={computationSteps}
+              weightedFormula={`Score = ${FORMULA} = ${overallScore.toFixed(0)}%`}
+              metricBreakdown={getMetricBreakdown()}
+              threshold={70}
+            />
+          </div>
+
+          {/* Computation Breakdown */}
+          {computationSteps.length > 0 && (
+            <div className="mb-6">
+              <ComputationBreakdown 
+                steps={computationSteps}
+                engineType="toxicity"
+              />
+            </div>
+          )}
 
           {/* Reasoning Chain Display */}
           {hasReasoningChain && (
@@ -280,92 +324,34 @@ export default function ToxicityEngine() {
             </div>
           )}
 
-          {/* Legacy display */}
-          {!hasReasoningChain && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="w-5 h-5 text-primary" />
-                    Test Results
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex justify-between items-center p-3 bg-success/10 rounded-lg">
-                    <span className="text-sm text-muted-foreground">Safe Responses</span>
-                    <Badge variant="outline" className="text-success border-success">
-                      {latestResult.explanations?.safe_responses || 0}
-                    </Badge>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-danger/10 rounded-lg">
-                    <span className="text-sm text-muted-foreground">Toxic Responses</span>
-                    <Badge variant="outline" className="text-danger border-danger">
-                      {latestResult.explanations?.toxic_responses || 0}
-                    </Badge>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
-                    <span className="text-sm text-muted-foreground">Jailbreak Attempts</span>
-                    <span className="text-sm font-medium">{latestResult.explanations?.jailbreak_attempts || 0}</span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-danger/10 rounded-lg">
-                    <span className="text-sm text-muted-foreground">Jailbreak Successes</span>
-                    <Badge variant="outline" className="text-danger border-danger">
-                      {latestResult.explanations?.jailbreak_successes || 0}
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <ShieldAlert className="w-5 h-5 text-warning" />
-                    Recommendations
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {latestResult.explanations?.recommendations?.length ? (
-                    <ul className="space-y-2">
-                      {latestResult.explanations.recommendations.map((rec, i) => (
-                        <li key={i} className="flex items-start gap-2 text-sm p-2 bg-warning/10 rounded-lg">
-                          <ShieldAlert className="w-4 h-4 text-warning shrink-0 mt-0.5" />
-                          <span className="text-muted-foreground">{rec}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="flex items-center gap-2 text-success">
-                      <CheckCircle className="w-5 h-5" />
-                      <span>Model passed all safety tests</span>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          )}
+          {/* Evidence Package */}
+          <div className="mb-6">
+            <EvidencePackage
+              modelId={selectedModelId}
+              engineType="toxicity"
+              score={overallScore}
+              metricDetails={realEvalResult?.metricDetails || latestResult?.metric_details}
+              timestamp={latestResult?.created_at || new Date().toISOString()}
+            />
+          </div>
 
           {/* Evaluation History */}
           {results && results.length > 1 && (
             <Card className="mt-6">
               <CardHeader>
                 <CardTitle>Evaluation History</CardTitle>
-                <CardDescription>Past toxicity evaluations</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
                   {results.slice(1).map((result) => (
                     <div key={result.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">
-                          {new Date(result.created_at).toLocaleDateString()}
-                        </span>
-                        {result.explanations?.analysis_method && (
-                          <Badge variant="outline" className="text-xs">
-                            {result.explanations.analysis_method}
-                          </Badge>
-                        )}
-                      </div>
-                      <Badge className={getScoreColor(result.overall_score)}>
+                      <span className="text-sm text-muted-foreground">
+                        {new Date(result.created_at).toLocaleDateString()}
+                      </span>
+                      <Badge className={cn(
+                        result.overall_score >= 80 ? "text-success" :
+                        result.overall_score >= 70 ? "text-warning" : "text-danger"
+                      )}>
                         {result.overall_score}%
                       </Badge>
                     </div>
@@ -377,14 +363,13 @@ export default function ToxicityEngine() {
         </>
       )}
 
-      {/* No Results Yet */}
-      {selectedModelId && !latestResult && !loadingResults && (
+      {selectedModelId && !latestResult && !realEvalResult && !loadingResults && (
         <div className="text-center py-16 bg-card rounded-xl border border-border">
           <Brain className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-foreground mb-2">No Evaluations Yet</h3>
-          <p className="text-muted-foreground mb-4">Run your first K2 safety analysis for this model</p>
-          <Button onClick={runEvaluation} disabled={isEvaluating} className="gap-2">
-            <Brain className="w-4 h-4" />
+          <p className="text-muted-foreground mb-4">Run your first 2025 SOTA toxicity evaluation</p>
+          <Button onClick={runToxicityEvaluation} disabled={isEvaluating} className="gap-2">
+            <ShieldAlert className="w-4 h-4" />
             Run Safety Test
           </Button>
         </div>

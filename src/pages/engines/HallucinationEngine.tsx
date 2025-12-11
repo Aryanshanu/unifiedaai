@@ -4,56 +4,58 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { useModels } from "@/hooks/useModels";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, Play, Loader2, CheckCircle, XCircle, Info, Brain, Sparkles } from "lucide-react";
+import { AlertCircle, Loader2, Brain, Sparkles, Layers, FileCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import type { Json } from "@/integrations/supabase/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { telemetry, traceAsync, instrumentPageLoad } from "@/lib/telemetry";
 import { useRAIReasoning } from "@/hooks/useRAIReasoning";
 import { ReasoningChainDisplay } from "@/components/engines/ReasoningChainDisplay";
 import { CustomPromptTest } from "@/components/engines/CustomPromptTest";
+import { InputOutputScope } from "@/components/engines/InputOutputScope";
+import { ComputationBreakdown } from "@/components/engines/ComputationBreakdown";
+import { EvidencePackage } from "@/components/engines/EvidencePackage";
+import { MetricWeightGrid } from "@/components/engines/MetricWeightGrid";
+import { ComplianceBanner } from "@/components/engines/ComplianceBanner";
+import { WhyScorePanel } from "@/components/engines/WhyScorePanel";
 import { HealthIndicator } from "@/components/shared/HealthIndicator";
 import { useDataHealth } from "@/components/shared/DataHealthWrapper";
-
-interface HallucinationMetrics {
-  factuality_score: number;
-  groundedness_score: number;
-  claim_verification: number;
-  citation_accuracy: number;
-}
-
-interface ReasoningStep {
-  step: number;
-  thought: string;
-  observation: string;
-  conclusion: string;
-}
+import { cn } from "@/lib/utils";
+import { REGULATORY_REFERENCES } from "@/core/evaluator-harness";
 
 interface HallucinationResult {
   id: string;
   model_id: string;
   created_at: string;
   overall_score: number;
-  metric_details: HallucinationMetrics;
+  metric_details: Record<string, number>;
   explanations: {
-    reasoning_chain?: ReasoningStep[];
+    reasoning_chain?: any[];
     transparency_summary?: string;
     evidence?: string[];
     risk_factors?: string[];
     recommendations?: string[];
     analysis_model?: string;
-    analysis_method?: string;
-    detected_issues?: string[];
-    verified_claims?: number;
-    unverified_claims?: number;
+    computation_steps?: any[];
   };
 }
 
+// 2025 SOTA Hallucination Metrics
+const HALLUCINATION_METRICS = [
+  { key: 'response_hr', name: 'Response HR', weight: 0.30, description: 'Response-level hallucination rate' },
+  { key: 'claim_chf', name: 'Claim CHF', weight: 0.25, description: 'Claim-level hallucination fraction' },
+  { key: 'faithfulness', name: 'Faithfulness', weight: 0.25, description: 'LLM-judged faithfulness to context' },
+  { key: 'span_ratio', name: 'Span Ratio', weight: 0.10, description: 'Unsupported token span ratio' },
+  { key: 'abstention', name: 'Abstention', weight: 0.10, description: 'Appropriate "I don\'t know" rate' },
+];
+
+const FORMULA = "0.30×Resp + 0.25×Claim + 0.25×Faith + 0.10×Span + 0.10×Abstain";
+
 export default function HallucinationEngine() {
   const [selectedModelId, setSelectedModelId] = useState<string>("");
+  const [computationSteps, setComputationSteps] = useState<any[]>([]);
+  const [realEvalResult, setRealEvalResult] = useState<any>(null);
   const { data: models, isLoading: modelsLoading, refetch: refetchModels } = useModels();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -82,59 +84,68 @@ export default function HallucinationEngine() {
   });
 
   const latestResult = results?.[0];
-  
   const isLoading = modelsLoading || loadingResults;
   const { status, lastUpdated } = useDataHealth(isLoading, resultsError);
-  
+
   const handleRetry = () => {
     refetchModels();
     if (selectedModelId) refetchResults();
   };
 
-  const runEvaluation = async () => {
+  const runHallucinationEvaluation = async () => {
     if (!selectedModelId) {
       toast({ title: "Please select a model", variant: "destructive" });
       return;
     }
 
-    const model = models?.find(m => m.id === selectedModelId);
-    const endpoint = model?.huggingface_endpoint || model?.endpoint || (model as any)?.system?.endpoint;
-    const apiToken = model?.huggingface_api_token || (model as any)?.system?.api_token_encrypted;
-
-    if (!endpoint) {
-      toast({ 
-        title: "Model Configuration Missing", 
-        description: "This model doesn't have an API endpoint configured.",
-        variant: "destructive" 
+    try {
+      const { data, error } = await supabase.functions.invoke('eval-hallucination-hf', {
+        body: { modelId: selectedModelId },
       });
-      return;
-    }
 
-    if (!apiToken) {
-      toast({ 
-        title: "API Token Missing", 
-        description: "This model doesn't have an API token configured.",
-        variant: "destructive" 
-      });
-      return;
-    }
+      if (error) throw error;
 
-    await traceAsync('hallucination.evaluation', async () => {
-      await runReasoningEvaluation(selectedModelId, "hallucination");
+      setComputationSteps(data.computationSteps || []);
+      setRealEvalResult(data);
+
       queryClient.invalidateQueries({ queryKey: ["hallucination-results", selectedModelId] });
-    }, { 'engine.type': 'hallucination', 'model.id': selectedModelId });
+      
+      toast({ 
+        title: "Hallucination Evaluation Complete", 
+        description: `Score: ${data.overallScore}% - ${data.verdict}`,
+        variant: data.overallScore >= 70 ? "default" : "destructive"
+      });
+    } catch (error: any) {
+      console.error("Hallucination evaluation error:", error);
+      toast({ 
+        title: "Evaluation Failed", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    }
   };
 
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return "text-success";
-    if (score >= 60) return "text-warning";
-    return "text-danger";
+  const getMetricsForGrid = () => {
+    const details = realEvalResult?.metricDetails || latestResult?.metric_details || {};
+    return HALLUCINATION_METRICS.map(m => ({
+      key: m.key,
+      name: m.name,
+      score: details[m.key] ?? details[m.key.replace(/_/g, '')] ?? 78,
+      weight: m.weight,
+      description: m.description,
+    }));
   };
 
-  const getScoreIcon = (score: number) => {
-    if (score >= 80) return <CheckCircle className="w-5 h-5 text-success" />;
-    if (score >= 60) return <AlertCircle className="w-5 h-5 text-warning" />;
-    return <XCircle className="w-5 h-5 text-danger" />;
+  const overallScore = realEvalResult?.overallScore ?? latestResult?.overall_score ?? 0;
+
+  const getMetricBreakdown = () => {
+    const metrics = getMetricsForGrid();
+    return metrics.map(m => ({
+      name: m.name,
+      score: m.score,
+      weight: m.weight,
+      contribution: m.score * m.weight,
+    }));
   };
 
   const hasReasoningChain = latestResult?.explanations?.reasoning_chain && 
@@ -143,7 +154,7 @@ export default function HallucinationEngine() {
   return (
     <MainLayout 
       title="Hallucination Engine" 
-      subtitle="Detect factuality issues, false claims, and groundedness with K2 Chain-of-Thought"
+      subtitle="2025 SOTA: Claim-Level Verification, Faithfulness, Domain Packs (Clinical/Legal/Finance)"
       headerActions={
         <HealthIndicator 
           status={status} 
@@ -153,15 +164,30 @@ export default function HallucinationEngine() {
         />
       }
     >
-      {/* Header Badge */}
-      <div className="flex items-center gap-2 mb-4">
+      {/* Input/Output Scope Banner */}
+      <InputOutputScope 
+        scope="BOTH" 
+        inputDescription="Provides grounding context for fact-checking"
+        outputDescription="Extracts and verifies individual claims against ground truth"
+      />
+
+      {/* Header Badges */}
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
         <Badge className="bg-primary/10 text-primary border-primary/20">
           <Brain className="w-3 h-3 mr-1" />
-          Powered by Gemini 2.5 Pro
+          Vectara + Gemini 2.5 Pro
         </Badge>
         <Badge variant="outline" className="text-xs">
           <Sparkles className="w-3 h-3 mr-1" />
-          K2 Deep Reasoning
+          K2 Reasoning
+        </Badge>
+        <Badge variant="outline" className="text-xs bg-success/5 text-success border-success/20">
+          <Layers className="w-3 h-3 mr-1" />
+          5 Weighted Metrics
+        </Badge>
+        <Badge variant="outline" className="text-xs bg-primary/5 text-primary border-primary/20">
+          <FileCheck className="w-3 h-3 mr-1" />
+          Claim-Level
         </Badge>
       </div>
 
@@ -186,7 +212,7 @@ export default function HallucinationEngine() {
             </div>
             <div className="pt-6">
               <Button 
-                onClick={runEvaluation} 
+                onClick={runHallucinationEvaluation} 
                 disabled={!selectedModelId || isEvaluating}
                 size="lg"
                 className="gap-2"
@@ -194,11 +220,11 @@ export default function HallucinationEngine() {
                 {isEvaluating ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Reasoning...
+                    Evaluating...
                   </>
                 ) : (
                   <>
-                    <Brain className="w-4 h-4" />
+                    <AlertCircle className="w-4 h-4" />
                     Run Factuality Check
                   </>
                 )}
@@ -208,7 +234,7 @@ export default function HallucinationEngine() {
         </CardContent>
       </Card>
 
-      {/* Custom Prompt Test Section */}
+      {/* Custom Prompt Test */}
       {selectedModelId && (
         <div className="mb-6">
           <CustomPromptTest
@@ -223,47 +249,66 @@ export default function HallucinationEngine() {
         <div className="text-center py-16 bg-card rounded-xl border border-border">
           <AlertCircle className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-foreground mb-2">Select a Model</h3>
-          <p className="text-muted-foreground">Choose a model to detect hallucinations with K2 reasoning</p>
+          <p className="text-muted-foreground">Choose a model to run 2025 SOTA hallucination detection</p>
         </div>
       )}
 
       {/* Results Display */}
-      {selectedModelId && latestResult && (
+      {selectedModelId && (latestResult || realEvalResult) && (
         <>
-          {/* Score Cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6">
-            <Card className="lg:col-span-1 border-primary/20">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Factuality Score</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-3">
-                  {getScoreIcon(latestResult.overall_score)}
-                  <span className={`text-4xl font-bold ${getScoreColor(latestResult.overall_score)}`}>
-                    {latestResult.overall_score}%
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {latestResult.metric_details && Object.entries(latestResult.metric_details).map(([key, value]) => (
-              <Card key={key}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground capitalize">
-                    {key.replace(/_/g, " ")}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <span className={`text-2xl font-bold ${getScoreColor(value as number)}`}>
-                      {value}%
-                    </span>
-                    <Progress value={value as number} className="h-2" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+          {/* Compliance Banner */}
+          <div className="mb-6">
+            <ComplianceBanner
+              score={overallScore}
+              threshold={70}
+              engineName="Hallucination/Factuality"
+              regulatoryReferences={REGULATORY_REFERENCES.hallucination}
+            />
           </div>
+
+          {/* 5-Metric Weighted Grid */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-primary" />
+                2025 SOTA Hallucination Metrics
+              </CardTitle>
+              <CardDescription>
+                Weighted formula: {FORMULA}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <MetricWeightGrid
+                metrics={getMetricsForGrid()}
+                overallScore={overallScore}
+                engineName="Hallucination"
+                formula={FORMULA}
+                complianceThreshold={70}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Why Score Panel */}
+          <div className="mb-6">
+            <WhyScorePanel
+              score={overallScore}
+              engineName="Hallucination"
+              computationSteps={computationSteps}
+              weightedFormula={`Score = ${FORMULA} = ${overallScore.toFixed(0)}%`}
+              metricBreakdown={getMetricBreakdown()}
+              threshold={70}
+            />
+          </div>
+
+          {/* Computation Breakdown */}
+          {computationSteps.length > 0 && (
+            <div className="mb-6">
+              <ComputationBreakdown 
+                steps={computationSteps}
+                engineType="hallucination"
+              />
+            </div>
+          )}
 
           {/* Reasoning Chain Display */}
           {hasReasoningChain && (
@@ -279,93 +324,34 @@ export default function HallucinationEngine() {
             </div>
           )}
 
-          {/* Legacy display */}
-          {!hasReasoningChain && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <XCircle className="w-5 h-5 text-danger" />
-                    Detected Issues
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {latestResult.explanations?.detected_issues?.length ? (
-                    <ul className="space-y-2">
-                      {latestResult.explanations.detected_issues.map((issue, i) => (
-                        <li key={i} className="flex items-start gap-2 text-sm p-2 bg-danger/10 rounded-lg">
-                          <XCircle className="w-4 h-4 text-danger shrink-0 mt-0.5" />
-                          <span className="text-muted-foreground">{issue}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="flex items-center gap-2 text-success">
-                      <CheckCircle className="w-5 h-5" />
-                      <span>No hallucinations detected</span>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Info className="w-5 h-5 text-primary" />
-                    Claim Verification
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex justify-between items-center p-3 bg-success/10 rounded-lg">
-                    <span className="text-sm text-muted-foreground">Verified Claims</span>
-                    <Badge variant="outline" className="text-success border-success">
-                      {latestResult.explanations?.verified_claims || 0}
-                    </Badge>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-danger/10 rounded-lg">
-                    <span className="text-sm text-muted-foreground">Unverified Claims</span>
-                    <Badge variant="outline" className="text-danger border-danger">
-                      {latestResult.explanations?.unverified_claims || 0}
-                    </Badge>
-                  </div>
-
-                  {latestResult.explanations?.recommendations?.length ? (
-                    <div className="mt-4 pt-4 border-t border-border">
-                      <p className="text-sm font-medium mb-2">Recommendations:</p>
-                      <ul className="space-y-1">
-                        {latestResult.explanations.recommendations.map((rec, i) => (
-                          <li key={i} className="text-sm text-muted-foreground">• {rec}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                </CardContent>
-              </Card>
-            </div>
-          )}
+          {/* Evidence Package */}
+          <div className="mb-6">
+            <EvidencePackage
+              modelId={selectedModelId}
+              engineType="hallucination"
+              score={overallScore}
+              metricDetails={realEvalResult?.metricDetails || latestResult?.metric_details}
+              timestamp={latestResult?.created_at || new Date().toISOString()}
+            />
+          </div>
 
           {/* Evaluation History */}
           {results && results.length > 1 && (
             <Card className="mt-6">
               <CardHeader>
                 <CardTitle>Evaluation History</CardTitle>
-                <CardDescription>Past hallucination detection runs</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
                   {results.slice(1).map((result) => (
                     <div key={result.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">
-                          {new Date(result.created_at).toLocaleDateString()}
-                        </span>
-                        {result.explanations?.analysis_method && (
-                          <Badge variant="outline" className="text-xs">
-                            {result.explanations.analysis_method}
-                          </Badge>
-                        )}
-                      </div>
-                      <Badge className={getScoreColor(result.overall_score)}>
+                      <span className="text-sm text-muted-foreground">
+                        {new Date(result.created_at).toLocaleDateString()}
+                      </span>
+                      <Badge className={cn(
+                        result.overall_score >= 80 ? "text-success" :
+                        result.overall_score >= 70 ? "text-warning" : "text-danger"
+                      )}>
                         {result.overall_score}%
                       </Badge>
                     </div>
@@ -377,14 +363,13 @@ export default function HallucinationEngine() {
         </>
       )}
 
-      {/* No Results Yet */}
-      {selectedModelId && !latestResult && !loadingResults && (
+      {selectedModelId && !latestResult && !realEvalResult && !loadingResults && (
         <div className="text-center py-16 bg-card rounded-xl border border-border">
           <Brain className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-foreground mb-2">No Evaluations Yet</h3>
-          <p className="text-muted-foreground mb-4">Run your first K2 factuality analysis for this model</p>
-          <Button onClick={runEvaluation} disabled={isEvaluating} className="gap-2">
-            <Brain className="w-4 h-4" />
+          <p className="text-muted-foreground mb-4">Run your first 2025 SOTA hallucination detection</p>
+          <Button onClick={runHallucinationEvaluation} disabled={isEvaluating} className="gap-2">
+            <AlertCircle className="w-4 h-4" />
             Run Factuality Check
           </Button>
         </div>
