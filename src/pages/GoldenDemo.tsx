@@ -73,21 +73,66 @@ export default function GoldenDemo() {
       // Find any system with endpoint
       const { data: systems } = await supabase
         .from('systems')
-        .select('id, name, endpoint, api_token_encrypted, requires_approval, deployment_status')
+        .select('id, name, endpoint, api_token_encrypted, requires_approval, deployment_status, project_id')
         .not('endpoint', 'is', null)
         .limit(1);
       
       if (systems?.length && systems[0].endpoint) {
+        const sys = systems[0];
+        
         // Auto-approve for demo if needed
-        if (systems[0].requires_approval || systems[0].deployment_status !== 'deployed') {
+        if (sys.requires_approval || sys.deployment_status !== 'deployed') {
           await supabase.from('systems').update({ 
             requires_approval: false,
             deployment_status: 'deployed' 
-          }).eq('id', systems[0].id);
+          }).eq('id', sys.id);
         }
+        
+        // Create risk assessment if missing
+        const { data: existingRisk } = await supabase
+          .from('risk_assessments')
+          .select('id')
+          .eq('system_id', sys.id)
+          .limit(1);
+        
+        if (!existingRisk?.length && sys.project_id) {
+          await supabase.from('risk_assessments').insert({
+            system_id: sys.id,
+            project_id: sys.project_id,
+            risk_tier: 'low',
+            static_risk_score: 25,
+            runtime_risk_score: 15,
+            uri_score: 21,
+            dimension_scores: { data: 20, model: 25, useCase: 30, operational: 20, regulatory: 15, ethical: 20 },
+            questionnaire_answers: {},
+            summary: 'Auto-created for Golden Demo execution',
+            version: 1
+          });
+        }
+        
+        // Create impact assessment if missing
+        const { data: existingImpact } = await supabase
+          .from('impact_assessments')
+          .select('id')
+          .eq('system_id', sys.id)
+          .limit(1);
+        
+        if (!existingImpact?.length && sys.project_id) {
+          await supabase.from('impact_assessments').insert({
+            system_id: sys.id,
+            project_id: sys.project_id,
+            quadrant: 'low_low',
+            overall_score: 25,
+            dimensions: { reach: 20, severity: 25, reversibility: 30, vulnerability: 20 },
+            questionnaire_answers: {},
+            summary: 'Auto-created for Golden Demo execution',
+            version: 1
+          });
+        }
+        
         setHasModel(true);
-        setSystemId(systems[0].id);
-        setModelEndpoint(systems[0].endpoint);
+        setSystemId(sys.id);
+        setModelEndpoint(sys.endpoint);
       } else {
         setHasModel(false);
       }
@@ -305,7 +350,8 @@ export default function GoldenDemo() {
         const result = await executePrompt(prompt, 'toxicity');
         setCounters(prev => ({ ...prev, requests: prev.requests + 1 }));
         
-        if (result?.data?.decision === 'BLOCK' || result?.error) {
+        const resultData = result && 'data' in result ? result.data : null;
+        if (resultData?.decision === 'BLOCK' || result?.error) {
           violations++;
           setCounters(prev => ({ ...prev, blocks: prev.blocks + 1 }));
           addLog(`  ⛔ Attack BLOCKED successfully`);
@@ -725,11 +771,11 @@ export default function GoldenDemo() {
                     )}
                     <div className="flex-1 min-w-0">
                       <p className={`text-sm ${isKilled ? 'line-through text-gray-500' : 'text-gray-300'}`}>
-                        {bullet.gap}
+                        {bullet.text}
                       </p>
                       {isKilled && (
                         <p className="text-xs text-emerald-400 mt-1 truncate">
-                          ✓ {bullet.solution}
+                          ✓ KILLED — Fractal RAI-OS delivers this
                         </p>
                       )}
                     </div>
