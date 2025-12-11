@@ -6,54 +6,170 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Real-time PII detection using pattern matching (Presidio-inspired)
-const PII_PATTERNS = {
-  email: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/gi,
-  phone: /\b(\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g,
-  ssn: /\b\d{3}-\d{2}-\d{4}\b/g,
-  creditCard: /\b(?:\d{4}[-.\s]?){3}\d{4}\b/g,
-  ipAddress: /\b(?:\d{1,3}\.){3}\d{1,3}\b/g,
-};
-
-// Toxicity keywords for real-time blocking
-const TOXICITY_KEYWORDS = [
-  "kill yourself", "harm myself", "suicide", "self-harm",
-  "how to make a bomb", "synthesize drugs", "child exploitation",
-  "hate speech", "racial slur", "violent threat"
-];
+// HuggingFace Models for real-time scanning
+const HF_TOXICITY_MODEL = "ml6team/toxic-comment-classification";
+const HF_PRIVACY_MODEL = "obi/deid_roberta_i2b2";
 
 interface TokenScanResult {
   hasPII: boolean;
   hasToxicity: boolean;
-  piiTypes: string[];
-  toxicityMatches: string[];
-  score: number;
+  piiEntities: string[];
+  toxicityScore: number;
+  privacyScore: number;
+  modelsUsed: string[];
+  latencyMs: number;
 }
 
-function scanTokenChunk(text: string): TokenScanResult {
-  const piiTypes: string[] = [];
-  const toxicityMatches: string[] = [];
-  
-  // Check PII patterns
-  for (const [type, pattern] of Object.entries(PII_PATTERNS)) {
-    if (pattern.test(text)) {
-      piiTypes.push(type);
+// Call HuggingFace toxicity model
+async function callToxicityModel(text: string, hfToken: string): Promise<{ score: number; raw: any }> {
+  try {
+    const response = await fetch(
+      `https://api-inference.huggingface.co/models/${HF_TOXICITY_MODEL}`,
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${hfToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ inputs: text }),
+      }
+    );
+
+    if (!response.ok) {
+      console.warn(`[realtime-chat] Toxicity model returned ${response.status}`);
+      return { score: 0, raw: null };
     }
+
+    const output = await response.json();
+    
+    // Parse ml6team output format
+    let maxScore = 0;
+    if (Array.isArray(output)) {
+      const labels = Array.isArray(output[0]) ? output[0] : output;
+      for (const item of labels) {
+        if (item.label?.toLowerCase().includes("toxic") && item.score > maxScore) {
+          maxScore = item.score;
+        }
+      }
+    }
+
+    return { score: maxScore, raw: output };
+  } catch (error) {
+    console.error("[realtime-chat] Toxicity model error:", error);
+    return { score: 0, raw: null };
   }
-  
-  // Check toxicity
+}
+
+// Call HuggingFace PII model
+async function callPrivacyModel(text: string, hfToken: string): Promise<{ entities: string[]; raw: any }> {
+  try {
+    const response = await fetch(
+      `https://api-inference.huggingface.co/models/${HF_PRIVACY_MODEL}`,
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${hfToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ inputs: text }),
+      }
+    );
+
+    if (!response.ok) {
+      console.warn(`[realtime-chat] Privacy model returned ${response.status}`);
+      return { entities: [], raw: null };
+    }
+
+    const output = await response.json();
+    
+    // Parse NER output
+    const entities: string[] = [];
+    if (Array.isArray(output)) {
+      for (const entity of output) {
+        if (entity.score >= 0.5 && entity.entity_group) {
+          entities.push(entity.entity_group);
+        }
+      }
+    }
+
+    return { entities: [...new Set(entities)], raw: output };
+  } catch (error) {
+    console.error("[realtime-chat] Privacy model error:", error);
+    return { entities: [], raw: null };
+  }
+}
+
+// Parallel HuggingFace model scanning
+async function scanWithHFModels(text: string, hfToken: string | null): Promise<TokenScanResult> {
+  const startTime = Date.now();
+  const modelsUsed: string[] = [];
+
+  // If no HF token, fall back to basic regex
+  if (!hfToken) {
+    console.log("[realtime-chat] No HF token, using fallback regex scanning");
+    return fallbackRegexScan(text);
+  }
+
+  // Parallel model calls
+  const [toxicityResult, privacyResult] = await Promise.all([
+    callToxicityModel(text, hfToken),
+    callPrivacyModel(text, hfToken),
+  ]);
+
+  if (toxicityResult.raw) modelsUsed.push(HF_TOXICITY_MODEL);
+  if (privacyResult.raw) modelsUsed.push(HF_PRIVACY_MODEL);
+
+  const hasToxicity = toxicityResult.score >= 0.5;
+  const hasPII = privacyResult.entities.length > 0;
+
+  return {
+    hasPII,
+    hasToxicity,
+    piiEntities: privacyResult.entities,
+    toxicityScore: toxicityResult.score,
+    privacyScore: hasPII ? 0.8 : 0,
+    modelsUsed,
+    latencyMs: Date.now() - startTime,
+  };
+}
+
+// Fallback regex-based scanning (when HF token unavailable)
+function fallbackRegexScan(text: string): TokenScanResult {
+  const PII_PATTERNS = {
+    email: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/gi,
+    phone: /\b(\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g,
+    ssn: /\b\d{3}-\d{2}-\d{4}\b/g,
+    creditCard: /\b(?:\d{4}[-.\s]?){3}\d{4}\b/g,
+  };
+
+  const TOXICITY_KEYWORDS = [
+    "kill yourself", "harm myself", "suicide", "self-harm",
+    "how to make a bomb", "synthesize drugs",
+  ];
+
+  const piiEntities: string[] = [];
+  for (const [type, pattern] of Object.entries(PII_PATTERNS)) {
+    if (pattern.test(text)) piiEntities.push(type);
+  }
+
+  let toxicityScore = 0;
   const lowerText = text.toLowerCase();
   for (const keyword of TOXICITY_KEYWORDS) {
     if (lowerText.includes(keyword)) {
-      toxicityMatches.push(keyword);
+      toxicityScore = 0.9;
+      break;
     }
   }
-  
-  const hasPII = piiTypes.length > 0;
-  const hasToxicity = toxicityMatches.length > 0;
-  const score = (hasPII ? 0.5 : 0) + (hasToxicity ? 0.5 : 0);
-  
-  return { hasPII, hasToxicity, piiTypes, toxicityMatches, score };
+
+  return {
+    hasPII: piiEntities.length > 0,
+    hasToxicity: toxicityScore >= 0.5,
+    piiEntities,
+    toxicityScore,
+    privacyScore: piiEntities.length > 0 ? 0.8 : 0,
+    modelsUsed: ["regex-fallback"],
+    latencyMs: 1,
+  };
 }
 
 serve(async (req) => {
@@ -132,16 +248,21 @@ serve(async (req) => {
       if (data.type === "message.send") {
         const messages = data.messages || [];
         const userMessage = messages.find((m: any) => m.role === "user")?.content || "";
+        const hfToken = Deno.env.get("HUGGING_FACE_ACCESS_TOKEN") || null;
         
-        // Pre-scan user input
-        const inputScan = scanTokenChunk(userMessage);
-        if (inputScan.score > 0.7) {
+        // Pre-scan user input with HuggingFace models
+        console.log(`[realtime-chat] Scanning input with HF models...`);
+        const inputScan = await scanWithHFModels(userMessage, hfToken);
+        
+        if (inputScan.hasToxicity || inputScan.hasPII) {
           socket.send(JSON.stringify({
             type: "response.blocked",
-            reason: "Input blocked by safety policy",
+            reason: "Input blocked by HuggingFace safety models",
             details: {
-              pii: inputScan.piiTypes,
-              toxicity: inputScan.toxicityMatches
+              pii: inputScan.piiEntities,
+              toxicity_score: inputScan.toxicityScore,
+              models_used: inputScan.modelsUsed,
+              scan_latency_ms: inputScan.latencyMs,
             }
           }));
           
@@ -149,11 +270,14 @@ serve(async (req) => {
           await supabase.from("request_logs").insert({
             system_id: systemId,
             request_body: { messages },
-            response_body: { blocked: true, reason: "input_blocked" },
+            response_body: { blocked: true, reason: "input_blocked_by_hf" },
             status_code: 451,
             latency_ms: Date.now() - startTime,
             decision: "BLOCK",
-            engine_scores: { input_scan: inputScan }
+            engine_scores: { 
+              input_scan: inputScan,
+              models_used: inputScan.modelsUsed,
+            }
           });
           
           return;
@@ -219,69 +343,76 @@ serve(async (req) => {
                 tokenCount++;
                 accumulatedText += content;
                 
-                // REAL-TIME TOKEN SCANNING
-                const tokenScan = scanTokenChunk(accumulatedText);
-                
-                if (tokenScan.score > 0.7 && blockedAtToken === null) {
-                  blockedAtToken = tokenCount;
+                // REAL-TIME TOKEN SCANNING with HuggingFace (every 50 tokens for efficiency)
+                if (tokenCount % 50 === 0 && blockedAtToken === null) {
+                  const tokenScan = await scanWithHFModels(accumulatedText, hfToken);
                   
-                  socket.send(JSON.stringify({
-                    type: "response.blocked",
-                    blockedAtToken,
-                    reason: "Output blocked by safety policy",
-                    details: {
-                      pii: tokenScan.piiTypes,
-                      toxicity: tokenScan.toxicityMatches
-                    }
-                  }));
-                  
-                  // Create HITL review item for blocked response
-                  await supabase.from("review_queue").insert({
-                    title: `Token Stream Blocked at position ${blockedAtToken}`,
-                    description: `Real-time safety block triggered. PII: ${tokenScan.piiTypes.join(", ")}. Toxicity: ${tokenScan.toxicityMatches.join(", ")}`,
-                    review_type: "realtime_block",
-                    severity: tokenScan.hasToxicity ? "critical" : "high",
-                    status: "pending",
-                    context: {
-                      system_id: systemId,
-                      blocked_at_token: blockedAtToken,
-                      scan_result: tokenScan,
-                      partial_text: accumulatedText.substring(0, 500)
-                    },
-                    sla_deadline: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
-                  });
-                  
-                  // Create incident for critical blocks
-                  if (tokenScan.hasToxicity) {
-                    await supabase.from("incidents").insert({
-                      title: `Real-time Toxicity Block at token ${blockedAtToken}`,
-                      description: `Streaming response blocked due to detected harmful content: ${tokenScan.toxicityMatches.join(", ")}`,
-                      incident_type: "realtime_toxicity",
-                      severity: "critical",
-                      status: "open"
+                  if ((tokenScan.hasToxicity || tokenScan.hasPII) && blockedAtToken === null) {
+                    blockedAtToken = tokenCount;
+                    
+                    socket.send(JSON.stringify({
+                      type: "response.blocked",
+                      blockedAtToken,
+                      reason: "Output blocked by HuggingFace safety models",
+                      details: {
+                        pii: tokenScan.piiEntities,
+                        toxicity_score: tokenScan.toxicityScore,
+                        models_used: tokenScan.modelsUsed,
+                        scan_latency_ms: tokenScan.latencyMs,
+                      }
+                    }));
+                    
+                    // Create HITL review item for blocked response
+                    await supabase.from("review_queue").insert({
+                      title: `Token Stream Blocked at position ${blockedAtToken}`,
+                      description: `Real-time HuggingFace safety block. Models: ${tokenScan.modelsUsed.join(", ")}. PII: ${tokenScan.piiEntities.join(", ")}. Toxicity: ${Math.round(tokenScan.toxicityScore * 100)}%`,
+                      review_type: "realtime_block_hf",
+                      severity: tokenScan.hasToxicity ? "critical" : "high",
+                      status: "pending",
+                      context: {
+                        system_id: systemId,
+                        blocked_at_token: blockedAtToken,
+                        scan_result: tokenScan,
+                        partial_text: accumulatedText.substring(0, 500),
+                        models_used: tokenScan.modelsUsed,
+                      },
+                      sla_deadline: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
                     });
-                  }
-                  
-                  // Log blocked request
-                  await supabase.from("request_logs").insert({
-                    system_id: systemId,
-                    request_body: { messages },
-                    response_body: { 
-                      blocked: true, 
-                      blocked_at_token: blockedAtToken,
-                      partial_text: accumulatedText.substring(0, 200)
-                    },
-                    status_code: 451,
-                    latency_ms: Date.now() - startTime,
-                    decision: "BLOCK",
-                    engine_scores: { 
-                      realtime_scan: tokenScan,
-                      blocked_at_token: blockedAtToken
+                    
+                    // Create incident for critical blocks
+                    if (tokenScan.hasToxicity) {
+                      await supabase.from("incidents").insert({
+                        title: `Real-time HF Toxicity Block at token ${blockedAtToken}`,
+                        description: `Streaming response blocked by ${HF_TOXICITY_MODEL}. Toxicity score: ${Math.round(tokenScan.toxicityScore * 100)}%`,
+                        incident_type: "realtime_toxicity_hf",
+                        severity: "critical",
+                        status: "open"
+                      });
                     }
-                  });
-                  
-                  reader.cancel();
-                  break;
+                    
+                    // Log blocked request
+                    await supabase.from("request_logs").insert({
+                      system_id: systemId,
+                      request_body: { messages },
+                      response_body: { 
+                        blocked: true, 
+                        blocked_at_token: blockedAtToken,
+                        partial_text: accumulatedText.substring(0, 200),
+                        models_used: tokenScan.modelsUsed,
+                      },
+                      status_code: 451,
+                      latency_ms: Date.now() - startTime,
+                      decision: "BLOCK",
+                      engine_scores: { 
+                        realtime_scan: tokenScan,
+                        blocked_at_token: blockedAtToken,
+                        models_used: tokenScan.modelsUsed,
+                      }
+                    });
+                    
+                    reader.cancel();
+                    break;
+                  }
                 }
                 
                 // Send token to client
@@ -316,8 +447,8 @@ serve(async (req) => {
             latency_ms: Date.now() - startTime,
             decision: "ALLOW",
             engine_scores: { 
-              realtime_scan: scanTokenChunk(accumulatedText),
-              total_tokens: tokenCount
+              total_tokens: tokenCount,
+              models_available: hfToken ? [HF_TOXICITY_MODEL, HF_PRIVACY_MODEL] : ["regex-fallback"],
             }
           });
         }
