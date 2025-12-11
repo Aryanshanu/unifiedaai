@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PlatformHealthCards } from "@/components/dashboard/PlatformHealthCards";
+import { RealityCheckDashboard } from "@/components/dashboard/RealityCheckDashboard";
 import { useUnsafeDeployments, usePlatformMetrics } from "@/hooks/usePlatformMetrics";
 import { Database, Scale, AlertCircle, ShieldAlert, Lock, Eye, Plus, AlertOctagon, ArrowRight, Shield } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -97,6 +98,11 @@ export default function Index() {
           </div>
         </div>
       )}
+
+      {/* Reality Check Dashboard — December 11, 2025 */}
+      <div className="mb-6">
+        <RealityCheckDashboard />
+      </div>
 
       {/* Platform Health */}
       <div className="mb-6">

@@ -342,6 +342,31 @@ serve(async (req) => {
           status: "open",
         });
         console.log(`Auto-created incident for critical block: ${traceIdGen}`);
+
+        // KG AUTO-EDGE: Create edge for every BLOCK
+        try {
+          await supabase.functions.invoke('kg-upsert', {
+            body: {
+              nodes: [
+                { entity_type: 'request', entity_id: traceIdGen, label: `Request ${traceIdGen.slice(0,8)}` },
+                { entity_type: 'incident', entity_id: traceIdGen, label: `Block: ${blockingEngine?.engine}` }
+              ],
+              edges: [
+                { 
+                  source_entity_type: 'request', 
+                  source_entity_id: traceIdGen,
+                  target_entity_type: 'incident', 
+                  target_entity_id: traceIdGen,
+                  relationship_type: 'TRIGGERED_BLOCK',
+                  properties: { engine: blockingEngine?.engine, system: system.name }
+                }
+              ]
+            }
+          });
+          console.log(`KG edge created for block: ${traceIdGen}`);
+        } catch (kgError) {
+          console.warn(`KG edge creation failed (non-fatal):`, kgError);
+        }
       }
 
       return new Response(

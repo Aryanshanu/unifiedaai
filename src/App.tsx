@@ -31,6 +31,7 @@ import Governance from "./pages/Governance";
 import Evaluation from "./pages/Evaluation";
 import GoldenDemo from "./pages/GoldenDemo";
 import RunTests from "./pages/RunTests";
+import GapsClosed from "./pages/GapsClosed";
 import NotFound from "./pages/NotFound";
 import { GlobalBanner } from "./components/layout/GlobalBanner";
 
@@ -44,7 +45,6 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <GlobalBanner />
-          {/* Test Runner Overlay - only visible when ?test=1 in URL */}
           <TestRunnerOverlay />
           <Routes>
             <Route path="/auth" element={<Auth />} />
@@ -88,6 +88,7 @@ const App = () => (
             {/* Test & Demo Routes */}
             <Route path="/golden" element={<GoldenDemo />} />
             <Route path="/run-tests" element={<RunTests />} />
+            <Route path="/gaps-closed" element={<GapsClosed />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

@@ -9,6 +9,7 @@ import { useSettings, useUpdateSettings } from "@/hooks/useSettings";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UsersTeamsSection } from "@/components/settings/UsersTeamsSection";
+import { ConnectModelForm } from "@/components/settings/ConnectModelForm";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -456,7 +457,13 @@ export default function Settings() {
             {activeSection === "integrations" && (
               <>
                 <h2 className="text-lg font-semibold text-foreground mb-6">Integrations</h2>
-                <div className="space-y-4">
+                <div className="space-y-6">
+                  {/* Connect Your Model - PRIMARY */}
+                  <ConnectModelForm />
+
+                  {/* Other Integrations */}
+                  <h3 className="text-md font-medium text-foreground mt-8 mb-4">Other Integrations</h3>
+                  
                   <Card className="border-border">
                     <CardContent className="flex items-center justify-between py-4">
                       <div className="flex items-center gap-3">
