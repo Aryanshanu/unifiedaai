@@ -70,6 +70,10 @@ export default function GoldenDemo() {
   // Check for model on mount and auto-approve for demo
   useEffect(() => {
     const checkModel = async () => {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id;
+      
       // Find any system with endpoint
       const { data: systems } = await supabase
         .from('systems')
@@ -88,14 +92,14 @@ export default function GoldenDemo() {
           }).eq('id', sys.id);
         }
         
-        // Create risk assessment if missing
+        // Create risk assessment if missing (with created_by for RLS)
         const { data: existingRisk } = await supabase
           .from('risk_assessments')
           .select('id')
           .eq('system_id', sys.id)
           .limit(1);
         
-        if (!existingRisk?.length && sys.project_id) {
+        if (!existingRisk?.length && sys.project_id && userId) {
           await supabase.from('risk_assessments').insert({
             system_id: sys.id,
             project_id: sys.project_id,
@@ -106,18 +110,19 @@ export default function GoldenDemo() {
             dimension_scores: { data: 20, model: 25, useCase: 30, operational: 20, regulatory: 15, ethical: 20 },
             questionnaire_answers: {},
             summary: 'Auto-created for Golden Demo execution',
-            version: 1
+            version: 1,
+            created_by: userId
           });
         }
         
-        // Create impact assessment if missing
+        // Create impact assessment if missing (with created_by for RLS)
         const { data: existingImpact } = await supabase
           .from('impact_assessments')
           .select('id')
           .eq('system_id', sys.id)
           .limit(1);
         
-        if (!existingImpact?.length && sys.project_id) {
+        if (!existingImpact?.length && sys.project_id && userId) {
           await supabase.from('impact_assessments').insert({
             system_id: sys.id,
             project_id: sys.project_id,
@@ -126,7 +131,8 @@ export default function GoldenDemo() {
             dimensions: { reach: 20, severity: 25, reversibility: 30, vulnerability: 20 },
             questionnaire_answers: {},
             summary: 'Auto-created for Golden Demo execution',
-            version: 1
+            version: 1,
+            created_by: userId
           });
         }
         
@@ -446,11 +452,21 @@ export default function GoldenDemo() {
       addLog("→ Generating 6-page regulator-ready PDF...");
       
       try {
+        // Get auth session for authorization header
+        const { data: { session } } = await supabase.auth.getSession();
+        const authHeader = session?.access_token 
+          ? `Bearer ${session.access_token}` 
+          : `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`;
+        
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-scorecard`,
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': authHeader,
+              'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+            },
             body: JSON.stringify({ model_id: model?.id }),
           }
         );
