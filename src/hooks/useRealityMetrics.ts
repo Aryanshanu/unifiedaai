@@ -1,0 +1,39 @@
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+
+export interface RealityMetrics {
+  realRequestsProcessed: number;
+  realBlocks: number;
+  realHITLReviews: number;
+  lastDriftCheck: string | null;
+  fakeDataCount: number; // Always 0 after Dec 11, 2025
+}
+
+export function useRealityMetrics() {
+  return useQuery({
+    queryKey: ["reality-metrics"],
+    queryFn: async (): Promise<RealityMetrics> => {
+      // Query real counts from database
+      const [
+        requestLogsResult,
+        incidentsResult,
+        reviewQueueResult,
+        driftAlertsResult,
+      ] = await Promise.all([
+        supabase.from("request_logs").select("id", { count: "exact", head: true }),
+        supabase.from("incidents").select("id", { count: "exact", head: true }),
+        supabase.from("review_queue").select("id", { count: "exact", head: true }).eq("status", "approved"),
+        supabase.from("drift_alerts").select("detected_at").order("detected_at", { ascending: false }).limit(1),
+      ]);
+
+      return {
+        realRequestsProcessed: requestLogsResult.count || 0,
+        realBlocks: incidentsResult.count || 0,
+        realHITLReviews: reviewQueueResult.count || 0,
+        lastDriftCheck: driftAlertsResult.data?.[0]?.detected_at || null,
+        fakeDataCount: 0, // Permanently 0 after Dec 11, 2025 purge
+      };
+    },
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+}

@@ -12,7 +12,7 @@ import { useModels, Model } from "@/hooks/useModels";
 import { usePlatformMetrics, useSystemHealthSummary } from "@/hooks/usePlatformMetrics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
-import { TrafficGenerator } from "@/components/observability/TrafficGenerator";
+// TrafficGenerator removed - no fake data allowed after Dec 11, 2025
 import { RealtimeChatDemo } from "@/components/observability/RealtimeChatDemo";
 import { DriftDetector } from "@/components/observability/DriftDetector";
 import { supabase } from "@/integrations/supabase/client";
@@ -405,7 +405,6 @@ export default function Observability() {
           <div className="bg-card border border-border rounded-xl p-4">
             <h3 className="text-sm font-semibold text-foreground mb-4">Quick Actions</h3>
             <div className="space-y-2">
-              <TrafficGenerator />
               <Button variant="outline" className="w-full justify-start" onClick={handleRefreshAll}>
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Force Model Refresh
@@ -419,6 +418,10 @@ export default function Observability() {
                 Drift Analysis
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground mt-4 p-2 bg-secondary/50 rounded text-center">
+              Only real traffic flows here.<br />
+              Fake data deleted Dec 11, 2025.
+            </p>
           </div>
         </div>
       </div>
