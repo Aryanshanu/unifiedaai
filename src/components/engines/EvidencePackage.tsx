@@ -2,8 +2,14 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Package, Download, Shield, Hash, Clock, CheckCircle } from "lucide-react";
+import { Package, Download, Shield, Hash, Clock, CheckCircle, Cpu, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
+
+interface ModelInfo {
+  id: string;
+  version: string;
+  latency_ms?: number;
+}
 
 interface EvidencePackageProps {
   data: {
@@ -11,13 +17,23 @@ interface EvidencePackageProps {
     rawLogs: any[];
     modelId: string;
     evaluationType?: string;
+    hfModels?: ModelInfo[];
   };
 }
+
+// HuggingFace model mappings for each engine type
+const HF_MODEL_MAP: Record<string, ModelInfo> = {
+  toxicity: { id: "ml6team/toxic-comment-classification", version: "latest" },
+  privacy: { id: "obi/deid_roberta_i2b2", version: "latest" },
+  hallucination: { id: "vectara/hallucination_evaluation_model", version: "latest" },
+  fairness: { id: "AIF360 (statistical)", version: "0.5.1" },
+  explainability: { id: "SHAP + LLM Analysis", version: "latest" },
+};
 
 export function EvidencePackage({ data }: EvidencePackageProps) {
   const [downloading, setDownloading] = useState(false);
 
-  // Generate SHA-256 hash (simplified client-side version)
+  // Generate SHA-256 hash
   const generateHash = async (content: string): Promise<string> => {
     const encoder = new TextEncoder();
     const dataBuffer = encoder.encode(content);
@@ -25,6 +41,18 @@ export function EvidencePackage({ data }: EvidencePackageProps) {
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
   };
+
+  // Get HF models for this evaluation type
+  const getModelsUsed = (): ModelInfo[] => {
+    if (data.hfModels && data.hfModels.length > 0) {
+      return data.hfModels;
+    }
+    const engineType = data.evaluationType || "fairness";
+    const model = HF_MODEL_MAP[engineType];
+    return model ? [model] : [];
+  };
+
+  const modelsUsed = getModelsUsed();
 
   const downloadEvidence = async () => {
     setDownloading(true);
@@ -38,6 +66,17 @@ export function EvidencePackage({ data }: EvidencePackageProps) {
             modelId: data.modelId,
             version: "1.0.0",
             platform: "Fractal RAI-OS",
+            huggingface_models: modelsUsed,
+          },
+          model_provenance: {
+            evaluation_models: modelsUsed.map(m => ({
+              model_id: m.id,
+              version: m.version,
+              inference_latency_ms: m.latency_ms || null,
+              model_card_url: m.id.includes("/") 
+                ? `https://huggingface.co/${m.id}` 
+                : null,
+            })),
           },
           results: data.results,
           rawLogs: data.rawLogs,
@@ -71,7 +110,7 @@ export function EvidencePackage({ data }: EvidencePackageProps) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success("Evidence package downloaded with SHA-256 hash");
+      toast.success("Evidence package downloaded with SHA-256 hash and HuggingFace model provenance");
     } catch (error) {
       toast.error("Failed to generate evidence package");
     } finally {
@@ -98,6 +137,34 @@ export function EvidencePackage({ data }: EvidencePackageProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {/* HuggingFace Model Info */}
+        {modelsUsed.length > 0 && (
+          <div className="mb-4 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <Cpu className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">Powered by Open-Source Models</span>
+            </div>
+            <div className="space-y-1">
+              {modelsUsed.map((model, idx) => (
+                <div key={idx} className="flex items-center justify-between text-xs">
+                  <code className="text-muted-foreground">{model.id}</code>
+                  {model.id.includes("/") && (
+                    <a 
+                      href={`https://huggingface.co/${model.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline flex items-center gap-1"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      Model Card
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
             <Hash className="w-4 h-4 text-primary" />
@@ -130,7 +197,7 @@ export function EvidencePackage({ data }: EvidencePackageProps) {
             </span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Package includes: evaluation results, raw computation logs, metadata,
+            Package includes: evaluation results, raw computation logs, HuggingFace model provenance,
             and cryptographic hash for audit verification.
           </p>
         </div>
