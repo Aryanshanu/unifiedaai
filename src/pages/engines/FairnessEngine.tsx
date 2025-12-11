@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useModels } from "@/hooks/useModels";
 import { useToast } from "@/hooks/use-toast";
 import { Scale, Play, Loader2, AlertTriangle, CheckCircle, Brain, Sparkles, Users } from "lucide-react";
@@ -17,6 +18,10 @@ import { ReasoningChainDisplay } from "@/components/engines/ReasoningChainDispla
 import { CustomPromptTest } from "@/components/engines/CustomPromptTest";
 import { CohortSelector } from "@/components/engines/CohortSelector";
 import { EvaluationComparison } from "@/components/engines/EvaluationComparison";
+import { InputOutputScope } from "@/components/engines/InputOutputScope";
+import { ComputationBreakdown } from "@/components/engines/ComputationBreakdown";
+import { RawDataLog } from "@/components/engines/RawDataLog";
+import { EvidencePackage } from "@/components/engines/EvidencePackage";
 import { HealthIndicator } from "@/components/shared/HealthIndicator";
 import { useDataHealth } from "@/components/shared/DataHealthWrapper";
 import { cn } from "@/lib/utils";
@@ -89,8 +94,13 @@ export default function FairnessEngine() {
   const [selectedModelId, setSelectedModelId] = useState<string>("");
   const [selectedCohorts, setSelectedCohorts] = useState<Record<string, string>>({});
   const [showComparison, setShowComparison] = useState(false);
+  const [rawLogs, setRawLogs] = useState<any[]>([]);
+  const [computationSteps, setComputationSteps] = useState<any[]>([]);
+  const [realEvalResult, setRealEvalResult] = useState<any>(null);
   const { data: models, isLoading: modelsLoading, refetch: refetchModels } = useModels();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { runReasoningEvaluation, isEvaluating } = useRAIReasoning();
   const queryClient = useQueryClient();
   const { runReasoningEvaluation, isEvaluating } = useRAIReasoning();
 
@@ -126,6 +136,57 @@ export default function FairnessEngine() {
     if (selectedModelId) refetchResults();
   };
 
+  // Run real fairness evaluation using eval-fairness edge function
+  const runRealFairnessEvaluation = async () => {
+    if (!selectedModelId) {
+      toast({ title: "Please select a model", variant: "destructive" });
+      return;
+    }
+
+    const model = models?.find(m => m.id === selectedModelId);
+    const endpoint = model?.huggingface_endpoint || model?.endpoint || (model as any)?.system?.endpoint;
+    const apiToken = model?.huggingface_api_token || (model as any)?.system?.api_token_encrypted;
+
+    if (!endpoint) {
+      toast({ 
+        title: "Model Configuration Missing", 
+        description: "This model doesn't have an API endpoint configured.",
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    try {
+      // Call the eval-fairness edge function
+      const { data, error } = await supabase.functions.invoke('eval-fairness', {
+        body: { modelId: selectedModelId },
+      });
+
+      if (error) throw error;
+
+      // Store the computation steps and logs for transparency display
+      setComputationSteps(data.computationSteps || []);
+      setRawLogs(data.rawLogs || []);
+      setRealEvalResult(data);
+
+      queryClient.invalidateQueries({ queryKey: ["fairness-results", selectedModelId] });
+      
+      toast({ 
+        title: "Fairness Evaluation Complete", 
+        description: `Score: ${data.overallScore}% - ${data.status.toUpperCase()}`,
+        variant: data.status === "pass" ? "default" : "destructive"
+      });
+    } catch (error: any) {
+      console.error("Fairness evaluation error:", error);
+      toast({ 
+        title: "Evaluation Failed", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    }
+  };
+
+  // Fallback to K2 reasoning if eval-fairness not available
   const runEvaluation = async () => {
     if (!selectedModelId) {
       toast({ title: "Please select a model", variant: "destructive" });
@@ -211,15 +272,22 @@ export default function FairnessEngine() {
         />
       }
     >
+      {/* Input/Output Scope Banner */}
+      <InputOutputScope 
+        scope="BOTH" 
+        inputDescription="Analyzes input cohorts (age, gender, income, region)"
+        outputDescription="Evaluates model predictions for demographic parity, equalized odds, and disparate impact"
+      />
+
       {/* Header Badge */}
       <div className="flex items-center gap-2 mb-4">
         <Badge className="bg-primary/10 text-primary border-primary/20">
           <Brain className="w-3 h-3 mr-1" />
-          Powered by Gemini 2.5 Pro
+          Powered by AIF360 + Gemini 2.5 Pro
         </Badge>
         <Badge variant="outline" className="text-xs">
           <Sparkles className="w-3 h-3 mr-1" />
-          K2 Deep Reasoning
+          K2 Transparency
         </Badge>
         <Button 
           variant="outline" 
@@ -250,9 +318,9 @@ export default function FairnessEngine() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="pt-6">
+            <div className="pt-6 flex gap-2">
               <Button 
-                onClick={runEvaluation} 
+                onClick={runRealFairnessEvaluation} 
                 disabled={!selectedModelId || isEvaluating}
                 size="lg"
                 className="gap-2"
@@ -260,14 +328,24 @@ export default function FairnessEngine() {
                 {isEvaluating ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Reasoning...
+                    Evaluating...
                   </>
                 ) : (
                   <>
-                    <Brain className="w-4 h-4" />
-                    Run Fairness Analysis
+                    <Scale className="w-4 h-4" />
+                    Run Real Fairness (AIF360)
                   </>
                 )}
+              </Button>
+              <Button 
+                onClick={runEvaluation} 
+                disabled={!selectedModelId || isEvaluating}
+                size="lg"
+                variant="outline"
+                className="gap-2"
+              >
+                <Brain className="w-4 h-4" />
+                K2 Reasoning
               </Button>
             </div>
           </div>
@@ -447,8 +525,48 @@ export default function FairnessEngine() {
                           <p className="text-sm font-medium text-foreground mb-1">Age Analysis</p>
                           <p className="text-sm text-muted-foreground">{latestResult.explanations.age_analysis}</p>
                         </div>
-                      )}
-                    </>
+          )}
+
+          {/* Transparency Section - Computation Breakdown, Raw Logs, Evidence */}
+          {(computationSteps.length > 0 || rawLogs.length > 0) && (
+            <div className="space-y-6 mt-8 border-t pt-6">
+              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <Scale className="w-5 h-5 text-primary" />
+                Transparency & Evidence
+              </h3>
+              
+              {computationSteps.length > 0 && (
+                <ComputationBreakdown 
+                  steps={computationSteps} 
+                  overallScore={realEvalResult?.overallScore || latestResult?.overall_score || 0} 
+                />
+              )}
+              
+              {rawLogs.length > 0 && (
+                <RawDataLog logs={rawLogs} />
+              )}
+              
+              <EvidencePackage 
+                data={{ 
+                  results: realEvalResult || latestResult, 
+                  rawLogs, 
+                  modelId: selectedModelId,
+                  evaluationType: "fairness"
+                }} 
+              />
+
+              {/* Non-compliant Alert */}
+              {realEvalResult?.status === "fail" && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="w-4 h-4" />
+                  <AlertDescription>
+                    <strong>NON-COMPLIANT:</strong> Demographic Parity Difference of {realEvalResult?.parity?.toFixed(4)} exceeds 0.08 threshold. 
+                    Recommend dataset rebalancing per EU AI Act Article 10.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
                   )}
                 </CardContent>
               </Card>
