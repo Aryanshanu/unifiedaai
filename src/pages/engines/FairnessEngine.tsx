@@ -101,8 +101,6 @@ export default function FairnessEngine() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { runReasoningEvaluation, isEvaluating } = useRAIReasoning();
-  const queryClient = useQueryClient();
-  const { runReasoningEvaluation, isEvaluating } = useRAIReasoning();
 
   useEffect(() => {
     const endTrace = instrumentPageLoad('FairnessEngine');
@@ -525,6 +523,38 @@ export default function FairnessEngine() {
                           <p className="text-sm font-medium text-foreground mb-1">Age Analysis</p>
                           <p className="text-sm text-muted-foreground">{latestResult.explanations.age_analysis}</p>
                         </div>
+                      )}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-warning" />
+                    Recommendations
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {latestResult.explanations?.recommendations?.length ? (
+                    <ul className="space-y-2">
+                      {latestResult.explanations.recommendations.map((rec, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm p-2 bg-warning/10 rounded-lg">
+                          <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
+                          <span className="text-muted-foreground">{rec}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="flex items-center gap-2 text-success">
+                      <CheckCircle className="w-5 h-5" />
+                      <span>Model shows good fairness metrics</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           )}
 
           {/* Transparency Section - Computation Breakdown, Raw Logs, Evidence */}
@@ -567,39 +597,7 @@ export default function FairnessEngine() {
               )}
             </div>
           )}
-                  )}
-                </CardContent>
-              </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <AlertTriangle className="w-5 h-5 text-warning" />
-                    Recommendations
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {latestResult.explanations?.recommendations?.length ? (
-                    <ul className="space-y-2">
-                      {latestResult.explanations.recommendations.map((rec, i) => (
-                        <li key={i} className="flex items-start gap-2 text-sm p-2 bg-warning/10 rounded-lg">
-                          <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
-                          <span className="text-muted-foreground">{rec}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="flex items-center gap-2 text-success">
-                      <CheckCircle className="w-5 h-5" />
-                      <span>Model shows good fairness metrics</span>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {/* Evaluation History */}
           {results && results.length > 1 && (
             <Card className="mt-6">
               <CardHeader>
