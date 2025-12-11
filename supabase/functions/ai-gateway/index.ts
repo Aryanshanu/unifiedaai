@@ -292,8 +292,11 @@ serve(async (req) => {
 
     const inputVerdict = combineVerdicts(inputEngineScores);
 
-    // Block if input is harmful
+    // Block if input is harmful - AUTO-ESCALATE TO HITL
     if (inputVerdict === "BLOCK") {
+      const blockingEngine = inputEngineScores.find(e => e.verdict === "BLOCK");
+      const traceIdGen = traceId || crypto.randomUUID();
+      
       const logEntry = {
         system_id: systemId,
         project_id: system.project_id,
@@ -301,43 +304,142 @@ serve(async (req) => {
         response_body: { error: "Input blocked by safety policy" },
         status_code: 451,
         latency_ms: Date.now() - startTime,
-        error_message: inputEngineScores.find(e => e.verdict === "BLOCK")?.details,
-        trace_id: traceId,
+        error_message: blockingEngine?.details,
+        trace_id: traceIdGen,
         decision: "BLOCK",
         engine_scores: { input: Object.fromEntries(inputEngineScores.map(e => [e.engine, e])) },
       };
       await supabase.from("request_logs").insert(logEntry);
 
+      // AUTO-ESCALATE: Create HITL review item on BLOCK
+      const toxicityScore = blockingEngine?.scores?.toxicity ?? 0;
+      const severity = (toxicityScore > 80 || blockingEngine?.engine === "safety") ? "critical" : "high";
+      
+      await supabase.from("review_queue").insert({
+        title: `Gateway Block: ${blockingEngine?.engine || 'Policy'} violation`,
+        description: `Request blocked. Engine: ${blockingEngine?.engine}. Details: ${blockingEngine?.details || 'Safety policy triggered'}`,
+        review_type: "gateway_block",
+        severity,
+        status: "pending",
+        context: {
+          trace_id: traceIdGen,
+          system_id: systemId,
+          system_name: system.name,
+          engine_scores: inputEngineScores,
+          prompt_preview: userMessage.substring(0, 200),
+        },
+        sla_deadline: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(), // 4-hour SLA
+      });
+      console.log(`Auto-created HITL review for blocked request: ${traceIdGen}`);
+
+      // Create incident for critical blocks
+      if (severity === "critical") {
+        await supabase.from("incidents").insert({
+          title: `Critical Block: ${blockingEngine?.engine} threshold exceeded`,
+          description: `System "${system.name}" blocked a request due to ${blockingEngine?.engine} policy. Trace: ${traceIdGen}`,
+          incident_type: `${blockingEngine?.engine}_violation`,
+          severity: "critical",
+          status: "open",
+        });
+        console.log(`Auto-created incident for critical block: ${traceIdGen}`);
+      }
+
       return new Response(
         JSON.stringify({ 
           error: "Request blocked by safety policy",
           decision: "BLOCK",
+          trace_id: traceIdGen,
           details: inputEngineScores.filter(e => e.verdict === "BLOCK").map(e => e.details)
         }),
         { status: 451, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Forward to AI Gateway
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY not configured");
+    // Check if system has its own endpoint configured
+    let aiResponse!: Response;
+    let usedUserEndpoint = false;
+    
+    if (system.endpoint && system.api_token_encrypted) {
+      // Use user's configured model endpoint
+      console.log(`Using user endpoint: ${system.endpoint}`);
+      usedUserEndpoint = true;
+      
+      try {
+        // Detect endpoint type and format request accordingly
+        const isOpenAI = system.endpoint.includes("openai.com") || system.endpoint.includes("api.openai");
+        const isHuggingFace = system.endpoint.includes("huggingface") || system.endpoint.includes("hf.space");
+        const isAzure = system.endpoint.includes("azure") || system.endpoint.includes("openai.azure");
+        
+        let requestBody: any;
+        let headers: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+        
+        if (isOpenAI || isAzure) {
+          headers["Authorization"] = `Bearer ${system.api_token_encrypted}`;
+          requestBody = {
+            model: system.model_name || "gpt-4",
+            messages: [
+              { role: "system", content: system.use_case || "You are a helpful AI assistant." },
+              ...messages,
+            ],
+          };
+        } else if (isHuggingFace) {
+          headers["Authorization"] = `Bearer ${system.api_token_encrypted}`;
+          requestBody = {
+            inputs: messages.map((m: any) => `${m.role}: ${m.content}`).join("\n"),
+            parameters: { max_new_tokens: 1000 }
+          };
+        } else {
+          // Generic OpenAI-compatible endpoint
+          headers["Authorization"] = `Bearer ${system.api_token_encrypted}`;
+          requestBody = {
+            model: system.model_name || "default",
+            messages: [
+              { role: "system", content: system.use_case || "You are a helpful AI assistant." },
+              ...messages,
+            ],
+          };
+        }
+        
+        aiResponse = await fetch(system.endpoint, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(requestBody),
+        });
+        
+        if (!aiResponse.ok) {
+          console.warn(`User endpoint failed with ${aiResponse.status}, falling back to Lovable AI`);
+          usedUserEndpoint = false;
+        }
+      } catch (endpointError) {
+        console.warn(`User endpoint error: ${endpointError}, falling back to Lovable AI`);
+        usedUserEndpoint = false;
+      }
     }
+    
+    // Fallback to Lovable AI if no user endpoint or it failed
+    if (!usedUserEndpoint) {
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      if (!LOVABLE_API_KEY) {
+        throw new Error("LOVABLE_API_KEY not configured");
+      }
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: input?.model || body?.model || "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: system.use_case || "You are a helpful AI assistant." },
-          ...messages,
-        ],
-      }),
-    });
+      aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: input?.model || body?.model || "google/gemini-2.5-flash",
+          messages: [
+            { role: "system", content: system.use_case || "You are a helpful AI assistant." },
+            ...messages,
+          ],
+        }),
+      });
+    }
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
