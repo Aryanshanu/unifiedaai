@@ -347,6 +347,7 @@ export default function FairnessEngine() {
             <div className="mb-6">
               <ComputationBreakdown 
                 steps={computationSteps.length > 0 ? computationSteps : realEvalResult?.computationSteps || []}
+                overallScore={overallScore}
                 engineType="fairness"
               />
             </div>
@@ -376,11 +377,14 @@ export default function FairnessEngine() {
           {/* Evidence Package */}
           <div className="mb-6">
             <EvidencePackage
-              modelId={selectedModelId}
-              engineType="fairness"
-              score={overallScore}
-              metricDetails={realEvalResult?.metricDetails || latestResult?.metric_details}
-              timestamp={latestResult?.created_at || new Date().toISOString()}
+              data={{
+                results: realEvalResult?.metricDetails || latestResult?.metric_details,
+                rawLogs: rawLogs,
+                modelId: selectedModelId,
+                evaluationType: "fairness",
+                overallScore: overallScore,
+                isCompliant: overallScore >= 70
+              }}
             />
           </div>
 

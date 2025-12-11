@@ -305,6 +305,7 @@ export default function HallucinationEngine() {
             <div className="mb-6">
               <ComputationBreakdown 
                 steps={computationSteps}
+                overallScore={overallScore}
                 engineType="hallucination"
               />
             </div>
@@ -327,11 +328,14 @@ export default function HallucinationEngine() {
           {/* Evidence Package */}
           <div className="mb-6">
             <EvidencePackage
-              modelId={selectedModelId}
-              engineType="hallucination"
-              score={overallScore}
-              metricDetails={realEvalResult?.metricDetails || latestResult?.metric_details}
-              timestamp={latestResult?.created_at || new Date().toISOString()}
+              data={{
+                results: realEvalResult?.metricDetails || latestResult?.metric_details,
+                rawLogs: [],
+                modelId: selectedModelId,
+                evaluationType: "hallucination",
+                overallScore: overallScore,
+                isCompliant: overallScore >= 70
+              }}
             />
           </div>
 
