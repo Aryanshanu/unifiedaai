@@ -62,3 +62,6 @@ verify_jwt = false
 
 [functions.eval-hallucination-hf]
 verify_jwt = false
+
+[functions.eval-explainability-hf]
+verify_jwt = false
