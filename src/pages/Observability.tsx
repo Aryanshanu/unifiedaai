@@ -5,7 +5,7 @@ import { LiveMetrics } from "@/components/dashboard/LiveMetrics";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Activity, AlertTriangle, TrendingUp, Clock, RefreshCw, Bell, Zap } from "lucide-react";
+import { Activity, AlertTriangle, TrendingUp, Clock, RefreshCw, Bell, Zap, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDriftAlerts, useDriftAlertStats, DriftAlert } from "@/hooks/useDriftAlerts";
 import { useModels, Model } from "@/hooks/useModels";
@@ -13,10 +13,13 @@ import { usePlatformMetrics, useSystemHealthSummary } from "@/hooks/usePlatformM
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
 import { TrafficGenerator } from "@/components/observability/TrafficGenerator";
+import { RealtimeChatDemo } from "@/components/observability/RealtimeChatDemo";
+import { DriftDetector } from "@/components/observability/DriftDetector";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 function getModelStatus(model: Model): "healthy" | "warning" | "critical" {
   const fairness = model.fairness_score ?? 100;
@@ -149,6 +152,8 @@ export default function Observability() {
     toast.success("Dashboard refreshed");
   };
 
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'realtime' | 'drift'>('dashboard');
+
   return (
     <MainLayout title="Observability" subtitle="Real-time telemetry, drift detection, and model health monitoring">
       {/* Realtime indicator */}
@@ -167,42 +172,67 @@ export default function Observability() {
         </div>
       )}
 
-      {/* KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <MetricCard
-          title="Gateway Health"
-          value={platformMetrics?.errorCount === 0 ? "100%" : `${Math.round((1 - (platformMetrics?.errorCount || 0) / (platformMetrics?.totalRequests || 1)) * 100)}%`}
-          subtitle={`${platformMetrics?.systemsCount || 0} active systems`}
-          icon={<Activity className="w-4 h-4 text-success" />}
-          status={platformMetrics?.errorCount === 0 ? "success" : "warning"}
-        />
-        <MetricCard
-          title="Drift Alerts"
-          value={(driftStats?.open || 0).toString()}
-          subtitle={`${driftStats?.critical || 0} critical`}
-          icon={<TrendingUp className="w-4 h-4 text-warning" />}
-          status={driftStats?.critical ? "danger" : driftStats?.open ? "warning" : "success"}
-        />
-        <MetricCard
-          title="Avg Latency"
-          value={`${platformMetrics?.avgLatency || 0}ms`}
-          subtitle={`${platformMetrics?.totalRequests || 0} requests today`}
-          icon={<Clock className="w-4 h-4 text-primary" />}
-          trend={platformMetrics?.avgLatency && platformMetrics.avgLatency < 100 
-            ? { value: 8, direction: "down" } 
-            : undefined
-          }
-        />
-        <MetricCard
-          title="Open Incidents"
-          value={(platformMetrics?.recentIncidents || 0).toString()}
-          subtitle={platformMetrics?.recentIncidents === 0 ? "All clear" : "Requires attention"}
-          icon={<AlertTriangle className="w-4 h-4 text-muted-foreground" />}
-          status={platformMetrics?.recentIncidents ? "danger" : "success"}
-        />
+      {/* Tab Navigation */}
+      <div className="flex items-center gap-2 mb-6 border-b border-border pb-4">
+        {[
+          { id: 'dashboard', label: 'Dashboard', icon: Activity },
+          { id: 'realtime', label: 'Real-Time Chat', icon: MessageSquare },
+          { id: 'drift', label: 'Drift Detection', icon: TrendingUp },
+        ].map(tab => (
+          <Button
+            key={tab.id}
+            variant={activeTab === tab.id ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setActiveTab(tab.id as any)}
+            className="gap-2"
+          >
+            <tab.icon className="w-4 h-4" />
+            {tab.label}
+          </Button>
+        ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {activeTab === 'realtime' && <RealtimeChatDemo />}
+      {activeTab === 'drift' && <DriftDetector />}
+      
+      {activeTab === 'dashboard' && (
+        <>
+          {/* KPIs */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <MetricCard
+              title="Gateway Health"
+              value={platformMetrics?.errorCount === 0 ? "100%" : `${Math.round((1 - (platformMetrics?.errorCount || 0) / (platformMetrics?.totalRequests || 1)) * 100)}%`}
+              subtitle={`${platformMetrics?.systemsCount || 0} active systems`}
+              icon={<Activity className="w-4 h-4 text-success" />}
+              status={platformMetrics?.errorCount === 0 ? "success" : "warning"}
+            />
+            <MetricCard
+              title="Drift Alerts"
+              value={(driftStats?.open || 0).toString()}
+              subtitle={`${driftStats?.critical || 0} critical`}
+              icon={<TrendingUp className="w-4 h-4 text-warning" />}
+              status={driftStats?.critical ? "danger" : driftStats?.open ? "warning" : "success"}
+            />
+            <MetricCard
+              title="Avg Latency"
+              value={`${platformMetrics?.avgLatency || 0}ms`}
+              subtitle={`${platformMetrics?.totalRequests || 0} requests today`}
+              icon={<Clock className="w-4 h-4 text-primary" />}
+              trend={platformMetrics?.avgLatency && platformMetrics.avgLatency < 100 
+                ? { value: 8, direction: "down" } 
+                : undefined
+              }
+            />
+            <MetricCard
+              title="Open Incidents"
+              value={(platformMetrics?.recentIncidents || 0).toString()}
+              subtitle={platformMetrics?.recentIncidents === 0 ? "All clear" : "Requires attention"}
+              icon={<AlertTriangle className="w-4 h-4 text-muted-foreground" />}
+              status={platformMetrics?.recentIncidents ? "danger" : "success"}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
           {/* System Health Table */}
@@ -392,6 +422,8 @@ export default function Observability() {
           </div>
         </div>
       </div>
+      </>
+      )}
     </MainLayout>
   );
 }

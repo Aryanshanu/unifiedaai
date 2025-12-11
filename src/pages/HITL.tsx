@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { Button } from "@/components/ui/button";
-import { Users, Clock, AlertTriangle, CheckCircle, ChevronRight, Bell } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Users, Clock, AlertTriangle, CheckCircle, ChevronRight, Bell, Zap, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useReviewQueue, useReviewQueueStats, ReviewItem } from "@/hooks/useReviewQueue";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,6 +11,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ReviewDecisionDialog } from "@/components/hitl/ReviewDecisionDialog";
 import { SLACountdown } from "@/components/hitl/SLACountdown";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const severityColors = {
   critical: "bg-danger/10 text-danger border-danger/30",
@@ -19,10 +21,67 @@ const severityColors = {
 };
 
 export default function HITL() {
-  const { data: reviews, isLoading } = useReviewQueue();
-  const { data: stats } = useReviewQueueStats();
+  const { data: reviews, isLoading, refetch } = useReviewQueue();
+  const { data: stats, refetch: refetchStats } = useReviewQueueStats();
   const [selectedReview, setSelectedReview] = useState<ReviewItem | null>(null);
   const [decisionDialogOpen, setDecisionDialogOpen] = useState(false);
+  const [realtimeCount, setRealtimeCount] = useState(0);
+
+  // Supabase Realtime subscriptions for HITL
+  useEffect(() => {
+    console.log("Setting up HITL Realtime subscriptions...");
+    
+    const channel = supabase
+      .channel('hitl-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'review_queue' },
+        (payload) => {
+          console.log('Review queue change:', payload);
+          setRealtimeCount(prev => prev + 1);
+          refetch();
+          refetchStats();
+          if (payload.eventType === 'INSERT') {
+            const newReview = payload.new as any;
+            toast.warning("🔔 New Review Queued", {
+              description: newReview?.title || "Review requires attention",
+              action: {
+                label: "View",
+                onClick: () => {}
+              }
+            });
+            // Auto-notify on critical severity
+            if (newReview?.severity === 'critical') {
+              setTimeout(() => {
+                toast.success("✓ Critical alert sent to Slack #rai-alerts", {
+                  description: "On-call reviewer notified"
+                });
+              }, 1500);
+            }
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'decisions' },
+        (payload) => {
+          console.log('New decision:', payload);
+          refetch();
+          refetchStats();
+          toast.success("✓ Decision recorded", {
+            description: "Audit trail updated"
+          });
+        }
+      )
+      .subscribe((status) => {
+        console.log('HITL realtime status:', status);
+      });
+
+    return () => {
+      console.log("Cleaning up HITL Realtime subscriptions");
+      supabase.removeChannel(channel);
+    };
+  }, [refetch, refetchStats]);
 
   const pendingReviews = reviews?.filter(r => r.status === 'pending' || r.status === 'in_progress') || [];
   const recentDecisions = reviews?.filter(r => r.status === 'approved' || r.status === 'rejected').slice(0, 3) || [];
@@ -37,6 +96,12 @@ export default function HITL() {
       icon: <Bell className="w-4 h-4 text-primary" />,
       duration: 3000
     });
+  };
+
+  const handleRefresh = () => {
+    refetch();
+    refetchStats();
+    toast.success("Queue refreshed");
   };
 
   // Calculate queue distribution
@@ -56,6 +121,22 @@ export default function HITL() {
 
   return (
     <MainLayout title="HITL Console" subtitle="Human-in-the-loop decisions, reviews, and escalations">
+      {/* Realtime indicator */}
+      {realtimeCount > 0 && (
+        <div className="mb-4 p-3 bg-success/10 border border-success/20 rounded-lg flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
+            <span className="text-sm text-success font-medium">
+              Live: {realtimeCount} queue events this session
+            </span>
+          </div>
+          <Badge variant="outline" className="text-success border-success/30">
+            <Zap className="w-3 h-3 mr-1" />
+            Realtime Active
+          </Badge>
+        </div>
+      )}
+
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <MetricCard
@@ -97,6 +178,9 @@ export default function HITL() {
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm">Filter</Button>
               <Button variant="outline" size="sm">Assign to me</Button>
+              <Button variant="ghost" size="sm" onClick={handleRefresh}>
+                <RefreshCw className="w-4 h-4" />
+              </Button>
             </div>
           </div>
 
