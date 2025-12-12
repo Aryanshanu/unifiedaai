@@ -1,492 +1,304 @@
-import { useState, useEffect, useRef } from "react";
-import { MainLayout } from "@/components/layout/MainLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useMemo } from 'react';
+import { MainLayout } from '@/components/layout/MainLayout';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Activity, 
-  Zap, 
-  Filter, 
+  Search, 
+  Pause, 
+  Play, 
   Trash2, 
   Download,
-  Pause,
-  Play,
-  Search,
-  ArrowUp,
-  ArrowDown,
+  Filter,
+  Clock,
   CheckCircle,
   XCircle,
-  AlertTriangle,
-  Shield,
+  Loader2,
+  Globe,
   Database,
-  Cpu,
-  Clock,
-  Terminal
-} from "lucide-react";
-import { format } from "date-fns";
+  MousePointer,
+  Navigation,
+  AlertTriangle,
+  MessageSquare
+} from 'lucide-react';
+import { useActivityLogs } from '@/hooks/useActivityLogs';
+import { ActivityLog } from '@/lib/activity-logger';
+import { format } from 'date-fns';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
-interface LogEntry {
-  id: string;
-  timestamp: Date;
-  type: 'action' | 'response' | 'error' | 'system' | 'security' | 'evaluation';
-  source: string;
-  message: string;
-  details?: Record<string, unknown>;
-  status?: 'success' | 'error' | 'warning' | 'info';
-  latency?: number;
-}
+const typeIcons: Record<string, React.ReactNode> = {
+  action: <MousePointer className="h-4 w-4" />,
+  response: <MessageSquare className="h-4 w-4" />,
+  error: <AlertTriangle className="h-4 w-4" />,
+  navigation: <Navigation className="h-4 w-4" />,
+  api_call: <Globe className="h-4 w-4" />,
+  db_change: <Database className="h-4 w-4" />,
+  user_input: <MousePointer className="h-4 w-4" />,
+};
 
-interface TelemetryMetric {
-  label: string;
-  value: number;
-  unit: string;
-  trend: 'up' | 'down' | 'stable';
-  color: string;
+const typeColors: Record<string, string> = {
+  action: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+  response: 'bg-green-500/20 text-green-400 border-green-500/30',
+  error: 'bg-red-500/20 text-red-400 border-red-500/30',
+  navigation: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+  api_call: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+  db_change: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
+  user_input: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+};
+
+const statusIcons: Record<string, React.ReactNode> = {
+  pending: <Loader2 className="h-3 w-3 animate-spin text-yellow-400" />,
+  success: <CheckCircle className="h-3 w-3 text-green-400" />,
+  error: <XCircle className="h-3 w-3 text-red-400" />,
+};
+
+function LogEntry({ log }: { log: ActivityLog }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div 
+      className="border-b border-border/50 py-2 px-3 hover:bg-muted/30 cursor-pointer transition-colors"
+      onClick={() => setExpanded(!expanded)}
+    >
+      <div className="flex items-center gap-3">
+        <span className="text-xs text-muted-foreground font-mono w-20 shrink-0">
+          {format(new Date(log.timestamp), 'HH:mm:ss.SSS')}
+        </span>
+
+        <div className="w-4 shrink-0">
+          {statusIcons[log.status]}
+        </div>
+
+        <Badge variant="outline" className={`${typeColors[log.type]} text-xs px-2 py-0 shrink-0`}>
+          <span className="mr-1">{typeIcons[log.type]}</span>
+          {log.type.replace('_', ' ')}
+        </Badge>
+
+        <span className="text-xs text-muted-foreground w-20 shrink-0 truncate">
+          {log.category}
+        </span>
+
+        <span className="text-sm flex-1 truncate">
+          {log.action}
+        </span>
+
+        {log.duration !== undefined && (
+          <span className="text-xs text-muted-foreground shrink-0">
+            {log.duration}ms
+          </span>
+        )}
+      </div>
+
+      {expanded && Object.keys(log.details).length > 0 && (
+        <div className="mt-2 ml-24 p-2 bg-muted/50 rounded text-xs font-mono overflow-x-auto">
+          <pre className="whitespace-pre-wrap break-all">
+            {JSON.stringify(log.details, null, 2)}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function LiveLogs() {
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [isPaused, setIsPaused] = useState(false);
-  const [filter, setFilter] = useState("");
-  const [activeTab, setActiveTab] = useState("all");
-  const [metrics, setMetrics] = useState<TelemetryMetric[]>([
-    { label: "Requests/min", value: 0, unit: "req", trend: "stable", color: "text-primary" },
-    { label: "Avg Latency", value: 0, unit: "ms", trend: "stable", color: "text-yellow-500" },
-    { label: "Error Rate", value: 0, unit: "%", trend: "stable", color: "text-red-500" },
-    { label: "Block Rate", value: 0, unit: "%", trend: "stable", color: "text-orange-500" },
-  ]);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [autoScroll, setAutoScroll] = useState(true);
+  const { logs, isPaused, clearLogs, togglePause } = useActivityLogs();
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  // Add a new log entry
-  const addLog = (entry: Omit<LogEntry, 'id' | 'timestamp'>) => {
-    if (isPaused) return;
-    
-    const newLog: LogEntry = {
-      ...entry,
-      id: crypto.randomUUID(),
-      timestamp: new Date(),
-    };
-    
-    setLogs(prev => {
-      const updated = [...prev, newLog];
-      // Keep only last 500 logs
-      return updated.slice(-500);
-    });
-  };
-
-  // Subscribe to real-time events
-  useEffect(() => {
-    // Log initial connection
-    addLog({
-      type: 'system',
-      source: 'Telemetry',
-      message: 'Live telemetry stream connected',
-      status: 'success'
-    });
-
-    // Subscribe to request_logs
-    const requestLogsChannel = supabase
-      .channel('live-logs-requests')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'request_logs' },
-        (payload) => {
-          const log = payload.new as Record<string, unknown>;
-          addLog({
-            type: log.decision === 'BLOCK' ? 'security' : 'action',
-            source: 'AI Gateway',
-            message: `Request ${log.decision}: ${log.status_code || 'N/A'}`,
-            details: {
-              decision: log.decision,
-              latency: log.latency_ms,
-              trace_id: log.trace_id,
-              engine_scores: log.engine_scores
-            },
-            status: log.decision === 'ALLOW' ? 'success' : log.decision === 'BLOCK' ? 'error' : 'warning',
-            latency: log.latency_ms as number
-          });
-        }
-      )
-      .subscribe();
-
-    // Subscribe to drift_alerts
-    const driftChannel = supabase
-      .channel('live-logs-drift')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'drift_alerts' },
-        (payload) => {
-          const alert = payload.new as Record<string, unknown>;
-          addLog({
-            type: 'system',
-            source: 'Drift Detection',
-            message: `Drift detected: ${alert.drift_type} on ${alert.feature}`,
-            details: { drift_value: alert.drift_value, severity: alert.severity },
-            status: alert.severity === 'critical' ? 'error' : 'warning'
-          });
-        }
-      )
-      .subscribe();
-
-    // Subscribe to incidents
-    const incidentChannel = supabase
-      .channel('live-logs-incidents')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'incidents' },
-        (payload) => {
-          const incident = payload.new as Record<string, unknown>;
-          addLog({
-            type: 'error',
-            source: 'Incident Manager',
-            message: `New incident: ${incident.title}`,
-            details: { severity: incident.severity, type: incident.incident_type },
-            status: 'error'
-          });
-        }
-      )
-      .subscribe();
-
-    // Subscribe to review_queue
-    const reviewChannel = supabase
-      .channel('live-logs-reviews')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'review_queue' },
-        (payload) => {
-          const review = payload.new as Record<string, unknown>;
-          const eventType = payload.eventType;
-          addLog({
-            type: 'action',
-            source: 'HITL Queue',
-            message: `Review ${eventType}: ${review?.title || 'Unknown'}`,
-            details: { status: review?.status, severity: review?.severity },
-            status: eventType === 'DELETE' ? 'success' : 'info'
-          });
-        }
-      )
-      .subscribe();
-
-    // Subscribe to evaluation_runs
-    const evalChannel = supabase
-      .channel('live-logs-evals')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'evaluation_runs' },
-        (payload) => {
-          const run = payload.new as Record<string, unknown>;
-          addLog({
-            type: 'evaluation',
-            source: `${run?.engine_type || 'RAI'} Engine`,
-            message: `Evaluation ${run?.status}: Score ${run?.overall_score || 'N/A'}%`,
-            details: { 
-              engine: run?.engine_type, 
-              score: run?.overall_score,
-              fairness: run?.fairness_score,
-              privacy: run?.privacy_score
-            },
-            status: (run?.overall_score as number) >= 70 ? 'success' : 'warning'
-          });
-        }
-      )
-      .subscribe();
-
-    // Fetch metrics periodically
-    const metricsInterval = setInterval(async () => {
-      const since = new Date();
-      since.setMinutes(since.getMinutes() - 1);
-      
-      const { data: recentLogs } = await supabase
-        .from('request_logs')
-        .select('decision, latency_ms, status_code')
-        .gte('created_at', since.toISOString());
-      
-      if (recentLogs) {
-        const total = recentLogs.length;
-        const errors = recentLogs.filter(l => (l.status_code || 0) >= 400).length;
-        const blocks = recentLogs.filter(l => l.decision === 'BLOCK').length;
-        const avgLatency = total > 0 
-          ? recentLogs.reduce((a, b) => a + (b.latency_ms || 0), 0) / total 
-          : 0;
-        
-        setMetrics([
-          { 
-            label: "Requests/min", 
-            value: total, 
-            unit: "req", 
-            trend: total > 10 ? 'up' : 'stable',
-            color: "text-primary" 
-          },
-          { 
-            label: "Avg Latency", 
-            value: Math.round(avgLatency), 
-            unit: "ms", 
-            trend: avgLatency > 1000 ? 'up' : 'stable',
-            color: avgLatency > 2000 ? "text-red-500" : "text-yellow-500" 
-          },
-          { 
-            label: "Error Rate", 
-            value: total > 0 ? Math.round((errors / total) * 100) : 0, 
-            unit: "%", 
-            trend: errors > 0 ? 'up' : 'stable',
-            color: "text-red-500" 
-          },
-          { 
-            label: "Block Rate", 
-            value: total > 0 ? Math.round((blocks / total) * 100) : 0, 
-            unit: "%", 
-            trend: blocks > 0 ? 'up' : 'stable',
-            color: "text-orange-500" 
-          },
-        ]);
+  const filteredLogs = useMemo(() => {
+    return logs.filter(log => {
+      if (search) {
+        const searchLower = search.toLowerCase();
+        const matchesSearch = 
+          log.action.toLowerCase().includes(searchLower) ||
+          log.category.toLowerCase().includes(searchLower) ||
+          JSON.stringify(log.details).toLowerCase().includes(searchLower);
+        if (!matchesSearch) return false;
       }
-    }, 5000);
 
-    return () => {
-      supabase.removeChannel(requestLogsChannel);
-      supabase.removeChannel(driftChannel);
-      supabase.removeChannel(incidentChannel);
-      supabase.removeChannel(reviewChannel);
-      supabase.removeChannel(evalChannel);
-      clearInterval(metricsInterval);
-    };
-  }, [isPaused]);
+      if (typeFilter !== 'all' && log.type !== typeFilter) return false;
+      if (statusFilter !== 'all' && log.status !== statusFilter) return false;
 
-  // Auto-scroll to bottom
-  useEffect(() => {
-    if (autoScroll && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [logs, autoScroll]);
-
-  const getTypeIcon = (type: LogEntry['type']) => {
-    switch (type) {
-      case 'action': return <Zap className="h-3.5 w-3.5 text-blue-400" />;
-      case 'response': return <Database className="h-3.5 w-3.5 text-green-400" />;
-      case 'error': return <XCircle className="h-3.5 w-3.5 text-red-400" />;
-      case 'system': return <Cpu className="h-3.5 w-3.5 text-purple-400" />;
-      case 'security': return <Shield className="h-3.5 w-3.5 text-orange-400" />;
-      case 'evaluation': return <Activity className="h-3.5 w-3.5 text-cyan-400" />;
-      default: return <Terminal className="h-3.5 w-3.5 text-muted-foreground" />;
-    }
-  };
-
-  const getStatusBadge = (status?: LogEntry['status']) => {
-    switch (status) {
-      case 'success': return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">OK</Badge>;
-      case 'error': return <Badge className="bg-red-500/20 text-red-400 border-red-500/30">ERR</Badge>;
-      case 'warning': return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">WARN</Badge>;
-      default: return <Badge variant="outline" className="text-muted-foreground">INFO</Badge>;
-    }
-  };
-
-  const filteredLogs = logs.filter(log => {
-    const matchesFilter = !filter || 
-      log.message.toLowerCase().includes(filter.toLowerCase()) ||
-      log.source.toLowerCase().includes(filter.toLowerCase());
-    
-    const matchesTab = activeTab === 'all' || log.type === activeTab;
-    
-    return matchesFilter && matchesTab;
-  });
-
-  const clearLogs = () => {
-    setLogs([]);
-    addLog({
-      type: 'system',
-      source: 'Telemetry',
-      message: 'Logs cleared',
-      status: 'info'
+      return true;
     });
-  };
+  }, [logs, search, typeFilter, statusFilter]);
+
+  const stats = useMemo(() => {
+    const now = Date.now();
+    const last5Min = logs.filter(l => now - new Date(l.timestamp).getTime() < 5 * 60 * 1000);
+    
+    return {
+      total: logs.length,
+      errors: logs.filter(l => l.status === 'error').length,
+      apiCalls: logs.filter(l => l.type === 'api_call').length,
+      last5Min: last5Min.length,
+    };
+  }, [logs]);
 
   const exportLogs = () => {
-    const data = JSON.stringify(logs, null, 2);
+    const data = JSON.stringify(filteredLogs, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `fractal-logs-${format(new Date(), 'yyyy-MM-dd-HH-mm')}.json`;
+    a.download = `activity-logs-${format(new Date(), 'yyyy-MM-dd-HH-mm')}.json`;
     a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
     <MainLayout title="Live Logs & Telemetry">
       <div className="space-y-4">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Live Logs & Telemetry</h1>
-            <p className="text-muted-foreground text-sm">Real-time system activity and performance monitoring</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className={isPaused ? "bg-yellow-500/20 text-yellow-400" : "bg-green-500/20 text-green-400"}>
-              {isPaused ? "Paused" : "Live"}
-            </Badge>
-            <span className="text-xs text-muted-foreground">{logs.length} entries</span>
-          </div>
+        <div className="grid grid-cols-4 gap-4">
+          <Card className="bg-card/50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <Activity className="h-4 w-4 text-primary" />
+                <span className="text-sm text-muted-foreground">Total Events</span>
+              </div>
+              <p className="text-2xl font-bold mt-1">{stats.total}</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-card/50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <Globe className="h-4 w-4 text-orange-400" />
+                <span className="text-sm text-muted-foreground">API Calls</span>
+              </div>
+              <p className="text-2xl font-bold mt-1">{stats.apiCalls}</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-card/50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-red-400" />
+                <span className="text-sm text-muted-foreground">Errors</span>
+              </div>
+              <p className="text-2xl font-bold mt-1">{stats.errors}</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-card/50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-green-400" />
+                <span className="text-sm text-muted-foreground">Last 5 min</span>
+              </div>
+              <p className="text-2xl font-bold mt-1">{stats.last5Min}</p>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Telemetry Metrics */}
-        <div className="grid grid-cols-4 gap-3">
-          {metrics.map((metric, i) => (
-            <Card key={i} className="bg-card/50 border-border/50">
-              <CardContent className="p-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">{metric.label}</span>
-                  {metric.trend === 'up' && <ArrowUp className="h-3 w-3 text-red-400" />}
-                  {metric.trend === 'down' && <ArrowDown className="h-3 w-3 text-green-400" />}
-                </div>
-                <div className={`text-xl font-bold ${metric.color}`}>
-                  {metric.value}
-                  <span className="text-xs font-normal text-muted-foreground ml-1">{metric.unit}</span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Main Log Panel */}
-        <Card className="border-border/50">
-          <CardHeader className="pb-2 border-b border-border/50">
+        <Card className="bg-card/50">
+          <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Terminal className="h-4 w-4 text-primary" />
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5 text-primary" />
                 Activity Stream
+                {!isPaused && (
+                  <span className="ml-2 h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                )}
               </CardTitle>
               <div className="flex items-center gap-2">
-                {/* Filter Input */}
-                <div className="relative">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                  <Input
-                    placeholder="Filter logs..."
-                    value={filter}
-                    onChange={(e) => setFilter(e.target.value)}
-                    className="h-7 w-48 pl-7 text-xs"
-                  />
-                </div>
-                
-                {/* Controls */}
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="h-7"
-                  onClick={() => setIsPaused(!isPaused)}
+                  onClick={togglePause}
+                  className={isPaused ? 'text-yellow-400' : ''}
                 >
-                  {isPaused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+                  {isPaused ? <Play className="h-4 w-4 mr-1" /> : <Pause className="h-4 w-4 mr-1" />}
+                  {isPaused ? 'Resume' : 'Pause'}
                 </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-7"
-                  onClick={() => setAutoScroll(!autoScroll)}
-                >
-                  <ArrowDown className={`h-3.5 w-3.5 ${autoScroll ? 'text-primary' : ''}`} />
+                <Button variant="outline" size="sm" onClick={clearLogs}>
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Clear
                 </Button>
-                <Button variant="outline" size="sm" className="h-7" onClick={clearLogs}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-                <Button variant="outline" size="sm" className="h-7" onClick={exportLogs}>
-                  <Download className="h-3.5 w-3.5" />
+                <Button variant="outline" size="sm" onClick={exportLogs}>
+                  <Download className="h-4 w-4 mr-1" />
+                  Export
                 </Button>
               </div>
             </div>
-
-            {/* Type Tabs */}
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-2">
-              <TabsList className="h-7 bg-muted/50">
-                <TabsTrigger value="all" className="text-xs h-6 px-2">All</TabsTrigger>
-                <TabsTrigger value="action" className="text-xs h-6 px-2">Actions</TabsTrigger>
-                <TabsTrigger value="security" className="text-xs h-6 px-2">Security</TabsTrigger>
-                <TabsTrigger value="evaluation" className="text-xs h-6 px-2">Evaluations</TabsTrigger>
-                <TabsTrigger value="error" className="text-xs h-6 px-2">Errors</TabsTrigger>
-                <TabsTrigger value="system" className="text-xs h-6 px-2">System</TabsTrigger>
-              </TabsList>
-            </Tabs>
           </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search logs..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-40">
+                  <Filter className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="action">Action</SelectItem>
+                  <SelectItem value="response">Response</SelectItem>
+                  <SelectItem value="error">Error</SelectItem>
+                  <SelectItem value="navigation">Navigation</SelectItem>
+                  <SelectItem value="api_call">API Call</SelectItem>
+                  <SelectItem value="db_change">DB Change</SelectItem>
+                  <SelectItem value="user_input">User Input</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="success">Success</SelectItem>
+                  <SelectItem value="error">Error</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-          <CardContent className="p-0">
-            <ScrollArea className="h-[500px]" ref={scrollRef}>
-              <div className="font-mono text-xs">
+            <div className="border rounded-lg bg-background/50">
+              <div className="flex items-center gap-3 px-3 py-2 border-b bg-muted/30 text-xs text-muted-foreground font-medium">
+                <span className="w-20">Time</span>
+                <span className="w-4"></span>
+                <span className="w-24">Type</span>
+                <span className="w-20">Category</span>
+                <span className="flex-1">Action</span>
+                <span className="w-16 text-right">Duration</span>
+              </div>
+
+              <ScrollArea className="h-[500px]">
                 {filteredLogs.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                    <Terminal className="h-8 w-8 mb-2 opacity-50" />
-                    <p>No logs yet. Activity will appear here in real-time.</p>
+                    <Activity className="h-12 w-12 mb-4 opacity-20" />
+                    <p>No activity logs yet</p>
+                    <p className="text-sm">Interact with the platform to see logs here</p>
                   </div>
                 ) : (
                   filteredLogs.map((log) => (
-                    <div 
-                      key={log.id} 
-                      className="flex items-start gap-3 px-4 py-2 border-b border-border/30 hover:bg-muted/30 transition-colors"
-                    >
-                      {/* Timestamp */}
-                      <span className="text-muted-foreground shrink-0 w-20">
-                        {format(log.timestamp, 'HH:mm:ss.SSS')}
-                      </span>
-                      
-                      {/* Type Icon */}
-                      <div className="shrink-0 mt-0.5">
-                        {getTypeIcon(log.type)}
-                      </div>
-                      
-                      {/* Source */}
-                      <span className="text-primary shrink-0 w-28 truncate">
-                        [{log.source}]
-                      </span>
-                      
-                      {/* Message */}
-                      <span className="flex-1 text-foreground">
-                        {log.message}
-                      </span>
-                      
-                      {/* Latency */}
-                      {log.latency && (
-                        <span className="text-muted-foreground shrink-0 flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {log.latency}ms
-                        </span>
-                      )}
-                      
-                      {/* Status Badge */}
-                      <div className="shrink-0">
-                        {getStatusBadge(log.status)}
-                      </div>
-                    </div>
+                    <LogEntry key={log.id} log={log} />
                   ))
                 )}
-              </div>
-            </ScrollArea>
+              </ScrollArea>
+            </div>
+
+            <p className="text-xs text-muted-foreground mt-2">
+              Showing {filteredLogs.length} of {logs.length} events
+            </p>
           </CardContent>
         </Card>
-
-        {/* Legend */}
-        <div className="flex items-center justify-center gap-6 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1.5">
-            <Zap className="h-3 w-3 text-blue-400" />
-            <span>Action</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Shield className="h-3 w-3 text-orange-400" />
-            <span>Security</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Activity className="h-3 w-3 text-cyan-400" />
-            <span>Evaluation</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <XCircle className="h-3 w-3 text-red-400" />
-            <span>Error</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Cpu className="h-3 w-3 text-purple-400" />
-            <span>System</span>
-          </div>
-        </div>
       </div>
     </MainLayout>
   );
