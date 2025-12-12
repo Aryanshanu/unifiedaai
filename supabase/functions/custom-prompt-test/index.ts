@@ -118,21 +118,48 @@ async function callLovableAI(systemPrompt: string, userPrompt: string): Promise<
 async function callTargetModel(endpoint: string, apiToken: string, prompt: string): Promise<string> {
   console.log("Calling target model at:", endpoint);
   
-  // Detect endpoint type and format request accordingly
-  const isOpenRouter = endpoint.includes("openrouter.ai");
-  const isHuggingFace = endpoint.includes("huggingface.co") || endpoint.includes("api-inference.huggingface.co");
+  // Normalize endpoint - handle cases where user enters just a model name
+  let normalizedEndpoint = endpoint.trim();
   
-  let requestUrl = endpoint;
+  // If endpoint doesn't start with http, try to detect and fix it
+  if (!normalizedEndpoint.startsWith("http")) {
+    // Check if it looks like an OpenRouter model ID (e.g., "deepseek-ai/DeepSeek-V3")
+    if (normalizedEndpoint.includes("/") && !normalizedEndpoint.includes(".")) {
+      console.log("Detected OpenRouter model ID format, converting to API endpoint");
+      normalizedEndpoint = `openrouter:${normalizedEndpoint}`;
+    } else if (normalizedEndpoint.includes("huggingface") || normalizedEndpoint.includes("hf.co")) {
+      // Handle partial HuggingFace URLs
+      normalizedEndpoint = `https://${normalizedEndpoint}`;
+    } else {
+      // Assume it's a HuggingFace model ID
+      console.log("Detected HuggingFace model ID format, converting to API endpoint");
+      normalizedEndpoint = `https://api-inference.huggingface.co/models/${normalizedEndpoint}`;
+    }
+  }
+  
+  // Detect endpoint type and format request accordingly
+  const isOpenRouter = normalizedEndpoint.includes("openrouter.ai") || normalizedEndpoint.startsWith("openrouter:");
+  const isHuggingFace = normalizedEndpoint.includes("huggingface.co") || normalizedEndpoint.includes("api-inference.huggingface.co");
+  const isOpenAI = normalizedEndpoint.includes("api.openai.com");
+  const isAnthropic = normalizedEndpoint.includes("api.anthropic.com");
+  
+  let requestUrl = normalizedEndpoint;
   let requestBody: any;
   let requestHeaders: Record<string, string> = {
     "Content-Type": "application/json",
   };
 
-  if (isOpenRouter) {
+  if (isOpenRouter || normalizedEndpoint.startsWith("openrouter:")) {
     // OpenRouter uses OpenAI-compatible format
     // Extract model ID from URL like https://openrouter.ai/meta-llama/llama-3.3-70b-instruct:free
-    const modelMatch = endpoint.match(/openrouter\.ai\/(.+)$/);
-    const modelId = modelMatch ? modelMatch[1] : "meta-llama/llama-3.3-70b-instruct:free";
+    // Or from openrouter:model-id format
+    let modelId: string;
+    if (normalizedEndpoint.startsWith("openrouter:")) {
+      modelId = normalizedEndpoint.replace("openrouter:", "");
+    } else {
+      const modelMatch = normalizedEndpoint.match(/openrouter\.ai\/(.+)$/);
+      modelId = modelMatch ? modelMatch[1] : "meta-llama/llama-3.3-70b-instruct:free";
+    }
     
     requestUrl = "https://openrouter.ai/api/v1/chat/completions";
     requestHeaders["Authorization"] = `Bearer ${apiToken}`;
@@ -153,6 +180,26 @@ async function callTargetModel(endpoint: string, apiToken: string, prompt: strin
       parameters: { max_new_tokens: 500, temperature: 0.7 },
     };
     console.log("Using HuggingFace format");
+  } else if (isOpenAI) {
+    // OpenAI API format
+    requestHeaders["Authorization"] = `Bearer ${apiToken}`;
+    requestBody = {
+      model: "gpt-4",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 500,
+      temperature: 0.7,
+    };
+    console.log("Using OpenAI format");
+  } else if (isAnthropic) {
+    // Anthropic API format
+    requestHeaders["x-api-key"] = apiToken;
+    requestHeaders["anthropic-version"] = "2023-06-01";
+    requestBody = {
+      model: "claude-3-sonnet-20240229",
+      max_tokens: 500,
+      messages: [{ role: "user", content: prompt }],
+    };
+    console.log("Using Anthropic format");
   } else {
     // Default: try OpenAI-compatible format
     requestHeaders["Authorization"] = `Bearer ${apiToken}`;
