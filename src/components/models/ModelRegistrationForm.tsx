@@ -12,8 +12,9 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { useCreateModel } from "@/hooks/useModels";
 import { useProjects } from "@/hooks/useProjects";
 import { toast } from "sonner";
-import { Loader2, ChevronRight, ChevronLeft, Check, Brain, Server, Settings, FileCheck, FolderOpen, Shield, Scale, ExternalLink } from "lucide-react";
+import { Loader2, ChevronRight, ChevronLeft, Check, Brain, Server, Settings, FileCheck, FolderOpen, Shield, Scale, ExternalLink, Eye, EyeOff, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { validateEndpoint, validateApiKey, getEndpointHint, getApiKeyHint } from "@/lib/endpoint-validation";
 
 const modelSchema = z.object({
   name: z.string().min(2, "Model name must be at least 2 characters"),
@@ -86,6 +87,9 @@ const useCases = [
 
 export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: ModelRegistrationFormProps) {
   const [step, setStep] = useState(defaultProjectId ? 2 : 1);
+  const [showApiToken, setShowApiToken] = useState(false);
+  const [endpointWarning, setEndpointWarning] = useState<string | null>(null);
+  const [apiKeyWarning, setApiKeyWarning] = useState<string | null>(null);
   const navigate = useNavigate();
   const createModel = useCreateModel();
   const { data: projects, isLoading: projectsLoading } = useProjects();
@@ -448,11 +452,30 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                     <FormItem>
                       <FormLabel>API Endpoint</FormLabel>
                       <FormControl>
-                        <Input placeholder="https://api.example.com/v1/model" {...field} />
+                        <Input 
+                          placeholder={getEndpointHint(formValues.provider || "")} 
+                          {...field}
+                          onBlur={(e) => {
+                            field.onBlur();
+                            const result = validateEndpoint(e.target.value, formValues.provider);
+                            if (!result.isValid && result.error) {
+                              setEndpointWarning(result.warning || result.error);
+                            } else {
+                              setEndpointWarning(null);
+                            }
+                          }}
+                        />
                       </FormControl>
                       <FormDescription>
-                        The API endpoint for running evaluations (optional).
+                        The API endpoint for running evaluations. 
+                        {formValues.provider === "Hugging Face" && " Use the Inference API URL, not the model page URL."}
                       </FormDescription>
+                      {endpointWarning && (
+                        <div className="flex items-start gap-2 p-2 bg-warning/10 border border-warning/20 rounded text-sm">
+                          <AlertTriangle className="w-4 h-4 text-warning mt-0.5 flex-shrink-0" />
+                          <span className="text-warning">{endpointWarning}</span>
+                        </div>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
@@ -464,16 +487,43 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>API Token</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="password" 
-                          placeholder="sk_live_..." 
-                          {...field} 
-                        />
-                      </FormControl>
+                      <div className="relative">
+                        <FormControl>
+                          <Input 
+                            type={showApiToken ? "text" : "password"}
+                            placeholder={getApiKeyHint(formValues.provider || "")}
+                            className="pr-10"
+                            {...field}
+                            onBlur={(e) => {
+                              field.onBlur();
+                              const result = validateApiKey(e.target.value, formValues.provider);
+                              if (!result.isValid && result.error) {
+                                setApiKeyWarning(result.warning || result.error);
+                              } else {
+                                setApiKeyWarning(null);
+                              }
+                            }}
+                          />
+                        </FormControl>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground"
+                          onClick={() => setShowApiToken(!showApiToken)}
+                        >
+                          {showApiToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </Button>
+                      </div>
                       <FormDescription>
                         Authentication token for the API endpoint. Required if your endpoint needs authentication.
                       </FormDescription>
+                      {apiKeyWarning && (
+                        <div className="flex items-start gap-2 p-2 bg-warning/10 border border-warning/20 rounded text-sm">
+                          <AlertTriangle className="w-4 h-4 text-warning mt-0.5 flex-shrink-0" />
+                          <span className="text-warning">{apiKeyWarning}</span>
+                        </div>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}

@@ -10,6 +10,9 @@ import { useProject } from "@/hooks/useProjects";
 import { useSystems } from "@/hooks/useSystems";
 import { SystemCard } from "@/components/registry/SystemCard";
 import { ProjectModelsTab } from "@/components/project/ProjectModelsTab";
+import { ProjectRiskTab } from "@/components/project/ProjectRiskTab";
+import { ProjectActivityTab } from "@/components/project/ProjectActivityTab";
+import { ProjectDocumentationTab } from "@/components/project/ProjectDocumentationTab";
 import { ModelRegistrationForm } from "@/components/models/ModelRegistrationForm";
 import { 
   ArrowLeft, Plus, FolderOpen, Server, Shield, Database, 
@@ -276,54 +279,15 @@ export default function ProjectDetail() {
           </TabsContent>
 
           <TabsContent value="risk">
-            <Card>
-              <CardHeader>
-                <CardTitle>Risk Assessment</CardTitle>
-                <CardDescription>
-                  Static and runtime risk analysis for this project
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold">Risk Assessment Coming Soon</h3>
-                <p className="text-muted-foreground mt-2 max-w-md">
-                  The Risk Assessment Engine will be available in Phase 2 of development.
-                </p>
-              </CardContent>
-            </Card>
+            {id && <ProjectRiskTab projectId={id} />}
           </TabsContent>
 
           <TabsContent value="activity">
-            <Card>
-              <CardHeader>
-                <CardTitle>Activity Log</CardTitle>
-                <CardDescription>
-                  Recent changes and events for this project
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                <Activity className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">No activity recorded yet</p>
-              </CardContent>
-            </Card>
+            {id && <ProjectActivityTab projectId={id} />}
           </TabsContent>
 
           <TabsContent value="docs">
-            <Card>
-              <CardHeader>
-                <CardTitle>Documentation</CardTitle>
-                <CardDescription>
-                  Project documentation and compliance artifacts
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold">Documentation Generation Coming Soon</h3>
-                <p className="text-muted-foreground mt-2 max-w-md">
-                  Auto-generated documentation, model cards, and compliance reports will be available in Phase 4.
-                </p>
-              </CardContent>
-            </Card>
+            {id && <ProjectDocumentationTab projectId={id} />}
           </TabsContent>
         </Tabs>
       </div>
