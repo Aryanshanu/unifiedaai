@@ -370,7 +370,13 @@ export default function FairnessEngine() {
           {/* Raw Data Log */}
           {rawLogs.length > 0 && (
             <div className="mb-6">
-              <RawDataLog logs={rawLogs} />
+              <RawDataLog logs={rawLogs.map((log, idx) => ({
+                id: `log-${idx}`,
+                timestamp: new Date().toISOString(),
+                type: 'computation' as const,
+                data: log,
+                metadata: log.demographic ? { demographic: log.demographic } : undefined
+              }))} />
             </div>
           )}
 
