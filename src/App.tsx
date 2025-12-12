@@ -33,6 +33,7 @@ import GoldenDemo from "./pages/GoldenDemo";
 import RunTests from "./pages/RunTests";
 import GapsClosed from "./pages/GapsClosed";
 import Architecture from "./pages/Architecture";
+import LiveLogs from "./pages/LiveLogs";
 import NotFound from "./pages/NotFound";
 import { GlobalBanner } from "./components/layout/GlobalBanner";
 
@@ -69,6 +70,7 @@ const App = () => (
             <Route path="/lineage" element={<ProtectedRoute><Lineage /></ProtectedRoute>} />
             {/* Monitoring */}
             <Route path="/observability" element={<ProtectedRoute><Observability /></ProtectedRoute>} />
+            <Route path="/live-logs" element={<ProtectedRoute><LiveLogs /></ProtectedRoute>} />
             <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
             <Route path="/evaluation" element={<ProtectedRoute><Evaluation /></ProtectedRoute>} />
             {/* Core RAI Engines */}

@@ -25,6 +25,7 @@ import {
   BookOpen,
   Play,
   FlaskConical,
+  Terminal,
 } from "lucide-react";
 
 const navItems = [
@@ -39,6 +40,7 @@ const navItems = [
   { path: "/lineage", icon: GitBranch, label: "Knowledge Graph" },
   { divider: true, label: "Monitoring" },
   { path: "/observability", icon: Activity, label: "Observability" },
+  { path: "/live-logs", icon: Terminal, label: "Live Logs & Telemetry" },
   { path: "/alerts", icon: Bell, label: "Alerts & Notifications" },
   { divider: true, label: "Core RAI Engines" },
   { path: "/engine/fairness", icon: Scale, label: "Fairness Engine" },
