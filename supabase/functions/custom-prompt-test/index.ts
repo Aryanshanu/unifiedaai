@@ -118,8 +118,17 @@ async function callLovableAI(systemPrompt: string, userPrompt: string): Promise<
 async function callTargetModel(endpoint: string, apiToken: string, prompt: string): Promise<string> {
   console.log("Calling target model at:", endpoint);
   
-  // Normalize endpoint - handle cases where user enters just a model name
+  // Normalize endpoint - handle cases where user enters just a model name or wrong URL format
   let normalizedEndpoint = endpoint.trim();
+  
+  // Convert HuggingFace model page URLs to Inference API URLs
+  // e.g., https://huggingface.co/deepseek-ai/DeepSeek-V3 -> https://api-inference.huggingface.co/models/deepseek-ai/DeepSeek-V3
+  const hfModelPageMatch = normalizedEndpoint.match(/^https?:\/\/huggingface\.co\/([^\/]+\/[^\/]+)/);
+  if (hfModelPageMatch) {
+    const modelId = hfModelPageMatch[1];
+    normalizedEndpoint = `https://api-inference.huggingface.co/models/${modelId}`;
+    console.log("Converted HuggingFace model page URL to Inference API:", normalizedEndpoint);
+  }
   
   // If endpoint doesn't start with http, try to detect and fix it
   if (!normalizedEndpoint.startsWith("http")) {
@@ -139,7 +148,7 @@ async function callTargetModel(endpoint: string, apiToken: string, prompt: strin
   
   // Detect endpoint type and format request accordingly
   const isOpenRouter = normalizedEndpoint.includes("openrouter.ai") || normalizedEndpoint.startsWith("openrouter:");
-  const isHuggingFace = normalizedEndpoint.includes("huggingface.co") || normalizedEndpoint.includes("api-inference.huggingface.co");
+  const isHuggingFace = normalizedEndpoint.includes("api-inference.huggingface.co");
   const isOpenAI = normalizedEndpoint.includes("api.openai.com");
   const isAnthropic = normalizedEndpoint.includes("api.anthropic.com");
   
