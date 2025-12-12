@@ -90,6 +90,7 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
   const [showApiToken, setShowApiToken] = useState(false);
   const [endpointWarning, setEndpointWarning] = useState<string | null>(null);
   const [apiKeyWarning, setApiKeyWarning] = useState<string | null>(null);
+  const [suggestedEndpoint, setSuggestedEndpoint] = useState<string | null>(null);
   const navigate = useNavigate();
   const createModel = useCreateModel();
   const { data: projects, isLoading: projectsLoading } = useProjects();
@@ -460,8 +461,15 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                             const result = validateEndpoint(e.target.value, formValues.provider);
                             if (!result.isValid && result.error) {
                               setEndpointWarning(result.warning || result.error);
+                              // Store suggested correction if available
+                              if (result.normalizedEndpoint) {
+                                setSuggestedEndpoint(result.normalizedEndpoint);
+                              } else {
+                                setSuggestedEndpoint(null);
+                              }
                             } else {
                               setEndpointWarning(null);
+                              setSuggestedEndpoint(null);
                             }
                           }}
                         />
@@ -471,9 +479,32 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                         {formValues.provider === "Hugging Face" && " Use the Inference API URL, not the model page URL."}
                       </FormDescription>
                       {endpointWarning && (
-                        <div className="flex items-start gap-2 p-2 bg-warning/10 border border-warning/20 rounded text-sm">
-                          <AlertTriangle className="w-4 h-4 text-warning mt-0.5 flex-shrink-0" />
-                          <span className="text-warning">{endpointWarning}</span>
+                        <div className="flex flex-col gap-2 p-3 bg-warning/10 border border-warning/20 rounded text-sm">
+                          <div className="flex items-start gap-2">
+                            <AlertTriangle className="w-4 h-4 text-warning mt-0.5 flex-shrink-0" />
+                            <span className="text-warning">{endpointWarning}</span>
+                          </div>
+                          {suggestedEndpoint && (
+                            <div className="flex items-center gap-2 mt-1">
+                              <code className="text-xs bg-background/50 px-2 py-1 rounded border border-border flex-1 truncate">
+                                {suggestedEndpoint}
+                              </code>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="shrink-0 text-xs h-7"
+                                onClick={() => {
+                                  field.onChange(suggestedEndpoint);
+                                  setEndpointWarning(null);
+                                  setSuggestedEndpoint(null);
+                                  toast.success("Endpoint auto-corrected");
+                                }}
+                              >
+                                Auto-correct
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       )}
                       <FormMessage />
