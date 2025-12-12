@@ -15,6 +15,7 @@ import { ReasoningChainDisplay } from "@/components/engines/ReasoningChainDispla
 import { CustomPromptTest } from "@/components/engines/CustomPromptTest";
 import { InputOutputScope } from "@/components/engines/InputOutputScope";
 import { ComputationBreakdown } from "@/components/engines/ComputationBreakdown";
+import { RawDataLog } from "@/components/engines/RawDataLog";
 import { EvidencePackage } from "@/components/engines/EvidencePackage";
 import { MetricWeightGrid } from "@/components/engines/MetricWeightGrid";
 import { ComplianceBanner } from "@/components/engines/ComplianceBanner";
@@ -55,6 +56,7 @@ const FORMULA = "0.30×Clarity + 0.30×Faith + 0.20×Coverage + 0.10×Action + 0
 export default function ExplainabilityEngine() {
   const [selectedModelId, setSelectedModelId] = useState<string>("");
   const [computationSteps, setComputationSteps] = useState<any[]>([]);
+  const [rawLogs, setRawLogs] = useState<any[]>([]);
   const [realEvalResult, setRealEvalResult] = useState<any>(null);
   const { data: models, isLoading: modelsLoading, refetch: refetchModels } = useModels();
   const { toast } = useToast();
@@ -106,6 +108,7 @@ export default function ExplainabilityEngine() {
       if (error) throw error;
 
       setComputationSteps(data.computationSteps || []);
+      setRawLogs(data.rawLogs || []);
       setRealEvalResult(data);
 
       queryClient.invalidateQueries({ queryKey: ["explainability-results", selectedModelId] });
@@ -325,12 +328,24 @@ export default function ExplainabilityEngine() {
             </div>
           )}
 
+          {/* Raw Data Log */}
+          {rawLogs.length > 0 && (
+            <div className="mb-6">
+              <RawDataLog logs={rawLogs.map((log, idx) => ({
+                id: `log-${idx}`,
+                timestamp: new Date().toISOString(),
+                type: 'computation' as const,
+                data: log,
+              }))} />
+            </div>
+          )}
+
           {/* Evidence Package */}
           <div className="mb-6">
             <EvidencePackage
               data={{
                 results: realEvalResult?.metricDetails || latestResult?.metric_details,
-                rawLogs: [],
+                rawLogs: rawLogs,
                 modelId: selectedModelId,
                 evaluationType: "explainability",
                 overallScore: overallScore,
