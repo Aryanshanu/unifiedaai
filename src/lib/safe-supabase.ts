@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { logApiError } from './error-logger';
+import { sanitizeErrorMessage } from './ui-helpers';
 import { toast } from 'sonner';
-
 interface SafeQueryOptions {
   showErrorToast?: boolean;
   toastMessage?: string;
@@ -83,28 +83,29 @@ export async function safeInvoke<T = unknown>(
       
       return { data: data as T, error: null };
     } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      
-      // Log the error
-      await logApiError(`edge_function:${functionName}`, error, body);
-      
+      const rawError = err instanceof Error ? err : new Error(String(err));
+      const friendlyError = new Error(sanitizeErrorMessage(rawError.message));
+
+      // Log the raw error (keep technical details out of UI)
+      await logApiError(`edge_function:${functionName}`, rawError, body);
+
       // Retry if not last attempt
       if (attempt < (opts.retries ?? 0)) {
         if (opts.showErrorToast) {
           toast.info('Temporary issue — retrying...', { duration: opts.retryDelay });
         }
-        await new Promise(resolve => setTimeout(resolve, opts.retryDelay));
+        await new Promise((resolve) => setTimeout(resolve, opts.retryDelay));
         continue;
       }
-      
+
       // Last attempt failed
       if (opts.showErrorToast) {
-        toast.error(opts.toastMessage || 'Service temporarily unavailable. Please try again.');
+        toast.error(opts.toastMessage || sanitizeErrorMessage(rawError.message));
       }
-      
-      return { 
-        data: opts.fallbackData as T | null, 
-        error 
+
+      return {
+        data: opts.fallbackData as T | null,
+        error: friendlyError,
       };
     }
   }

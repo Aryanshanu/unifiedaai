@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-
+import { sanitizeErrorMessage } from "@/lib/ui-helpers";
 export interface CustomTestResult {
   success: boolean;
   engine_type: string;
@@ -49,12 +49,18 @@ export function useCustomPromptTest() {
         body: { modelId, engineType, customPrompt },
       });
 
+      const payload = data as any;
+
       if (error) {
-        throw new Error(error.message || "Custom test failed");
+        const maybeMessage =
+          payload && typeof payload === "object" && "error" in payload
+            ? String(payload.error)
+            : error.message;
+        throw new Error(maybeMessage || "Custom test could not be completed");
       }
 
-      if (!data.success) {
-        throw new Error(data.error || "Custom test failed");
+      if (!payload?.success) {
+        throw new Error(payload?.error || "Custom test could not be completed");
       }
 
       const result = data as CustomTestResult;

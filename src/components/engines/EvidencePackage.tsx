@@ -16,6 +16,7 @@ interface WeightedMetrics {
 }
 
 interface EvidencePackageProps {
+  mode?: 'full' | 'download';
   data: {
     results: any;
     rawLogs: any[];
@@ -63,7 +64,7 @@ const HF_MODEL_MAP: Record<string, ModelInfo> = {
   explainability: { id: "Lovable AI (Gemini 2.5 Pro)", version: "latest" },
 };
 
-export function EvidencePackage({ data }: EvidencePackageProps) {
+export function EvidencePackage({ data, mode = 'full' }: EvidencePackageProps) {
   const [downloading, setDownloading] = useState(false);
 
   const engineType = data.evaluationType || "fairness";
@@ -174,6 +175,67 @@ export function EvidencePackage({ data }: EvidencePackageProps) {
     packageSize > 1024
       ? `${(packageSize / 1024).toFixed(1)} KB`
       : `${packageSize} bytes`;
+
+  if (mode === 'download') {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Package className="w-5 h-5 text-primary" />
+            Evidence Package
+            <Badge variant="outline" className="ml-2">
+              <Shield className="w-3 h-3 mr-1" />
+              Tamper-Evident
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {data.overallScore !== undefined && (
+            <div
+              className={`p-3 rounded-lg border ${
+                isCompliant
+                  ? 'bg-success/10 border-success/20'
+                  : 'bg-danger/10 border-danger/20'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {isCompliant ? (
+                    <CheckCircle className="w-5 h-5 text-success" />
+                  ) : (
+                    <AlertTriangle className="w-5 h-5 text-danger" />
+                  )}
+                  <span
+                    className={`font-semibold ${
+                      isCompliant ? 'text-success' : 'text-danger'
+                    }`}
+                  >
+                    {isCompliant ? 'COMPLIANT' : 'NON-COMPLIANT'}
+                  </span>
+                </div>
+                <Badge className={isCompliant ? 'bg-success' : 'bg-danger'}>
+                  {data.overallScore}% / {threshold}%
+                </Badge>
+              </div>
+            </div>
+          )}
+
+          <div className="text-xs text-muted-foreground">
+            Includes SHA-256 integrity hash, model provenance, weighted formula, and raw evaluation logs. Size: {formattedSize}
+          </div>
+
+          <Button
+            onClick={downloadEvidence}
+            disabled={downloading}
+            className="w-full gap-2"
+          >
+            <Download className="w-4 h-4" />
+            {downloading ? 'Generating...' : 'Download Evidence (JSON)'}
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>

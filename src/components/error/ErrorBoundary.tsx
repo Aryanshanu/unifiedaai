@@ -73,10 +73,10 @@ export class ErrorBoundary extends Component<Props, State> {
             {/* Friendly Message */}
             <div className="space-y-2">
               <h1 className="text-2xl font-bold text-foreground">
-                Something went wrong
+                Temporary issue
               </h1>
               <p className="text-muted-foreground">
-                We're fixing it right now. Your data is safe and secure.
+                Auto-recovery in progress. Your data is safe.
               </p>
             </div>
 
