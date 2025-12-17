@@ -160,11 +160,15 @@ function combineVerdicts(engines: EngineScore[]): "ALLOW" | "WARN" | "BLOCK" {
 }
 
 serve(async (req) => {
+  console.log("=== AI-GATEWAY CALLED ===");
+  console.log(`Method: ${req.method}, URL: ${req.url}`);
+  
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   const startTime = Date.now();
+  console.log(`Request started at: ${new Date().toISOString()}`);
 
   try {
     const body = await req.json().catch(() => null);
@@ -332,7 +336,14 @@ serve(async (req) => {
         decision: "BLOCK",
         engine_scores: { input: Object.fromEntries(inputEngineScores.map(e => [e.engine, e])) },
       };
-      await supabase.from("request_logs").insert(logEntry);
+      console.log("=== INSERTING REQUEST_LOG (BLOCK) ===");
+      console.log(`System: ${systemId}, Decision: BLOCK, Trace: ${traceIdGen}`);
+      const { error: logError } = await supabase.from("request_logs").insert(logEntry);
+      if (logError) {
+        console.error("REQUEST_LOG INSERT FAILED:", logError);
+      } else {
+        console.log("REQUEST_LOG INSERT SUCCESS");
+      }
 
       // AUTO-ESCALATE: Create HITL review item on BLOCK
       const toxicityScore = blockingEngine?.scores?.toxicity ?? 0;
@@ -557,7 +568,14 @@ serve(async (req) => {
       engine_scores: allEngineScores,
     };
 
-    await supabase.from("request_logs").insert(logEntry);
+    console.log("=== INSERTING REQUEST_LOG (SUCCESS PATH) ===");
+    console.log(`System: ${systemId}, Decision: ${decision}, Latency: ${latencyMs}ms`);
+    const { error: logInsertError } = await supabase.from("request_logs").insert(logEntry);
+    if (logInsertError) {
+      console.error("REQUEST_LOG INSERT FAILED:", logInsertError);
+    } else {
+      console.log("REQUEST_LOG INSERT SUCCESS");
+    }
 
     // Update runtime metrics
     const now = new Date();
