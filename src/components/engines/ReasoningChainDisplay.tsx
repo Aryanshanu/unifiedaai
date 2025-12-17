@@ -110,7 +110,9 @@ export function ReasoningChainDisplay({
                         <Brain className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                         <div>
                           <span className="text-xs font-medium text-primary uppercase">Thought</span>
-                          <p className="text-sm text-muted-foreground mt-0.5">{step.thought}</p>
+                          <p className="text-sm text-muted-foreground mt-0.5">
+                            {typeof step.thought === 'object' ? JSON.stringify(step.thought) : String(step.thought)}
+                          </p>
                         </div>
                       </div>
                     )}
@@ -119,7 +121,9 @@ export function ReasoningChainDisplay({
                         <Eye className="w-4 h-4 text-warning shrink-0 mt-0.5" />
                         <div>
                           <span className="text-xs font-medium text-warning uppercase">Observation</span>
-                          <p className="text-sm text-muted-foreground mt-0.5">{step.observation}</p>
+                          <p className="text-sm text-muted-foreground mt-0.5">
+                            {typeof step.observation === 'object' ? JSON.stringify(step.observation) : String(step.observation)}
+                          </p>
                         </div>
                       </div>
                     )}
@@ -128,7 +132,9 @@ export function ReasoningChainDisplay({
                         <CheckCircle className="w-4 h-4 text-success shrink-0 mt-0.5" />
                         <div>
                           <span className="text-xs font-medium text-success uppercase">Conclusion</span>
-                          <p className="text-sm text-muted-foreground mt-0.5">{step.conclusion}</p>
+                          <p className="text-sm text-muted-foreground mt-0.5">
+                            {typeof step.conclusion === 'object' ? JSON.stringify(step.conclusion) : String(step.conclusion)}
+                          </p>
                         </div>
                       </div>
                     )}
@@ -154,7 +160,9 @@ export function ReasoningChainDisplay({
               {evidence.map((item, i) => (
                 <li key={i} className="flex items-start gap-2 text-sm">
                   <span className="text-info mt-0.5">•</span>
-                  <span className="text-muted-foreground">{item}</span>
+                  <span className="text-muted-foreground">
+                    {typeof item === 'object' ? JSON.stringify(item) : String(item)}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -174,7 +182,9 @@ export function ReasoningChainDisplay({
                 {riskFactors.map((risk, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm p-2 bg-danger/10 rounded-lg">
                     <span className="text-danger shrink-0">⚠</span>
-                    <span className="text-muted-foreground">{risk}</span>
+                    <span className="text-muted-foreground">
+                      {typeof risk === 'object' ? JSON.stringify(risk) : String(risk)}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -192,7 +202,9 @@ export function ReasoningChainDisplay({
                 {recommendations.map((rec, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm p-2 bg-success/10 rounded-lg">
                     <span className="text-success shrink-0">✓</span>
-                    <span className="text-muted-foreground">{rec}</span>
+                    <span className="text-muted-foreground">
+                      {typeof rec === 'object' ? JSON.stringify(rec) : String(rec)}
+                    </span>
                   </li>
                 ))}
               </ul>
