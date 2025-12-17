@@ -32,11 +32,11 @@ export function RawDataLog({ logs }: RawDataLogProps) {
   const getTypeColor = (type: string) => {
     switch (type) {
       case "input":
-        return "bg-blue-500/10 text-blue-600";
+        return "bg-primary/10 text-primary";
       case "output":
-        return "bg-green-500/10 text-green-600";
+        return "bg-success/10 text-success";
       case "computation":
-        return "bg-yellow-500/10 text-yellow-600";
+        return "bg-warning/10 text-warning";
       default:
         return "bg-muted text-muted-foreground";
     }
