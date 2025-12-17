@@ -370,13 +370,21 @@ export default function FairnessEngine() {
           {/* Raw Data Log */}
           {rawLogs.length > 0 && (
             <div className="mb-6">
-              <RawDataLog logs={rawLogs.map((log, idx) => ({
-                id: `log-${idx}`,
-                timestamp: new Date().toISOString(),
-                type: 'computation' as const,
-                data: log,
-                metadata: log.demographic ? { demographic: log.demographic } : undefined
-              }))} />
+              <RawDataLog logs={rawLogs.map((log, idx) => {
+                // Ensure data is always a plain object that can be stringified
+                const safeData = typeof log === 'object' ? log : { value: log };
+                // Ensure demographic is a string, not an object
+                const demographicValue = log.demographic 
+                  ? (typeof log.demographic === 'object' ? JSON.stringify(log.demographic) : String(log.demographic))
+                  : undefined;
+                return {
+                  id: `log-${idx}`,
+                  timestamp: new Date().toISOString(),
+                  type: 'computation' as const,
+                  data: safeData,
+                  metadata: demographicValue ? { demographic: demographicValue } : undefined
+                };
+              })} />
             </div>
           )}
 
