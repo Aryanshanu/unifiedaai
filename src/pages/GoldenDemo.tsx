@@ -146,6 +146,42 @@ export default function GoldenDemo() {
     checkModel();
   }, []);
 
+  // Fetch live counters from database
+  const fetchLiveCounters = async () => {
+    const [logs, blocks, hitl, incidents, drift] = await Promise.all([
+      supabase.from('request_logs').select('*', { count: 'exact', head: true }),
+      supabase.from('request_logs').select('*', { count: 'exact', head: true }).eq('decision', 'BLOCK'),
+      supabase.from('review_queue').select('*', { count: 'exact', head: true }),
+      supabase.from('incidents').select('*', { count: 'exact', head: true }),
+      supabase.from('drift_alerts').select('*', { count: 'exact', head: true }),
+    ]);
+    
+    setCounters({
+      requests: logs.count || 0,
+      blocks: blocks.count || 0,
+      hitlItems: hitl.count || 0,
+      incidents: incidents.count || 0,
+      driftAlerts: drift.count || 0,
+    });
+  };
+
+  // Realtime subscriptions for live counter updates
+  useEffect(() => {
+    fetchLiveCounters();
+    
+    const channel = supabase
+      .channel('golden-demo-live')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'request_logs' }, fetchLiveCounters)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'incidents' }, fetchLiveCounters)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'drift_alerts' }, fetchLiveCounters)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'review_queue' }, fetchLiveCounters)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   // Timer
   useEffect(() => {
     if (isRunning) {
