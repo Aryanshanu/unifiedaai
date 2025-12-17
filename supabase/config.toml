@@ -65,3 +65,6 @@ verify_jwt = false
 
 [functions.eval-explainability-hf]
 verify_jwt = false
+
+[functions.llm-generate]
+verify_jwt = true
