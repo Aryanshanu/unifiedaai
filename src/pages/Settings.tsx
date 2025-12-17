@@ -3,13 +3,14 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, User, Shield, Bell, Database, Key, Globe, Loader2, Check, Plus, Trash2, Copy, Eye, EyeOff, AlertTriangle } from "lucide-react";
+import { Settings as SettingsIcon, User, Shield, Bell, Database, Key, Globe, Loader2, Check, Plus, Trash2, Copy, Eye, EyeOff, AlertTriangle, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings, useUpdateSettings } from "@/hooks/useSettings";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UsersTeamsSection } from "@/components/settings/UsersTeamsSection";
 import { ConnectModelForm } from "@/components/settings/ConnectModelForm";
+import { ProviderKeysSection } from "@/components/settings/ProviderKeysSection";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +24,7 @@ const settingsSections = [
   { id: "security", icon: Shield, label: "Security", description: "Authentication and encryption settings" },
   { id: "notifications", icon: Bell, label: "Notifications", description: "Alert channels and preferences" },
   { id: "integrations", icon: Database, label: "Integrations", description: "Model registries and data sources" },
+  { id: "providers", icon: Bot, label: "LLM Providers", description: "Configure AI provider API keys" },
   { id: "api", icon: Key, label: "API Keys", description: "Manage API access tokens" },
   { id: "regions", icon: Globe, label: "Regions & Compliance", description: "Jurisdictional settings" },
 ];
@@ -544,6 +546,11 @@ export default function Settings() {
                   </Card>
                 </div>
               </>
+            )}
+
+            {/* LLM Provider Keys Section */}
+            {activeSection === "providers" && (
+              <ProviderKeysSection />
             )}
 
             {/* API Keys Section */}
