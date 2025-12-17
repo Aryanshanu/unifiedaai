@@ -537,9 +537,32 @@ serve(async (req) => {
       modelResponse = await callTargetModel(endpoint, apiToken, customPrompt);
       console.log("Model response received:", modelResponse.substring(0, 200) + "...");
     } catch (error: any) {
+      const errorMsg = error.message || "Unknown error";
+      
+      // Return appropriate status codes with friendly messages
+      if (errorMsg.includes("Rate limit") || errorMsg.includes("429")) {
+        return new Response(
+          JSON.stringify({ success: false, error: "The model is busy. Please wait a moment and try again." }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (errorMsg.includes("authentication") || errorMsg.includes("401")) {
+        return new Response(
+          JSON.stringify({ success: false, error: "API authentication failed. Please check your API token in Settings." }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (errorMsg.includes("access denied") || errorMsg.includes("403")) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Access denied. Your API key may not have the required permissions." }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      // Generic friendly error
       return new Response(
-        JSON.stringify({ success: false, error: `Failed to get model response: ${error.message}` }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ success: false, error: "Unable to reach the model. Please check your endpoint configuration and try again." }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
