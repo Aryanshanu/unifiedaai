@@ -10,17 +10,13 @@ import { Scale, Loader2, Brain, Sparkles, Users, Layers } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { instrumentPageLoad } from "@/lib/telemetry";
-import { useRAIReasoning } from "@/hooks/useRAIReasoning";
-import { ReasoningChainDisplay } from "@/components/engines/ReasoningChainDisplay";
 import { CustomPromptTest } from "@/components/engines/CustomPromptTest";
 import { CohortSelector } from "@/components/engines/CohortSelector";
-import { EvaluationComparison } from "@/components/engines/EvaluationComparison";
 import { InputOutputScope } from "@/components/engines/InputOutputScope";
 import { ComputationBreakdown } from "@/components/engines/ComputationBreakdown";
 import { RawDataLog } from "@/components/engines/RawDataLog";
 import { EvidencePackage } from "@/components/engines/EvidencePackage";
 import { MetricWeightGrid } from "@/components/engines/MetricWeightGrid";
-import { ComplianceBanner } from "@/components/engines/ComplianceBanner";
 import { WhyScorePanel } from "@/components/engines/WhyScorePanel";
 import { HealthIndicator } from "@/components/shared/HealthIndicator";
 import { useDataHealth } from "@/components/shared/DataHealthWrapper";
@@ -29,6 +25,8 @@ import { EngineSkeleton } from "@/components/engines/EngineSkeleton";
 import { EngineLoadingStatus, EvalStatus } from "@/components/engines/EngineLoadingStatus";
 import { EngineErrorCard } from "@/components/engines/EngineErrorCard";
 import { NoEndpointWarning } from "@/components/engines/NoModelConnected";
+import { EngineResultsLayout } from "@/components/engines/EngineResultsLayout";
+import { EngineActionBar } from "@/components/engines/EngineActionBar";
 import { cn } from "@/lib/utils";
 import { REGULATORY_REFERENCES } from "@/core/evaluator-harness";
 
@@ -62,7 +60,6 @@ const FORMULA = "0.25×DP + 0.25×EO + 0.25×EOdds + 0.15×GLR + 0.10×Bias";
 function FairnessEngineContent() {
   const [selectedModelId, setSelectedModelId] = useState<string>("");
   const [selectedCohorts, setSelectedCohorts] = useState<Record<string, string>>({});
-  const [showComparison, setShowComparison] = useState(false);
   const [rawLogs, setRawLogs] = useState<any[]>([]);
   const [computationSteps, setComputationSteps] = useState<any[]>([]);
   const [realEvalResult, setRealEvalResult] = useState<any>(null);
@@ -72,7 +69,6 @@ function FairnessEngineContent() {
   const { data: models, isLoading: modelsLoading, refetch: refetchModels } = useModels();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { isEvaluating } = useRAIReasoning();
 
   useEffect(() => {
     const endTrace = instrumentPageLoad('FairnessEngine');
@@ -137,8 +133,8 @@ function FairnessEngineContent() {
       
       toast({ 
         title: "Fairness Evaluation Complete", 
-        description: `Score: ${data.overallScore}% - ${data.status?.toUpperCase() || 'DONE'}`,
-        variant: data.status === "pass" ? "default" : "destructive"
+        description: `Score: ${data.overallScore}%`,
+        variant: data.overallScore >= 70 ? "default" : "destructive"
       });
     } catch (error: any) {
       console.error("Fairness evaluation error:", error);
@@ -181,10 +177,51 @@ function FairnessEngineContent() {
     }));
   };
 
-  const hasReasoningChain = latestResult?.explanations?.reasoning_chain && 
-    latestResult.explanations.reasoning_chain.length > 0;
+  const getSummaryBullets = () => {
+    const bullets: Array<{ type: 'success' | 'warning' | 'error' | 'info'; text: string }> = [];
+    const metrics = getMetricsForGrid();
+    
+    if (overallScore >= 80) {
+      bullets.push({ type: 'success', text: 'Model demonstrates strong fairness across all demographic groups' });
+    } else if (overallScore >= 70) {
+      bullets.push({ type: 'warning', text: 'Model shows acceptable fairness but has room for improvement' });
+    } else {
+      bullets.push({ type: 'error', text: 'Model exhibits significant bias that requires immediate attention' });
+    }
 
-  // Show skeleton while initially loading
+    const lowestMetric = metrics.reduce((min, m) => m.score < min.score ? m : min, metrics[0]);
+    if (lowestMetric && lowestMetric.score < 70) {
+      bullets.push({ type: 'warning', text: `${lowestMetric.name} is below threshold at ${lowestMetric.score.toFixed(0)}%` });
+    }
+
+    const highestMetric = metrics.reduce((max, m) => m.score > max.score ? m : max, metrics[0]);
+    if (highestMetric) {
+      bullets.push({ type: 'success', text: `${highestMetric.name} performs well at ${highestMetric.score.toFixed(0)}%` });
+    }
+
+    return bullets;
+  };
+
+  const getKeyInsight = () => {
+    if (overallScore >= 80) return "No significant demographic bias detected in model outputs";
+    if (overallScore >= 70) return "Minor fairness concerns identified — review recommended";
+    return "Significant bias detected — immediate remediation required";
+  };
+
+  const getRecommendations = () => {
+    const recs = latestResult?.explanations?.recommendations || realEvalResult?.recommendations || [];
+    if (recs.length > 0) return recs;
+    
+    if (overallScore < 70) {
+      return [
+        "Review training data for demographic imbalances",
+        "Consider applying fairness-aware training techniques",
+        "Implement monitoring for bias drift over time"
+      ];
+    }
+    return ["Continue monitoring fairness metrics", "Consider expanding cohort analysis"];
+  };
+
   if (modelsLoading) {
     return (
       <MainLayout title="Fairness Engine" subtitle="Loading...">
@@ -193,10 +230,12 @@ function FairnessEngineContent() {
     );
   }
 
+  const hasResults = (latestResult || realEvalResult) && !evalError;
+
   return (
     <MainLayout 
       title="Fairness Engine" 
-      subtitle="2025 SOTA: Demographic Parity, Equal Opportunity, Equalized Odds, GLR, Bias Detection"
+      subtitle="2025 SOTA: Demographic Parity, Equal Opportunity, Equalized Odds"
       headerActions={
         <HealthIndicator 
           status={status} 
@@ -208,8 +247,8 @@ function FairnessEngineContent() {
     >
       <InputOutputScope 
         scope="BOTH" 
-        inputDescription="Analyzes input cohorts (age, gender, income, region, intersectional)"
-        outputDescription="Evaluates predictions for demographic parity, equalized odds, and disparate impact"
+        inputDescription="Analyzes input cohorts (age, gender, income, region)"
+        outputDescription="Evaluates predictions for demographic parity and disparate impact"
       />
 
       <div className="flex items-center gap-2 mb-4 flex-wrap">
@@ -225,14 +264,6 @@ function FairnessEngineContent() {
           <Layers className="w-3 h-3 mr-1" />
           5 Weighted Metrics
         </Badge>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="ml-auto"
-          onClick={() => setShowComparison(!showComparison)}
-        >
-          {showComparison ? "Hide Comparison" : "Compare Evaluations"}
-        </Button>
       </div>
 
       {/* Model Selection */}
@@ -262,7 +293,7 @@ function FairnessEngineContent() {
             <div className="pt-6">
               <Button 
                 onClick={() => runRealFairnessEvaluation()} 
-                disabled={!selectedModelId || evalStatus !== 'idle' && evalStatus !== 'complete' && evalStatus !== 'error'}
+                disabled={!selectedModelId || (evalStatus !== 'idle' && evalStatus !== 'complete' && evalStatus !== 'error')}
                 size="lg"
                 className="gap-2"
               >
@@ -274,7 +305,7 @@ function FairnessEngineContent() {
                 ) : (
                   <>
                     <Scale className="w-4 h-4" />
-                    Run Fairness Evaluation
+                    Run Evaluation
                   </>
                 )}
               </Button>
@@ -283,14 +314,14 @@ function FairnessEngineContent() {
         </CardContent>
       </Card>
 
-      {/* Loading Status Indicator */}
+      {/* Loading Status */}
       {evalStatus !== 'idle' && evalStatus !== 'complete' && evalStatus !== 'error' && (
         <div className="mb-6">
           <EngineLoadingStatus status={evalStatus} engineName="Fairness" />
         </div>
       )}
 
-      {/* Error Card with Retry */}
+      {/* Error Card */}
       {evalError && (
         <div className="mb-6">
           <EngineErrorCard 
@@ -306,14 +337,11 @@ function FairnessEngineContent() {
       {/* Cohort Selector */}
       {selectedModelId && (
         <Card className="mb-6">
-          <CardHeader>
+          <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Users className="w-5 h-5 text-primary" />
-              Cohort Analysis (Intersectional)
+              Cohort Analysis
             </CardTitle>
-            <CardDescription>
-              Filter by demographics including India-specific packs (rural, caste, income)
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <CohortSelector 
@@ -323,52 +351,26 @@ function FairnessEngineContent() {
         </Card>
       )}
 
-      {showComparison && selectedModelId && (
-        <div className="mb-6">
-          <EvaluationComparison evaluations={results || []} />
-        </div>
-      )}
-
-      {selectedModelId && (
-        <div className="mb-6">
-          <CustomPromptTest
-            modelId={selectedModelId}
-            engineType="fairness"
-            engineName="Fairness"
-          />
-        </div>
-      )}
-
+      {/* Empty State */}
       {!selectedModelId && (
         <div className="text-center py-16 bg-card rounded-xl border border-border">
           <Scale className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-foreground mb-2">Select a Model</h3>
-          <p className="text-muted-foreground">Choose a model to run 2025 SOTA fairness evaluation</p>
+          <p className="text-muted-foreground">Choose a model to run fairness evaluation</p>
         </div>
       )}
 
-      {selectedModelId && (latestResult || realEvalResult) && !evalError && (
-        <>
-          <div className="mb-6">
-            <ComplianceBanner
-              score={overallScore}
-              threshold={70}
-              engineName="Fairness"
-              regulatoryReferences={REGULATORY_REFERENCES.fairness}
-            />
-          </div>
-
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Scale className="w-5 h-5 text-primary" />
-                2025 SOTA Fairness Metrics
-              </CardTitle>
-              <CardDescription>
-                Weighted formula: {FORMULA}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+      {/* Results - Professional Tabbed Layout */}
+      {selectedModelId && hasResults && (
+        <EngineResultsLayout
+          score={overallScore}
+          threshold={70}
+          engineName="Fairness"
+          keyInsight={getKeyInsight()}
+          summaryBullets={getSummaryBullets()}
+          recommendations={getRecommendations()}
+          metricsContent={
+            <div className="space-y-6">
               <MetricWeightGrid
                 metrics={getMetricsForGrid()}
                 overallScore={overallScore}
@@ -376,63 +378,42 @@ function FairnessEngineContent() {
                 formula={FORMULA}
                 complianceThreshold={70}
               />
-            </CardContent>
-          </Card>
-
-          <div className="mb-6">
-            <WhyScorePanel
-              score={overallScore}
-              engineName="Fairness"
-              computationSteps={computationSteps.length > 0 ? computationSteps : realEvalResult?.computationSteps || []}
-              weightedFormula={`Score = ${FORMULA} = ${overallScore.toFixed(0)}%`}
-              metricBreakdown={getMetricBreakdown()}
-              delta={0.1}
-              threshold={70}
-            />
-          </div>
-
-          {(computationSteps.length > 0 || realEvalResult?.computationSteps) && (
-            <div className="mb-6">
-              <ComputationBreakdown 
-                steps={computationSteps.length > 0 ? computationSteps : realEvalResult?.computationSteps || []}
-                overallScore={overallScore}
-                engineType="fairness"
+              <WhyScorePanel
+                score={overallScore}
+                engineName="Fairness"
+                computationSteps={computationSteps.length > 0 ? computationSteps : realEvalResult?.computationSteps || []}
+                weightedFormula={`Score = ${FORMULA} = ${overallScore.toFixed(0)}%`}
+                metricBreakdown={getMetricBreakdown()}
+                delta={0.1}
+                threshold={70}
               />
+              {(computationSteps.length > 0 || realEvalResult?.computationSteps) && (
+                <ComputationBreakdown 
+                  steps={computationSteps.length > 0 ? computationSteps : realEvalResult?.computationSteps || []}
+                  overallScore={overallScore}
+                  engineType="fairness"
+                />
+              )}
             </div>
-          )}
-
-          {hasReasoningChain && (
-            <div className="mb-6">
-              <ReasoningChainDisplay
-                reasoningChain={latestResult.explanations.reasoning_chain!}
-                transparencySummary={latestResult.explanations.transparency_summary || ""}
-                evidence={latestResult.explanations.evidence}
-                riskFactors={latestResult.explanations.risk_factors}
-                recommendations={latestResult.explanations.recommendations}
-                analysisModel={latestResult.explanations.analysis_model}
-              />
-            </div>
-          )}
-
-          {rawLogs.length > 0 && (
-            <div className="mb-6">
-              <RawDataLog logs={rawLogs.map((log, idx) => {
-                const safeData = typeof log === 'object' ? log : { value: log };
-                const demographicValue = log.demographic 
-                  ? (typeof log.demographic === 'object' ? JSON.stringify(log.demographic) : String(log.demographic))
-                  : undefined;
-                return {
+          }
+          rawDataContent={
+            <div className="space-y-4">
+              {rawLogs.length > 0 ? (
+                <RawDataLog logs={rawLogs.map((log, idx) => ({
                   id: `log-${idx}`,
                   timestamp: new Date().toISOString(),
                   type: 'computation' as const,
-                  data: safeData,
-                  metadata: demographicValue ? { demographic: demographicValue } : undefined
-                };
-              })} />
+                  data: typeof log === 'object' ? log : { value: log },
+                  metadata: log.demographic ? { demographic: String(log.demographic) } : undefined
+                }))} />
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>Raw data logs will appear here after running an evaluation</p>
+                </div>
+              )}
             </div>
-          )}
-
-          <div className="mb-6">
+          }
+          evidenceContent={
             <EvidencePackage
               data={{
                 results: realEvalResult?.metricDetails || latestResult?.metric_details,
@@ -443,50 +424,48 @@ function FairnessEngineContent() {
                 isCompliant: overallScore >= 70
               }}
             />
-          </div>
-
-          {results && results.length > 1 && (
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle>Evaluation History</CardTitle>
-                <CardDescription>Past fairness evaluations</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {results.slice(1).map((result) => (
-                    <div key={result.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                      <span className="text-sm text-muted-foreground">
-                        {new Date(result.created_at).toLocaleDateString()}
-                      </span>
-                      <Badge className={cn(
-                        result.overall_score >= 80 ? "text-success" :
-                        result.overall_score >= 70 ? "text-warning" : "text-danger"
-                      )}>
-                        {result.overall_score}%
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </>
+          }
+        />
       )}
 
+      {/* Custom Prompt Test */}
+      {selectedModelId && (
+        <div className="mt-6">
+          <CustomPromptTest
+            modelId={selectedModelId}
+            engineType="fairness"
+            engineName="Fairness"
+          />
+        </div>
+      )}
+
+      {/* No Results Yet */}
       {selectedModelId && !latestResult && !realEvalResult && !loadingResults && !evalError && (
         <div className="text-center py-16 bg-card rounded-xl border border-border">
           <Brain className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-foreground mb-2">No Evaluations Yet</h3>
-          <p className="text-muted-foreground mb-4">Run your first 2025 SOTA fairness evaluation</p>
+          <p className="text-muted-foreground mb-4">Run your first fairness evaluation</p>
           <Button onClick={() => runRealFairnessEvaluation()} disabled={evalStatus !== 'idle'} className="gap-2">
             <Scale className="w-4 h-4" />
-            Run Fairness Evaluation
+            Run Evaluation
           </Button>
         </div>
       )}
 
-      {loadingResults && (
-        <EngineSkeleton showMetrics={false} />
+      {loadingResults && <EngineSkeleton showMetrics={false} />}
+
+      {/* Action Bar */}
+      {selectedModelId && hasResults && (
+        <div className="mt-6">
+          <EngineActionBar
+            onRetry={() => runRealFairnessEvaluation()}
+            modelId={selectedModelId}
+            systemId={selectedModel?.system_id}
+            engineName="Fairness"
+            score={overallScore}
+            isRetrying={evalStatus === 'sending' || evalStatus === 'analyzing'}
+          />
+        </div>
       )}
     </MainLayout>
   );
