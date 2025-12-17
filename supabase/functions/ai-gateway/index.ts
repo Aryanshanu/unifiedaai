@@ -6,17 +6,21 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Simple PII detection patterns - FIX #4 & #5: Format detection, not validation
+// Simple PII detection patterns - EXPANDED with India-specific patterns
 const PII_PATTERNS = {
   email: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
-  // FIX #5: Expanded phone patterns for various formats
   phone: /\b(\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b|\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b|\b\d{10}\b/g,
-  // FIX #4: Simple format detection instead of validation
   ssn: /\b\d{3}-\d{2}-\d{4}\b/g,
   creditCard: /\b(?:\d{4}[-.\s]?){3}\d{4}\b/g,
+  // India-specific PII patterns - CRITICAL FIX
+  aadhaar: /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g, // Aadhaar: 1234-5678-9012 or 1234 5678 9012
+  pan: /\b[A-Z]{5}\d{4}[A-Z]\b/g, // PAN: ABCDE1234F
+  upi: /\b[\w.-]+@[\w]+\b/g, // UPI: name@upi or name@bank
+  indianPhone: /\b(\+91[-\s]?)?[6-9]\d{9}\b/g, // Indian mobile: +91 9876543210
+  passport: /\b[A-Z]\d{7}\b/g, // Indian passport: A1234567
 };
 
-// FIX #3: Expanded harmful content keywords for self-harm detection
+// EXPANDED harmful content keywords - includes religious/ethnic hate speech
 const HARMFUL_KEYWORDS = [
   // Self-harm patterns
   "how to harm myself", "hurt myself", "harm my body", "harm myself",
@@ -27,7 +31,20 @@ const HARMFUL_KEYWORDS = [
   // Chemical harm
   "harm using chemicals", "poison myself", "dangerous chemicals to hurt",
   // General dangerous
-  "how to hurt someone", "how to kill", "how to attack"
+  "how to hurt someone", "how to kill", "how to attack",
+  // Religious hate speech - CRITICAL FIX
+  "hate all muslims", "hate muslims", "kill muslims", "death to muslims",
+  "hate all jews", "hate jews", "kill jews", "death to jews",
+  "hate all christians", "hate christians", "kill christians", "death to christians",
+  "hate all hindus", "hate hindus", "kill hindus", "death to hindus",
+  // Ethnic hate speech
+  "hate all blacks", "kill blacks", "death to blacks",
+  "hate all whites", "kill whites", "death to whites",
+  "hate all asians", "kill asians", "death to asians",
+  // Generic hate patterns
+  "i hate all", "death to all", "kill all", "exterminate",
+  // Slurs and derogatory terms (abbreviated for detection)
+  "terrorist", "vermin", "subhuman", "inferior race",
 ];
 
 // FIX #2: Expanded secret patterns with sk-test and JWT detection
@@ -52,18 +69,24 @@ interface EngineScore {
   details?: string;
 }
 
-// Privacy Engine: Detect PII in text
+// Privacy Engine: Detect PII in text - EXPANDED with India-specific detection
 function runPrivacyEngine(text: string): EngineScore {
   const scores: Record<string, number> = {};
   let piiCount = 0;
   let hasSensitivePII = false;
+  const detectedTypes: string[] = [];
 
   for (const [type, pattern] of Object.entries(PII_PATTERNS)) {
     const matches = text.match(pattern) || [];
     scores[`${type}_count`] = matches.length;
     piiCount += matches.length;
-    if (type === "ssn" || type === "creditCard") {
-      hasSensitivePII = matches.length > 0;
+    
+    // Sensitive PII types that trigger BLOCK
+    if (type === "ssn" || type === "creditCard" || type === "aadhaar" || type === "pan") {
+      if (matches.length > 0) {
+        hasSensitivePII = true;
+        detectedTypes.push(type.toUpperCase());
+      }
     }
   }
 
@@ -75,7 +98,7 @@ function runPrivacyEngine(text: string): EngineScore {
     scores,
     verdict: hasSensitivePII ? "BLOCK" : piiCount > 0 ? "WARN" : "ALLOW",
     details: hasSensitivePII 
-      ? "Sensitive PII detected (SSN/Credit Card)" 
+      ? `Sensitive PII detected: ${detectedTypes.join(", ")}` 
       : piiCount > 0 
         ? `Found ${piiCount} PII entities` 
         : undefined,

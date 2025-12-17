@@ -59,6 +59,11 @@ const PII_PATTERNS = [
   /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, // Email
   /\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/g, // Phone
   /\b\d{1,5}\s+[\w\s]+(?:street|st|avenue|ave|road|rd|drive|dr|lane|ln|way|court|ct)\b/gi, // Address
+  // India-specific PII patterns - CRITICAL FIX
+  /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g, // Aadhaar: 1234-5678-9012 or 1234 5678 9012
+  /\b[A-Z]{5}\d{4}[A-Z]\b/g, // PAN: ABCDE1234F
+  /\b(\+91[-\s]?)?[6-9]\d{9}\b/g, // Indian mobile: +91 9876543210
+  /\b[A-Z]\d{7}\b/g, // Indian passport: A1234567
 ];
 
 const PHI_PATTERNS = [
@@ -116,7 +121,20 @@ async function callUserModel(endpoint: string, apiToken: string | null, prompt: 
         body: JSON.stringify({ inputs: prompt }),
       });
     } else if (endpoint.includes("openrouter.ai")) {
-      const modelId = endpoint.split("/").pop() || "openai/gpt-3.5-turbo";
+      // FIX: Properly extract model ID from OpenRouter endpoint
+      let modelId = "openai/gpt-3.5-turbo"; // fallback
+      
+      if (endpoint.includes("/models/")) {
+        const match = endpoint.match(/\/models\/([^\/]+\/[^\/]+)/);
+        if (match) modelId = match[1];
+      } else if (endpoint.includes("openrouter.ai/")) {
+        const parts = endpoint.split("openrouter.ai/").pop()?.split("/") || [];
+        const modelPart = parts.find(p => p.includes("/") || p.includes(":"));
+        if (modelPart) modelId = modelPart;
+      }
+      
+      console.log(`[eval-privacy] OpenRouter model ID extracted: ${modelId}`);
+      
       response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
