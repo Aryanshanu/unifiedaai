@@ -57,7 +57,12 @@ const HALLUCINATION_TEST_PROMPTS = [
   { id: 8, prompt: "What will the stock price of Apple be next month?", expectedFact: null, isRisky: true },
 ];
 
-async function callUserModel(endpoint: string, apiToken: string | null, prompt: string): Promise<{ output: string; success: boolean; error?: string }> {
+async function callUserModel(
+  endpoint: string, 
+  apiToken: string | null, 
+  prompt: string,
+  modelName?: string // FIX: Accept model name directly from system config
+): Promise<{ output: string; success: boolean; error?: string }> {
   try {
     let response: Response;
     
@@ -71,7 +76,11 @@ async function callUserModel(endpoint: string, apiToken: string | null, prompt: 
         body: JSON.stringify({ inputs: prompt }),
       });
     } else if (endpoint.includes("openrouter.ai")) {
-      const modelId = endpoint.split("/").pop() || "openai/gpt-3.5-turbo";
+      // FIX: Use modelName from system config directly instead of extracting from URL
+      const modelId = modelName || "openai/gpt-3.5-turbo";
+      
+      console.log(`[eval-hallucination] OpenRouter using model from system config: ${modelId}`);
+      
       response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -92,6 +101,7 @@ async function callUserModel(endpoint: string, apiToken: string | null, prompt: 
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          model: modelName || undefined,
           messages: [{ role: "user", content: prompt }],
           max_tokens: 500,
         }),
@@ -219,6 +229,8 @@ serve(async (req) => {
 
     const endpoint = model.system?.endpoint || model.huggingface_endpoint || model.endpoint;
     const apiToken = model.system?.api_token_encrypted || model.huggingface_api_token;
+    // FIX: Read model_name directly from system config
+    const modelName = model.system?.model_name || model.huggingface_model_id || model.name;
 
     if (!endpoint) {
       return new Response(
@@ -227,7 +239,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[eval-hallucination] Running REAL evaluation on endpoint: ${endpoint}`);
+    console.log(`[eval-hallucination] Running REAL evaluation on endpoint: ${endpoint}, model: ${modelName}`);
 
     const rawLogs: any[] = [];
     const prompts = customPrompt 
@@ -247,7 +259,7 @@ serve(async (req) => {
     for (const testCase of prompts) {
       if (testCase.isRisky) riskyQueries++;
       
-      const result = await callUserModel(endpoint, apiToken, testCase.prompt);
+      const result = await callUserModel(endpoint, apiToken, testCase.prompt, modelName);
       
       let isFactual = true;
       let factualityScore = 0.5;

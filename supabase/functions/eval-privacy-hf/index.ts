@@ -107,7 +107,12 @@ function detectSecrets(text: string): string[] {
   return found;
 }
 
-async function callUserModel(endpoint: string, apiToken: string | null, prompt: string): Promise<{ output: string; success: boolean; error?: string }> {
+async function callUserModel(
+  endpoint: string, 
+  apiToken: string | null, 
+  prompt: string,
+  modelName?: string // FIX: Accept model name directly from system config
+): Promise<{ output: string; success: boolean; error?: string }> {
   try {
     let response: Response;
     
@@ -121,19 +126,10 @@ async function callUserModel(endpoint: string, apiToken: string | null, prompt: 
         body: JSON.stringify({ inputs: prompt }),
       });
     } else if (endpoint.includes("openrouter.ai")) {
-      // FIX: Properly extract model ID from OpenRouter endpoint
-      let modelId = "openai/gpt-3.5-turbo"; // fallback
+      // FIX: Use modelName from system config directly instead of extracting from URL
+      const modelId = modelName || "openai/gpt-3.5-turbo";
       
-      if (endpoint.includes("/models/")) {
-        const match = endpoint.match(/\/models\/([^\/]+\/[^\/]+)/);
-        if (match) modelId = match[1];
-      } else if (endpoint.includes("openrouter.ai/")) {
-        const parts = endpoint.split("openrouter.ai/").pop()?.split("/") || [];
-        const modelPart = parts.find(p => p.includes("/") || p.includes(":"));
-        if (modelPart) modelId = modelPart;
-      }
-      
-      console.log(`[eval-privacy] OpenRouter model ID extracted: ${modelId}`);
+      console.log(`[eval-privacy] OpenRouter using model from system config: ${modelId}`);
       
       response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
@@ -155,6 +151,7 @@ async function callUserModel(endpoint: string, apiToken: string | null, prompt: 
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          model: modelName || undefined,
           messages: [{ role: "user", content: prompt }],
           max_tokens: 500,
         }),
@@ -238,6 +235,8 @@ serve(async (req) => {
 
     const endpoint = model.system?.endpoint || model.huggingface_endpoint || model.endpoint;
     const apiToken = model.system?.api_token_encrypted || model.huggingface_api_token;
+    // FIX: Read model_name directly from system config
+    const modelName = model.system?.model_name || model.huggingface_model_id || model.name;
 
     if (!endpoint) {
       return new Response(
@@ -246,7 +245,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[eval-privacy] Running REAL evaluation on endpoint: ${endpoint}`);
+    console.log(`[eval-privacy] Running REAL evaluation on endpoint: ${endpoint}, model: ${modelName}`);
 
     const rawLogs: any[] = [];
     const prompts = customPrompt 
@@ -260,7 +259,7 @@ serve(async (req) => {
 
     // Call REAL model with privacy-probing prompts
     for (const testCase of prompts) {
-      const result = await callUserModel(endpoint, apiToken, testCase.prompt);
+      const result = await callUserModel(endpoint, apiToken, testCase.prompt, modelName);
       
       const pii = result.success ? detectPII(result.output) : [];
       const phi = result.success ? detectPHI(result.output) : [];
