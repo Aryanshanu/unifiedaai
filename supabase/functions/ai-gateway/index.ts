@@ -601,9 +601,33 @@ serve(async (req) => {
 
   } catch (error) {
     console.error("Gateway error:", error);
+    
+    // Log to app_errors table for debugging
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      
+      await supabase.from("app_errors").insert({
+        error_type: "edge_function_error",
+        error_message: error instanceof Error ? error.message : "Unknown error",
+        error_stack: error instanceof Error ? error.stack : null,
+        component_name: "ai-gateway",
+        page_url: null,
+        user_agent: null,
+        metadata: { function: "ai-gateway" },
+      });
+    } catch (logErr) {
+      console.error("Failed to log error:", logErr);
+    }
+    
+    // Return friendly error message - NEVER expose raw errors to user
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ 
+        error: "Service temporarily unavailable — we're fixing it. Please retry in a moment.",
+        retry_after: 5
+      }),
+      { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
