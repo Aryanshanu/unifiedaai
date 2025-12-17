@@ -12,6 +12,8 @@ export interface CustomTestResult {
     summary: string;
     issues: string[];
     recommendations: string[];
+    computation?: Record<string, number>;
+    regulatory_reference?: string;
   };
 }
 
@@ -40,7 +42,7 @@ export function useCustomPromptTest() {
     try {
       toast({
         title: "Running Custom Test",
-        description: `Testing your prompt against the ${engineType} engine...`,
+        description: `Testing your prompt against the ${engineType} engine with real analysis...`,
       });
 
       const { data, error } = await supabase.functions.invoke("custom-prompt-test", {
@@ -58,9 +60,13 @@ export function useCustomPromptTest() {
       const result = data as CustomTestResult;
       setCustomResult(result);
 
+      const isCompliant = result.analysis.score >= 70;
       toast({
-        title: "Custom Test Complete",
-        description: `${engineType.charAt(0).toUpperCase() + engineType.slice(1)} analysis score: ${result.analysis.score}%`,
+        title: isCompliant ? "Test Complete" : "NON-COMPLIANT",
+        description: isCompliant 
+          ? `${engineType.charAt(0).toUpperCase() + engineType.slice(1)} score: ${result.analysis.score}%`
+          : `Score ${result.analysis.score}% is below 70% compliance threshold`,
+        variant: isCompliant ? "default" : "destructive",
       });
 
       return result;
