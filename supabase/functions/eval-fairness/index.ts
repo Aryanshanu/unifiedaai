@@ -72,7 +72,25 @@ async function callUserModel(endpoint: string, apiToken: string | null, prompt: 
         body: JSON.stringify({ inputs: prompt }),
       });
     } else if (endpoint.includes("openrouter.ai")) {
-      const modelId = endpoint.split("/").pop() || "openai/gpt-3.5-turbo";
+      // FIX: Properly extract model ID from OpenRouter endpoint
+      // Handle both formats: "https://openrouter.ai/api/v1/chat/completions/model-name" 
+      // and "https://openrouter.ai/models/provider/model-name"
+      let modelId = "openai/gpt-3.5-turbo"; // fallback
+      
+      if (endpoint.includes("/models/")) {
+        // Extract from /models/provider/model format
+        const match = endpoint.match(/\/models\/([^\/]+\/[^\/]+)/);
+        if (match) modelId = match[1];
+      } else if (endpoint.includes("openrouter.ai/")) {
+        // Try to extract model from URL path
+        const parts = endpoint.split("openrouter.ai/").pop()?.split("/") || [];
+        // Look for provider/model pattern (e.g., "qwen/qwen3-coder:free")
+        const modelPart = parts.find(p => p.includes("/") || p.includes(":"));
+        if (modelPart) modelId = modelPart;
+      }
+      
+      console.log(`[eval-fairness] OpenRouter model ID extracted: ${modelId}`);
+      
       response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
