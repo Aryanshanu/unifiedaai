@@ -102,7 +102,9 @@ export function RawDataLog({ logs }: RawDataLogProps) {
                 {log.metadata && (
                   <div className="mt-2 pt-2 border-t border-border">
                     <p className="text-xs text-muted-foreground">
-                      {Object.entries(log.metadata).map(([k, v]) => `${k}: ${v}`).join(" | ")}
+                      {Object.entries(log.metadata).map(([k, v]) => 
+                        `${k}: ${typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v)}`
+                      ).join(" | ")}
                     </p>
                   </div>
                 )}
