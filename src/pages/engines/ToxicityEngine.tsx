@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ShieldAlert, Loader2, Brain, Sparkles, Layers, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { telemetry, traceAsync, instrumentPageLoad } from "@/lib/telemetry";
+import { instrumentPageLoad } from "@/lib/telemetry";
 import { useRAIReasoning } from "@/hooks/useRAIReasoning";
 import { ReasoningChainDisplay } from "@/components/engines/ReasoningChainDisplay";
 import { CustomPromptTest } from "@/components/engines/CustomPromptTest";
@@ -22,6 +22,11 @@ import { ComplianceBanner } from "@/components/engines/ComplianceBanner";
 import { WhyScorePanel } from "@/components/engines/WhyScorePanel";
 import { HealthIndicator } from "@/components/shared/HealthIndicator";
 import { useDataHealth } from "@/components/shared/DataHealthWrapper";
+import { ComponentErrorBoundary } from "@/components/error/ErrorBoundary";
+import { EngineSkeleton } from "@/components/engines/EngineSkeleton";
+import { EngineLoadingStatus, EvalStatus } from "@/components/engines/EngineLoadingStatus";
+import { EngineErrorCard } from "@/components/engines/EngineErrorCard";
+import { NoEndpointWarning } from "@/components/engines/NoModelConnected";
 import { cn } from "@/lib/utils";
 import { REGULATORY_REFERENCES } from "@/core/evaluator-harness";
 
@@ -42,7 +47,6 @@ interface ToxicityResult {
   };
 }
 
-// 2025 SOTA Toxicity Metrics
 const TOXICITY_METRICS = [
   { key: 'overall_tor', name: 'Overall TOR', weight: 0.30, description: 'Overall toxic output rate' },
   { key: 'severe_stor', name: 'Severe STOR', weight: 0.25, description: 'Severe toxicity (slurs, threats)' },
@@ -53,15 +57,17 @@ const TOXICITY_METRICS = [
 
 const FORMULA = "0.30×TOR + 0.25×STOR + 0.20×Diff + 0.15×Topic + 0.10×Guard";
 
-export default function ToxicityEngine() {
+function ToxicityEngineContent() {
   const [selectedModelId, setSelectedModelId] = useState<string>("");
   const [computationSteps, setComputationSteps] = useState<any[]>([]);
   const [rawLogs, setRawLogs] = useState<any[]>([]);
   const [realEvalResult, setRealEvalResult] = useState<any>(null);
+  const [evalStatus, setEvalStatus] = useState<EvalStatus>('idle');
+  const [evalError, setEvalError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const { data: models, isLoading: modelsLoading, refetch: refetchModels } = useModels();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { runReasoningEvaluation, isEvaluating } = useRAIReasoning();
 
   useEffect(() => {
     const endTrace = instrumentPageLoad('ToxicityEngine');
@@ -85,33 +91,44 @@ export default function ToxicityEngine() {
     enabled: !!selectedModelId,
   });
 
+  const selectedModel = models?.find(m => m.id === selectedModelId);
+  const hasEndpoint = selectedModel?.huggingface_endpoint || selectedModel?.endpoint;
   const latestResult = results?.[0];
   const isLoading = modelsLoading || loadingResults;
   const { status, lastUpdated } = useDataHealth(isLoading, resultsError);
 
   const handleRetry = () => {
+    setEvalError(null);
     refetchModels();
     if (selectedModelId) refetchResults();
   };
 
-  const runToxicityEvaluation = async () => {
+  const runToxicityEvaluation = async (isRetry = false) => {
     if (!selectedModelId) {
       toast({ title: "Please select a model", variant: "destructive" });
       return;
     }
 
+    setEvalStatus('sending');
+    setEvalError(null);
+
     try {
+      setEvalStatus('analyzing');
       const { data, error } = await supabase.functions.invoke('eval-toxicity-hf', {
         body: { modelId: selectedModelId },
       });
 
       if (error) throw error;
 
+      setEvalStatus('computing');
       setComputationSteps(data.computationSteps || []);
       setRawLogs(data.rawLogs || []);
       setRealEvalResult(data);
 
       queryClient.invalidateQueries({ queryKey: ["toxicity-results", selectedModelId] });
+      
+      setEvalStatus('complete');
+      setRetryCount(0);
       
       toast({ 
         title: "Toxicity Evaluation Complete", 
@@ -120,11 +137,19 @@ export default function ToxicityEngine() {
       });
     } catch (error: any) {
       console.error("Toxicity evaluation error:", error);
-      toast({ 
-        title: "Evaluation Failed", 
-        description: error.message,
-        variant: "destructive" 
-      });
+      setEvalStatus('error');
+      
+      if (!isRetry && retryCount < 2) {
+        setRetryCount(prev => prev + 1);
+        toast({ 
+          title: "Temporary issue — retrying...", 
+          description: `Attempt ${retryCount + 2} of 3`,
+        });
+        setTimeout(() => runToxicityEvaluation(true), 2000);
+      } else {
+        setEvalError(error.message || "Evaluation failed. Please try again.");
+        setRetryCount(0);
+      }
     }
   };
 
@@ -154,6 +179,14 @@ export default function ToxicityEngine() {
   const hasReasoningChain = latestResult?.explanations?.reasoning_chain && 
     latestResult.explanations.reasoning_chain.length > 0;
 
+  if (modelsLoading) {
+    return (
+      <MainLayout title="Toxicity Engine" subtitle="Loading...">
+        <EngineSkeleton />
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout 
       title="Toxicity Engine" 
@@ -167,14 +200,12 @@ export default function ToxicityEngine() {
         />
       }
     >
-      {/* Input/Output Scope Banner */}
       <InputOutputScope 
         scope="BOTH" 
         inputDescription="Analyzes toxic inputs including Hinglish and regional languages"
         outputDescription="Evaluates model responses for harmful content, hate speech, and jailbreak attempts"
       />
 
-      {/* Header Badges */}
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         <Badge className="bg-primary/10 text-primary border-primary/20">
           <Brain className="w-3 h-3 mr-1" />
@@ -194,7 +225,6 @@ export default function ToxicityEngine() {
         </Badge>
       </div>
 
-      {/* Model Selection */}
       <Card className="mb-6">
         <CardContent className="pt-6">
           <div className="flex items-center gap-4">
@@ -212,15 +242,20 @@ export default function ToxicityEngine() {
                   ))}
                 </SelectContent>
               </Select>
+              {selectedModelId && !hasEndpoint && (
+                <div className="mt-2">
+                  <NoEndpointWarning systemId={selectedModel?.system_id} />
+                </div>
+              )}
             </div>
             <div className="pt-6">
               <Button 
-                onClick={runToxicityEvaluation} 
-                disabled={!selectedModelId || isEvaluating}
+                onClick={() => runToxicityEvaluation()} 
+                disabled={!selectedModelId || evalStatus !== 'idle' && evalStatus !== 'complete' && evalStatus !== 'error'}
                 size="lg"
                 className="gap-2"
               >
-                {isEvaluating ? (
+                {evalStatus === 'sending' || evalStatus === 'analyzing' || evalStatus === 'computing' ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Evaluating...
@@ -237,7 +272,24 @@ export default function ToxicityEngine() {
         </CardContent>
       </Card>
 
-      {/* Custom Prompt Test */}
+      {evalStatus !== 'idle' && evalStatus !== 'complete' && evalStatus !== 'error' && (
+        <div className="mb-6">
+          <EngineLoadingStatus status={evalStatus} engineName="Toxicity" />
+        </div>
+      )}
+
+      {evalError && (
+        <div className="mb-6">
+          <EngineErrorCard 
+            type="connection"
+            message={evalError}
+            onRetry={() => runToxicityEvaluation()}
+            isRetrying={evalStatus === 'sending'}
+            systemId={selectedModel?.system_id}
+          />
+        </div>
+      )}
+
       {selectedModelId && (
         <div className="mb-6">
           <CustomPromptTest
@@ -256,10 +308,8 @@ export default function ToxicityEngine() {
         </div>
       )}
 
-      {/* Results Display */}
-      {selectedModelId && (latestResult || realEvalResult) && (
+      {selectedModelId && (latestResult || realEvalResult) && !evalError && (
         <>
-          {/* Compliance Banner */}
           <div className="mb-6">
             <ComplianceBanner
               score={overallScore}
@@ -269,7 +319,6 @@ export default function ToxicityEngine() {
             />
           </div>
 
-          {/* 5-Metric Weighted Grid */}
           <Card className="mb-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -291,7 +340,6 @@ export default function ToxicityEngine() {
             </CardContent>
           </Card>
 
-          {/* Why Score Panel */}
           <div className="mb-6">
             <WhyScorePanel
               score={overallScore}
@@ -303,7 +351,6 @@ export default function ToxicityEngine() {
             />
           </div>
 
-          {/* Computation Breakdown */}
           {computationSteps.length > 0 && (
             <div className="mb-6">
               <ComputationBreakdown 
@@ -314,7 +361,6 @@ export default function ToxicityEngine() {
             </div>
           )}
 
-          {/* Reasoning Chain Display */}
           {hasReasoningChain && (
             <div className="mb-6">
               <ReasoningChainDisplay
@@ -328,7 +374,6 @@ export default function ToxicityEngine() {
             </div>
           )}
 
-          {/* Raw Data Log */}
           {rawLogs.length > 0 && (
             <div className="mb-6">
               <RawDataLog logs={rawLogs.map((log, idx) => ({
@@ -340,7 +385,6 @@ export default function ToxicityEngine() {
             </div>
           )}
 
-          {/* Evidence Package */}
           <div className="mb-6">
             <EvidencePackage
               data={{
@@ -354,7 +398,6 @@ export default function ToxicityEngine() {
             />
           </div>
 
-          {/* Evaluation History */}
           {results && results.length > 1 && (
             <Card className="mt-6">
               <CardHeader>
@@ -382,24 +425,27 @@ export default function ToxicityEngine() {
         </>
       )}
 
-      {selectedModelId && !latestResult && !realEvalResult && !loadingResults && (
+      {selectedModelId && !latestResult && !realEvalResult && !loadingResults && !evalError && (
         <div className="text-center py-16 bg-card rounded-xl border border-border">
           <Brain className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-foreground mb-2">No Evaluations Yet</h3>
           <p className="text-muted-foreground mb-4">Run your first 2025 SOTA toxicity evaluation</p>
-          <Button onClick={runToxicityEvaluation} disabled={isEvaluating} className="gap-2">
+          <Button onClick={() => runToxicityEvaluation()} disabled={evalStatus !== 'idle'} className="gap-2">
             <ShieldAlert className="w-4 h-4" />
             Run Safety Test
           </Button>
         </div>
       )}
 
-      {loadingResults && (
-        <div className="text-center py-16 bg-card rounded-xl border border-border">
-          <Loader2 className="w-16 h-16 text-primary mx-auto mb-4 animate-spin" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Loading Results</h3>
-        </div>
-      )}
+      {loadingResults && <EngineSkeleton showMetrics={false} />}
     </MainLayout>
+  );
+}
+
+export default function ToxicityEngine() {
+  return (
+    <ComponentErrorBoundary>
+      <ToxicityEngineContent />
+    </ComponentErrorBoundary>
   );
 }
