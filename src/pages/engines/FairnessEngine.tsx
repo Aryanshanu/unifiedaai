@@ -6,12 +6,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { useModels } from "@/hooks/useModels";
 import { useToast } from "@/hooks/use-toast";
-import { Scale, Loader2, Brain, Sparkles, Users, Layers } from "lucide-react";
+import { Scale, Loader2, Brain, Sparkles, Layers } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { instrumentPageLoad } from "@/lib/telemetry";
 import { CustomPromptTest } from "@/components/engines/CustomPromptTest";
-import { CohortSelector } from "@/components/engines/CohortSelector";
 import { InputOutputScope } from "@/components/engines/InputOutputScope";
 import { ComputationBreakdown } from "@/components/engines/ComputationBreakdown";
 import { RawDataLog } from "@/components/engines/RawDataLog";
@@ -59,7 +58,6 @@ const FORMULA = "0.25×DP + 0.25×EO + 0.25×EOdds + 0.15×GLR + 0.10×Bias";
 
 function FairnessEngineContent() {
   const [selectedModelId, setSelectedModelId] = useState<string>("");
-  const [selectedCohorts, setSelectedCohorts] = useState<Record<string, string>>({});
   const [rawLogs, setRawLogs] = useState<any[]>([]);
   const [computationSteps, setComputationSteps] = useState<any[]>([]);
   const [realEvalResult, setRealEvalResult] = useState<any>(null);
@@ -247,7 +245,7 @@ function FairnessEngineContent() {
     >
       <InputOutputScope 
         scope="BOTH" 
-        inputDescription="Analyzes input cohorts (age, gender, income, region)"
+        inputDescription="Analyzes model inputs for fairness indicators"
         outputDescription="Evaluates predictions for demographic parity and disparate impact"
       />
 
@@ -334,22 +332,6 @@ function FairnessEngineContent() {
         </div>
       )}
 
-      {/* Cohort Selector */}
-      {selectedModelId && (
-        <Card className="mb-6">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Users className="w-5 h-5 text-primary" />
-              Cohort Analysis
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <CohortSelector 
-              onCohortChange={(cohort, value) => setSelectedCohorts(prev => ({ ...prev, [cohort]: value }))}
-            />
-          </CardContent>
-        </Card>
-      )}
 
       {/* Empty State */}
       {!selectedModelId && (
