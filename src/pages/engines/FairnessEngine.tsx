@@ -175,49 +175,39 @@ function FairnessEngineContent() {
     }));
   };
 
+  // Use ONLY real data from API - no hardcoded fallbacks
   const getSummaryBullets = () => {
     const bullets: Array<{ type: 'success' | 'warning' | 'error' | 'info'; text: string }> = [];
-    const metrics = getMetricsForGrid();
     
-    if (overallScore >= 80) {
-      bullets.push({ type: 'success', text: 'Model demonstrates strong fairness across all demographic groups' });
-    } else if (overallScore >= 70) {
-      bullets.push({ type: 'warning', text: 'Model shows acceptable fairness but has room for improvement' });
-    } else {
-      bullets.push({ type: 'error', text: 'Model exhibits significant bias that requires immediate attention' });
-    }
-
-    const lowestMetric = metrics.reduce((min, m) => m.score < min.score ? m : min, metrics[0]);
-    if (lowestMetric && lowestMetric.score < 70) {
-      bullets.push({ type: 'warning', text: `${lowestMetric.name} is below threshold at ${lowestMetric.score.toFixed(0)}%` });
-    }
-
-    const highestMetric = metrics.reduce((max, m) => m.score > max.score ? m : max, metrics[0]);
-    if (highestMetric) {
-      bullets.push({ type: 'success', text: `${highestMetric.name} performs well at ${highestMetric.score.toFixed(0)}%` });
-    }
-
+    // Get real risk factors from evaluation
+    const riskFactors = latestResult?.explanations?.risk_factors || realEvalResult?.riskFactors || [];
+    const evidence = latestResult?.explanations?.evidence || realEvalResult?.evidence || [];
+    
+    // Add real risk factors as warnings/errors
+    riskFactors.forEach((factor: string) => {
+      bullets.push({ type: 'warning', text: factor });
+    });
+    
+    // Add evidence as success items
+    evidence.forEach((item: string) => {
+      bullets.push({ type: 'success', text: item });
+    });
+    
     return bullets;
   };
 
   const getKeyInsight = () => {
-    if (overallScore >= 80) return "No significant demographic bias detected in model outputs";
-    if (overallScore >= 70) return "Minor fairness concerns identified — review recommended";
-    return "Significant bias detected — immediate remediation required";
+    // Use real transparency summary from API if available
+    const realSummary = latestResult?.explanations?.transparency_summary || realEvalResult?.transparencySummary;
+    if (realSummary) return realSummary;
+    
+    // Minimal fallback based on compliance status only
+    return overallScore >= 70 ? "Evaluation complete - see detailed metrics" : "Review required - see detailed metrics";
   };
 
   const getRecommendations = () => {
-    const recs = latestResult?.explanations?.recommendations || realEvalResult?.recommendations || [];
-    if (recs.length > 0) return recs;
-    
-    if (overallScore < 70) {
-      return [
-        "Review training data for demographic imbalances",
-        "Consider applying fairness-aware training techniques",
-        "Implement monitoring for bias drift over time"
-      ];
-    }
-    return ["Continue monitoring fairness metrics", "Consider expanding cohort analysis"];
+    // Use ONLY real recommendations from API - no hardcoded fallbacks
+    return latestResult?.explanations?.recommendations || realEvalResult?.recommendations || [];
   };
 
   if (modelsLoading) {
