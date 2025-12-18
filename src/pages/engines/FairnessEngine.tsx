@@ -185,13 +185,22 @@ function FairnessEngineContent() {
     const evidence = latestResult?.explanations?.evidence || realEvalResult?.evidence || [];
     
     // Add real risk factors as warnings/errors
-    riskFactors.forEach((factor: string) => {
-      bullets.push({ type: 'warning', text: factor });
+    riskFactors.forEach((factor: any) => {
+      // Handle both string and object formats
+      const text = typeof factor === 'string' ? factor : (factor?.text || factor?.description || JSON.stringify(factor));
+      if (text) bullets.push({ type: 'warning', text });
     });
     
-    // Add evidence as success items
-    evidence.forEach((item: string) => {
-      bullets.push({ type: 'success', text: item });
+    // Add evidence as success items - handle object format {input, output, prediction, demographic}
+    evidence.forEach((item: any) => {
+      if (typeof item === 'string') {
+        bullets.push({ type: 'success', text: item });
+      } else if (item && typeof item === 'object') {
+        // Format evidence object into readable text
+        const text = item.text || item.description || 
+          (item.input ? `Test: "${item.input}" → ${item.prediction || item.output || 'evaluated'}` : null);
+        if (text) bullets.push({ type: 'success', text });
+      }
     });
     
     return bullets;
