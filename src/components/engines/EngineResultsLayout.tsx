@@ -104,20 +104,26 @@ export function EngineResultsLayout({
             <TabsContent value="summary" className="mt-0 space-y-4">
               <div>
                 <h4 className="text-sm font-semibold text-foreground mb-3">Key Findings</h4>
-                <div className="space-y-2">
-                  {summaryBullets.map((bullet, idx) => (
-                    <div 
-                      key={idx} 
-                      className={cn(
-                        "flex items-start gap-3 p-3 rounded-lg",
-                        getBulletBg(bullet.type)
-                      )}
-                    >
-                      {getBulletIcon(bullet.type)}
-                      <span className="text-sm text-foreground">{bullet.text}</span>
-                    </div>
-                  ))}
-                </div>
+                {summaryBullets.length > 0 ? (
+                  <div className="space-y-2">
+                    {summaryBullets.map((bullet, idx) => (
+                      <div 
+                        key={idx} 
+                        className={cn(
+                          "flex items-start gap-3 p-3 rounded-lg",
+                          getBulletBg(bullet.type)
+                        )}
+                      >
+                        {getBulletIcon(bullet.type)}
+                        <span className="text-sm text-foreground">{bullet.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-muted-foreground bg-muted/20 rounded-lg">
+                    <p className="text-sm">See "Detailed Metrics" tab for evaluation breakdown</p>
+                  </div>
+                )}
               </div>
 
               {recommendations && recommendations.length > 0 && (
