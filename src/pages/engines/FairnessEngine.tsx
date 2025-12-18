@@ -26,6 +26,7 @@ import { EngineErrorCard } from "@/components/engines/EngineErrorCard";
 import { NoEndpointWarning } from "@/components/engines/NoModelConnected";
 import { EngineResultsLayout } from "@/components/engines/EngineResultsLayout";
 import { EngineActionBar } from "@/components/engines/EngineActionBar";
+import { sanitizeErrorMessage } from "@/lib/ui-helpers";
 import { cn } from "@/lib/utils";
 import { REGULATORY_REFERENCES } from "@/core/evaluator-harness";
 
@@ -146,7 +147,7 @@ function FairnessEngineContent() {
         });
         setTimeout(() => runRealFairnessEvaluation(true), 2000);
       } else {
-        setEvalError(error.message || "Evaluation failed. Please try again.");
+        setEvalError(sanitizeErrorMessage(error.message) || "Evaluation failed. Please try again.");
         setRetryCount(0);
       }
     }
