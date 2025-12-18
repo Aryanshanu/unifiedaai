@@ -182,12 +182,19 @@ function HallucinationEngineContent() {
     const riskFactors = latestResult?.explanations?.risk_factors || realEvalResult?.riskFactors || [];
     const evidence = latestResult?.explanations?.evidence || realEvalResult?.evidence || [];
     
-    riskFactors.forEach((factor: string) => {
-      bullets.push({ type: 'warning', text: factor });
+    riskFactors.forEach((factor: any) => {
+      const text = typeof factor === 'string' ? factor : (factor?.text || factor?.description || JSON.stringify(factor));
+      if (text) bullets.push({ type: 'warning', text });
     });
     
-    evidence.forEach((item: string) => {
-      bullets.push({ type: 'success', text: item });
+    evidence.forEach((item: any) => {
+      if (typeof item === 'string') {
+        bullets.push({ type: 'success', text: item });
+      } else if (item && typeof item === 'object') {
+        const text = item.text || item.description || 
+          (item.input ? `Test: "${item.input}" → ${item.prediction || item.output || 'evaluated'}` : null);
+        if (text) bullets.push({ type: 'success', text });
+      }
     });
     
     return bullets;
