@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -10,15 +10,12 @@ import { Lock, Loader2, Brain, Sparkles, Layers, Shield } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { instrumentPageLoad } from "@/lib/telemetry";
-import { useRAIReasoning } from "@/hooks/useRAIReasoning";
-import { ReasoningChainDisplay } from "@/components/engines/ReasoningChainDisplay";
 import { CustomPromptTest } from "@/components/engines/CustomPromptTest";
 import { InputOutputScope } from "@/components/engines/InputOutputScope";
 import { ComputationBreakdown } from "@/components/engines/ComputationBreakdown";
 import { RawDataLog } from "@/components/engines/RawDataLog";
 import { EvidencePackage } from "@/components/engines/EvidencePackage";
 import { MetricWeightGrid } from "@/components/engines/MetricWeightGrid";
-import { ComplianceBanner } from "@/components/engines/ComplianceBanner";
 import { WhyScorePanel } from "@/components/engines/WhyScorePanel";
 import { HealthIndicator } from "@/components/shared/HealthIndicator";
 import { useDataHealth } from "@/components/shared/DataHealthWrapper";
@@ -27,8 +24,9 @@ import { EngineSkeleton } from "@/components/engines/EngineSkeleton";
 import { EngineLoadingStatus, EvalStatus } from "@/components/engines/EngineLoadingStatus";
 import { EngineErrorCard } from "@/components/engines/EngineErrorCard";
 import { NoEndpointWarning } from "@/components/engines/NoModelConnected";
-import { cn } from "@/lib/utils";
-import { REGULATORY_REFERENCES } from "@/core/evaluator-harness";
+import { EngineResultsLayout } from "@/components/engines/EngineResultsLayout";
+import { EngineActionBar } from "@/components/engines/EngineActionBar";
+import { sanitizeErrorMessage } from "@/lib/ui-helpers";
 
 interface PrivacyResult {
   id: string;
@@ -147,18 +145,19 @@ function PrivacyEngineContent() {
         });
         setTimeout(() => runPrivacyEvaluation(true), 2000);
       } else {
-        setEvalError(error.message || "Evaluation failed. Please try again.");
+        setEvalError(sanitizeErrorMessage(error.message) || "Evaluation failed. Please try again.");
         setRetryCount(0);
       }
     }
   };
 
+  // Use ONLY real data - no hardcoded fallbacks
   const getMetricsForGrid = () => {
     const details = realEvalResult?.metricDetails || latestResult?.metric_details || {};
     return PRIVACY_METRICS.map(m => ({
       key: m.key,
       name: m.name,
-      score: details[m.key] ?? details[m.key.replace(/_/g, '')] ?? 85,
+      score: details[m.key] ?? details[m.key.replace(/_/g, '')] ?? null,
       weight: m.weight,
       description: m.description,
     }));
@@ -168,16 +167,41 @@ function PrivacyEngineContent() {
 
   const getMetricBreakdown = () => {
     const metrics = getMetricsForGrid();
-    return metrics.map(m => ({
+    return metrics.filter(m => m.score !== null).map(m => ({
       name: m.name,
-      score: m.score,
+      score: m.score!,
       weight: m.weight,
-      contribution: m.score * m.weight,
+      contribution: m.score! * m.weight,
     }));
   };
 
-  const hasReasoningChain = latestResult?.explanations?.reasoning_chain && 
-    latestResult.explanations.reasoning_chain.length > 0;
+  // Use ONLY real data from API - no hardcoded fallbacks
+  const getSummaryBullets = () => {
+    const bullets: Array<{ type: 'success' | 'warning' | 'error' | 'info'; text: string }> = [];
+    
+    const riskFactors = latestResult?.explanations?.risk_factors || realEvalResult?.riskFactors || [];
+    const evidence = latestResult?.explanations?.evidence || realEvalResult?.evidence || [];
+    
+    riskFactors.forEach((factor: string) => {
+      bullets.push({ type: 'warning', text: factor });
+    });
+    
+    evidence.forEach((item: string) => {
+      bullets.push({ type: 'success', text: item });
+    });
+    
+    return bullets;
+  };
+
+  const getKeyInsight = () => {
+    const realSummary = latestResult?.explanations?.transparency_summary || realEvalResult?.transparencySummary;
+    if (realSummary) return realSummary;
+    return overallScore >= 70 ? "Evaluation complete - see detailed metrics" : "Review required - see detailed metrics";
+  };
+
+  const getRecommendations = () => {
+    return latestResult?.explanations?.recommendations || realEvalResult?.recommendations || [];
+  };
 
   if (modelsLoading) {
     return (
@@ -186,6 +210,8 @@ function PrivacyEngineContent() {
       </MainLayout>
     );
   }
+
+  const hasResults = (latestResult || realEvalResult) && !evalError;
 
   return (
     <MainLayout 
@@ -251,7 +277,7 @@ function PrivacyEngineContent() {
             <div className="pt-6">
               <Button 
                 onClick={() => runPrivacyEvaluation()} 
-                disabled={!selectedModelId || evalStatus !== 'idle' && evalStatus !== 'complete' && evalStatus !== 'error'}
+                disabled={!selectedModelId || (evalStatus !== 'idle' && evalStatus !== 'complete' && evalStatus !== 'error')}
                 size="lg"
                 className="gap-2"
               >
@@ -290,16 +316,6 @@ function PrivacyEngineContent() {
         </div>
       )}
 
-      {selectedModelId && (
-        <div className="mb-6">
-          <CustomPromptTest
-            modelId={selectedModelId}
-            engineType="privacy"
-            engineName="Privacy"
-          />
-        </div>
-      )}
-
       {!selectedModelId && (
         <div className="text-center py-16 bg-card rounded-xl border border-border">
           <Lock className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
@@ -308,84 +324,57 @@ function PrivacyEngineContent() {
         </div>
       )}
 
-      {selectedModelId && (latestResult || realEvalResult) && !evalError && (
-        <>
-          <div className="mb-6">
-            <ComplianceBanner
-              score={overallScore}
-              threshold={70}
-              engineName="Privacy"
-              regulatoryReferences={REGULATORY_REFERENCES.privacy}
-            />
-          </div>
-
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Lock className="w-5 h-5 text-primary" />
-                2025 SOTA Privacy Metrics
-              </CardTitle>
-              <CardDescription>
-                Weighted formula: {FORMULA}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+      {selectedModelId && hasResults && (
+        <EngineResultsLayout
+          score={overallScore}
+          threshold={70}
+          engineName="Privacy"
+          keyInsight={getKeyInsight()}
+          summaryBullets={getSummaryBullets()}
+          recommendations={getRecommendations()}
+          metricsContent={
+            <div className="space-y-6">
               <MetricWeightGrid
-                metrics={getMetricsForGrid()}
+                metrics={getMetricsForGrid().filter(m => m.score !== null)}
                 overallScore={overallScore}
                 engineName="Privacy"
                 formula={FORMULA}
                 complianceThreshold={70}
               />
-            </CardContent>
-          </Card>
-
-          <div className="mb-6">
-            <WhyScorePanel
-              score={overallScore}
-              engineName="Privacy"
-              computationSteps={computationSteps}
-              weightedFormula={`Score = ${FORMULA} = ${overallScore.toFixed(0)}%`}
-              metricBreakdown={getMetricBreakdown()}
-              threshold={70}
-            />
-          </div>
-
-          {computationSteps.length > 0 && (
-            <div className="mb-6">
-              <ComputationBreakdown 
-                steps={computationSteps}
-                overallScore={overallScore}
-                engineType="privacy"
+              <WhyScorePanel
+                score={overallScore}
+                engineName="Privacy"
+                computationSteps={computationSteps.length > 0 ? computationSteps : realEvalResult?.computationSteps || []}
+                weightedFormula={`Score = ${FORMULA} = ${overallScore.toFixed(0)}%`}
+                metricBreakdown={getMetricBreakdown()}
+                threshold={70}
               />
+              {(computationSteps.length > 0 || realEvalResult?.computationSteps) && (
+                <ComputationBreakdown 
+                  steps={computationSteps.length > 0 ? computationSteps : realEvalResult?.computationSteps || []}
+                  overallScore={overallScore}
+                  engineType="privacy"
+                />
+              )}
             </div>
-          )}
-
-          {hasReasoningChain && (
-            <div className="mb-6">
-              <ReasoningChainDisplay
-                reasoningChain={latestResult.explanations.reasoning_chain!}
-                transparencySummary={latestResult.explanations.transparency_summary || ""}
-                evidence={latestResult.explanations.evidence}
-                riskFactors={latestResult.explanations.risk_factors}
-                recommendations={latestResult.explanations.recommendations}
-                analysisModel={latestResult.explanations.analysis_model}
-              />
+          }
+          rawDataContent={
+            <div className="space-y-4">
+              {rawLogs.length > 0 ? (
+                <RawDataLog logs={rawLogs.map((log, idx) => ({
+                  id: `log-${idx}`,
+                  timestamp: new Date().toISOString(),
+                  type: 'computation' as const,
+                  data: typeof log === 'object' ? log : { value: log },
+                }))} />
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>Raw data logs will appear here after running an evaluation</p>
+                </div>
+              )}
             </div>
-          )}
-
-          {rawLogs.length > 0 && (
-            <div className="mb-6">
-              <RawDataLog logs={rawLogs.map((log, idx) => ({
-                id: `log-${idx}`,
-                timestamp: new Date().toISOString(),
-                type: 'computation' as const,
-                data: log,
-              }))} />
-            </div>
-          )}
-
-          <div className="mb-6">
+          }
+          evidenceContent={
             <EvidencePackage
               data={{
                 results: realEvalResult?.metricDetails || latestResult?.metric_details,
@@ -396,33 +385,18 @@ function PrivacyEngineContent() {
                 isCompliant: overallScore >= 70
               }}
             />
-          </div>
+          }
+        />
+      )}
 
-          {results && results.length > 1 && (
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle>Evaluation History</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {results.slice(1).map((result) => (
-                    <div key={result.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                      <span className="text-sm text-muted-foreground">
-                        {new Date(result.created_at).toLocaleDateString()}
-                      </span>
-                      <Badge className={cn(
-                        result.overall_score >= 80 ? "text-success" :
-                        result.overall_score >= 70 ? "text-warning" : "text-danger"
-                      )}>
-                        {result.overall_score}%
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </>
+      {selectedModelId && (
+        <div className="mt-6">
+          <CustomPromptTest
+            modelId={selectedModelId}
+            engineType="privacy"
+            engineName="Privacy"
+          />
+        </div>
       )}
 
       {selectedModelId && !latestResult && !realEvalResult && !loadingResults && !evalError && (
@@ -438,6 +412,19 @@ function PrivacyEngineContent() {
       )}
 
       {loadingResults && <EngineSkeleton showMetrics={false} />}
+
+      {selectedModelId && hasResults && (
+        <div className="mt-6">
+          <EngineActionBar
+            onRetry={() => runPrivacyEvaluation()}
+            modelId={selectedModelId}
+            systemId={selectedModel?.system_id}
+            engineName="Privacy"
+            score={overallScore}
+            isRetrying={evalStatus === 'sending' || evalStatus === 'analyzing'}
+          />
+        </div>
+      )}
     </MainLayout>
   );
 }
