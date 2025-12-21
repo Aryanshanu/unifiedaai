@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { validateSession, requireAuth, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
 
 // =====================================================
 // RATE LIMITING (Per-system)
@@ -192,6 +188,27 @@ serve(async (req) => {
   console.log(`Request started at: ${new Date().toISOString()}`);
 
   try {
+    // =====================================================
+    // AUTHENTICATION: Validate user JWT via auth-helper
+    // This enforces RLS for user-scoped queries
+    // =====================================================
+    const authResult = await validateSession(req);
+    const authError = requireAuth(authResult);
+    
+    if (authError) {
+      console.log("[ai-gateway] Authentication failed - returning 401");
+      return authError;
+    }
+    
+    const { user } = authResult;
+    // Non-null assertion safe: requireAuth already verified authentication
+    const supabase = authResult.supabase!;
+    console.log(`[ai-gateway] Authenticated user: ${user?.id}`);
+    
+    // Service client for system operations (logging, incidents, system updates)
+    // This is isolated from user context and used only for system writes
+    const serviceClient = getServiceClient();
+
     const body = await req.json().catch(() => null);
 
     if (!body) {
@@ -238,11 +255,8 @@ serve(async (req) => {
         { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Fetch system configuration
+    // Fetch system configuration (uses RLS via user context)
     const { data: system, error: systemError } = await supabase
       .from("systems")
       .select("*, projects(*)")
@@ -251,7 +265,7 @@ serve(async (req) => {
 
     if (systemError || !system) {
       return new Response(
-        JSON.stringify({ error: "System not found" }),
+        JSON.stringify({ error: "System not found or access denied" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -277,7 +291,7 @@ serve(async (req) => {
           }
         },
       };
-      await supabase.from("request_logs").insert(logEntry);
+      await serviceClient.from("request_logs").insert(logEntry);
 
       return new Response(
         JSON.stringify({ 
@@ -307,7 +321,7 @@ serve(async (req) => {
       // Auto-lock critical risk systems
       if (riskTier === 'critical' && !system.registry_locked) {
         console.log(`[ai-gateway] Auto-locking critical risk system: ${systemId}`);
-        await supabase.from("systems").update({
+        await serviceClient.from("systems").update({
           registry_locked: true,
           locked_at: new Date().toISOString(),
           lock_reason: "Auto-locked: Critical risk tier detected",
@@ -315,7 +329,7 @@ serve(async (req) => {
         }).eq("id", systemId);
 
         // Create incident for auto-lock
-        await supabase.from("incidents").insert({
+        await serviceClient.from("incidents").insert({
           title: `Critical Risk Auto-Lock: ${system.name}`,
           description: `System auto-locked due to critical risk tier (URI score: ${latestRiskAssessment.uri_score})`,
           incident_type: "risk_auto_lock",
@@ -371,7 +385,7 @@ serve(async (req) => {
               .single();
 
             if (!existingReview) {
-              await supabase.from("review_queue").insert({
+              await serviceClient.from("review_queue").insert({
                 title: `HITL Required: ${system.name} (${riskTier} risk)`,
                 description: binding.enforcement_description,
                 review_type: "hitl_gate",
@@ -416,7 +430,7 @@ serve(async (req) => {
           compliance: { verdict: "BLOCK", reason: `Missing: ${missingAssessments.join(", ")}` }
         },
       };
-      await supabase.from("request_logs").insert(logEntry);
+      await serviceClient.from("request_logs").insert(logEntry);
 
       return new Response(
         JSON.stringify({ 
@@ -456,7 +470,7 @@ serve(async (req) => {
             evaluation_gate: { verdict: "FAIL_CLOSED", reason: "No evaluations found for high-risk system" }
           },
         };
-        await supabase.from("request_logs").insert(logEntry);
+        await serviceClient.from("request_logs").insert(logEntry);
 
         return new Response(
           JSON.stringify({
@@ -494,7 +508,7 @@ serve(async (req) => {
           }
         },
       };
-      await supabase.from("request_logs").insert(logEntry);
+      await serviceClient.from("request_logs").insert(logEntry);
 
       return new Response(
         JSON.stringify({
@@ -532,10 +546,10 @@ serve(async (req) => {
           }
         },
       };
-      await supabase.from("request_logs").insert(logEntry);
+      await serviceClient.from("request_logs").insert(logEntry);
 
       // Create HITL review for low scores
-      await supabase.from("review_queue").insert({
+      await serviceClient.from("review_queue").insert({
         title: `Low Evaluation Score: ${system.name}`,
         description: `System blocked due to evaluation scores below 70%. Engines: ${lowScoreEvals.map(e => `${e.engine_type}=${e.overall_score}%`).join(', ')}`,
         review_type: "evaluation_failure",
@@ -571,7 +585,7 @@ serve(async (req) => {
           .single();
 
         if (!existingApproval) {
-          await supabase.from("system_approvals").insert({
+          await serviceClient.from("system_approvals").insert({
             system_id: systemId,
             status: "pending",
             reason: "Auto-generated on gateway call - transition to pending_approval",
@@ -595,7 +609,7 @@ serve(async (req) => {
           governance: { verdict: "BLOCK", reason: "Not approved" }
         },
       };
-      await supabase.from("request_logs").insert(logEntry);
+      await serviceClient.from("request_logs").insert(logEntry);
 
       return new Response(
         JSON.stringify({ error: "System not approved for deployment", decision: "BLOCK" }),
@@ -634,7 +648,7 @@ serve(async (req) => {
       };
       console.log("=== INSERTING REQUEST_LOG (BLOCK) ===");
       console.log(`System: ${systemId}, Decision: BLOCK, Trace: ${traceIdGen}`);
-      const { error: logError } = await supabase.from("request_logs").insert(logEntry);
+      const { error: logError } = await serviceClient.from("request_logs").insert(logEntry);
       if (logError) {
         console.error("REQUEST_LOG INSERT FAILED:", logError);
       } else {
@@ -645,7 +659,7 @@ serve(async (req) => {
       const toxicityScore = blockingEngine?.scores?.toxicity ?? 0;
       const severity = (toxicityScore > 80 || blockingEngine?.engine === "safety") ? "critical" : "high";
       
-      await supabase.from("review_queue").insert({
+      await serviceClient.from("review_queue").insert({
         title: `Gateway Block: ${blockingEngine?.engine || 'Policy'} violation`,
         description: `Request blocked. Engine: ${blockingEngine?.engine}. Details: ${blockingEngine?.details || 'Safety policy triggered'}`,
         review_type: "gateway_block",
@@ -664,7 +678,7 @@ serve(async (req) => {
 
       // Create incident for critical blocks
       if (severity === "critical") {
-        await supabase.from("incidents").insert({
+        await serviceClient.from("incidents").insert({
           title: `Critical Block: ${blockingEngine?.engine} threshold exceeded`,
           description: `System "${system.name}" blocked a request due to ${blockingEngine?.engine} policy. Trace: ${traceIdGen}`,
           incident_type: `${blockingEngine?.engine}_violation`,
@@ -675,7 +689,7 @@ serve(async (req) => {
 
         // KG AUTO-EDGE: Create edge for every BLOCK
         try {
-          await supabase.functions.invoke('kg-upsert', {
+          await serviceClient.functions.invoke('kg-upsert', {
             body: {
               nodes: [
                 { entity_type: 'request', entity_id: traceIdGen, label: `Request ${traceIdGen.slice(0,8)}` },
@@ -866,7 +880,7 @@ serve(async (req) => {
 
     console.log("=== INSERTING REQUEST_LOG (SUCCESS PATH) ===");
     console.log(`System: ${systemId}, Decision: ${decision}, Latency: ${latencyMs}ms`);
-    const { error: logInsertError } = await supabase.from("request_logs").insert(logEntry);
+    const { error: logInsertError } = await serviceClient.from("request_logs").insert(logEntry);
     if (logInsertError) {
       console.error("REQUEST_LOG INSERT FAILED:", logInsertError);
     } else {
@@ -877,7 +891,7 @@ serve(async (req) => {
     const now = new Date();
     const windowStart = new Date(now.getTime() - 5 * 60 * 1000).toISOString();
     
-    await supabase.from("risk_metrics").insert([
+    await serviceClient.from("risk_metrics").insert([
       { system_id: systemId, metric_name: "request_logged", metric_value: 1, time_window: "5m" },
       { system_id: systemId, metric_name: "latency_ms", metric_value: latencyMs, time_window: "5m" },
       { system_id: systemId, metric_name: decision === "BLOCK" ? "blocked_count" : "allowed_count", metric_value: 1, time_window: "5m" },
@@ -900,11 +914,9 @@ serve(async (req) => {
     
     // Log to app_errors table for debugging
     try {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-      const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-      const supabase = createClient(supabaseUrl, supabaseKey);
+      const errorClient = getServiceClient();
       
-      await supabase.from("app_errors").insert({
+      await errorClient.from("app_errors").insert({
         error_type: "edge_function_error",
         error_message: error instanceof Error ? error.message : "Unknown error",
         error_stack: error instanceof Error ? error.stack : null,

@@ -86,8 +86,8 @@ export default function HITL() {
   };
   
   const handleNotifySlack = () => {
-    toast("✓ Alert sent to #rai-alerts on Slack", {
-      icon: <Bell className="w-4 h-4 text-primary" />,
+    toast.warning("Slack notifications not implemented", {
+      description: "Backend webhook integration pending",
       duration: 3000
     });
   };
