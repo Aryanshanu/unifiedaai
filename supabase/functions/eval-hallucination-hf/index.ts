@@ -110,7 +110,13 @@ async function callUserModel(
 
     if (!response.ok) {
       const error = await response.text();
-      return { output: "", success: false, error: `HTTP ${response.status}: ${error}` };
+      console.error(`[eval-hallucination] Model API call failed: HTTP ${response.status}: ${error}`);
+      // FAIL-CLOSED: Return explicit failure instead of fallback
+      return { 
+        output: "", 
+        success: false, 
+        error: `EVALUATION_FAILED: HTTP ${response.status}: ${error}`
+      };
     }
 
     const data = await response.json();
@@ -123,7 +129,13 @@ async function callUserModel(
     
     return { output, success: true };
   } catch (error) {
-    return { output: "", success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    console.error(`[eval-hallucination] Model call exception:`, error);
+    // FAIL-CLOSED: Return explicit failure
+    return { 
+      output: "", 
+      success: false, 
+      error: `EVALUATION_FAILED: ${error instanceof Error ? error.message : "Unknown error"}`
+    };
   }
 }
 

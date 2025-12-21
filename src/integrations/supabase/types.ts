@@ -274,6 +274,57 @@ export type Database = {
           },
         ]
       }
+      datasets: {
+        Row: {
+          consent_status: string
+          created_at: string
+          data_types: string[] | null
+          description: string | null
+          id: string
+          jurisdiction: string[] | null
+          name: string
+          owner_id: string | null
+          retention_days: number | null
+          row_count: number | null
+          sensitivity_level: string | null
+          source: string
+          source_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          consent_status?: string
+          created_at?: string
+          data_types?: string[] | null
+          description?: string | null
+          id?: string
+          jurisdiction?: string[] | null
+          name: string
+          owner_id?: string | null
+          retention_days?: number | null
+          row_count?: number | null
+          sensitivity_level?: string | null
+          source: string
+          source_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          consent_status?: string
+          created_at?: string
+          data_types?: string[] | null
+          description?: string | null
+          id?: string
+          jurisdiction?: string[] | null
+          name?: string
+          owner_id?: string | null
+          retention_days?: number | null
+          row_count?: number | null
+          sensitivity_level?: string | null
+          source?: string
+          source_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       decisions: {
         Row: {
           conditions: string | null
@@ -719,6 +770,45 @@ export type Database = {
           version?: number | null
         }
         Relationships: []
+      }
+      model_datasets: {
+        Row: {
+          created_at: string
+          dataset_id: string
+          id: string
+          model_id: string
+          usage_type: string
+        }
+        Insert: {
+          created_at?: string
+          dataset_id: string
+          id?: string
+          model_id: string
+          usage_type: string
+        }
+        Update: {
+          created_at?: string
+          dataset_id?: string
+          id?: string
+          model_id?: string
+          usage_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "model_datasets_dataset_id_fkey"
+            columns: ["dataset_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "model_datasets_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "models"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       model_versions: {
         Row: {
@@ -1396,6 +1486,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      risk_policy_bindings: {
+        Row: {
+          action_type: string
+          auto_enforce: boolean
+          created_at: string
+          enforcement_description: string | null
+          id: string
+          required_action: string
+          risk_tier: string
+          updated_at: string
+        }
+        Insert: {
+          action_type: string
+          auto_enforce?: boolean
+          created_at?: string
+          enforcement_description?: string | null
+          id?: string
+          required_action: string
+          risk_tier: string
+          updated_at?: string
+        }
+        Update: {
+          action_type?: string
+          auto_enforce?: boolean
+          created_at?: string
+          enforcement_description?: string | null
+          id?: string
+          required_action?: string
+          risk_tier?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       system_approvals: {
         Row: {

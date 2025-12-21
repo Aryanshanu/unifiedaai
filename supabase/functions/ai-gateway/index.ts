@@ -256,6 +256,101 @@ serve(async (req) => {
       );
     }
 
+    // PHASE 2: RISK POLICY BINDING ENFORCEMENT
+    // Check risk tier and enforce mandatory actions
+    const { data: latestRiskAssessment } = await supabase
+      .from("risk_assessments")
+      .select("risk_tier, uri_score")
+      .eq("system_id", systemId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (latestRiskAssessment?.risk_tier) {
+      const riskTier = latestRiskAssessment.risk_tier;
+      
+      // Auto-lock critical risk systems
+      if (riskTier === 'critical' && !system.registry_locked) {
+        console.log(`[ai-gateway] Auto-locking critical risk system: ${systemId}`);
+        await supabase.from("systems").update({
+          registry_locked: true,
+          locked_at: new Date().toISOString(),
+          lock_reason: "Auto-locked: Critical risk tier detected",
+          deployment_status: "blocked",
+        }).eq("id", systemId);
+
+        // Create incident for auto-lock
+        await supabase.from("incidents").insert({
+          title: `Critical Risk Auto-Lock: ${system.name}`,
+          description: `System auto-locked due to critical risk tier (URI score: ${latestRiskAssessment.uri_score})`,
+          incident_type: "risk_auto_lock",
+          severity: "critical",
+          status: "open",
+        });
+
+        return new Response(
+          JSON.stringify({
+            error: "CRITICAL_RISK: System auto-locked pending executive review",
+            decision: "PERMANENT_BLOCK",
+            risk_tier: riskTier,
+            uri_score: latestRiskAssessment.uri_score,
+            requires: "Executive signoff and compliance review to unlock"
+          }),
+          { status: 451, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Check risk policy bindings
+      const { data: bindings } = await supabase
+        .from("risk_policy_bindings")
+        .select("*")
+        .eq("risk_tier", riskTier)
+        .eq("auto_enforce", true);
+
+      if (bindings && bindings.length > 0) {
+        for (const binding of bindings) {
+          // Enforce approval requirement for high risk
+          if (binding.action_type === 'approval_required' && 
+              system.deployment_status !== 'approved' && 
+              system.deployment_status !== 'deployed') {
+            return new Response(
+              JSON.stringify({
+                error: `Risk Policy: ${binding.required_action}`,
+                decision: "BLOCK",
+                risk_tier: riskTier,
+                policy_binding: binding.enforcement_description,
+                requires: "System must be approved before deployment"
+              }),
+              { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          // Enforce HITL requirement
+          if (binding.action_type === 'hitl_mandatory') {
+            // Create HITL review item if not exists
+            const { data: existingReview } = await supabase
+              .from("review_queue")
+              .select("id")
+              .eq("context->system_id", systemId)
+              .eq("status", "pending")
+              .single();
+
+            if (!existingReview) {
+              await supabase.from("review_queue").insert({
+                title: `HITL Required: ${system.name} (${riskTier} risk)`,
+                description: binding.enforcement_description,
+                review_type: "hitl_gate",
+                severity: "high",
+                status: "pending",
+                context: { system_id: systemId, risk_tier: riskTier, binding_id: binding.id },
+                sla_deadline: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
+              });
+            }
+          }
+        }
+      }
+    }
+
     // FIX #6: Check if Risk & Impact assessments exist
     const { data: riskAssessments } = await supabase
       .from("risk_assessments")
