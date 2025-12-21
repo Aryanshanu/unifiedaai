@@ -47,6 +47,96 @@ interface CICDGateResponse {
   requiresApproval: boolean;
 }
 
+// =====================================================
+// JWT VERIFICATION FOR DEPLOYMENT TOKENS
+// =====================================================
+interface TokenVerifyResult {
+  valid: boolean;
+  payload?: Record<string, unknown>;
+  error?: string;
+}
+
+/**
+ * Verifies a signed deployment token using HMAC-SHA256.
+ * Validates signature, expiry (exp), and audience (aud).
+ * Returns structured result with payload or error.
+ */
+async function verifyDeploymentToken(token: string): Promise<TokenVerifyResult> {
+  const signingSecret = Deno.env.get("DEPLOYMENT_SIGNING_SECRET");
+  
+  if (!signingSecret) {
+    console.error("[cicd-gate] DEPLOYMENT_SIGNING_SECRET not configured - cannot verify tokens");
+    return { valid: false, error: "Token verification not configured" };
+  }
+  
+  // Split token into parts
+  const parts = token.split(".");
+  if (parts.length !== 3) {
+    return { valid: false, error: "Invalid token format - expected JWT structure" };
+  }
+  
+  const [headerB64, payloadB64, signatureB64] = parts;
+  
+  try {
+    // Verify signature
+    const encoder = new TextEncoder();
+    const data = `${headerB64}.${payloadB64}`;
+    
+    const key = await crypto.subtle.importKey(
+      "raw",
+      encoder.encode(signingSecret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["verify"]
+    );
+    
+    // Decode signature from base64url
+    const signatureBytes = Uint8Array.from(
+      atob(signatureB64.replace(/-/g, '+').replace(/_/g, '/')),
+      c => c.charCodeAt(0)
+    );
+    
+    const isValid = await crypto.subtle.verify(
+      "HMAC",
+      key,
+      signatureBytes,
+      encoder.encode(data)
+    );
+    
+    if (!isValid) {
+      console.warn("[cicd-gate] Token signature verification failed");
+      return { valid: false, error: "Invalid token signature" };
+    }
+    
+    // Decode and parse payload
+    const payloadJson = atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/'));
+    const payload = JSON.parse(payloadJson);
+    
+    // Validate expiry (exp claim)
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp && payload.exp < now) {
+      console.warn(`[cicd-gate] Token expired: exp=${payload.exp}, now=${now}`);
+      return { valid: false, error: "Token expired" };
+    }
+    
+    // Decode and validate audience from header
+    const headerJson = atob(headerB64.replace(/-/g, '+').replace(/_/g, '/'));
+    const header = JSON.parse(headerJson);
+    
+    if (header.aud !== "cicd-pipeline") {
+      console.warn(`[cicd-gate] Invalid audience: ${header.aud}`);
+      return { valid: false, error: "Invalid token audience" };
+    }
+    
+    console.log(`[cicd-gate] Token verified successfully for system: ${payload.systemId}`);
+    return { valid: true, payload };
+    
+  } catch (err) {
+    console.error("[cicd-gate] Token verification error:", err);
+    return { valid: false, error: "Token verification failed" };
+  }
+}
+
 serve(async (req) => {
   console.log("=== CICD-GATE CALLED ===");
   
