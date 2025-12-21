@@ -274,21 +274,29 @@ export default function Settings() {
               <>
                 <h2 className="text-lg font-semibold text-foreground mb-6">Security Settings</h2>
                 <div className="space-y-6">
-                  <Card className="border-border">
+                  {/* MFA - DISABLED until backend enforcement */}
+                  <Card className="border-border opacity-60">
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-base">Multi-Factor Authentication</CardTitle>
-                      <CardDescription>Add an extra layer of security to your account</CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Badge variant={securitySettings.mfaEnabled ? "default" : "secondary"}>
-                          {securitySettings.mfaEnabled ? "Enabled" : "Disabled"}
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base">Multi-Factor Authentication</CardTitle>
+                        <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/30">
+                          DISABLED
                         </Badge>
                       </div>
-                      <Switch
-                        checked={securitySettings.mfaEnabled}
-                        onCheckedChange={(checked) => setSecuritySettings(prev => ({ ...prev, mfaEnabled: checked }))}
-                      />
+                      <CardDescription>Add an extra layer of security to your account</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="w-4 h-4 text-destructive mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium text-destructive">Backend Enforcement Pending</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              MFA toggle is disabled until backend enforcement is implemented via Supabase Auth configuration.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     </CardContent>
                   </Card>
 
@@ -336,14 +344,20 @@ export default function Settings() {
 
                   <Separator />
 
-                  <div className="flex items-center justify-between py-3">
+                  {/* SSO - DISABLED until backend integration */}
+                  <div className="flex items-center justify-between py-3 opacity-60">
                     <div>
-                      <p className="font-medium">Single Sign-On (SSO)</p>
-                      <p className="text-sm text-muted-foreground">Enable SSO with your identity provider</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">Single Sign-On (SSO)</p>
+                        <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/30 text-[10px]">
+                          DISABLED
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">SSO/SAML integration pending enterprise deployment</p>
                     </div>
                     <Switch
-                      checked={securitySettings.ssoEnabled}
-                      onCheckedChange={(checked) => setSecuritySettings(prev => ({ ...prev, ssoEnabled: checked }))}
+                      checked={false}
+                      disabled={true}
                     />
                   </div>
 
@@ -372,16 +386,22 @@ export default function Settings() {
               <>
                 <h2 className="text-lg font-semibold text-foreground mb-6">Notification Settings</h2>
                 <div className="space-y-6">
-                  <div>
-                    <Label className="mb-2 block">Slack Webhook URL</Label>
+                  {/* Slack - DISABLED */}
+                  <div className="opacity-60">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Label className="block">Slack Webhook URL</Label>
+                      <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/30 text-[10px]">
+                        DISABLED
+                      </Badge>
+                    </div>
                     <Input
-                      value={notificationSettings.slackWebhookUrl}
-                      onChange={(e) => setNotificationSettings(prev => ({ ...prev, slackWebhookUrl: e.target.value }))}
-                      placeholder="https://hooks.slack.com/services/..."
+                      value=""
+                      disabled={true}
+                      placeholder="Notification delivery pending implementation"
                       className="bg-secondary"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Receive alerts and notifications in your Slack channel
+                    <p className="text-xs text-destructive mt-1">
+                      Slack webhook integration is disabled until backend delivery is implemented
                     </p>
                   </div>
 

@@ -6,6 +6,27 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// =====================================================
+// RATE LIMITING (Per-system)
+// =====================================================
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT = 100; // 100 requests per minute per system
+const RATE_WINDOW_MS = 60000;
+
+function checkRateLimit(systemId: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(systemId);
+  
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(systemId, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return true;
+  }
+  
+  if (entry.count >= RATE_LIMIT) return false;
+  entry.count++;
+  return true;
+}
+
 // Simple PII detection patterns - EXPANDED with India-specific patterns
 const PII_PATTERNS = {
   email: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
@@ -202,7 +223,21 @@ serve(async (req) => {
       );
     }
 
-    // Initialize Supabase client
+    // =====================================================
+    // RATE LIMITING CHECK (Per-system enforcement)
+    // =====================================================
+    if (!checkRateLimit(systemId)) {
+      console.log(`[ai-gateway] Rate limit exceeded for system: ${systemId}`);
+      return new Response(
+        JSON.stringify({
+          error: "RATE_LIMITED: Too many requests",
+          decision: "BLOCK",
+          retry_after: 60,
+          system_id: systemId
+        }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -393,7 +428,138 @@ serve(async (req) => {
       );
     }
 
-    // FIX #7: Check if system requires approval and is not approved (BEFORE engine compute)
+    // =====================================================
+    // EVALUATION SCORE ENFORCEMENT (CRITICAL FIX)
+    // Block if no evaluations, failed evaluations, or low scores
+    // =====================================================
+    const { data: recentEvals } = await supabase
+      .from("evaluation_runs")
+      .select("engine_type, overall_score, status, fail_closed")
+      .or(`model_id.eq.${systemId},model_id.in.(${systemId})`)
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    // Block if no evaluations exist for high-risk systems
+    if (latestRiskAssessment?.risk_tier === 'high' || latestRiskAssessment?.risk_tier === 'critical') {
+      if (!recentEvals?.length) {
+        const logEntry = {
+          system_id: systemId,
+          project_id: system.project_id,
+          request_body: { messages },
+          response_body: { error: "NO_EVALUATIONS: High-risk system has not been evaluated" },
+          status_code: 451,
+          latency_ms: Date.now() - startTime,
+          error_message: `High-risk system requires evaluation before deployment`,
+          trace_id: traceId,
+          decision: "FAIL_CLOSED",
+          engine_scores: {
+            evaluation_gate: { verdict: "FAIL_CLOSED", reason: "No evaluations found for high-risk system" }
+          },
+        };
+        await supabase.from("request_logs").insert(logEntry);
+
+        return new Response(
+          JSON.stringify({
+            error: "NO_EVALUATIONS: High-risk system requires evaluation",
+            decision: "FAIL_CLOSED",
+            risk_tier: latestRiskAssessment.risk_tier,
+            requires: "Complete at least one RAI evaluation before deployment"
+          }),
+          { status: 451, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // Block if any evaluation has fail_closed = true or status = 'failed'
+    const failClosedEvals = recentEvals?.filter(e => 
+      e.status === 'failed' || e.fail_closed === true
+    ) || [];
+    
+    if (failClosedEvals.length > 0) {
+      const logEntry = {
+        system_id: systemId,
+        project_id: system.project_id,
+        request_body: { messages },
+        response_body: { error: "EVALUATION_FAILED: Fail-closed triggered" },
+        status_code: 451,
+        latency_ms: Date.now() - startTime,
+        error_message: `${failClosedEvals.length} evaluation(s) in fail-closed state`,
+        trace_id: traceId,
+        decision: "FAIL_CLOSED",
+        engine_scores: {
+          evaluation_gate: { 
+            verdict: "FAIL_CLOSED", 
+            failed_engines: failClosedEvals.map(e => e.engine_type),
+            reason: "Evaluation failure triggered fail-closed"
+          }
+        },
+      };
+      await supabase.from("request_logs").insert(logEntry);
+
+      return new Response(
+        JSON.stringify({
+          error: "EVALUATION_FAILED: Fail-closed triggered",
+          decision: "FAIL_CLOSED",
+          failed_engines: failClosedEvals.map(e => e.engine_type),
+          requires: "Re-run failed evaluations and achieve passing scores"
+        }),
+        { status: 451, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Block if any completed evaluation has score below 70%
+    const completedEvals = recentEvals?.filter(e => e.status === 'completed') || [];
+    const lowScoreEvals = completedEvals.filter(e => 
+      (e.overall_score ?? 0) < 70
+    );
+    
+    if (lowScoreEvals.length > 0) {
+      const logEntry = {
+        system_id: systemId,
+        project_id: system.project_id,
+        request_body: { messages },
+        response_body: { error: `NON_COMPLIANT: ${lowScoreEvals.length} evaluation(s) below 70%` },
+        status_code: 451,
+        latency_ms: Date.now() - startTime,
+        error_message: `Evaluation scores below compliance threshold`,
+        trace_id: traceId,
+        decision: "BLOCK",
+        engine_scores: {
+          evaluation_gate: { 
+            verdict: "BLOCK", 
+            low_score_engines: lowScoreEvals.map(e => ({ engine: e.engine_type, score: e.overall_score })),
+            reason: "One or more evaluations below 70% threshold"
+          }
+        },
+      };
+      await supabase.from("request_logs").insert(logEntry);
+
+      // Create HITL review for low scores
+      await supabase.from("review_queue").insert({
+        title: `Low Evaluation Score: ${system.name}`,
+        description: `System blocked due to evaluation scores below 70%. Engines: ${lowScoreEvals.map(e => `${e.engine_type}=${e.overall_score}%`).join(', ')}`,
+        review_type: "evaluation_failure",
+        severity: "high",
+        status: "pending",
+        context: { 
+          system_id: systemId, 
+          low_scores: lowScoreEvals.map(e => ({ engine: e.engine_type, score: e.overall_score }))
+        },
+        sla_deadline: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
+      });
+
+      return new Response(
+        JSON.stringify({
+          error: `NON_COMPLIANT: ${lowScoreEvals.length} evaluation(s) below 70%`,
+          decision: "BLOCK",
+          scores: lowScoreEvals.map(e => ({ engine: e.engine_type, score: e.overall_score })),
+          requires: "Improve model performance to achieve 70%+ scores on all evaluations"
+        }),
+        { status: 451, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`[ai-gateway] Evaluation gate passed: ${completedEvals.length} evaluations, all >= 70%`);
     if (system.requires_approval && system.deployment_status !== "approved" && system.deployment_status !== "deployed") {
       // FIX #1: Ensure approval record exists when pending
       if (system.deployment_status === "pending_approval") {

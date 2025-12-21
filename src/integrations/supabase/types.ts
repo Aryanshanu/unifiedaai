@@ -1905,6 +1905,14 @@ export type Database = {
         Args: { p_justification: string; p_system_id: string }
         Returns: undefined
       }
+      verify_audit_chain: {
+        Args: never
+        Returns: {
+          broken_at: string
+          is_valid: boolean
+          message: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "reviewer" | "analyst" | "viewer"
