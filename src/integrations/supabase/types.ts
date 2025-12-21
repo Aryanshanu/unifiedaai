@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_audit_log: {
+        Row: {
+          action_type: string
+          change_summary: string | null
+          id: string
+          ip_address: string | null
+          new_values: Json | null
+          old_values: Json | null
+          performed_at: string
+          performed_by: string | null
+          record_id: string | null
+          session_id: string | null
+          table_name: string
+          user_agent: string | null
+        }
+        Insert: {
+          action_type: string
+          change_summary?: string | null
+          id?: string
+          ip_address?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          performed_at?: string
+          performed_by?: string | null
+          record_id?: string | null
+          session_id?: string | null
+          table_name: string
+          user_agent?: string | null
+        }
+        Update: {
+          action_type?: string
+          change_summary?: string | null
+          id?: string
+          ip_address?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          performed_at?: string
+          performed_by?: string | null
+          record_id?: string | null
+          session_id?: string | null
+          table_name?: string
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       app_errors: {
         Row: {
           component_name: string | null
@@ -1448,12 +1493,16 @@ export type Database = {
           id: string
           last_risk_calculation: string | null
           license: string | null
+          lock_reason: string | null
+          locked_at: string | null
+          locked_by: string | null
           model_card_url: string | null
           model_name: string | null
           name: string
           owner_id: string | null
           project_id: string
           provider: string
+          registry_locked: boolean
           requires_approval: boolean
           runtime_risk_score: number | null
           sla_tier: string | null
@@ -1477,12 +1526,16 @@ export type Database = {
           id?: string
           last_risk_calculation?: string | null
           license?: string | null
+          lock_reason?: string | null
+          locked_at?: string | null
+          locked_by?: string | null
           model_card_url?: string | null
           model_name?: string | null
           name: string
           owner_id?: string | null
           project_id: string
           provider: string
+          registry_locked?: boolean
           requires_approval?: boolean
           runtime_risk_score?: number | null
           sla_tier?: string | null
@@ -1506,12 +1559,16 @@ export type Database = {
           id?: string
           last_risk_calculation?: string | null
           license?: string | null
+          lock_reason?: string | null
+          locked_at?: string | null
+          locked_by?: string | null
           model_card_url?: string | null
           model_name?: string | null
           name?: string
           owner_id?: string | null
           project_id?: string
           provider?: string
+          registry_locked?: boolean
           requires_approval?: boolean
           runtime_risk_score?: number | null
           sla_tier?: string | null
@@ -1642,6 +1699,14 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      lock_system: {
+        Args: { p_reason?: string; p_system_id: string }
+        Returns: undefined
+      }
+      unlock_system: {
+        Args: { p_justification: string; p_system_id: string }
+        Returns: undefined
       }
     }
     Enums: {

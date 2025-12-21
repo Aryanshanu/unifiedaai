@@ -143,6 +143,19 @@ export function useProcessApproval() {
       status: "approved" | "rejected"; 
       reason?: string;
     }) => {
+      // SEPARATION OF DUTIES CHECK: Verify user is not approving their own request
+      const { data: approval, error: fetchError } = await supabase
+        .from("system_approvals")
+        .select("requested_by")
+        .eq("id", approvalId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      if (approval?.requested_by === user?.id) {
+        throw new Error("Separation of Duties Violation: You cannot approve or reject your own request. Another authorized user must process this approval.");
+      }
+
       // Update approval
       const { data, error } = await supabase
         .from("system_approvals")
@@ -156,7 +169,13 @@ export function useProcessApproval() {
         .select()
         .single();
       
-      if (error) throw error;
+      if (error) {
+        // Handle SoD constraint violation from database
+        if (error.message?.includes('sod_requester_not_approver')) {
+          throw new Error("Separation of Duties Violation: The requester cannot be the same as the approver.");
+        }
+        throw error;
+      }
 
       // Update system deployment status
       await supabase
