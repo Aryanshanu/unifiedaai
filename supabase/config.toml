@@ -7,10 +7,10 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.compute-runtime-risk]
-verify_jwt = false
+verify_jwt = true
 
 [functions.run-red-team]
-verify_jwt = false
+verify_jwt = true
 
 [functions.rai-reasoning-engine]
 verify_jwt = true
@@ -34,7 +34,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.generate-test-traffic]
-verify_jwt = false
+verify_jwt = true
 
 [functions.compile-policy]
 verify_jwt = true
@@ -49,10 +49,10 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.detect-drift]
-verify_jwt = false
+verify_jwt = true
 
 [functions.ml-detection]
-verify_jwt = false
+verify_jwt = true
 
 [functions.eval-toxicity-hf]
 verify_jwt = false

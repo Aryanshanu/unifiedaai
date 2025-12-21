@@ -24,6 +24,8 @@ export type Database = {
           old_values: Json | null
           performed_at: string
           performed_by: string | null
+          previous_hash: string | null
+          record_hash: string | null
           record_id: string | null
           session_id: string | null
           table_name: string
@@ -38,6 +40,8 @@ export type Database = {
           old_values?: Json | null
           performed_at?: string
           performed_by?: string | null
+          previous_hash?: string | null
+          record_hash?: string | null
           record_id?: string | null
           session_id?: string | null
           table_name: string
@@ -52,6 +56,8 @@ export type Database = {
           old_values?: Json | null
           performed_at?: string
           performed_by?: string | null
+          previous_hash?: string | null
+          record_hash?: string | null
           record_id?: string | null
           session_id?: string | null
           table_name?: string
@@ -410,6 +416,41 @@ export type Database = {
           },
         ]
       }
+      evaluation_requirements: {
+        Row: {
+          created_at: string
+          engine_type: string
+          id: string
+          is_blocking: boolean
+          min_score: number
+          system_id: string
+        }
+        Insert: {
+          created_at?: string
+          engine_type: string
+          id?: string
+          is_blocking?: boolean
+          min_score?: number
+          system_id: string
+        }
+        Update: {
+          created_at?: string
+          engine_type?: string
+          id?: string
+          is_blocking?: boolean
+          min_score?: number
+          system_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evaluation_requirements_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       evaluation_results: {
         Row: {
           created_at: string
@@ -459,6 +500,8 @@ export type Database = {
           engine_type: string | null
           explanations: Json | null
           factuality_score: number | null
+          fail_closed: boolean | null
+          failed_reason: string | null
           fairness_score: number | null
           id: string
           metric_details: Json | null
@@ -479,6 +522,8 @@ export type Database = {
           engine_type?: string | null
           explanations?: Json | null
           factuality_score?: number | null
+          fail_closed?: boolean | null
+          failed_reason?: string | null
           fairness_score?: number | null
           id?: string
           metric_details?: Json | null
@@ -499,6 +544,8 @@ export type Database = {
           engine_type?: string | null
           explanations?: Json | null
           factuality_score?: number | null
+          fail_closed?: boolean | null
+          failed_reason?: string | null
           fairness_score?: number | null
           id?: string
           metric_details?: Json | null
@@ -556,6 +603,33 @@ export type Database = {
           name?: string
           test_count?: number
           updated_at?: string
+        }
+        Relationships: []
+      }
+      gateway_config: {
+        Row: {
+          config_key: string
+          config_value: Json
+          description: string | null
+          id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          config_key: string
+          config_value?: Json
+          description?: string | null
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          config_key?: string
+          config_value?: Json
+          description?: string | null
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
         }
         Relationships: []
       }
