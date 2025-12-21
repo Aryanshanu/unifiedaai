@@ -221,6 +221,41 @@ serve(async (req) => {
       );
     }
 
+    // GOVERNANCE ENFORCEMENT: Check registry lock (Point of No Return)
+    if (system.registry_locked) {
+      const logEntry = {
+        system_id: systemId,
+        project_id: system.project_id,
+        request_body: { messages },
+        response_body: { error: "REGISTRY_LOCKED: System permanently blocked" },
+        status_code: 451,
+        latency_ms: Date.now() - startTime,
+        error_message: `Permanent block: ${system.lock_reason || 'Governance policy violation'}`,
+        trace_id: traceId,
+        decision: "PERMANENT_BLOCK",
+        engine_scores: {
+          governance: { 
+            verdict: "PERMANENT_BLOCK", 
+            reason: system.lock_reason,
+            locked_at: system.locked_at,
+            locked_by: system.locked_by
+          }
+        },
+      };
+      await supabase.from("request_logs").insert(logEntry);
+
+      return new Response(
+        JSON.stringify({ 
+          error: "REGISTRY_LOCKED: System permanently blocked",
+          decision: "PERMANENT_BLOCK",
+          locked_at: system.locked_at,
+          lock_reason: system.lock_reason,
+          requires: "Admin escalation with justification to unlock"
+        }),
+        { status: 451, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // FIX #6: Check if Risk & Impact assessments exist
     const { data: riskAssessments } = await supabase
       .from("risk_assessments")

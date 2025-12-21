@@ -27,6 +27,11 @@ export interface System {
   uri_score: number | null;
   runtime_risk_score: number | null;
   last_risk_calculation: string | null;
+  // Governance enforcement fields
+  registry_locked: boolean;
+  locked_at: string | null;
+  locked_by: string | null;
+  lock_reason: string | null;
 }
 
 export interface CreateSystemInput {
@@ -151,6 +156,68 @@ export function useDeleteSystem() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["systems"] });
+    },
+  });
+}
+
+// Lock a system (Point of No Return - requires admin to unlock)
+export function useLockSystem() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ systemId, reason }: { systemId: string; reason: string }) => {
+      const { data, error } = await supabase
+        .from("systems")
+        .update({
+          registry_locked: true,
+          locked_at: new Date().toISOString(),
+          locked_by: user?.id,
+          lock_reason: reason,
+          deployment_status: "blocked" as DeploymentStatus,
+        })
+        .eq("id", systemId)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data as System;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["systems"] });
+      queryClient.invalidateQueries({ queryKey: ["systems", data.project_id] });
+      queryClient.invalidateQueries({ queryKey: ["systems", "detail", data.id] });
+    },
+  });
+}
+
+// Unlock a system (Admin only, requires justification)
+export function useUnlockSystem() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ systemId, justification }: { systemId: string; justification: string }) => {
+      if (justification.length < 20) {
+        throw new Error("Justification must be at least 20 characters");
+      }
+      
+      const { data, error } = await supabase
+        .from("systems")
+        .update({
+          registry_locked: false,
+          deployment_status: "draft" as DeploymentStatus,
+        })
+        .eq("id", systemId)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data as System;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["systems"] });
+      queryClient.invalidateQueries({ queryKey: ["systems", data.project_id] });
+      queryClient.invalidateQueries({ queryKey: ["systems", "detail", data.id] });
     },
   });
 }
