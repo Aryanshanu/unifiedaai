@@ -329,6 +329,29 @@ serve(async (req) => {
       );
     }
 
+    // AUTHORIZATION CHECK: Verify caller identity using their JWT
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Authorization header required" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: { user }, error: userError } = await anonClient.auth.getUser();
+    if (userError || !user) {
+      console.error("User auth error:", userError);
+      return new Response(
+        JSON.stringify({ error: "Invalid or expired token" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Fetch model and system configuration
@@ -345,6 +368,31 @@ serve(async (req) => {
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // AUTHORIZATION CHECK: Verify user has access to this model
+    const isOwner = model.owner_id === user.id || model.system?.owner_id === user.id;
+    
+    if (!isOwner) {
+      // Check if user has admin or analyst role
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id);
+
+      const hasPrivilegedRole = roles?.some((r) =>
+        ["admin", "reviewer", "analyst"].includes(r.role)
+      );
+
+      if (!hasPrivilegedRole) {
+        console.warn(`Unauthorized access attempt: user ${user.id} tried to access model ${modelId}`);
+        return new Response(
+          JSON.stringify({ error: "You do not have permission to evaluate this model" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    console.log(`Authorized user ${user.id} to evaluate model ${modelId}`);
 
     // Get endpoint and token
     const endpoint = model.huggingface_endpoint || model.endpoint || model.system?.endpoint;
