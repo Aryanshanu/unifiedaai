@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
 import { HealthIndicator } from "@/components/shared/HealthIndicator";
 import { useDataHealth } from "@/components/shared/DataHealthWrapper";
+import { EnforcementBadge } from "@/components/shared/EnforcementBadge";
 
 export default function Governance() {
   const { data: frameworks, isLoading: frameworksLoading, isError: frameworksError, refetch: refetchFrameworks } = useControlFrameworks();
@@ -47,12 +48,15 @@ export default function Governance() {
       title="Governance & Compliance" 
       subtitle="Regulatory controls, risk assessments, and compliance attestations"
       headerActions={
-        <HealthIndicator 
-          status={status} 
-          lastUpdated={lastUpdated} 
-          onRetry={handleRetry}
-          showLabel 
-        />
+        <div className="flex items-center gap-3">
+          <EnforcementBadge level="enforced" />
+          <HealthIndicator 
+            status={status} 
+            lastUpdated={lastUpdated} 
+            onRetry={handleRetry}
+            showLabel 
+          />
+        </div>
       }
     >
       {/* KPIs */}

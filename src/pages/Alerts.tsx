@@ -20,6 +20,7 @@ import {
   Globe,
   Zap
 } from "lucide-react";
+import { EnforcementBadge } from "@/components/shared/EnforcementBadge";
 import { cn } from "@/lib/utils";
 import { useDriftAlerts } from "@/hooks/useDriftAlerts";
 import { useIncidents } from "@/hooks/useIncidents";
@@ -108,12 +109,8 @@ export default function Alerts() {
             toast.error("🔥 New Incident", {
               description: (payload.new as any)?.title || "Incident created"
             });
-            // Fake external notification
-            setTimeout(() => {
-              toast.success("✓ Alert escalated to PagerDuty", {
-                description: "On-call team notified"
-              });
-            }, 2000);
+            // NOTE: PagerDuty escalation disabled - backend integration not implemented
+            // When implemented, this will trigger actual PagerDuty API call
           }
         }
       )
@@ -193,6 +190,9 @@ export default function Alerts() {
     <MainLayout 
       title="Alerts & Notifications" 
       subtitle="Real-time alerts, drift notifications, and notification channel management"
+      headerActions={
+        <EnforcementBadge level="advisory" />
+      }
     >
       {/* Realtime indicator */}
       {realtimeCount > 0 && (

@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { EnforcementBadge } from "@/components/shared/EnforcementBadge";
 
 function getModelStatus(model: Model): "healthy" | "warning" | "critical" {
   const fairness = model.fairness_score ?? 100;
@@ -151,7 +152,13 @@ export default function Observability() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'realtime' | 'drift'>('dashboard');
 
   return (
-    <MainLayout title="Observability" subtitle="Real-time telemetry, drift detection, and model health monitoring">
+    <MainLayout 
+      title="Observability" 
+      subtitle="Real-time telemetry, drift detection, and model health monitoring"
+      headerActions={
+        <EnforcementBadge level="advisory" />
+      }
+    >
       {/* Realtime indicator */}
       {realtimeCount > 0 && (
         <div className="mb-4 p-3 bg-success/10 border border-success/20 rounded-lg flex items-center justify-between">
