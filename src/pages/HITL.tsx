@@ -50,14 +50,8 @@ export default function HITL() {
                 onClick: () => {}
               }
             });
-            // Auto-notify on critical severity
-            if (newReview?.severity === 'critical') {
-              setTimeout(() => {
-                toast.success("✓ Critical alert sent to Slack #rai-alerts", {
-                  description: "On-call reviewer notified"
-                });
-              }, 1500);
-            }
+            // NOTE: Slack notification disabled - backend delivery not implemented
+            // When implemented, this will trigger actual webhook call
           }
         }
       )

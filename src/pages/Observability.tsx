@@ -86,12 +86,8 @@ export default function Observability() {
           toast.error("🔥 New Incident Created", {
             description: (payload.new as any)?.title || "Incident requires attention",
           });
-          // Fake PagerDuty notification
-          setTimeout(() => {
-            toast.success("✓ Incident escalated to PagerDuty", {
-              description: "On-call engineer notified"
-            });
-          }, 1500);
+          // NOTE: PagerDuty escalation disabled - backend integration not implemented
+          // When implemented, this will trigger actual PagerDuty API call
         }
       )
       .subscribe((status) => {

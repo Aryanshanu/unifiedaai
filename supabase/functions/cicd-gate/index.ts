@@ -243,19 +243,66 @@ serve(async (req) => {
     let deploymentToken: string | undefined;
 
     if (allowed) {
-      // Generate signed deployment token
-      const tokenPayload = {
-        systemId,
-        commitSha,
-        branch,
-        pipelineId,
-        issuedAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 3600000).toISOString(), // 1 hour
-        checks: checks.filter(c => c.passed).length,
-      };
+      // Generate HMAC-SHA256 signed JWT deployment token
+      const signingSecret = Deno.env.get("DEPLOYMENT_SIGNING_SECRET");
       
-      // Simple token encoding (in production, use JWT with proper signing)
-      deploymentToken = btoa(JSON.stringify(tokenPayload));
+      if (signingSecret) {
+        const tokenPayload = {
+          systemId,
+          commitSha,
+          branch,
+          pipelineId,
+          issuedAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 3600000).toISOString(), // 1 hour
+          checks: checks.filter(c => c.passed).length,
+          riskTier: riskAssessment?.risk_tier,
+        };
+        
+        try {
+          // Create JWT-like signed token
+          const encoder = new TextEncoder();
+          const header = { alg: "HS256", typ: "JWT", aud: "cicd-pipeline" };
+          const now = Math.floor(Date.now() / 1000);
+          const jwtPayload = { ...tokenPayload, iat: now, exp: now + 3600 };
+          
+          const headerB64 = btoa(JSON.stringify(header)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+          const payloadB64 = btoa(JSON.stringify(jwtPayload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+          const data = `${headerB64}.${payloadB64}`;
+          
+          const key = await crypto.subtle.importKey(
+            "raw", 
+            encoder.encode(signingSecret),
+            { name: "HMAC", hash: "SHA-256" }, 
+            false, 
+            ["sign"]
+          );
+          
+          const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(data));
+          const sigB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
+            .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+          
+          deploymentToken = `${headerB64}.${payloadB64}.${sigB64}`;
+          console.log(`[cicd-gate] Signed JWT deployment token generated for ${systemId}`);
+        } catch (signError) {
+          console.error(`[cicd-gate] Token signing failed:`, signError);
+          // Fallback to simple encoding if signing fails (logged as warning)
+          deploymentToken = btoa(JSON.stringify(tokenPayload));
+        }
+      } else {
+        // No signing secret configured - use simple encoding with warning
+        console.warn(`[cicd-gate] DEPLOYMENT_SIGNING_SECRET not configured - using unsigned token`);
+        const tokenPayload = {
+          systemId,
+          commitSha,
+          branch,
+          pipelineId,
+          issuedAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 3600000).toISOString(),
+          checks: checks.filter(c => c.passed).length,
+          unsigned: true, // Mark as unsigned
+        };
+        deploymentToken = btoa(JSON.stringify(tokenPayload));
+      }
     }
 
     const response: CICDGateResponse = {
