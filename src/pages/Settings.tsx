@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Settings as SettingsIcon, User, Shield, Bell, Database, Key, Globe, Loader2, Check, Plus, Trash2, Copy, Eye, EyeOff, AlertTriangle, Bot } from "lucide-react";
+import { EnforcementBadge } from "@/components/shared/EnforcementBadge";
 import { cn } from "@/lib/utils";
 import { useSettings, useUpdateSettings } from "@/hooks/useSettings";
 import { useToast } from "@/hooks/use-toast";
@@ -133,7 +134,13 @@ export default function Settings() {
   };
 
   return (
-    <MainLayout title="Settings" subtitle="System configuration and preferences">
+    <MainLayout 
+      title="Settings" 
+      subtitle="System configuration and preferences"
+      headerActions={
+        <EnforcementBadge level="ui-only" />
+      }
+    >
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Navigation */}
         <div className="lg:col-span-1">

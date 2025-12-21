@@ -12,6 +12,7 @@ import { ReviewDecisionDialog } from "@/components/hitl/ReviewDecisionDialog";
 import { SLACountdown } from "@/components/hitl/SLACountdown";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { EnforcementBadge } from "@/components/shared/EnforcementBadge";
 
 const severityColors = {
   critical: "bg-danger/10 text-danger border-danger/30",
@@ -114,7 +115,13 @@ export default function HITL() {
   }));
 
   return (
-    <MainLayout title="HITL Console" subtitle="Human-in-the-loop decisions, reviews, and escalations">
+    <MainLayout 
+      title="HITL Console" 
+      subtitle="Human-in-the-loop decisions, reviews, and escalations"
+      headerActions={
+        <EnforcementBadge level="enforced" />
+      }
+    >
       {/* Realtime indicator */}
       {realtimeCount > 0 && (
         <div className="mb-4 p-3 bg-success/10 border border-success/20 rounded-lg flex items-center justify-between">

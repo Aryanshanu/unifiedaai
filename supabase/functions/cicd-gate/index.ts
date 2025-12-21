@@ -26,11 +26,13 @@ function checkRateLimit(clientId: string): boolean {
 }
 
 interface CICDGateRequest {
-  systemId: string;
+  action?: 'check' | 'verify';  // 'check' = request token, 'verify' = validate token
+  systemId?: string;
   commitSha?: string;
   branch?: string;
   pipelineId?: string;
   requestedBy?: string;
+  token?: string;  // For verify action
 }
 
 interface CICDGateResponse {
@@ -157,8 +159,137 @@ serve(async (req) => {
     }
 
     const body: CICDGateRequest = await req.json();
-    const { systemId, commitSha, branch, pipelineId, requestedBy } = body;
+    const { action = 'check', systemId, commitSha, branch, pipelineId, requestedBy, token } = body;
 
+    // =====================================================
+    // ACTION: VERIFY — Validate a deployment token
+    // =====================================================
+    if (action === 'verify') {
+      console.log("[cicd-gate] Token verification requested");
+      
+      if (!token) {
+        return new Response(
+          JSON.stringify({ valid: false, error: "Token is required for verification" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      const result = await verifyDeploymentToken(token);
+      
+      if (!result.valid) {
+        console.log(`[cicd-gate] Token verification FAILED: ${result.error}`);
+        
+        // Log the failed verification attempt
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        await supabase.from("request_logs").insert({
+          system_id: (result.payload as any)?.systemId || "unknown",
+          request_body: { action: "verify", token_prefix: token.substring(0, 20) + "..." },
+          response_body: { valid: false, error: result.error },
+          status_code: 403,
+          latency_ms: Date.now() - startTime,
+          decision: "BLOCK",
+          engine_scores: { cicd_gate: { verification: "failed", reason: result.error } },
+        });
+        
+        return new Response(
+          JSON.stringify({ valid: false, error: result.error }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      // TOCTOU Protection: Re-check governance state
+      const payload = result.payload as any;
+      const tokenSystemId = payload?.systemId;
+      
+      if (tokenSystemId) {
+        console.log(`[cicd-gate] TOCTOU check for system: ${tokenSystemId}`);
+        
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        const { data: currentSystem, error: sysError } = await supabase
+          .from("systems")
+          .select("registry_locked, deployment_status, requires_approval")
+          .eq("id", tokenSystemId)
+          .single();
+        
+        if (sysError || !currentSystem) {
+          console.log(`[cicd-gate] TOCTOU check FAILED: System not found`);
+          return new Response(
+            JSON.stringify({ valid: false, error: "System not found during TOCTOU check" }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        
+        // Check if governance state has changed
+        if (currentSystem.registry_locked) {
+          console.log(`[cicd-gate] TOCTOU check FAILED: System is now locked`);
+          return new Response(
+            JSON.stringify({ valid: false, error: "Governance state changed: System is now locked" }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        
+        if (currentSystem.deployment_status === 'blocked') {
+          console.log(`[cicd-gate] TOCTOU check FAILED: System is now blocked`);
+          return new Response(
+            JSON.stringify({ valid: false, error: "Governance state changed: System deployment is blocked" }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        
+        // Check if approval is still valid (if required)
+        if (currentSystem.requires_approval) {
+          const { data: approval } = await supabase
+            .from("system_approvals")
+            .select("status")
+            .eq("system_id", tokenSystemId)
+            .eq("status", "approved")
+            .order("approved_at", { ascending: false })
+            .limit(1)
+            .single();
+          
+          if (!approval) {
+            console.log(`[cicd-gate] TOCTOU check FAILED: Approval revoked`);
+            return new Response(
+              JSON.stringify({ valid: false, error: "Governance state changed: Approval no longer valid" }),
+              { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        }
+        
+        console.log(`[cicd-gate] TOCTOU check PASSED for system: ${tokenSystemId}`);
+        
+        // Log successful verification
+        await supabase.from("request_logs").insert({
+          system_id: tokenSystemId,
+          request_body: { action: "verify", token_prefix: token.substring(0, 20) + "..." },
+          response_body: { valid: true, payload: { ...payload, signature: "[REDACTED]" } },
+          status_code: 200,
+          latency_ms: Date.now() - startTime,
+          decision: "ALLOW",
+          engine_scores: { cicd_gate: { verification: "passed", toctou: "passed" } },
+        });
+      }
+      
+      console.log(`[cicd-gate] Token verification PASSED`);
+      return new Response(
+        JSON.stringify({ 
+          valid: true, 
+          payload: result.payload,
+          toctou_verified: true,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // =====================================================
+    // ACTION: CHECK — Generate a new deployment token
+    // =====================================================
     if (!systemId) {
       return new Response(
         JSON.stringify({ error: "systemId is required" }),
