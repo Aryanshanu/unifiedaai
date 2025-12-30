@@ -1,7 +1,9 @@
+import { useEffect, useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   Layers, 
   Zap, 
@@ -18,10 +20,111 @@ import {
   Users,
   Database,
   GitBranch,
-  Target
+  Target,
+  Loader2
 } from "lucide-react";
 
+interface FlywheelStats {
+  testsFromIncidents: number;
+  testsFromRedTeam: number;
+  regressionPassRate: number;
+  totalNewTests: number;
+  isLoading: boolean;
+}
+
+interface EngineStatus {
+  name: string;
+  lastEval: string | null;
+  evalCount: number;
+  avgScore: number | null;
+  isHealthy: boolean;
+}
+
 export default function Architecture() {
+  const [flywheelStats, setFlywheelStats] = useState<FlywheelStats>({
+    testsFromIncidents: 0,
+    testsFromRedTeam: 0,
+    regressionPassRate: 0,
+    totalNewTests: 0,
+    isLoading: true
+  });
+
+  const [engineStatuses, setEngineStatuses] = useState<EngineStatus[]>([]);
+  const [isLoadingEngines, setIsLoadingEngines] = useState(true);
+
+  // Fetch real flywheel stats
+  useEffect(() => {
+    const fetchFlywheelStats = async () => {
+      try {
+        const [incidentsRes, campaignsRes, evalsRes] = await Promise.all([
+          supabase.from('incidents').select('*', { count: 'exact', head: true }),
+          supabase.from('red_team_campaigns').select('findings_count').eq('status', 'completed'),
+          supabase.from('evaluation_runs').select('overall_score, status').eq('status', 'completed').order('created_at', { ascending: false }).limit(50)
+        ]);
+
+        const incidentCount = incidentsRes.count || 0;
+        const redTeamFindings = (campaignsRes.data || []).reduce((sum, c) => sum + (c.findings_count || 0), 0);
+        const completedEvals = evalsRes.data || [];
+        const passedEvals = completedEvals.filter(e => (e.overall_score || 0) >= 70).length;
+        const passRate = completedEvals.length > 0 ? Math.round((passedEvals / completedEvals.length) * 100) : 0;
+
+        setFlywheelStats({
+          testsFromIncidents: incidentCount,
+          testsFromRedTeam: redTeamFindings,
+          regressionPassRate: passRate,
+          totalNewTests: incidentCount + redTeamFindings,
+          isLoading: false
+        });
+      } catch (error) {
+        console.error('Error fetching flywheel stats:', error);
+        setFlywheelStats(prev => ({ ...prev, isLoading: false }));
+      }
+    };
+
+    fetchFlywheelStats();
+  }, []);
+
+  // Fetch real engine statuses
+  useEffect(() => {
+    const fetchEngineStatuses = async () => {
+      try {
+        const engineTypes = ['fairness', 'toxicity', 'privacy', 'hallucination', 'explainability'];
+        
+        const statuses: EngineStatus[] = await Promise.all(
+          engineTypes.map(async (engineType) => {
+            const { data: evals } = await supabase
+              .from('evaluation_runs')
+              .select('created_at, overall_score, status')
+              .eq('engine_type', engineType)
+              .order('created_at', { ascending: false })
+              .limit(10);
+
+            const completedEvals = (evals || []).filter(e => e.status === 'completed');
+            const avgScore = completedEvals.length > 0
+              ? completedEvals.reduce((sum, e) => sum + (e.overall_score || 0), 0) / completedEvals.length
+              : null;
+
+            return {
+              name: engineType.charAt(0).toUpperCase() + engineType.slice(1),
+              lastEval: completedEvals[0]?.created_at || null,
+              evalCount: completedEvals.length,
+              avgScore: avgScore ? Math.round(avgScore) : null,
+              isHealthy: avgScore === null || avgScore >= 70
+            };
+          })
+        );
+
+        setEngineStatuses(statuses);
+        setIsLoadingEngines(false);
+      } catch (error) {
+        console.error('Error fetching engine statuses:', error);
+        setIsLoadingEngines(false);
+      }
+    };
+
+    fetchEngineStatuses();
+  }, []);
+
   return (
     <MainLayout title="2025 SOTA RAI Architecture" subtitle="The Fractal RAI-OS Evaluation Framework">
       <div className="space-y-6">
@@ -219,7 +322,7 @@ export default function Architecture() {
             </Card>
           </TabsContent>
 
-          {/* EVAL FLYWHEEL */}
+          {/* EVAL FLYWHEEL - Now with real data */}
           <TabsContent value="flywheel" className="space-y-6">
             <Card className="border-primary/20">
               <CardHeader>
@@ -283,21 +386,59 @@ export default function Architecture() {
                     </ul>
                   </div>
                   <div className="p-4 border rounded-lg">
-                    <h4 className="font-medium mb-2">Weekly Regression Report</h4>
-                    <div className="p-3 bg-muted rounded text-sm font-mono">
-                      New adversarial tests added: 47<br/>
-                      Tests from incidents: 23<br/>
-                      Tests from red-team: 24<br/>
-                      Regression pass rate: 94.2%
-                    </div>
+                    <h4 className="font-medium mb-2">Live Regression Report</h4>
+                    {flywheelStats.isLoading ? (
+                      <div className="flex items-center justify-center p-4">
+                        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-muted rounded text-sm font-mono">
+                        New adversarial tests added: {flywheelStats.totalNewTests}<br/>
+                        Tests from incidents: {flywheelStats.testsFromIncidents}<br/>
+                        Tests from red-team: {flywheelStats.testsFromRedTeam}<br/>
+                        Regression pass rate: {flywheelStats.regressionPassRate}%
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* 5 CORE ENGINES */}
+          {/* 5 CORE ENGINES - Now with real status */}
           <TabsContent value="engines" className="space-y-6">
+            {/* Engine Status Overview */}
+            {!isLoadingEngines && engineStatuses.length > 0 && (
+              <Card className="border-primary/20 mb-4">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-primary" />
+                    Live Engine Status
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-5 gap-2">
+                    {engineStatuses.map((engine) => (
+                      <div 
+                        key={engine.name}
+                        className={`p-3 rounded-lg border text-center ${
+                          engine.isHealthy ? 'bg-success/10 border-success/30' : 'bg-danger/10 border-danger/30'
+                        }`}
+                      >
+                        <p className="text-xs font-medium">{engine.name}</p>
+                        <p className={`text-lg font-bold ${engine.isHealthy ? 'text-success' : 'text-danger'}`}>
+                          {engine.avgScore !== null ? `${engine.avgScore}%` : 'N/A'}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {engine.evalCount} evals
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <div className="grid gap-4">
               {/* Fairness Engine */}
               <Card>
@@ -481,3 +622,6 @@ export default function Architecture() {
     </MainLayout>
   );
 }
+
+// Add Activity icon that was missing from imports
+import { Activity } from "lucide-react";

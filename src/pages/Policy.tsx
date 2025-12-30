@@ -55,10 +55,8 @@ export default function Policy() {
         description: "Executing adversarial attack scenarios...",
       });
 
-      // Simulate progress updates
-      const progressInterval = setInterval(() => {
-        setCampaignProgress((prev) => Math.min(prev + 3, 95));
-      }, 200);
+      // Simple indeterminate loading - no fake progress simulation
+      setCampaignProgress(50); // Shows "Running..." state
 
       const { data, error } = await supabase.functions.invoke("run-red-team", {
         body: {
@@ -68,7 +66,6 @@ export default function Policy() {
         },
       });
 
-      clearInterval(progressInterval);
       setCampaignProgress(100);
 
       if (error) throw error;
@@ -155,14 +152,17 @@ export default function Policy() {
               Campaign Results - Severity Heatmap
             </h4>
             <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
-              {ATTACK_CATEGORIES.map((cat, i) => {
-                const count = Math.floor(Math.random() * 8) + 1;
-                const blocked = Math.floor(count * (0.7 + Math.random() * 0.3));
+              {ATTACK_CATEGORIES.map((cat) => {
+                const categoryKey = cat.name.toLowerCase().replace(' ', '_');
+                const categoryData = latestCampaignResult?.summary?.categoryBreakdown?.[categoryKey];
+                const blocked = categoryData?.blocked ?? 0;
+                const failed = categoryData?.failed ?? 0;
+                const total = blocked + failed;
                 return (
                   <div key={cat.name} className={cn("p-3 rounded-lg", cat.color)}>
                     <p className="text-xs font-medium">{cat.name}</p>
                     <p className="text-lg font-bold">
-                      {blocked}/{count}
+                      {total > 0 ? `${blocked}/${total}` : 'N/A'}
                     </p>
                     <p className="text-[10px] opacity-80">blocked</p>
                   </div>
@@ -171,12 +171,12 @@ export default function Policy() {
             </div>
             <div className="flex items-center gap-4 mt-4 text-sm">
               <Badge className="bg-success/10 text-success">
-                Coverage: {latestCampaignResult?.summary?.passRate || 85}%
+                Coverage: {latestCampaignResult?.summary?.passRate ?? 'N/A'}%
               </Badge>
               <Badge className="bg-danger/10 text-danger">
-                Findings: {latestCampaignResult?.summary?.failedTests || 4}
+                Findings: {latestCampaignResult?.summary?.failedTests ?? 0}
               </Badge>
-              <Badge variant="outline">Total Tests: {latestCampaignResult?.summary?.totalTests || 30}</Badge>
+              <Badge variant="outline">Total Tests: {latestCampaignResult?.summary?.totalTests ?? 0}</Badge>
             </div>
           </div>
         )}

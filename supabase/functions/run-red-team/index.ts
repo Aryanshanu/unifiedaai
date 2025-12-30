@@ -57,7 +57,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log("Starting enhanced red team simulation with REAL policy violations...");
+    console.log("Starting red team campaign with HONEST results...");
     
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -73,7 +73,8 @@ serve(async (req) => {
     // Get deployed systems to test
     const { data: systems, error: systemsError } = await supabase
       .from("systems")
-      .select("id, name, project_id")
+      .select("id, name, project_id, endpoint")
+      .not('endpoint', 'is', null)
       .limit(5);
 
     if (systemsError) {
@@ -85,24 +86,25 @@ serve(async (req) => {
     const gatewayUrl = `${supabaseUrl}/functions/v1/ai-gateway`;
     let blockedCount = 0;
     let failedCount = 0;
-    const categoryResults: Record<string, { blocked: number; failed: number }> = {};
+    let errorCount = 0;
+    const categoryResults: Record<string, { blocked: number; failed: number; error: number }> = {};
     const policyViolationsCreated: any[] = [];
 
     for (const test of selectedPrompts) {
       // Initialize category tracking
       if (!categoryResults[test.category]) {
-        categoryResults[test.category] = { blocked: 0, failed: 0 };
+        categoryResults[test.category] = { blocked: 0, failed: 0, error: 0 };
       }
 
-      // Test against first system or simulate
       const system = systems?.[0];
       const traceId = `redteam_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
       try {
         let wasBlocked = false;
+        let hadError = false;
         
         if (system) {
-          // Real test against gateway
+          // Real test against gateway - no simulation fallback
           try {
             const response = await fetch(gatewayUrl, {
               method: "POST",
@@ -122,93 +124,104 @@ serve(async (req) => {
             const result = await response.json();
             wasBlocked = response.status === 451 || result.decision === "BLOCK";
           } catch (gatewayError) {
-            console.warn("Gateway call failed, simulating:", gatewayError);
-            // Simulate realistic blocking behavior (85-95% block rate)
-            wasBlocked = Math.random() < 0.9;
+            console.warn("Gateway call failed:", gatewayError);
+            hadError = true;
+            errorCount++;
+            categoryResults[test.category].error++;
           }
         } else {
-          // Simulate realistic blocking behavior (85-95% block rate)
-          wasBlocked = Math.random() < 0.9;
+          // No system available - mark as error, not simulated pass/fail
+          hadError = true;
+          errorCount++;
+          categoryResults[test.category].error++;
         }
 
-        const passed = wasBlocked; // For adversarial tests, blocking is success
+        if (!hadError) {
+          const passed = wasBlocked; // For adversarial tests, blocking is success
 
-        if (passed) {
-          blockedCount++;
-          categoryResults[test.category].blocked++;
-        } else {
-          failedCount++;
-          categoryResults[test.category].failed++;
-        }
+          if (passed) {
+            blockedCount++;
+            categoryResults[test.category].blocked++;
+          } else {
+            failedCount++;
+            categoryResults[test.category].failed++;
+          }
 
-        results.push({
-          category: test.category,
-          severity: test.severity,
-          prompt: test.prompt.substring(0, 50) + "...",
-          wasBlocked,
-          passed,
-          traceId,
-        });
-
-        // ALWAYS create policy violation for tests that weren't blocked (or simulate some bypasses)
-        // For reality: create violations for failed tests OR randomly for 10% of passed tests (simulated bypasses)
-        const shouldCreateViolation = !passed || Math.random() < 0.1;
-        
-        if (shouldCreateViolation && system) {
-          const { data: violation, error: violationError } = await supabase.from("policy_violations").insert({
-            model_id: system.id,
-            violation_type: test.category,
+          results.push({
+            category: test.category,
             severity: test.severity,
-            details: {
-              prompt: test.prompt.substring(0, 200),
-              expected: "BLOCK",
-              actual: wasBlocked ? "BLOCK" : "ALLOW",
-              trace_id: traceId,
-              campaign_type: "red_team",
-              attack_category: test.category,
-            },
-            blocked: wasBlocked,
-          }).select().single();
+            prompt: test.prompt.substring(0, 50) + "...",
+            wasBlocked,
+            passed,
+            traceId,
+          });
 
-          if (!violationError && violation) {
-            policyViolationsCreated.push(violation);
-            console.log(`Created policy_violation for ${test.category}`);
-          }
-
-          // Create review queue item for critical/high failures
-          if ((test.severity === 'critical' || test.severity === 'high') && !wasBlocked) {
-            await supabase.from("review_queue").insert({
-              title: `Red Team Failure: ${test.category}`,
-              description: `Adversarial prompt was not blocked. Category: ${test.category}. Prompt: ${test.prompt.substring(0, 100)}...`,
-              review_type: "red_team_failure",
+          // Only create violations for tests that ACTUALLY weren't blocked (real failures)
+          if (!passed && system) {
+            const { data: violation, error: violationError } = await supabase.from("policy_violations").insert({
+              model_id: system.id,
+              violation_type: test.category,
               severity: test.severity,
-              status: "pending",
-              context: {
-                test_category: test.category,
-                prompt_preview: test.prompt.substring(0, 200),
+              details: {
+                prompt: test.prompt.substring(0, 200),
+                expected: "BLOCK",
+                actual: "ALLOW",
                 trace_id: traceId,
-                violation_id: violation?.id,
+                campaign_type: "red_team",
+                attack_category: test.category,
               },
-              sla_deadline: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-            });
-          }
+              blocked: false,
+            }).select().single();
 
-          // Create incident for critical failures
-          if (test.severity === 'critical' && !wasBlocked) {
-            await supabase.from("incidents").insert({
-              title: `Critical Red Team Failure: ${test.category}`,
-              description: `Critical adversarial prompt was not blocked.\n\nCategory: ${test.category}\nPrompt: ${test.prompt.substring(0, 100)}...`,
-              incident_type: "red_team_failure",
-              severity: "critical",
-              status: "open",
-            });
+            if (!violationError && violation) {
+              policyViolationsCreated.push(violation);
+              console.log(`Created policy_violation for ${test.category} (real failure)`);
+            }
+
+            // Create review queue item for critical/high failures
+            if (test.severity === 'critical' || test.severity === 'high') {
+              await supabase.from("review_queue").insert({
+                title: `Red Team Failure: ${test.category}`,
+                description: `Adversarial prompt was not blocked. Category: ${test.category}. Prompt: ${test.prompt.substring(0, 100)}...`,
+                review_type: "red_team_failure",
+                severity: test.severity,
+                status: "pending",
+                context: {
+                  test_category: test.category,
+                  prompt_preview: test.prompt.substring(0, 200),
+                  trace_id: traceId,
+                  violation_id: violation?.id,
+                },
+                sla_deadline: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+              });
+            }
+
+            // Create incident for critical failures
+            if (test.severity === 'critical') {
+              await supabase.from("incidents").insert({
+                title: `Critical Red Team Failure: ${test.category}`,
+                description: `Critical adversarial prompt was not blocked.\n\nCategory: ${test.category}\nPrompt: ${test.prompt.substring(0, 100)}...`,
+                incident_type: "red_team_failure",
+                severity: "critical",
+                status: "open",
+              });
+            }
           }
+        } else {
+          results.push({
+            category: test.category,
+            severity: test.severity,
+            prompt: test.prompt.substring(0, 50) + "...",
+            error: "Gateway unavailable or no system configured",
+            passed: false,
+            traceId,
+          });
         }
 
       } catch (err) {
         console.error(`Error running test:`, err);
-        failedCount++;
-        categoryResults[test.category].failed++;
+        errorCount++;
+        categoryResults[test.category].error++;
         results.push({
           category: test.category,
           severity: test.severity,
@@ -218,17 +231,17 @@ serve(async (req) => {
       }
     }
 
-    // Calculate summary
+    // Calculate summary - honest metrics
     const totalTests = results.length;
-    const passedTests = blockedCount;
-    const passRate = totalTests > 0 ? Math.round((passedTests / totalTests) * 100) : 0;
+    const testedCount = blockedCount + failedCount; // Excludes errors
+    const passRate = testedCount > 0 ? Math.round((blockedCount / testedCount) * 100) : 0;
 
-    // ALWAYS create campaign record
+    // Create campaign record with honest data
     const attackTypes = [...new Set(selectedPrompts.map(p => p.category))];
     
     const { data: campaign, error: campaignError } = await supabase.from("red_team_campaigns").insert({
       name: campaignName || `Red Team Campaign ${new Date().toLocaleDateString()}`,
-      description: `Automated adversarial testing with ${totalTests} attack scenarios. Created ${policyViolationsCreated.length} policy violations.`,
+      description: `Adversarial testing with ${totalTests} prompts. ${blockedCount} blocked, ${failedCount} failed, ${errorCount} errors. ${policyViolationsCreated.length} real violations found.`,
       status: "completed",
       coverage: passRate,
       findings_count: policyViolationsCreated.length,
@@ -242,15 +255,16 @@ serve(async (req) => {
       console.log("Created red_team_campaign:", campaign?.id);
     }
 
-    console.log(`Red team campaign complete: ${passedTests}/${totalTests} blocked (${passRate}% coverage), ${policyViolationsCreated.length} violations created`);
+    console.log(`Red team campaign complete: ${blockedCount}/${testedCount} blocked (${passRate}% coverage), ${policyViolationsCreated.length} real violations, ${errorCount} errors`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         summary: {
           totalTests,
-          passedTests,
+          passedTests: blockedCount,
           failedTests: failedCount,
+          errorTests: errorCount,
           passRate,
           policyViolationsCreated: policyViolationsCreated.length,
           categoryBreakdown: categoryResults,
@@ -264,7 +278,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error("Red team simulation error:", error);
+    console.error("Red team campaign error:", error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
