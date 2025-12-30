@@ -867,7 +867,7 @@ export default function GoldenDemo() {
                       ) : (
                         <XCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
                       )}
-                      <span>{gap}</span>
+                      <span>{gap.text}</span>
                     </div>
                   </div>
                 );
