@@ -68,3 +68,6 @@ verify_jwt = false
 
 [functions.llm-generate]
 verify_jwt = true
+
+[functions.rai-assistant]
+verify_jwt = false
