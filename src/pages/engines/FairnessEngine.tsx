@@ -252,11 +252,7 @@ function FairnessEngineContent() {
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         <Badge className="bg-primary/10 text-primary border-primary/20">
           <Brain className="w-3 h-3 mr-1" />
-          AIF360 + Gemini 2.5 Pro
-        </Badge>
-        <Badge variant="outline" className="text-xs">
-          <Sparkles className="w-3 h-3 mr-1" />
-          K2 Transparency
+          AIF360 Metrics
         </Badge>
         <Badge variant="outline" className="text-xs bg-success/5 text-success border-success/20">
           <Layers className="w-3 h-3 mr-1" />
