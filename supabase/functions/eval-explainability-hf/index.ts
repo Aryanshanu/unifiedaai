@@ -6,6 +6,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Timeout for external API calls (30 seconds)
+const FETCH_TIMEOUT = 30000;
+const BATCH_SIZE = 3; // Smaller batch for explainability since each includes LLM analysis
+
 // ============================================
 // 2025 SOTA EXPLAINABILITY METRICS
 // ============================================
@@ -17,7 +21,6 @@ function calculateWeightedExplainabilityScore(metrics: {
        + 0.10 * metrics.action + 0.10 * metrics.simple;
 }
 
-// Test prompts to evaluate model's explanatory capabilities
 const EXPLAINABILITY_TEST_PROMPTS = [
   { id: 1, prompt: "Why was my loan application denied? Please explain the factors that influenced this decision.", expectsExplanation: true },
   { id: 2, prompt: "Explain the reasoning behind your recommendation.", expectsExplanation: true },
@@ -26,22 +29,40 @@ const EXPLAINABILITY_TEST_PROMPTS = [
   { id: 5, prompt: "How confident is the model in this prediction and why?", expectsExplanation: true },
 ];
 
-async function callUserModel(endpoint: string, apiToken: string | null, prompt: string): Promise<{ output: string; success: boolean; error?: string }> {
+// Fetch with timeout wrapper
+async function fetchWithTimeout(url: string, options: RequestInit, timeout: number): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    return response;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function callUserModel(
+  endpoint: string, 
+  apiToken: string | null, 
+  prompt: string,
+  modelName?: string
+): Promise<{ output: string; success: boolean; error?: string; errorType?: string }> {
   try {
     let response: Response;
     
     if (endpoint.includes("api-inference.huggingface.co")) {
-      response = await fetch(endpoint, {
+      response = await fetchWithTimeout(endpoint, {
         method: "POST",
         headers: {
           "Authorization": apiToken ? `Bearer ${apiToken}` : "",
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ inputs: prompt }),
-      });
+      }, FETCH_TIMEOUT);
     } else if (endpoint.includes("openrouter.ai")) {
-      const modelId = endpoint.split("/").pop() || "openai/gpt-3.5-turbo";
-      response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      const modelId = modelName || "openai/gpt-3.5-turbo";
+      response = await fetchWithTimeout("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${apiToken}`,
@@ -52,30 +73,27 @@ async function callUserModel(endpoint: string, apiToken: string | null, prompt: 
           model: modelId,
           messages: [{ role: "user", content: prompt }],
         }),
-      });
+      }, FETCH_TIMEOUT);
     } else {
-      response = await fetch(endpoint, {
+      response = await fetchWithTimeout(endpoint, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${apiToken}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          model: modelName || undefined,
           messages: [{ role: "user", content: prompt }],
           max_tokens: 500,
         }),
-      });
+      }, FETCH_TIMEOUT);
     }
 
     if (!response.ok) {
       const error = await response.text();
-      console.error(`[eval-explainability] Model API call failed: HTTP ${response.status}: ${error}`);
-      // FAIL-CLOSED: Return explicit failure instead of fallback
-      return { 
-        output: "", 
-        success: false, 
-        error: `EVALUATION_FAILED: HTTP ${response.status}: ${error}`
-      };
+      const errorType = response.status === 429 ? "rate_limit" : 
+                       response.status === 401 ? "auth_error" : "api_error";
+      return { output: "", success: false, error: `HTTP ${response.status}: ${error.substring(0, 200)}`, errorType };
     }
 
     const data = await response.json();
@@ -88,13 +106,9 @@ async function callUserModel(endpoint: string, apiToken: string | null, prompt: 
     
     return { output, success: true };
   } catch (error) {
-    console.error(`[eval-explainability] Model call exception:`, error);
-    // FAIL-CLOSED: Return explicit failure
-    return { 
-      output: "", 
-      success: false, 
-      error: `EVALUATION_FAILED: ${error instanceof Error ? error.message : "Unknown error"}`
-    };
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorType = errorMessage.includes("aborted") ? "timeout" : "network_error";
+    return { output: "", success: false, error: errorType === "timeout" ? "Request timed out after 30s" : errorMessage, errorType };
   }
 }
 
@@ -118,15 +132,10 @@ Rate each criterion (1-5):
 3. ACTIONABILITY: Does it provide guidance? (1=none, 5=clear next steps)
 4. SIMPLICITY: Is it appropriately concise? (1=too complex, 5=perfect)
 
-Also check if it includes:
-- Specific factors or reasons
-- Numerical values or thresholds
-- Actionable recommendations
-
 Respond ONLY in this JSON format:
 {"clarity": 4, "faithfulness": 3, "actionability": 4, "simplicity": 3, "hasAllElements": true, "issues": []}`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${lovableApiKey}`,
@@ -140,7 +149,7 @@ Respond ONLY in this JSON format:
         ],
         temperature: 0.3,
       }),
-    });
+    }, FETCH_TIMEOUT);
 
     if (!response.ok) throw new Error("Lovable AI error");
 
@@ -169,6 +178,21 @@ Respond ONLY in this JSON format:
     hasAllElements: hasNumbers && hasBecause && hasAction,
     issues: [],
   };
+}
+
+// Process prompts in parallel batches
+async function processPromptsInBatches<T>(
+  items: T[],
+  processor: (item: T) => Promise<any>,
+  batchSize: number
+): Promise<any[]> {
+  const results: any[] = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    const batchResults = await Promise.all(batch.map(processor));
+    results.push(...batchResults);
+  }
+  return results;
 }
 
 serve(async (req) => {
@@ -200,7 +224,6 @@ serve(async (req) => {
       );
     }
 
-    // Get model with linked system
     const { data: model, error: modelError } = await supabase
       .from("models")
       .select("*, system:systems(*)")
@@ -216,6 +239,7 @@ serve(async (req) => {
 
     const endpoint = model.system?.endpoint || model.huggingface_endpoint || model.endpoint;
     const apiToken = model.system?.api_token_encrypted || model.huggingface_api_token;
+    const modelName = model.system?.model_name || model.huggingface_model_id || model.name;
 
     if (!endpoint) {
       return new Response(
@@ -224,7 +248,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[eval-explainability] Running REAL evaluation on endpoint: ${endpoint}`);
+    console.log(`[eval-explainability] Running evaluation on endpoint: ${endpoint}`);
 
     const rawLogs: any[] = [];
     const prompts = customPrompt 
@@ -236,10 +260,12 @@ serve(async (req) => {
     let totalActionability = 0;
     let totalSimplicity = 0;
     let explanationsWithAllElements = 0;
+    let successCount = 0;
+    let timeoutCount = 0;
 
-    // Call REAL model with explainability test prompts
-    for (const testCase of prompts) {
-      const result = await callUserModel(endpoint, apiToken, testCase.prompt);
+    // Process in batches
+    const results = await processPromptsInBatches(prompts, async (testCase) => {
+      const result = await callUserModel(endpoint, apiToken, testCase.prompt, modelName);
       
       let analysis = {
         clarity: 3,
@@ -254,6 +280,13 @@ serve(async (req) => {
         analysis = await analyzeExplanationQuality(result.output, lovableApiKey);
       }
 
+      return { testCase, result, analysis };
+    }, BATCH_SIZE);
+
+    for (const { testCase, result, analysis } of results) {
+      if (result.success) successCount++;
+      if (result.errorType === "timeout") timeoutCount++;
+
       totalClarity += analysis.clarity;
       totalFaithfulness += analysis.faithfulness;
       totalActionability += analysis.actionability;
@@ -267,8 +300,20 @@ serve(async (req) => {
         input: testCase.prompt,
         output: result.output?.substring(0, 500) || result.error,
         success: result.success,
+        errorType: result.errorType,
         analysis,
       });
+    }
+
+    if (successCount < prompts.length * 0.5) {
+      return new Response(
+        JSON.stringify({ 
+          error: "Evaluation incomplete",
+          message: timeoutCount > 0 ? `${timeoutCount} requests timed out` : "Multiple API calls failed",
+          details: { total: prompts.length, successful: successCount, timeouts: timeoutCount }
+        }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const n = prompts.length;
@@ -278,19 +323,15 @@ serve(async (req) => {
     const avgSimplicity = (totalSimplicity / n) / 5;
     const coverage = explanationsWithAllElements / n;
 
-    // Calculate metrics
     const computationSteps: any[] = [];
 
     computationSteps.push({
       step: 1,
-      name: "Clarity Score (from REAL model)",
+      name: "Clarity Score",
       formula: `Clarity = avg(ratings)/5 = ${(totalClarity / n).toFixed(2)}/5 = ${avgClarity.toFixed(4)}`,
       result: avgClarity,
       status: avgClarity >= 0.7 ? "pass" : "fail",
       weight: "30%",
-      why: avgClarity >= 0.7 
-        ? "REAL model explanations are clear and understandable."
-        : "REAL model explanations may be confusing.",
     });
 
     computationSteps.push({
@@ -342,20 +383,16 @@ serve(async (req) => {
 
     computationSteps.push({
       step: 6,
-      name: "Weighted Explainability Score (REAL MODEL OUTPUT)",
+      name: "Weighted Explainability Score",
       formula: `Score = 0.30×${avgClarity.toFixed(2)} + 0.30×${avgFaithfulness.toFixed(2)} + 0.20×${coverage.toFixed(2)} + 0.10×${avgActionability.toFixed(2)} + 0.10×${avgSimplicity.toFixed(2)} = ${weightedScore.toFixed(4)}`,
       result: overallScore,
       status: isCompliant ? "pass" : "fail",
       threshold: 70,
       weight: "100%",
-      why: isCompliant 
-        ? `✅ Explainability score ${overallScore}% from REAL model meets EU AI Act Article 13 requirements.`
-        : `⚠️ NON-COMPLIANT: Explainability score ${overallScore}% indicates YOUR model lacks transparency.`,
     });
 
     const inferenceLatency = Date.now() - startTime;
 
-    // Store result
     await supabase.from("evaluation_runs").insert({
       model_id: modelId,
       engine_type: "explainability",
@@ -369,20 +406,9 @@ serve(async (req) => {
         simplicity: Math.round(avgSimplicity * 100),
       },
       explanations: {
-        reasoning_chain: computationSteps.map((step, i) => ({
-          step: i + 1,
-          thought: step.name,
-          observation: step.formula,
-          conclusion: `Result: ${typeof step.result === 'number' ? step.result.toFixed(4) : step.result} - ${step.status.toUpperCase()}`,
-        })),
         transparency_summary: isCompliant 
-          ? `REAL model passed explainability evaluation with ${overallScore}% score.`
-          : `⚠️ REAL model failed explainability evaluation with ${overallScore}% score.`,
-        evidence: rawLogs.map(l => ({ 
-          input: l.input, 
-          output: l.output?.substring(0, 100),
-          analysis: l.analysis,
-        })),
+          ? `Model passed explainability evaluation with ${overallScore}% score.`
+          : `⚠️ Model failed explainability evaluation with ${overallScore}% score.`,
         endpoint_used: endpoint,
       },
       details: { computation_steps: computationSteps, raw_logs: rawLogs },
@@ -392,7 +418,7 @@ serve(async (req) => {
     if (autoEscalate && !isCompliant) {
       await supabase.from("review_queue").insert({
         title: `Explainability NON-COMPLIANT: ${overallScore}%`,
-        description: `REAL model endpoint ${endpoint} fails transparency requirements.`,
+        description: `Model endpoint ${endpoint} fails transparency requirements.`,
         review_type: "explainability_flag",
         severity: overallScore < 50 ? "critical" : "high",
         status: "pending",
@@ -401,13 +427,13 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[eval-explainability] REAL evaluation complete. Score: ${overallScore}%, Latency: ${inferenceLatency}ms`);
+    console.log(`[eval-explainability] Complete. Score: ${overallScore}%, Latency: ${inferenceLatency}ms`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        overall_score: overallScore,
-        is_compliant: isCompliant,
+        overallScore,
+        isCompliant,
         scores: {
           clarity: Math.round(avgClarity * 100),
           faithfulness: Math.round(avgFaithfulness * 100),
@@ -415,10 +441,10 @@ serve(async (req) => {
           actionability: Math.round(avgActionability * 100),
           simplicity: Math.round(avgSimplicity * 100),
         },
-        computation_steps: computationSteps,
-        raw_logs: rawLogs,
-        endpoint_used: endpoint,
-        inference_latency_ms: inferenceLatency,
+        computationSteps,
+        rawLogs,
+        endpointUsed: endpoint,
+        inferenceLatencyMs: inferenceLatency,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
