@@ -5,7 +5,7 @@ import { LiveMetrics } from "@/components/dashboard/LiveMetrics";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Activity, AlertTriangle, TrendingUp, Clock, RefreshCw, Bell, Zap, MessageSquare } from "lucide-react";
+import { Activity, AlertTriangle, TrendingUp, Clock, RefreshCw, Bell, Zap, MessageSquare, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDriftAlerts, useDriftAlertStats, DriftAlert } from "@/hooks/useDriftAlerts";
 import { useModels, Model } from "@/hooks/useModels";
@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
 // TrafficGenerator removed - no fake data allowed after Dec 11, 2025
 import { RealtimeChatDemo } from "@/components/observability/RealtimeChatDemo";
+import { RAIAssistant } from "@/components/assistant/RAIAssistant";
 import { DriftDetector } from "@/components/observability/DriftDetector";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -149,7 +150,7 @@ export default function Observability() {
     toast.success("Dashboard refreshed");
   };
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'realtime' | 'drift'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'realtime' | 'drift' | 'assistant'>('dashboard');
 
   return (
     <MainLayout 
@@ -179,6 +180,7 @@ export default function Observability() {
       <div className="flex items-center gap-2 mb-6 border-b border-border pb-4">
         {[
           { id: 'dashboard', label: 'Dashboard', icon: Activity },
+          { id: 'assistant', label: 'AI Assistant', icon: Bot },
           { id: 'realtime', label: 'Real-Time Chat', icon: MessageSquare },
           { id: 'drift', label: 'Drift Detection', icon: TrendingUp },
         ].map(tab => (
@@ -195,6 +197,7 @@ export default function Observability() {
         ))}
       </div>
 
+      {activeTab === 'assistant' && <RAIAssistant currentPage="Observability" />}
       {activeTab === 'realtime' && <RealtimeChatDemo />}
       {activeTab === 'drift' && <DriftDetector />}
       
