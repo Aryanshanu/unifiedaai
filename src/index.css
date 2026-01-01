@@ -6,20 +6,22 @@
 
 @layer base {
   :root {
-    /* Dark theme - Enterprise AI Governance aesthetic */
-    --background: 222 47% 6%;
+    /* Fractal Dark Theme - Enterprise AI Governance
+       Deep Indigo primary with soft graphite backgrounds
+       Clean, authoritative, minimal */
+    --background: 222 47% 7%;
     --foreground: 210 40% 96%;
 
-    --card: 222 47% 8%;
+    --card: 222 47% 9%;
     --card-foreground: 210 40% 96%;
 
     --popover: 222 47% 10%;
     --popover-foreground: 210 40% 96%;
 
-    /* Teal/Cyan for trust & technology */
-    --primary: 173 80% 45%;
-    --primary-foreground: 222 47% 6%;
-    --primary-glow: 173 80% 55%;
+    /* Deep Indigo - Authority & Intelligence */
+    --primary: 232 47% 48%;
+    --primary-foreground: 210 40% 98%;
+    --primary-glow: 232 47% 58%;
 
     --secondary: 222 30% 14%;
     --secondary-foreground: 210 40% 90%;
@@ -27,55 +29,59 @@
     --muted: 222 30% 12%;
     --muted-foreground: 215 20% 55%;
 
-    --accent: 262 83% 58%;
+    --accent: 232 40% 35%;
     --accent-foreground: 210 40% 98%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 0 72% 48%;
     --destructive-foreground: 210 40% 98%;
 
-    /* Status colors */
-    --success: 152 69% 45%;
+    /* Status colors - Muted, Professional */
+    --success: 152 55% 42%;
     --success-foreground: 222 47% 6%;
-    --warning: 38 92% 50%;
+    --warning: 38 80% 48%;
     --warning-foreground: 222 47% 6%;
-    --danger: 0 72% 51%;
+    --danger: 0 65% 48%;
     --danger-foreground: 210 40% 98%;
 
-    /* Risk levels */
-    --risk-low: 152 69% 45%;
-    --risk-medium: 38 92% 50%;
-    --risk-high: 0 72% 51%;
-    --risk-critical: 328 85% 52%;
+    /* Fractal Risk Levels - Unified Visual Language
+       Critical: Fractal Red (ONLY for critical)
+       High: Amber
+       Medium: Yellow (muted)
+       Low: Neutral gray */
+    --risk-critical: 0 72% 48%;
+    --risk-high: 38 80% 48%;
+    --risk-medium: 45 70% 50%;
+    --risk-low: 215 20% 55%;
 
     --border: 222 30% 16%;
     --input: 222 30% 14%;
-    --ring: 173 80% 45%;
+    --ring: 232 47% 48%;
 
-    --radius: 0.75rem;
+    --radius: 0.5rem;
 
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(173 80% 45%), hsl(190 80% 50%));
+    /* Gradients - Subtle, not flashy */
+    --gradient-primary: linear-gradient(135deg, hsl(232 47% 48%), hsl(232 47% 38%));
     --gradient-card: linear-gradient(180deg, hsl(222 47% 10%), hsl(222 47% 7%));
-    --gradient-glow: radial-gradient(ellipse at center, hsl(173 80% 45% / 0.15), transparent 70%);
-    --gradient-hero: linear-gradient(135deg, hsl(222 47% 8%) 0%, hsl(222 47% 4%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(262 83% 58%), hsl(280 80% 55%));
+    --gradient-glow: radial-gradient(ellipse at center, hsl(232 47% 48% / 0.1), transparent 70%);
+    --gradient-hero: linear-gradient(135deg, hsl(222 47% 8%) 0%, hsl(222 47% 5%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(232 47% 48%), hsl(232 40% 35%));
 
-    /* Shadows */
+    /* Shadows - Subtle depth */
     --shadow-sm: 0 1px 2px hsl(222 47% 4% / 0.5);
     --shadow-md: 0 4px 12px hsl(222 47% 4% / 0.6);
     --shadow-lg: 0 8px 24px hsl(222 47% 4% / 0.7);
-    --shadow-glow: 0 0 40px hsl(173 80% 45% / 0.2);
-    --shadow-glow-accent: 0 0 40px hsl(262 83% 58% / 0.2);
+    --shadow-glow: 0 0 30px hsl(232 47% 48% / 0.15);
+    --shadow-glow-accent: 0 0 30px hsl(232 40% 35% / 0.15);
 
     /* Sidebar */
     --sidebar-background: 222 47% 5%;
     --sidebar-foreground: 210 40% 80%;
-    --sidebar-primary: 173 80% 45%;
-    --sidebar-primary-foreground: 222 47% 6%;
+    --sidebar-primary: 232 47% 48%;
+    --sidebar-primary-foreground: 210 40% 98%;
     --sidebar-accent: 222 30% 12%;
     --sidebar-accent-foreground: 210 40% 96%;
     --sidebar-border: 222 30% 12%;
-    --sidebar-ring: 173 80% 45%;
+    --sidebar-ring: 232 47% 48%;
   }
 
   .dark {
