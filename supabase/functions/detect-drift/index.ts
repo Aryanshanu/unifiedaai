@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { validateSession, requireAuth, hasAnyRole, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
 
 interface DriftMetrics {
   psi: number; // Population Stability Index
@@ -71,14 +67,29 @@ serve(async (req) => {
   }
 
   const startTime = Date.now();
-  console.log("Starting drift detection...");
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Authentication required for drift detection
+    const authResult = await validateSession(req);
+    const authError = requireAuth(authResult);
+    if (authError) return authError;
 
-    // Get all active systems
+    const { user } = authResult;
+    
+    // Only admins and analysts can run drift detection
+    if (!hasAnyRole(user!, ['admin', 'analyst'])) {
+      return new Response(
+        JSON.stringify({ error: "Admin or analyst role required for drift detection" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`[detect-drift] User ${user?.id} starting drift detection...`);
+    
+    const serviceClient = getServiceClient();
+    const supabase = authResult.supabase!;
+
+    // Get all active systems (uses RLS)
     const { data: systems, error: systemsError } = await supabase
       .from("systems")
       .select("id, name, project_id")

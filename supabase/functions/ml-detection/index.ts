@@ -1,9 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { validateSession, requireAuth, corsHeaders } from "../_shared/auth-helper.ts";
 
 // HuggingFace Model IDs for real ML detection
 const HF_TOXICITY_MODEL = "ml6team/toxic-comment-classification";
@@ -413,6 +409,13 @@ serve(async (req) => {
   }
 
   try {
+    // Authentication required for ML detection
+    const authResult = await validateSession(req);
+    const authError = requireAuth(authResult);
+    if (authError) return authError;
+
+    console.log(`[ml-detection] User ${authResult.user?.id} running ML detection...`);
+
     const { text, mode = "full" } = await req.json();
     
     if (!text || typeof text !== "string") {

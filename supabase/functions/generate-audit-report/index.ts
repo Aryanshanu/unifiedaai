@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { validateSession, requireAuth, hasAnyRole, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
 
 interface AuditReportRequest {
   systemId?: string;
@@ -32,6 +28,23 @@ serve(async (req) => {
   const startTime = Date.now();
 
   try {
+    // Authentication required for audit reports
+    const authResult = await validateSession(req);
+    const authError = requireAuth(authResult);
+    if (authError) return authError;
+
+    const { user } = authResult;
+    
+    // Only admins and analysts can generate audit reports
+    if (!hasAnyRole(user!, ['admin', 'analyst'])) {
+      return new Response(
+        JSON.stringify({ error: "Admin or analyst role required for audit reports" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`[generate-audit-report] User ${user?.id} generating report...`);
+
     const body: AuditReportRequest = await req.json();
     const { systemId, projectId, startDate, endDate, includeRawLogs = false } = body;
 
@@ -42,9 +55,8 @@ serve(async (req) => {
       );
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Use service client for full audit access (needs to read all logs)
+    const supabase = getServiceClient();
 
     const auditEntries: AuditEntry[] = [];
     const fromDate = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
