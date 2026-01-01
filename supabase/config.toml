@@ -25,7 +25,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.kg-lineage]
-verify_jwt = false
+verify_jwt = true
 
 [functions.kg-explain]
 verify_jwt = true
@@ -46,7 +46,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.realtime-chat]
-verify_jwt = false
+verify_jwt = true
 
 [functions.detect-drift]
 verify_jwt = true
@@ -55,19 +55,25 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.eval-toxicity-hf]
-verify_jwt = false
+verify_jwt = true
 
 [functions.eval-privacy-hf]
-verify_jwt = false
+verify_jwt = true
 
 [functions.eval-hallucination-hf]
-verify_jwt = false
+verify_jwt = true
 
 [functions.eval-explainability-hf]
-verify_jwt = false
+verify_jwt = true
 
 [functions.llm-generate]
 verify_jwt = true
 
 [functions.rai-assistant]
-verify_jwt = false
+verify_jwt = true
+
+[functions.cicd-gate]
+verify_jwt = true
+
+[functions.generate-audit-report]
+verify_jwt = true

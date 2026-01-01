@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { validateSession, requireAuth, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
 
 // Timeout for external API calls (30 seconds)
 const FETCH_TIMEOUT = 30000;
@@ -203,11 +199,24 @@ serve(async (req) => {
   const startTime = Date.now();
 
   try {
-    const { modelId, explanations, customPrompt, autoEscalate = true } = await req.json();
+    // =====================================================
+    // AUTHENTICATION: Validate user JWT
+    // =====================================================
+    const authResult = await validateSession(req);
+    const authError = requireAuth(authResult);
+    
+    if (authError) {
+      console.log("[eval-explainability] Authentication failed - returning 401");
+      return authError;
+    }
+    
+    const { user, supabase: userClient } = authResult;
+    console.log(`[eval-explainability] Authenticated user: ${user?.id}`);
+    
+    // Service client for system writes
+    const serviceClient = getServiceClient();
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const { modelId, explanations, customPrompt, autoEscalate = true } = await req.json();
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
 
     if (!lovableApiKey) {
@@ -224,7 +233,8 @@ serve(async (req) => {
       );
     }
 
-    const { data: model, error: modelError } = await supabase
+    // Get model using user client to respect RLS
+    const { data: model, error: modelError } = await userClient!
       .from("models")
       .select("*, system:systems(*)")
       .eq("id", modelId)
@@ -232,7 +242,7 @@ serve(async (req) => {
 
     if (modelError || !model) {
       return new Response(
-        JSON.stringify({ error: "Model not found" }),
+        JSON.stringify({ error: "Model not found or access denied" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -393,7 +403,8 @@ serve(async (req) => {
 
     const inferenceLatency = Date.now() - startTime;
 
-    await supabase.from("evaluation_runs").insert({
+    // Use service client for writes
+    await serviceClient.from("evaluation_runs").insert({
       model_id: modelId,
       engine_type: "explainability",
       status: "completed",
@@ -413,10 +424,11 @@ serve(async (req) => {
       },
       details: { computation_steps: computationSteps, raw_logs: rawLogs },
       completed_at: new Date().toISOString(),
+      triggered_by: user?.id,
     });
 
     if (autoEscalate && !isCompliant) {
-      await supabase.from("review_queue").insert({
+      await serviceClient.from("review_queue").insert({
         title: `Explainability NON-COMPLIANT: ${overallScore}%`,
         description: `Model endpoint ${endpoint} fails transparency requirements.`,
         review_type: "explainability_flag",
@@ -424,6 +436,7 @@ serve(async (req) => {
         status: "pending",
         model_id: modelId,
         sla_deadline: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
+        created_by: user?.id,
       });
     }
 
