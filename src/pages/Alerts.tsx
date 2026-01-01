@@ -17,10 +17,11 @@ import {
   Filter,
   Loader2,
   Trash2,
-  Globe,
-  Zap
+  Globe
 } from "lucide-react";
 import { EnforcementBadge } from "@/components/shared/EnforcementBadge";
+import { RiskIndicator } from "@/components/fractal";
+import { FRACTAL_RISK, normalizeRiskLevel } from "@/lib/fractal-theme";
 import { cn } from "@/lib/utils";
 import { useDriftAlerts } from "@/hooks/useDriftAlerts";
 import { useIncidents } from "@/hooks/useIncidents";
@@ -49,13 +50,6 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { EmptyState } from "@/components/shared/EmptyState";
 
-const severityColors = {
-  critical: "bg-danger/10 text-danger border-danger/30",
-  high: "bg-warning/10 text-warning border-warning/30",
-  medium: "bg-primary/10 text-primary border-primary/30",
-  low: "bg-muted text-muted-foreground border-border",
-};
-
 const channelIcons = {
   email: Mail,
   slack: Slack,
@@ -76,23 +70,18 @@ export default function Alerts() {
   const [newChannelType, setNewChannelType] = useState<'email' | 'slack' | 'teams' | 'webhook'>('email');
   const [newChannelName, setNewChannelName] = useState('');
   const [newChannelConfig, setNewChannelConfig] = useState('');
-  const [realtimeCount, setRealtimeCount] = useState(0);
 
   // Supabase Realtime subscriptions
   useEffect(() => {
-    console.log("Setting up Alerts Realtime subscriptions...");
-    
     const channel = supabase
       .channel('alerts-realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'drift_alerts' },
         (payload) => {
-          console.log('Drift alert change:', payload);
-          setRealtimeCount(prev => prev + 1);
           refetchDrift();
           if (payload.eventType === 'INSERT') {
-            toast.warning("🚨 New Drift Alert", {
+            toast.warning("New Drift Alert", {
               description: `${(payload.new as any)?.drift_type || 'Drift'} detected on ${(payload.new as any)?.feature || 'feature'}`
             });
           }
@@ -102,24 +91,17 @@ export default function Alerts() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'incidents' },
         (payload) => {
-          console.log('Incident change:', payload);
-          setRealtimeCount(prev => prev + 1);
           refetchIncidents();
           if (payload.eventType === 'INSERT') {
-            toast.error("🔥 New Incident", {
+            toast.error("New Incident", {
               description: (payload.new as any)?.title || "Incident created"
             });
-            // NOTE: PagerDuty escalation disabled - backend integration not implemented
-            // When implemented, this will trigger actual PagerDuty API call
           }
         }
       )
-      .subscribe((status) => {
-        console.log('Alerts realtime status:', status);
-      });
+      .subscribe();
 
     return () => {
-      console.log("Cleaning up Alerts Realtime subscriptions");
       supabase.removeChannel(channel);
     };
   }, [refetchDrift, refetchIncidents]);
@@ -148,7 +130,7 @@ export default function Alerts() {
   const toggleChannel = async (channelId: string, enabled: boolean) => {
     try {
       await updateChannel.mutateAsync({ id: channelId, enabled: !enabled });
-      toast.success("Channel updated");
+      toast.success("Channel configuration applied");
     } catch (error: any) {
       toast.error("Failed to update: " + error.message);
     }
@@ -157,7 +139,7 @@ export default function Alerts() {
   const handleDeleteChannel = async (channelId: string) => {
     try {
       await deleteChannel.mutateAsync(channelId);
-      toast.success("Channel deleted");
+      toast.success("Channel removed");
     } catch (error: any) {
       toast.error("Failed to delete: " + error.message);
     }
@@ -194,22 +176,6 @@ export default function Alerts() {
         <EnforcementBadge level="advisory" />
       }
     >
-      {/* Realtime indicator */}
-      {realtimeCount > 0 && (
-        <div className="mb-4 p-3 bg-success/10 border border-success/20 rounded-lg flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
-            <span className="text-sm text-success font-medium">
-              Live: {realtimeCount} realtime events received
-            </span>
-          </div>
-          <Badge variant="outline" className="text-success border-success/30">
-            <Zap className="w-3 h-3 mr-1" />
-            Realtime Active
-          </Badge>
-        </div>
-      )}
-
       {/* Tabs */}
       <div className="flex items-center gap-2 mb-6 border-b border-border pb-4">
         {[
@@ -244,10 +210,9 @@ export default function Alerts() {
                 Filter
               </Button>
             </div>
-            <Badge variant="outline" className="gap-1">
-              <Bell className="w-3 h-3" />
-              {allAlerts.filter(a => a.status === 'open').length} active
-            </Badge>
+            <span className="text-sm text-muted-foreground">
+              {allAlerts.filter(a => a.status === 'open').length} active alerts
+            </span>
           </div>
 
           {isLoading ? (
@@ -257,65 +222,57 @@ export default function Alerts() {
           ) : allAlerts.length === 0 ? (
             <EmptyState
               icon={<CheckCircle className="w-8 h-8 text-success/50" />}
-              title="All clear!"
-              description="No active alerts at this time. Your systems are healthy."
+              title="Systems nominal"
+              description="No active alerts. Your systems are healthy."
             />
           ) : (
             <div className="space-y-3">
-              {allAlerts.map(alert => (
-                <div
-                  key={alert.id}
-                  className="bg-card border border-border rounded-xl p-4 hover:border-primary/30 transition-all"
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={cn(
-                      "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
-                      alert.severity === 'critical' ? "bg-danger/10" : 
-                      alert.severity === 'high' ? "bg-warning/10" : "bg-primary/10"
-                    )}>
-                      <AlertTriangle className={cn(
-                        "w-5 h-5",
-                        alert.severity === 'critical' ? "text-danger" :
-                        alert.severity === 'high' ? "text-warning" : "text-primary"
-                      )} />
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge variant="outline" className="text-xs">
-                          {alert.type}
-                        </Badge>
-                        <span className={cn(
-                          "text-[10px] px-1.5 py-0.5 rounded-full border font-medium",
-                          severityColors[alert.severity as keyof typeof severityColors]
-                        )}>
-                          {alert.severity}
-                        </span>
-                        <span className={cn(
-                          "text-xs",
-                          alert.status === 'open' ? "text-warning" : 
-                          alert.status === 'resolved' ? "text-success" : "text-muted-foreground"
-                        )}>
-                          {alert.status}
-                        </span>
+              {allAlerts.map(alert => {
+                const riskLevel = normalizeRiskLevel(alert.severity);
+                const config = FRACTAL_RISK[riskLevel];
+                
+                return (
+                  <div
+                    key={alert.id}
+                    className="bg-card border border-border rounded-xl p-4 hover:border-primary/30 transition-all"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className={cn(
+                        "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
+                        config.bg
+                      )}>
+                        <AlertTriangle className={cn("w-5 h-5", config.text)} />
                       </div>
-                      <p className="font-medium text-foreground">{alert.title}</p>
-                      {alert.details && (
-                        <p className="text-sm text-muted-foreground mt-1">{alert.details}</p>
-                      )}
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
-                        <Clock className="w-3 h-3" />
-                        {formatDistanceToNow(new Date(alert.created_at), { addSuffix: true })}
-                      </div>
-                    </div>
 
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm">Acknowledge</Button>
-                      <Button variant="ghost" size="sm">Resolve</Button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <RiskIndicator level={alert.severity} size="sm" />
+                          <span className={cn(
+                            "text-xs",
+                            alert.status === 'open' ? "text-risk-high" : 
+                            alert.status === 'resolved' ? "text-success" : "text-muted-foreground"
+                          )}>
+                            {alert.status}
+                          </span>
+                        </div>
+                        <p className="font-medium text-foreground">{alert.title}</p>
+                        {alert.details && (
+                          <p className="text-sm text-muted-foreground mt-1">{alert.details}</p>
+                        )}
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
+                          <Clock className="w-3 h-3" />
+                          {formatDistanceToNow(new Date(alert.created_at), { addSuffix: true })}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm">Acknowledge</Button>
+                        <Button variant="ghost" size="sm">Resolve</Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -326,7 +283,7 @@ export default function Alerts() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Notification Channels</h2>
-            <Button variant="gradient" size="sm" className="gap-2" onClick={() => setShowAddChannel(true)}>
+            <Button variant="default" size="sm" className="gap-2" onClick={() => setShowAddChannel(true)}>
               <Plus className="w-4 h-4" />
               Add Channel
             </Button>
@@ -347,15 +304,15 @@ export default function Alerts() {
           ) : (
             <div className="grid gap-4">
               {channels.map(channel => {
-                const Icon = channelIcons[channel.channel_type];
+                const Icon = channelIcons[channel.channel_type as keyof typeof channelIcons] || Bell;
                 return (
                   <div
                     key={channel.id}
                     className="bg-card border border-border rounded-xl p-4 flex items-center justify-between"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Icon className="w-5 h-5 text-primary" />
+                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                        <Icon className="w-5 h-5 text-muted-foreground" />
                       </div>
                       <div>
                         <p className="font-medium text-foreground">{channel.name}</p>
@@ -363,9 +320,12 @@ export default function Alerts() {
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
-                      <Badge variant={channel.enabled ? "default" : "secondary"}>
-                        {channel.enabled ? "Active" : "Disabled"}
-                      </Badge>
+                      <span className={cn(
+                        "text-xs font-medium",
+                        channel.enabled ? "text-success" : "text-muted-foreground"
+                      )}>
+                        {channel.enabled ? "Enforced" : "Disabled"}
+                      </span>
                       <Switch 
                         checked={channel.enabled} 
                         onCheckedChange={() => toggleChannel(channel.id, channel.enabled)}
@@ -375,7 +335,7 @@ export default function Alerts() {
                         size="icon"
                         onClick={() => handleDeleteChannel(channel.id)}
                       >
-                        <Trash2 className="w-4 h-4 text-danger" />
+                        <Trash2 className="w-4 h-4 text-risk-critical" />
                       </Button>
                     </div>
                   </div>
@@ -432,7 +392,7 @@ export default function Alerts() {
                 <Button variant="outline" onClick={() => setShowAddChannel(false)}>
                   Cancel
                 </Button>
-                <Button variant="gradient" onClick={handleAddChannel} disabled={createChannel.isPending}>
+                <Button onClick={handleAddChannel} disabled={createChannel.isPending}>
                   {createChannel.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   Add Channel
                 </Button>
@@ -447,7 +407,7 @@ export default function Alerts() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Alert Rules</h2>
-            <Button variant="gradient" size="sm" className="gap-2">
+            <Button variant="default" size="sm" className="gap-2">
               <Plus className="w-4 h-4" />
               Create Rule
             </Button>
@@ -457,21 +417,28 @@ export default function Alerts() {
             <div className="space-y-4">
               {[
                 { name: 'Critical Drift Alert', condition: 'drift_value > 0.15', channels: ['email', 'slack'], enabled: true },
-                { name: 'High Severity Incident', condition: 'severity = critical', channels: ['slack'], enabled: true },
-                { name: 'Policy Violation', condition: 'violation_type = blocked', channels: ['email'], enabled: false },
+                { name: 'High Severity Incident', condition: 'severity = critical OR severity = high', channels: ['email'], enabled: true },
+                { name: 'Policy Violation', condition: 'violation_count > 0', channels: ['slack'], enabled: false },
               ].map((rule, i) => (
-                <div key={i} className="flex items-center justify-between py-3 border-b border-border last:border-0">
+                <div key={i} className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
                   <div>
                     <p className="font-medium text-foreground">{rule.name}</p>
-                    <p className="text-sm text-muted-foreground font-mono">{rule.condition}</p>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex gap-1">
-                      {rule.channels.map(ch => {
-                        const Icon = channelIcons[ch as keyof typeof channelIcons];
-                        return <Icon key={ch} className="w-4 h-4 text-muted-foreground" />;
-                      })}
+                    <p className="text-xs text-muted-foreground font-mono mt-1">{rule.condition}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      {rule.channels.map(ch => (
+                        <Badge key={ch} variant="outline" className="text-xs capitalize">
+                          {ch}
+                        </Badge>
+                      ))}
                     </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={cn(
+                      "text-xs font-medium",
+                      rule.enabled ? "text-success" : "text-muted-foreground"
+                    )}>
+                      {rule.enabled ? "Enforced" : "Disabled"}
+                    </span>
                     <Switch checked={rule.enabled} />
                   </div>
                 </div>

@@ -1,12 +1,11 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useModels } from "@/hooks/useModels";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { PlatformHealthCards } from "@/components/dashboard/PlatformHealthCards";
 import { RealityCheckDashboard } from "@/components/dashboard/RealityCheckDashboard";
 import { useUnsafeDeployments, usePlatformMetrics } from "@/hooks/usePlatformMetrics";
-import { Database, Scale, AlertCircle, ShieldAlert, Lock, Eye, Plus, AlertOctagon, ArrowRight, Shield, Radio } from "lucide-react";
+import { Database, Scale, AlertCircle, ShieldAlert, Lock, Eye, AlertOctagon, ArrowRight, Shield } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { HealthIndicator } from "@/components/shared/HealthIndicator";
 import { useDataHealth } from "@/components/shared/DataHealthWrapper";
@@ -16,7 +15,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 export default function Index() {
-  const [realtimeCount, setRealtimeCount] = useState(0);
+  const [realtimeActive, setRealtimeActive] = useState(false);
   const queryClient = useQueryClient();
   const { data: models, isLoading: modelsLoading, isError: modelsError, refetch: refetchModels } = useModels();
   const { data: unsafeDeployments, isLoading: deploymentsLoading } = useUnsafeDeployments();
@@ -35,7 +34,7 @@ export default function Index() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'systems' },
         () => {
-          setRealtimeCount(prev => prev + 1);
+          setRealtimeActive(true);
           queryClient.invalidateQueries({ queryKey: ['platform-metrics'] });
           queryClient.invalidateQueries({ queryKey: ['unsafe-deployments'] });
         }
@@ -44,7 +43,7 @@ export default function Index() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'incidents' },
         (payload) => {
-          setRealtimeCount(prev => prev + 1);
+          setRealtimeActive(true);
           queryClient.invalidateQueries({ queryKey: ['platform-metrics'] });
           
           if (payload.eventType === 'INSERT') {
@@ -66,7 +65,7 @@ export default function Index() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'models' },
         () => {
-          setRealtimeCount(prev => prev + 1);
+          setRealtimeActive(true);
           queryClient.invalidateQueries({ queryKey: ['models'] });
         }
       )
@@ -84,56 +83,45 @@ export default function Index() {
 
   const engines = [
     { 
-      name: "Fairness Engine", 
+      name: "Fairness", 
       icon: Scale, 
       path: "/engine/fairness",
-      description: "Evaluate demographic parity, equalized odds, and bias metrics",
-      color: "text-blue-500"
+      description: "Evaluate demographic parity, equalized odds, and bias metrics"
     },
     { 
-      name: "Hallucination Engine", 
+      name: "Hallucination", 
       icon: AlertCircle, 
       path: "/engine/hallucination",
-      description: "Detect factuality issues, groundedness, and false claims",
-      color: "text-orange-500"
+      description: "Detect factuality issues, groundedness, and false claims"
     },
     { 
-      name: "Toxicity Engine", 
+      name: "Toxicity", 
       icon: ShieldAlert, 
       path: "/engine/toxicity",
-      description: "Measure harmful content, hate speech, and jailbreak resistance",
-      color: "text-red-500"
+      description: "Measure harmful content, hate speech, and jailbreak resistance"
     },
     { 
-      name: "Privacy Engine", 
+      name: "Privacy", 
       icon: Lock, 
       path: "/engine/privacy",
-      description: "Assess PII leakage, data memorization, and privacy risks",
-      color: "text-green-500"
+      description: "Assess PII leakage, data memorization, and privacy risks"
     },
     { 
-      name: "Explainability Engine", 
+      name: "Explainability", 
       icon: Eye, 
       path: "/engine/explainability",
-      description: "Analyze reasoning quality, transparency, and decision clarity",
-      color: "text-purple-500"
+      description: "Analyze reasoning quality, transparency, and decision clarity"
     },
   ];
 
   return (
     <MainLayout 
-      title="Dashboard" 
+      title="Command Center" 
       subtitle="Fractal RAI Platform Overview"
       headerActions={
         <div className="flex items-center gap-3">
-          <Badge variant="outline" className="bg-success/10 text-success border-success/30 gap-1.5">
-            <Radio className="w-3 h-3 animate-pulse" />
-            Realtime
-          </Badge>
-          {realtimeCount > 0 && (
-            <Badge variant="secondary" className="text-xs">
-              {realtimeCount} updates
-            </Badge>
+          {realtimeActive && (
+            <span className="w-2 h-2 rounded-full bg-success animate-pulse" title="Realtime active" />
           )}
           <HealthIndicator 
             status={status} 
@@ -166,7 +154,7 @@ export default function Index() {
         </div>
       )}
 
-      {/* Reality Check Dashboard — December 11, 2025 */}
+      {/* Reality Check Dashboard */}
       <div className="mb-6">
         <RealityCheckDashboard />
       </div>
@@ -181,8 +169,8 @@ export default function Index() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate("/projects")}>
           <CardContent className="pt-6 flex items-center gap-4">
-            <div className="p-3 rounded-lg bg-primary/10">
-              <Database className="h-6 w-6 text-primary" />
+            <div className="p-3 rounded-lg bg-muted">
+              <Database className="h-6 w-6 text-muted-foreground" />
             </div>
             <div>
               <p className="text-2xl font-bold">{metrics?.systemsCount || 0}</p>
@@ -193,8 +181,8 @@ export default function Index() {
 
         <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate("/governance/approvals")}>
           <CardContent className="pt-6 flex items-center gap-4">
-            <div className="p-3 rounded-lg bg-yellow-500/10">
-              <Shield className="h-6 w-6 text-yellow-500" />
+            <div className="p-3 rounded-lg bg-muted">
+              <Shield className="h-6 w-6 text-muted-foreground" />
             </div>
             <div>
               <p className="text-2xl font-bold">{metrics?.pendingApprovals || 0}</p>
@@ -217,7 +205,7 @@ export default function Index() {
       </div>
 
       {/* Core Engines Grid */}
-      <h2 className="text-lg font-semibold text-foreground mb-4">Core RAI Engines</h2>
+      <h2 className="text-lg font-semibold text-foreground mb-4">Evaluation Engines</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {engines.map((engine) => {
           const Icon = engine.icon;
@@ -229,8 +217,8 @@ export default function Index() {
             >
               <CardContent className="pt-6">
                 <div className="flex items-start gap-4">
-                  <div className={`p-3 rounded-lg bg-muted ${engine.color}`}>
-                    <Icon className="w-6 h-6" />
+                  <div className="p-3 rounded-lg bg-muted">
+                    <Icon className="w-6 h-6 text-muted-foreground" />
                   </div>
                   <div className="flex-1">
                     <h3 className="font-semibold text-foreground mb-1">{engine.name}</h3>

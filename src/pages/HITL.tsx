@@ -2,8 +2,7 @@ import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Users, Clock, AlertTriangle, CheckCircle, ChevronRight, Bell, Zap, RefreshCw } from "lucide-react";
+import { Users, Clock, AlertTriangle, CheckCircle, ChevronRight, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useReviewQueue, useReviewQueueStats, ReviewItem } from "@/hooks/useReviewQueue";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,67 +12,51 @@ import { SLACountdown } from "@/components/hitl/SLACountdown";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { EnforcementBadge } from "@/components/shared/EnforcementBadge";
-
-const severityColors = {
-  critical: "bg-danger/10 text-danger border-danger/30",
-  high: "bg-warning/10 text-warning border-warning/30",
-  medium: "bg-primary/10 text-primary border-primary/30",
-  low: "bg-muted text-muted-foreground border-border",
-};
+import { RiskIndicator } from "@/components/fractal";
+import { FRACTAL_RISK, normalizeRiskLevel } from "@/lib/fractal-theme";
 
 export default function HITL() {
   const { data: reviews, isLoading, refetch } = useReviewQueue();
   const { data: stats, refetch: refetchStats } = useReviewQueueStats();
   const [selectedReview, setSelectedReview] = useState<ReviewItem | null>(null);
   const [decisionDialogOpen, setDecisionDialogOpen] = useState(false);
-  const [realtimeCount, setRealtimeCount] = useState(0);
 
   // Supabase Realtime subscriptions for HITL
   useEffect(() => {
-    console.log("Setting up HITL Realtime subscriptions...");
-    
     const channel = supabase
       .channel('hitl-realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'review_queue' },
         (payload) => {
-          console.log('Review queue change:', payload);
-          setRealtimeCount(prev => prev + 1);
           refetch();
           refetchStats();
           if (payload.eventType === 'INSERT') {
             const newReview = payload.new as any;
-            toast.warning("🔔 New Review Queued", {
+            toast.warning("New Review Queued", {
               description: newReview?.title || "Review requires attention",
               action: {
                 label: "View",
                 onClick: () => {}
               }
             });
-            // NOTE: Slack notification disabled - backend delivery not implemented
-            // When implemented, this will trigger actual webhook call
           }
         }
       )
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'decisions' },
-        (payload) => {
-          console.log('New decision:', payload);
+        () => {
           refetch();
           refetchStats();
-          toast.success("✓ Decision recorded", {
+          toast.success("Decision Recorded", {
             description: "Audit trail updated"
           });
         }
       )
-      .subscribe((status) => {
-        console.log('HITL realtime status:', status);
-      });
+      .subscribe();
 
     return () => {
-      console.log("Cleaning up HITL Realtime subscriptions");
       supabase.removeChannel(channel);
     };
   }, [refetch, refetchStats]);
@@ -86,17 +69,10 @@ export default function HITL() {
     setDecisionDialogOpen(true);
   };
   
-  const handleNotifySlack = () => {
-    toast.warning("Slack notifications not implemented", {
-      description: "Backend webhook integration pending",
-      duration: 3000
-    });
-  };
-
   const handleRefresh = () => {
     refetch();
     refetchStats();
-    toast.success("Queue refreshed");
+    toast.success("Queue synchronized");
   };
 
   // Calculate queue distribution
@@ -109,42 +85,26 @@ export default function HITL() {
   const distributionItems = Object.entries(queueDistribution).map(([label, count]) => ({
     label,
     count,
-    color: label.toLowerCase().includes('safety') ? 'bg-danger' :
-           label.toLowerCase().includes('fairness') ? 'bg-warning' :
+    color: label.toLowerCase().includes('safety') ? 'bg-risk-critical' :
+           label.toLowerCase().includes('fairness') ? 'bg-risk-high' :
            label.toLowerCase().includes('privacy') ? 'bg-primary' : 'bg-success',
   }));
 
   return (
     <MainLayout 
       title="HITL Console" 
-      subtitle="Human-in-the-loop decisions, reviews, and escalations"
+      subtitle="Human authority decisions and escalations"
       headerActions={
         <EnforcementBadge level="enforced" />
       }
     >
-      {/* Realtime indicator */}
-      {realtimeCount > 0 && (
-        <div className="mb-4 p-3 bg-success/10 border border-success/20 rounded-lg flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
-            <span className="text-sm text-success font-medium">
-              Live: {realtimeCount} queue events this session
-            </span>
-          </div>
-          <Badge variant="outline" className="text-success border-success/30">
-            <Zap className="w-3 h-3 mr-1" />
-            Realtime Active
-          </Badge>
-        </div>
-      )}
-
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <MetricCard
           title="Pending Reviews"
           value={(stats?.pending || 0).toString()}
           subtitle={`${pendingReviews.filter(r => r.severity === 'critical').length} critical`}
-          icon={<Clock className="w-4 h-4 text-warning" />}
+          icon={<Clock className="w-4 h-4 text-risk-high" />}
           status={stats?.pending ? "warning" : "success"}
         />
         <MetricCard
@@ -157,7 +117,7 @@ export default function HITL() {
           title="Overdue"
           value={(stats?.overdue || 0).toString()}
           subtitle="Past SLA"
-          icon={<AlertTriangle className="w-4 h-4 text-danger" />}
+          icon={<AlertTriangle className="w-4 h-4 text-risk-critical" />}
           status={stats?.overdue ? "danger" : "success"}
         />
         <MetricCard
@@ -173,7 +133,7 @@ export default function HITL() {
         <div className="lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-warning" />
+              <AlertTriangle className="w-4 h-4 text-risk-high" />
               Review Queue
             </h2>
             <div className="flex items-center gap-2">
@@ -203,8 +163,8 @@ export default function HITL() {
           ) : pendingReviews.length === 0 ? (
             <div className="text-center py-12 bg-card border border-border rounded-xl">
               <CheckCircle className="w-12 h-12 text-success mx-auto mb-4" />
-              <p className="text-foreground font-medium">All caught up!</p>
-              <p className="text-sm text-muted-foreground mt-1">No pending reviews in the queue</p>
+              <p className="text-foreground font-medium">Queue Clear</p>
+              <p className="text-sm text-muted-foreground mt-1">No pending reviews</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -232,9 +192,9 @@ export default function HITL() {
                       <span className="text-xs font-mono text-muted-foreground">{decision.id.slice(0, 8)}</span>
                       <span className={cn(
                         "text-xs font-medium",
-                        decision.status === "approved" ? "text-success" : "text-danger"
+                        decision.status === "approved" ? "text-success" : "text-risk-critical"
                       )}>
-                        {decision.status === "approved" ? "Approved" : "Rejected"}
+                        {decision.status === "approved" ? "Authorized" : "Denied"}
                       </span>
                     </div>
                     <p className="text-sm font-medium text-foreground">{decision.title}</p>
@@ -285,7 +245,8 @@ export default function HITL() {
 }
 
 function ReviewCard({ review, onClick }: { review: ReviewItem; onClick?: () => void }) {
-  const isOverdue = review.sla_deadline && new Date(review.sla_deadline) < new Date();
+  const riskLevel = normalizeRiskLevel(review.severity);
+  const config = FRACTAL_RISK[riskLevel];
 
   return (
     <div 
@@ -295,25 +256,17 @@ function ReviewCard({ review, onClick }: { review: ReviewItem; onClick?: () => v
       <div className="flex items-start gap-4">
         <div className={cn(
           "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
-          review.severity === "critical" ? "bg-danger/10" : review.severity === "high" ? "bg-warning/10" : "bg-primary/10"
+          config.bg
         )}>
-          <AlertTriangle className={cn(
-            "w-5 h-5",
-            review.severity === "critical" ? "text-danger" : review.severity === "high" ? "text-warning" : "text-primary"
-          )} />
+          <AlertTriangle className={cn("w-5 h-5", config.text)} />
         </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-xs font-mono text-muted-foreground">{review.id.slice(0, 8)}</span>
-            <span className={cn(
-              "text-[10px] px-1.5 py-0.5 rounded-full border font-medium",
-              severityColors[review.severity as keyof typeof severityColors]
-            )}>
-              {review.severity}
-            </span>
+            <RiskIndicator level={review.severity} size="sm" />
             <span className="text-xs text-muted-foreground">•</span>
-            <span className="text-xs text-primary capitalize">{review.review_type}</span>
+            <span className="text-xs text-muted-foreground capitalize">{review.review_type}</span>
           </div>
           <p className="font-medium text-foreground mb-1">{review.title}</p>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
