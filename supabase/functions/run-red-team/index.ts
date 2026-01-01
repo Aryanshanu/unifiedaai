@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { validateSession, requireAuth, hasAnyRole, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
 
 // Adversarial test prompts for red team campaigns
 const ADVERSARIAL_PROMPTS = [
@@ -57,11 +53,24 @@ serve(async (req) => {
   }
 
   try {
-    console.log("Starting red team campaign with HONEST results...");
+    // Authentication required for red team operations
+    const authResult = await validateSession(req);
+    const authError = requireAuth(authResult);
+    if (authError) return authError;
+
+    const { user } = authResult;
     
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Only admins and analysts can run red team campaigns
+    if (!hasAnyRole(user!, ['admin', 'analyst'])) {
+      return new Response(
+        JSON.stringify({ error: "Admin or analyst role required for red team operations" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`[run-red-team] User ${user?.id} starting red team campaign...`);
+    
+    const supabase = getServiceClient();
 
     const { campaignName, attackCount = 30, runFullCampaign = true } = await req.json().catch(() => ({ runFullCampaign: true }));
 
@@ -83,6 +92,8 @@ serve(async (req) => {
     }
 
     const results: any[] = [];
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const gatewayUrl = `${supabaseUrl}/functions/v1/ai-gateway`;
     let blockedCount = 0;
     let failedCount = 0;
@@ -110,7 +121,7 @@ serve(async (req) => {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${supabaseKey}`,
+                "Authorization": `Bearer ${supabaseServiceKey}`,
               },
               body: JSON.stringify({
                 systemId: system.id,

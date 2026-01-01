@@ -1,11 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { validateSession, requireAuth, hasRole, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
 
 // Test prompts for each engine type
 const testPrompts = {
@@ -66,9 +62,24 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Authentication required - admin only
+    const authResult = await validateSession(req);
+    const authError = requireAuth(authResult);
+    if (authError) return authError;
+
+    const { user } = authResult;
+    
+    // Only admins can generate test traffic
+    if (!hasRole(user!, 'admin')) {
+      return new Response(
+        JSON.stringify({ error: "Admin role required to generate test traffic" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`[generate-test-traffic] Admin ${user?.id} generating test traffic...`);
+    
+    const supabase = getServiceClient();
 
     const { systemId, count = 200 } = await req.json();
     

@@ -1,11 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { validateSession, requireAuth, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
 
 interface LineageNode {
   id: string;
@@ -32,9 +28,14 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Authentication required for lineage queries
+    const authResult = await validateSession(req);
+    const authError = requireAuth(authResult);
+    if (authError) return authError;
+
+    console.log(`[kg-lineage] User ${authResult.user?.id} querying lineage...`);
+    
+    const supabase = getServiceClient();
 
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/');

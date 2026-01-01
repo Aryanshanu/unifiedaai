@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { validateSession, requireAuth, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
 
 // Fractal RAI-OS System Knowledge Base
 const SYSTEM_KNOWLEDGE = `
@@ -157,6 +153,13 @@ serve(async (req) => {
   }
 
   try {
+    // Authentication required for RAI Assistant
+    const authResult = await validateSession(req);
+    const authError = requireAuth(authResult);
+    if (authError) return authError;
+
+    console.log(`[rai-assistant] User ${authResult.user?.id} accessing assistant...`);
+
     const { messages, currentPage, systemId, thinkingMode } = await req.json();
 
     if (!messages || !Array.isArray(messages)) {
@@ -166,9 +169,8 @@ serve(async (req) => {
       );
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Use service client for platform-wide data access
+    const supabase = getServiceClient();
 
     // Fetch live system context
     const contextParts: string[] = [SYSTEM_KNOWLEDGE];

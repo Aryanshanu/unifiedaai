@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { validateSession, requireAuth, hasAnyRole, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -14,11 +10,24 @@ serve(async (req) => {
   const startTime = Date.now();
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Authentication required for KG sync
+    const authResult = await validateSession(req);
+    const authError = requireAuth(authResult);
+    if (authError) return authError;
 
-    console.log('Starting optimized KG Sync...');
+    const { user } = authResult;
+    
+    // Only admins and analysts can sync the knowledge graph
+    if (!hasAnyRole(user!, ['admin', 'analyst'])) {
+      return new Response(
+        JSON.stringify({ error: "Admin or analyst role required for KG sync" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`[kg-sync] User ${user?.id} starting optimized KG Sync...`);
+    
+    const supabase = getServiceClient();
 
     // Fetch all data in parallel for speed
     const [
