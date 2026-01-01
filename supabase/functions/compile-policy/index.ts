@@ -1,11 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { validateSession, requireAuth, hasAnyRole, getServiceClient, corsHeaders, errorResponse, successResponse } from "../_shared/auth-helper.ts";
 
 // Policy DSL Schema
 interface PolicyRule {
@@ -38,14 +33,12 @@ interface PolicyDSL {
 function validatePolicyDSL(policy: any): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   
-  // Check required fields
   if (!policy.version) errors.push('Missing required field: version');
   if (!policy.name) errors.push('Missing required field: name');
   if (!policy.rules || !Array.isArray(policy.rules)) {
     errors.push('Missing or invalid field: rules (must be an array)');
   }
   
-  // Validate each rule
   if (policy.rules && Array.isArray(policy.rules)) {
     policy.rules.forEach((rule: any, index: number) => {
       if (!rule.id) errors.push(`Rule ${index}: missing id`);
@@ -84,7 +77,6 @@ function validatePolicyDSL(policy: any): { valid: boolean; errors: string[] } {
 }
 
 function compilePolicyToExecutable(policy: PolicyDSL): string {
-  // Generate executable policy logic
   const compiled = {
     id: crypto.randomUUID(),
     version: policy.version,
@@ -103,10 +95,9 @@ function compilePolicyToExecutable(policy: PolicyDSL): string {
         } ${rule.condition.threshold}`,
       })),
     exemptions: policy.exemptions || {},
-    hash: '', // Will be computed
+    hash: '',
   };
   
-  // Compute policy hash for integrity
   const policyString = JSON.stringify(compiled.rules);
   compiled.hash = btoa(policyString).slice(0, 32);
   
@@ -119,104 +110,70 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    // =====================================================
+    // AUTHENTICATION: Validate user JWT via auth-helper
+    // =====================================================
+    const authResult = await validateSession(req);
+    const authError = requireAuth(authResult);
+    
+    if (authError) {
+      console.log("[compile-policy] Authentication failed");
+      return authError;
     }
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } }
-    });
+    
+    const { user } = authResult;
+    // User client respects RLS
+    const supabase = authResult.supabase!;
+    
+    console.log(`[compile-policy] Authenticated user: ${user?.id}`);
 
     const { action, policyDSL, policyId } = await req.json();
 
     if (action === 'validate') {
-      // Parse and validate DSL
       let parsed: any;
       try {
         parsed = typeof policyDSL === 'string' ? JSON.parse(policyDSL) : policyDSL;
       } catch (e) {
-        return new Response(JSON.stringify({ 
-          valid: false, 
-          errors: ['Invalid JSON syntax'] 
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        return successResponse({ valid: false, errors: ['Invalid JSON syntax'] });
       }
       
       const validation = validatePolicyDSL(parsed);
-      
-      return new Response(JSON.stringify(validation), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return successResponse(validation);
     }
 
     if (action === 'compile') {
-      // Parse, validate, and compile
       let parsed: PolicyDSL;
       try {
         parsed = typeof policyDSL === 'string' ? JSON.parse(policyDSL) : policyDSL;
       } catch (e) {
-        return new Response(JSON.stringify({ 
-          error: 'Invalid JSON syntax',
-          compiled: null,
-        }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        return errorResponse('Invalid JSON syntax', 400);
       }
       
       const validation = validatePolicyDSL(parsed);
       if (!validation.valid) {
-        return new Response(JSON.stringify({ 
-          error: 'Policy validation failed',
-          errors: validation.errors,
-          compiled: null,
-        }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        return errorResponse('Policy validation failed', 400, { errors: validation.errors });
       }
       
       const compiled = compilePolicyToExecutable(parsed);
       
-      return new Response(JSON.stringify({ 
+      return successResponse({ 
         success: true,
         compiled: JSON.parse(compiled),
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     if (action === 'save') {
-      // Save compiled policy to database
       let parsed: PolicyDSL;
       try {
         parsed = typeof policyDSL === 'string' ? JSON.parse(policyDSL) : policyDSL;
       } catch (e) {
-        return new Response(JSON.stringify({ error: 'Invalid JSON syntax' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        return errorResponse('Invalid JSON syntax', 400);
       }
       
       const validation = validatePolicyDSL(parsed);
       if (!validation.valid) {
-        return new Response(JSON.stringify({ 
-          error: 'Policy validation failed',
-          errors: validation.errors,
-        }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        return errorResponse('Policy validation failed', 400, { errors: validation.errors });
       }
-
-      const { data: { user } } = await supabase.auth.getUser();
       
       const { data, error } = await supabase
         .from('policy_packs')
@@ -233,16 +190,18 @@ serve(async (req) => {
       
       if (error) throw error;
       
-      return new Response(JSON.stringify({ 
+      return successResponse({ 
         success: true,
         policy: data,
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     if (action === 'activate') {
-      // Activate a policy
+      // Only admin/analyst can activate policies
+      if (!hasAnyRole(user!, ['admin', 'analyst'])) {
+        return errorResponse('Only admins and analysts can activate policies', 403);
+      }
+      
       const { data, error } = await supabase
         .from('policy_packs')
         .update({ status: 'active' })
@@ -252,23 +211,15 @@ serve(async (req) => {
       
       if (error) throw error;
       
-      return new Response(JSON.stringify({ 
+      return successResponse({ 
         success: true,
         policy: data,
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    return new Response(JSON.stringify({ error: 'Invalid action' }), {
-      status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return errorResponse('Invalid action', 400);
   } catch (error: any) {
     console.error('Error in compile-policy:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return errorResponse(error.message, 500);
   }
 });

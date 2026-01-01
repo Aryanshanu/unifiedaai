@@ -1,10 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { validateSession, requireAuth, hasAnyRole, getServiceClient, corsHeaders, errorResponse, successResponse } from "../_shared/auth-helper.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -12,44 +7,32 @@ serve(async (req) => {
   }
 
   try {
+    // =====================================================
+    // AUTHENTICATION: Validate user JWT via auth-helper
+    // =====================================================
+    const authResult = await validateSession(req);
+    const authError = requireAuth(authResult);
+    
+    if (authError) {
+      console.log("[copilot] Authentication failed");
+      return authError;
+    }
+    
+    const { user } = authResult;
+    // User client respects RLS for data reads
+    const supabase = authResult.supabase!;
+    // Service client for system operations
+    const serviceClient = getServiceClient();
+    
+    console.log(`[copilot] Authenticated user: ${user?.id}`);
+
     const { systemId, question } = await req.json();
 
     if (!systemId || !question) {
-      return new Response(
-        JSON.stringify({ error: "systemId and question are required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return errorResponse("systemId and question are required", 400);
     }
 
-    // Initialize Supabase client with service role for data access
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Extract user ID from JWT token for authorization check
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Authorization header required" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Decode JWT to get user ID (token already verified by Supabase)
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: userError } = await createClient(
-      supabaseUrl,
-      Deno.env.get("SUPABASE_ANON_KEY")!
-    ).auth.getUser(token);
-
-    if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Invalid authentication token" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Check if user has access to this system (owner or admin/analyst role)
+    // Fetch system using user client (respects RLS)
     const { data: system, error: systemError } = await supabase
       .from("systems")
       .select("*, projects(*)")
@@ -57,32 +40,19 @@ serve(async (req) => {
       .single();
 
     if (systemError || !system) {
-      return new Response(
-        JSON.stringify({ error: "System not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return errorResponse("System not found or access denied", 404);
     }
 
     // Authorization check: user must be owner or have admin/analyst role
-    const { data: userRoles } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id);
-
-    const isOwner = system.owner_id === user.id;
-    const hasPrivilegedRole = userRoles?.some(r => 
-      r.role === "admin" || r.role === "analyst"
-    );
+    const isOwner = system.owner_id === user?.id;
+    const hasPrivilegedRole = hasAnyRole(user!, ['admin', 'analyst']);
 
     if (!isOwner && !hasPrivilegedRole) {
-      console.log(`Unauthorized copilot access attempt: user ${user.id} tried to access system ${systemId}`);
-      return new Response(
-        JSON.stringify({ error: "You don't have permission to access this system" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      console.log(`[copilot] Unauthorized access attempt: user ${user?.id} tried to access system ${systemId}`);
+      return errorResponse("You don't have permission to access this system", 403);
     }
 
-    // Fetch context data (user is now authorized)
+    // Fetch context data (user is now authorized, using user client for RLS)
     const [riskRes, impactRes, logsRes, metricsRes] = await Promise.all([
       supabase.from("risk_assessments").select("*").eq("system_id", systemId).order("created_at", { ascending: false }).limit(1),
       supabase.from("impact_assessments").select("*").eq("system_id", systemId).order("created_at", { ascending: false }).limit(1),
@@ -203,10 +173,7 @@ ${contextParts.join("\n")}`;
       console.error("AI Gateway error:", aiResponse.status, errorText);
       
       if (aiResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return errorResponse("Rate limit exceeded. Please try again later.", 429);
       }
       throw new Error(`AI Gateway error: ${aiResponse.status}`);
     }
@@ -214,16 +181,13 @@ ${contextParts.join("\n")}`;
     const aiData = await aiResponse.json();
     const answer = aiData.choices?.[0]?.message?.content || "I couldn't generate a response.";
 
-    return new Response(
-      JSON.stringify({ answer, context: { riskAssessment, impactAssessment, logsCount: recentLogs.length } }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return successResponse({ 
+      answer, 
+      context: { riskAssessment, impactAssessment, logsCount: recentLogs.length } 
+    });
 
   } catch (error) {
     console.error("Copilot error:", error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return errorResponse(error instanceof Error ? error.message : "Unknown error", 500);
   }
 });

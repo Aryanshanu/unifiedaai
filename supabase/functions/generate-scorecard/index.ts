@@ -1,11 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { validateSession, requireAuth, hasAnyRole, getServiceClient, corsHeaders, errorResponse } from "../_shared/auth-helper.ts";
 
 interface ScorecardSection {
   title: string;
@@ -87,7 +82,6 @@ const EU_AI_ACT_CONTROLS = [
   { article: "Art. 15(4)", title: "Cybersecurity", requirement: "Be resilient to unauthorized access" },
 ];
 
-// Compute SHA-256 hash
 async function computeSHA256(content: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(content);
@@ -96,7 +90,6 @@ async function computeSHA256(content: string): Promise<string> {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Generate minisign-style signature
 function generateMinisignSignature(hash: string): string {
   const base64Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
   let sig = 'RWSF';
@@ -112,32 +105,32 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    // =====================================================
+    // AUTHENTICATION: Validate user JWT via auth-helper
+    // =====================================================
+    const authResult = await validateSession(req);
+    const authError = requireAuth(authResult);
+    
+    if (authError) {
+      console.log("[generate-scorecard] Authentication failed");
+      return authError;
     }
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } }
-    });
+    
+    const { user } = authResult;
+    // User client respects RLS
+    const supabase = authResult.supabase!;
+    
+    console.log(`[generate-scorecard] Authenticated user: ${user?.id}`);
 
     const { modelId, format = 'pdf' } = await req.json();
 
     if (!modelId) {
-      return new Response(JSON.stringify({ error: 'modelId is required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return errorResponse('modelId is required', 400);
     }
 
     console.log(`[generate-scorecard] Generating regulator-grade PDF for model ${modelId}`);
 
-    // Fetch model details with system
+    // Fetch model details with system (uses RLS via user client)
     const { data: model, error: modelError } = await supabase
       .from('models')
       .select('*, systems(*)')
@@ -145,10 +138,7 @@ serve(async (req) => {
       .single();
 
     if (modelError || !model) {
-      return new Response(JSON.stringify({ error: 'Model not found' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return errorResponse('Model not found or access denied', 404);
     }
 
     // Fetch all REAL evaluation runs only
@@ -159,14 +149,9 @@ serve(async (req) => {
       .eq('status', 'completed')
       .order('completed_at', { ascending: false });
 
-    // If no real evaluations exist, return error
     if (!evaluations || evaluations.length === 0) {
-      return new Response(JSON.stringify({ 
-        error: 'No real evaluations found. Run evaluations first before generating scorecard.',
+      return errorResponse('No real evaluations found. Run evaluations first before generating scorecard.', 400, {
         hint: 'Use the Core RAI Engines to run real evaluations on your model.'
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -200,7 +185,7 @@ serve(async (req) => {
       .eq('entity_id', modelId)
       .limit(10);
 
-    // Build sections with REAL metrics only - no fallback values
+    // Build sections with REAL metrics only
     const sections: ScorecardSection[] = [];
     
     const latestFairness = evaluations?.find(e => e.engine_type === 'fairness');
@@ -334,7 +319,7 @@ serve(async (req) => {
     ];
 
     // Generate attestation ID
-    const attestationId = `ATT-2025-12-08-${crypto.randomUUID().substring(0, 8).toUpperCase()}`;
+    const attestationId = `ATT-${new Date().toISOString().split('T')[0]}-${crypto.randomUUID().substring(0, 8).toUpperCase()}`;
 
     // Compute hash
     const contentString = JSON.stringify({
@@ -384,40 +369,30 @@ serve(async (req) => {
 
     console.log(`[generate-scorecard] Generated scorecard: ${scorecard.attestation_id}, score: ${overallScore}%`);
 
-    // Always return HTML for PDF printing
+    // Generate HTML for PDF
     const html = generatePDFHTML(scorecard);
     return new Response(html, {
       headers: { 
         ...corsHeaders, 
         'Content-Type': 'text/html; charset=utf-8',
+        'Content-Disposition': `attachment; filename="fractal-rai-scorecard-${modelId.slice(0, 8)}.html"`,
       },
     });
+
   } catch (error: any) {
     console.error('[generate-scorecard] Error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return errorResponse(error.message, 500);
   }
 });
 
 function generatePDFHTML(scorecard: Scorecard): string {
-  const statusColors = {
-    compliant: '#059669',
-    warning: '#d97706',
-    'non-compliant': '#dc2626',
-    Compliant: '#059669',
-    Partial: '#d97706',
-    'Non-Compliant': '#dc2626',
-  };
-
-  const statusBg = {
-    compliant: '#d1fae5',
-    warning: '#fef3c7',
-    'non-compliant': '#fee2e2',
-    Compliant: '#d1fae5',
-    Partial: '#fef3c7',
-    'Non-Compliant': '#fee2e2',
+  const statusColor = (status: string) => {
+    switch (status) {
+      case 'compliant': return '#10b981';
+      case 'warning': return '#f59e0b';
+      case 'non-compliant': return '#ef4444';
+      default: return '#6b7280';
+    }
   };
 
   return `<!DOCTYPE html>
@@ -427,703 +402,120 @@ function generatePDFHTML(scorecard: Scorecard): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fractal RAI-OS Compliance Scorecard - ${scorecard.model_name}</title>
   <style>
-    @page { 
-      size: A4; 
-      margin: 0.75in;
-    }
-    @media print {
-      .page-break { page-break-before: always; }
-      body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { 
-      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; 
-      color: #1f2937; 
-      line-height: 1.5;
-      background: #fff;
-      font-size: 11pt;
-    }
-    .page { 
-      padding: 40px 50px; 
-      min-height: 100vh;
-      position: relative;
-    }
-    
-    /* Header/Letterhead */
-    .letterhead {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      border-bottom: 4px solid #0d9488;
-      padding-bottom: 20px;
-      margin-bottom: 30px;
-    }
-    .logo-section h1 {
-      font-size: 28pt;
-      font-weight: 800;
-      color: #0d9488;
-      letter-spacing: -0.5px;
-      margin-bottom: 2px;
-    }
-    .logo-section .tagline {
-      font-size: 10pt;
-      color: #6b7280;
-      font-weight: 500;
-    }
-    .doc-info {
-      text-align: right;
-      font-size: 9pt;
-      color: #6b7280;
-    }
-    .doc-info .attestation-id {
-      font-family: 'Consolas', 'Monaco', monospace;
-      font-size: 11pt;
-      color: #0d9488;
-      font-weight: 700;
-    }
-    
-    /* Title Section */
-    .title-section {
-      text-align: center;
-      margin: 30px 0 40px 0;
-    }
-    .title-section h2 {
-      font-size: 22pt;
-      font-weight: 700;
-      color: #111827;
-      margin-bottom: 15px;
-    }
-    .title-section .subtitle {
-      font-size: 12pt;
-      color: #4b5563;
-    }
-    
-    /* Summary Box */
-    .summary-box {
-      display: flex;
-      background: linear-gradient(135deg, #f0fdfa 0%, #ecfdf5 50%, #f0fdf4 100%);
-      border: 2px solid #0d9488;
-      border-radius: 12px;
-      padding: 25px 30px;
-      margin-bottom: 30px;
-    }
-    .summary-left {
-      flex: 1;
-    }
-    .summary-left .model-name {
-      font-size: 16pt;
-      font-weight: 700;
-      color: #111827;
-      margin-bottom: 8px;
-    }
-    .summary-left .model-meta {
-      font-size: 10pt;
-      color: #6b7280;
-      line-height: 1.8;
-    }
-    .summary-left .risk-badge {
-      display: inline-block;
-      background: #fef3c7;
-      color: #92400e;
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 9pt;
-      font-weight: 700;
-      text-transform: uppercase;
-      margin-top: 8px;
-    }
-    .summary-right {
-      text-align: center;
-      padding-left: 30px;
-      border-left: 2px solid #99f6e4;
-    }
-    .overall-score {
-      font-size: 52pt;
-      font-weight: 800;
-      color: ${statusColors[scorecard.overall_status]};
-      line-height: 1;
-    }
-    .overall-label {
-      font-size: 10pt;
-      color: #6b7280;
-      margin-top: 5px;
-    }
-    .status-badge {
-      display: inline-block;
-      background: ${statusBg[scorecard.overall_status]};
-      color: ${statusColors[scorecard.overall_status]};
-      padding: 6px 16px;
-      border-radius: 20px;
-      font-size: 11pt;
-      font-weight: 700;
-      text-transform: uppercase;
-      margin-top: 10px;
-    }
-    
-    /* Section Headers */
-    .section-header {
-      font-size: 14pt;
-      font-weight: 700;
-      color: #0d9488;
-      border-bottom: 2px solid #99f6e4;
-      padding-bottom: 8px;
-      margin: 30px 0 15px 0;
-    }
-    .section-header span {
-      background: #0d9488;
-      color: white;
-      padding: 3px 10px;
-      border-radius: 4px;
-      font-size: 10pt;
-      margin-right: 10px;
-    }
-    
-    /* EU AI Act Table */
-    .eu-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 9pt;
-      margin: 15px 0;
-    }
-    .eu-table th {
-      background: #0d9488;
-      color: white;
-      padding: 10px 8px;
-      text-align: left;
-      font-weight: 600;
-      font-size: 9pt;
-    }
-    .eu-table td {
-      border-bottom: 1px solid #e5e7eb;
-      padding: 8px;
-      vertical-align: top;
-    }
-    .eu-table tr:nth-child(even) { background: #f9fafb; }
-    .eu-table .status-cell {
-      text-align: center;
-    }
-    .status-pill {
-      display: inline-block;
-      padding: 3px 10px;
-      border-radius: 12px;
-      font-size: 8pt;
-      font-weight: 700;
-    }
-    .status-compliant { background: #d1fae5; color: #059669; }
-    .status-partial { background: #fef3c7; color: #d97706; }
-    .status-non-compliant { background: #fee2e2; color: #dc2626; }
-    
-    /* RAI Summary Grid */
-    .rai-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 15px;
-      margin: 15px 0;
-    }
-    .rai-card {
-      background: #f9fafb;
-      border: 1px solid #e5e7eb;
-      border-radius: 8px;
-      padding: 15px;
-      border-left: 4px solid #0d9488;
-    }
-    .rai-card h4 {
-      font-size: 11pt;
-      font-weight: 700;
-      color: #111827;
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 10px;
-    }
-    .rai-card .score {
-      font-size: 14pt;
-      font-weight: 800;
-    }
-    .rai-card .metrics {
-      font-size: 9pt;
-      color: #6b7280;
-    }
-    .rai-card .metrics div {
-      display: flex;
-      justify-content: space-between;
-      padding: 3px 0;
-      border-bottom: 1px dotted #e5e7eb;
-    }
-    
-    /* KG Lineage */
-    .kg-lineage {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin: 15px 0;
-      padding: 15px;
-      background: #f0fdfa;
-      border-radius: 8px;
-    }
-    .kg-node {
-      background: white;
-      border: 2px solid #0d9488;
-      border-radius: 6px;
-      padding: 8px 12px;
-      font-size: 9pt;
-      font-weight: 600;
-      color: #0d9488;
-    }
-    .kg-arrow {
-      color: #0d9488;
-      font-size: 14pt;
-    }
-    
-    /* Crypto Block */
-    .crypto-block {
-      background: #1f2937;
-      color: #f9fafb;
-      border-radius: 8px;
-      padding: 25px;
-      margin: 20px 0;
-      font-family: 'Consolas', 'Monaco', monospace;
-    }
-    .crypto-block h4 {
-      color: #5eead4;
-      font-size: 12pt;
-      margin-bottom: 15px;
-      font-family: 'Segoe UI', sans-serif;
-    }
-    .crypto-block .label {
-      color: #9ca3af;
-      font-size: 9pt;
-      margin-top: 12px;
-    }
-    .crypto-block .value {
-      color: #5eead4;
-      font-size: 10pt;
-      word-break: break-all;
-      margin-top: 3px;
-    }
-    .crypto-block .signature {
-      color: #fbbf24;
-      font-size: 9pt;
-    }
-    
-    /* Attestation Statement */
-    .attestation-statement {
-      background: linear-gradient(135deg, #f0fdfa 0%, #ffffff 100%);
-      border: 3px solid #0d9488;
-      border-radius: 12px;
-      padding: 35px;
-      margin: 25px 0;
-      text-align: center;
-    }
-    .attestation-statement h3 {
-      font-size: 16pt;
-      font-weight: 700;
-      color: #0d9488;
-      margin-bottom: 20px;
-    }
-    .attestation-statement p {
-      font-size: 11pt;
-      color: #374151;
-      line-height: 1.8;
-      max-width: 600px;
-      margin: 0 auto 20px auto;
-    }
-    .signature-line {
-      width: 300px;
-      border-bottom: 2px solid #111827;
-      margin: 30px auto 10px auto;
-    }
-    .signature-name {
-      font-size: 12pt;
-      font-weight: 700;
-      color: #111827;
-    }
-    .signature-title {
-      font-size: 10pt;
-      color: #6b7280;
-    }
-    .signature-date {
-      font-size: 11pt;
-      color: #0d9488;
-      font-weight: 600;
-      margin-top: 15px;
-    }
-    
-    /* Footer */
-    .page-footer {
-      position: absolute;
-      bottom: 30px;
-      left: 50px;
-      right: 50px;
-      border-top: 1px solid #e5e7eb;
-      padding-top: 10px;
-      font-size: 8pt;
-      color: #9ca3af;
-      display: flex;
-      justify-content: space-between;
-    }
-    
-    /* Red Team Stats */
-    .redteam-stats {
-      display: flex;
-      gap: 20px;
-      margin: 15px 0;
-    }
-    .stat-box {
-      flex: 1;
-      background: #fef3c7;
-      border: 1px solid #fbbf24;
-      border-radius: 8px;
-      padding: 15px;
-      text-align: center;
-    }
-    .stat-box .value {
-      font-size: 24pt;
-      font-weight: 800;
-      color: #92400e;
-    }
-    .stat-box .label {
-      font-size: 9pt;
-      color: #92400e;
-    }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #0a0a0a; color: #e5e5e5; line-height: 1.6; }
+    .container { max-width: 1000px; margin: 0 auto; padding: 40px; }
+    .header { text-align: center; margin-bottom: 40px; padding-bottom: 30px; border-bottom: 2px solid #22d3ee; }
+    .logo { font-size: 28px; font-weight: 700; background: linear-gradient(135deg, #22d3ee, #14b8a6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 10px; }
+    .subtitle { color: #9ca3af; font-size: 14px; }
+    .attestation-id { font-family: monospace; font-size: 12px; color: #22d3ee; margin-top: 10px; }
+    .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 40px; }
+    .summary-card { background: #171717; border: 1px solid #262626; border-radius: 12px; padding: 20px; text-align: center; }
+    .summary-card.overall { border-color: ${statusColor(scorecard.overall_status)}; }
+    .summary-value { font-size: 36px; font-weight: 700; color: #fff; }
+    .summary-label { font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; }
+    .section { background: #171717; border: 1px solid #262626; border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+    .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .section-title { font-size: 18px; font-weight: 600; }
+    .section-score { font-size: 24px; font-weight: 700; padding: 4px 12px; border-radius: 8px; }
+    .metrics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 16px; }
+    .metric { display: flex; justify-content: space-between; padding: 8px 12px; background: #0a0a0a; border-radius: 6px; font-size: 13px; }
+    .metric-label { color: #9ca3af; }
+    .metric-value { font-weight: 500; }
+    .eu-controls { margin-top: 40px; }
+    .eu-controls h2 { font-size: 20px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+    .controls-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .control { padding: 12px; background: #171717; border: 1px solid #262626; border-radius: 8px; font-size: 12px; }
+    .control-article { font-weight: 600; color: #22d3ee; }
+    .control-status { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 500; margin-top: 4px; }
+    .control-status.compliant { background: #065f46; color: #10b981; }
+    .control-status.partial { background: #78350f; color: #f59e0b; }
+    .control-status.non-compliant { background: #7f1d1d; color: #ef4444; }
+    .signature-block { margin-top: 40px; padding: 24px; background: #0f172a; border: 1px solid #22d3ee; border-radius: 12px; }
+    .signature-title { font-size: 14px; font-weight: 600; color: #22d3ee; margin-bottom: 12px; }
+    .signature-hash { font-family: monospace; font-size: 11px; word-break: break-all; color: #9ca3af; }
+    .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #262626; font-size: 12px; color: #6b7280; }
+    @media print { body { background: white; color: black; } .section, .summary-card { border-color: #e5e5e5; background: #f9f9f9; } }
   </style>
 </head>
 <body>
-  <!-- PAGE 1: Cover Page -->
-  <div class="page">
-    <div class="letterhead">
-      <div class="logo-section">
-        <h1>Fractal RAI-OS™</h1>
-        <div class="tagline">The World's First Responsible AI Operating System</div>
-      </div>
-      <div class="doc-info">
-        <div class="attestation-id">${scorecard.attestation_id}</div>
-        <div>Issued: December 2025</div>
-        <div>Version ${scorecard.version}</div>
-      </div>
+  <div class="container">
+    <div class="header">
+      <div class="logo">FRACTAL RAI-OS</div>
+      <div class="subtitle">Responsible AI Compliance Scorecard</div>
+      <div class="attestation-id">${scorecard.attestation_id}</div>
     </div>
     
-    <div class="title-section">
-      <h2>COMPLIANCE SCORECARD</h2>
-      <div class="subtitle">EU AI Act High-Risk System Assessment</div>
+    <div class="summary">
+      <div class="summary-card overall">
+        <div class="summary-value" style="color: ${statusColor(scorecard.overall_status)}">${scorecard.overall_score}%</div>
+        <div class="summary-label">Overall Score</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-value">${scorecard.risk_tier.toUpperCase()}</div>
+        <div class="summary-label">Risk Tier</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-value">42</div>
+        <div class="summary-label">EU AI Act Controls</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-value">${scorecard.redTeamStats.coverage}%</div>
+        <div class="summary-label">Red Team Coverage</div>
+      </div>
     </div>
+
+    <h2 style="font-size: 20px; margin-bottom: 20px;">Model: ${scorecard.model_name}</h2>
     
-    <div class="summary-box">
-      <div class="summary-left">
-        <div class="model-name">${scorecard.model_name}</div>
-        <div class="model-meta">
-          <strong>Model Type:</strong> ${scorecard.model_type}<br>
-          <strong>Model ID:</strong> ${scorecard.model_id.substring(0, 8)}...<br>
-          <strong>Assessment Date:</strong> ${new Date(scorecard.generated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+    ${scorecard.sections.map(section => `
+      <div class="section">
+        <div class="section-header">
+          <div class="section-title">${section.title}</div>
+          <div class="section-score" style="background: ${statusColor(section.status)}20; color: ${statusColor(section.status)}">${section.score}%</div>
         </div>
-        <div class="risk-badge">Risk Tier: ${scorecard.risk_tier.toUpperCase()} (EU AI Act Article 6)</div>
-      </div>
-      <div class="summary-right">
-        <div class="overall-score">${scorecard.overall_score}%</div>
-        <div class="overall-label">Overall Compliance</div>
-        <div class="status-badge">${scorecard.overall_status.replace('-', ' ')}</div>
-      </div>
-    </div>
-    
-    <div class="section-header"><span>1</span> Executive Summary</div>
-    <p style="font-size: 10pt; color: #374151; margin-bottom: 15px;">
-      This compliance scorecard provides a comprehensive assessment of <strong>${scorecard.model_name}</strong> 
-      against the EU AI Act requirements for high-risk AI systems. The evaluation covers all 42 controls 
-      specified in Articles 6-15, with detailed evidence collection and automated verification through 
-      the Fractal RAI-OS platform.
-    </p>
-    
-    <div class="rai-grid">
-      ${scorecard.sections.map(s => `
-        <div class="rai-card" style="border-left-color: ${statusColors[s.status]}">
-          <h4>
-            ${s.title}
-            <span class="score" style="color: ${statusColors[s.status]}">${s.score}%</span>
-          </h4>
-          <div class="metrics">
-            ${Object.entries(s.metrics || {}).map(([k, v]) => `<div><span>${k}</span><span>${v}</span></div>`).join('')}
+        <div style="color: #9ca3af; font-size: 14px;">${section.details}</div>
+        <div style="margin-top: 8px; font-size: 12px; color: #6b7280;">${section.euAiActArticle} | ${section.nistMapping}</div>
+        ${section.metrics ? `
+          <div class="metrics-grid">
+            ${Object.entries(section.metrics).map(([key, value]) => `
+              <div class="metric">
+                <span class="metric-label">${key}</span>
+                <span class="metric-value">${value}</span>
+              </div>
+            `).join('')}
           </div>
-        </div>
-      `).join('')}
-    </div>
-    
-    <div class="page-footer">
-      <span>Fractal RAI-OS™ Compliance Scorecard</span>
-      <span>Page 1 of 6</span>
-      <span>CONFIDENTIAL</span>
-    </div>
-  </div>
-  
-  <!-- PAGE 2: EU AI Act Requirements (Part 1) -->
-  <div class="page page-break">
-    <div class="letterhead">
-      <div class="logo-section">
-        <h1>Fractal RAI-OS™</h1>
-        <div class="tagline">EU AI Act Compliance Assessment</div>
+        ` : ''}
       </div>
-      <div class="doc-info">
-        <div class="attestation-id">${scorecard.attestation_id}</div>
-      </div>
-    </div>
-    
-    <div class="section-header"><span>2</span> EU AI Act High-Risk Requirements (Articles 6-15)</div>
-    
-    <table class="eu-table">
-      <thead>
-        <tr>
-          <th style="width: 12%">Article</th>
-          <th style="width: 22%">Requirement</th>
-          <th style="width: 12%">Status</th>
-          <th style="width: 54%">Evidence Summary</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${scorecard.euAiActMapping.slice(0, 21).map(m => `
-          <tr>
-            <td><strong>${m.article}</strong></td>
-            <td>${m.title}</td>
-            <td class="status-cell">
-              <span class="status-pill status-${m.status.toLowerCase().replace(' ', '-').replace('-', '')}">${m.status}</span>
-            </td>
-            <td style="font-size: 8pt; color: #6b7280;">${m.evidence.substring(0, 80)}${m.evidence.length > 80 ? '...' : ''}</td>
-          </tr>
+    `).join('')}
+
+    <div class="eu-controls">
+      <h2>🇪🇺 EU AI Act Compliance (42 Controls)</h2>
+      <div class="controls-grid">
+        ${scorecard.euAiActMapping.slice(0, 21).map(control => `
+          <div class="control">
+            <div class="control-article">${control.article}</div>
+            <div>${control.title}</div>
+            <span class="control-status ${control.status.toLowerCase().replace('-', '-')}">${control.status}</span>
+          </div>
         `).join('')}
-      </tbody>
-    </table>
-    
-    <div class="page-footer">
-      <span>Fractal RAI-OS™ Compliance Scorecard</span>
-      <span>Page 2 of 6</span>
-      <span>CONFIDENTIAL</span>
+      </div>
+    </div>
+
+    <div class="signature-block">
+      <div class="signature-title">🔐 Cryptographic Attestation</div>
+      <div class="signature-hash">
+        SHA-256: ${scorecard.hash}<br>
+        Minisign: ${scorecard.minisign_signature}<br>
+        Signed: ${scorecard.signatures[0]?.timestamp}
+      </div>
+    </div>
+
+    <div class="footer">
+      Generated by Fractal RAI-OS v${scorecard.version} | ${scorecard.generated_at}<br>
+      This document is cryptographically signed and tamper-evident.
     </div>
   </div>
-  
-  <!-- PAGE 3: EU AI Act Requirements (Part 2) -->
-  <div class="page page-break">
-    <div class="letterhead">
-      <div class="logo-section">
-        <h1>Fractal RAI-OS™</h1>
-        <div class="tagline">EU AI Act Compliance Assessment (Continued)</div>
-      </div>
-      <div class="doc-info">
-        <div class="attestation-id">${scorecard.attestation_id}</div>
-      </div>
-    </div>
-    
-    <table class="eu-table">
-      <thead>
-        <tr>
-          <th style="width: 12%">Article</th>
-          <th style="width: 22%">Requirement</th>
-          <th style="width: 12%">Status</th>
-          <th style="width: 54%">Evidence Summary</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${scorecard.euAiActMapping.slice(21).map(m => `
-          <tr>
-            <td><strong>${m.article}</strong></td>
-            <td>${m.title}</td>
-            <td class="status-cell">
-              <span class="status-pill status-${m.status.toLowerCase().replace(' ', '-').replace('-', '')}">${m.status}</span>
-            </td>
-            <td style="font-size: 8pt; color: #6b7280;">${m.evidence.substring(0, 80)}${m.evidence.length > 80 ? '...' : ''}</td>
-          </tr>
-        `).join('')}
-      </tbody>
-    </table>
-    
-    <p style="font-size: 9pt; color: #6b7280; margin-top: 20px; font-style: italic;">
-      Assessment covers all 42 mandatory controls for high-risk AI systems under the EU AI Act. 
-      Evidence collected through automated evaluation engines and manual attestation where required.
-    </p>
-    
-    <div class="page-footer">
-      <span>Fractal RAI-OS™ Compliance Scorecard</span>
-      <span>Page 3 of 6</span>
-      <span>CONFIDENTIAL</span>
-    </div>
-  </div>
-  
-  <!-- PAGE 4: Technical RAI Summary & Red Team -->
-  <div class="page page-break">
-    <div class="letterhead">
-      <div class="logo-section">
-        <h1>Fractal RAI-OS™</h1>
-        <div class="tagline">Technical Assessment Details</div>
-      </div>
-      <div class="doc-info">
-        <div class="attestation-id">${scorecard.attestation_id}</div>
-      </div>
-    </div>
-    
-    <div class="section-header"><span>3</span> Technical RAI Evaluation Summary</div>
-    
-    <div class="rai-grid">
-      ${scorecard.sections.map(s => `
-        <div class="rai-card" style="border-left-color: ${statusColors[s.status]}">
-          <h4>
-            ${s.title}
-            <span class="score" style="color: ${statusColors[s.status]}">${s.score}%</span>
-          </h4>
-          <p style="font-size: 9pt; color: #6b7280; margin-bottom: 10px;">${s.details}</p>
-          <div class="metrics">
-            ${Object.entries(s.metrics || {}).map(([k, v]) => `<div><span>${k}</span><span><strong>${v}</strong></span></div>`).join('')}
-          </div>
-          <div style="font-size: 8pt; color: #9ca3af; margin-top: 8px;">
-            ${s.euAiActArticle} │ NIST: ${s.nistMapping}
-          </div>
-        </div>
-      `).join('')}
-    </div>
-    
-    <div class="section-header"><span>4</span> Red Team Adversarial Testing</div>
-    
-    <div class="redteam-stats">
-      <div class="stat-box">
-        <div class="value">${scorecard.redTeamStats.coverage}%</div>
-        <div class="label">Attack Coverage</div>
-      </div>
-      <div class="stat-box">
-        <div class="value">${scorecard.redTeamStats.attacks}</div>
-        <div class="label">Attacks Executed</div>
-      </div>
-      <div class="stat-box">
-        <div class="value">${scorecard.redTeamStats.findings}</div>
-        <div class="label">Findings Identified</div>
-      </div>
-    </div>
-    
-    <p style="font-size: 9pt; color: #374151; margin-top: 15px;">
-      Adversarial testing includes jailbreak attempts, prompt injection, PII extraction, and 
-      harmful content generation. All findings have been documented and mitigated according 
-      to the Fractal RAI-OS incident response protocol.
-    </p>
-    
-    <div class="page-footer">
-      <span>Fractal RAI-OS™ Compliance Scorecard</span>
-      <span>Page 4 of 6</span>
-      <span>CONFIDENTIAL</span>
-    </div>
-  </div>
-  
-  <!-- PAGE 5: Knowledge Graph Lineage & Crypto Proof -->
-  <div class="page page-break">
-    <div class="letterhead">
-      <div class="logo-section">
-        <h1>Fractal RAI-OS™</h1>
-        <div class="tagline">Provenance & Integrity</div>
-      </div>
-      <div class="doc-info">
-        <div class="attestation-id">${scorecard.attestation_id}</div>
-      </div>
-    </div>
-    
-    <div class="section-header"><span>5</span> Knowledge Graph Lineage</div>
-    <p style="font-size: 10pt; color: #374151; margin-bottom: 15px;">
-      Complete data-to-deployment lineage tracked through the Fractal RAI-OS Knowledge Graph, 
-      providing end-to-end traceability for regulatory audits.
-    </p>
-    
-    <div class="kg-lineage">
-      ${scorecard.kgLineage.map((node, i) => `
-        <div class="kg-node">${node}</div>
-        ${i < scorecard.kgLineage.length - 1 ? '<span class="kg-arrow">→</span>' : ''}
-      `).join('')}
-    </div>
-    
-    <div class="section-header"><span>6</span> Cryptographic Proof of Integrity</div>
-    
-    <div class="crypto-block">
-      <h4>🔐 Document Integrity Verification</h4>
-      
-      <div class="label">Document Hash (SHA-256):</div>
-      <div class="value">${scorecard.hash}</div>
-      
-      <div class="label" style="margin-top: 20px;">Minisign Digital Signature:</div>
-      <div class="signature">${scorecard.minisign_signature}</div>
-      
-      <div class="label" style="margin-top: 20px;">Signed By:</div>
-      <div class="value">${scorecard.signatures[0]?.signedBy}</div>
-      
-      <div class="label" style="margin-top: 10px;">Timestamp:</div>
-      <div class="value">${scorecard.signatures[0]?.timestamp}</div>
-    </div>
-    
-    <p style="font-size: 9pt; color: #6b7280; font-style: italic;">
-      This cryptographic hash can be independently verified to confirm document integrity. 
-      Any modification to the scorecard content will result in a different hash value.
-    </p>
-    
-    <div class="page-footer">
-      <span>Fractal RAI-OS™ Compliance Scorecard</span>
-      <span>Page 5 of 6</span>
-      <span>CONFIDENTIAL</span>
-    </div>
-  </div>
-  
-  <!-- PAGE 6: Final Attestation Statement -->
-  <div class="page page-break">
-    <div class="letterhead">
-      <div class="logo-section">
-        <h1>Fractal RAI-OS™</h1>
-        <div class="tagline">Official Attestation</div>
-      </div>
-      <div class="doc-info">
-        <div class="attestation-id">${scorecard.attestation_id}</div>
-      </div>
-    </div>
-    
-    <div class="section-header"><span>7</span> Limitations & Caveats</div>
-    <ul style="font-size: 10pt; color: #374151; padding-left: 20px; margin-bottom: 30px;">
-      ${scorecard.limitations.map(l => `<li style="margin-bottom: 8px;">${l}</li>`).join('')}
-    </ul>
-    
-    <div class="attestation-statement">
-      <h3>ATTESTATION STATEMENT</h3>
-      
-      <p>
-        I hereby attest that the AI system described herein has been evaluated, monitored, 
-        and governed according to the <strong>Fractal RAI-OS Global Responsible AI Operating System</strong> 
-        and meets all applicable high-risk requirements under the <strong>EU AI Act</strong> 
-        as of <strong>December 2025</strong>.
-      </p>
-      
-      <p>
-        This assessment includes comprehensive evaluation across all five RAI dimensions 
-        (Fairness, Privacy, Safety, Robustness, Transparency), red-team adversarial testing, 
-        and verification against 42 EU AI Act controls with cryptographic proof of integrity.
-      </p>
-      
-      <div class="signature-line"></div>
-      <div class="signature-name">Fractal RAI-OS Attestation Authority</div>
-      <div class="signature-title">Automated Compliance System</div>
-      <div class="signature-date">December 08, 2025</div>
-    </div>
-    
-    <div style="text-align: center; margin-top: 40px; padding: 20px; background: #f0fdfa; border-radius: 8px;">
-      <p style="font-size: 11pt; color: #0d9488; font-weight: 600; margin: 0;">
-        ✓ Every gap from the 2024-2025 Responsible AI report has been closed.<br>
-        ✓ This scorecard was generated using 100% real platform data.<br>
-        ✓ Fractal RAI-OS is now live.
-      </p>
-    </div>
-    
-    <div class="page-footer">
-      <span>Fractal RAI-OS™ Compliance Scorecard</span>
-      <span>Page 6 of 6</span>
-      <span>CONFIDENTIAL</span>
-    </div>
-  </div>
-  
-  <script>
-    // Auto-trigger print dialog for PDF generation
-    window.onload = function() {
-      setTimeout(function() {
-        window.print();
-      }, 500);
-    };
-  </script>
 </body>
 </html>`;
 }
