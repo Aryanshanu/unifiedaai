@@ -9,15 +9,18 @@ import { RiskBadge } from "@/components/risk/RiskBadge";
 import { DeploymentStatusBadge } from "@/components/governance/DeploymentStatusBadge";
 import { 
   Shield, CheckCircle, XCircle, Clock, AlertTriangle, 
-  ArrowRight, AlertOctagon, History
+  ArrowRight, AlertOctagon, History, Radio
 } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 export default function Approvals() {
+  const [realtimeCount, setRealtimeCount] = useState(0);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: pendingApprovals, isLoading: pendingLoading } = usePendingApprovals();
@@ -96,8 +99,64 @@ export default function Approvals() {
     queryClient.invalidateQueries({ queryKey: ["system-approvals"] });
   };
 
+  // Realtime subscription for approvals
+  useEffect(() => {
+    const channel = supabase
+      .channel('approvals-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'system_approvals' },
+        (payload) => {
+          setRealtimeCount(prev => prev + 1);
+          queryClient.invalidateQueries({ queryKey: ['pending-approvals'] });
+          queryClient.invalidateQueries({ queryKey: ['system-approvals'] });
+          queryClient.invalidateQueries({ queryKey: ['unsafe-deployments'] });
+          
+          if (payload.eventType === 'INSERT') {
+            toast.info('New approval request received');
+          } else if (payload.eventType === 'UPDATE') {
+            const approval = payload.new as any;
+            if (approval.status === 'approved') {
+              toast.success('System approved');
+            } else if (approval.status === 'rejected') {
+              toast.error('System rejected');
+            }
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'systems' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['pending-approvals'] });
+          queryClient.invalidateQueries({ queryKey: ['unsafe-deployments'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
   return (
-    <MainLayout title="Governance & Approvals" subtitle="Manage system deployment approvals and compliance">
+    <MainLayout 
+      title="Governance & Approvals" 
+      subtitle="Manage system deployment approvals and compliance"
+      headerActions={
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="bg-success/10 text-success border-success/30 gap-1.5">
+            <Radio className="w-3 h-3 animate-pulse" />
+            Realtime Active
+          </Badge>
+          {realtimeCount > 0 && (
+            <Badge variant="secondary" className="text-xs">
+              {realtimeCount} updates
+            </Badge>
+          )}
+        </div>
+      }
+    >
       <div className="space-y-6">
         {/* Unsafe Deployment Warning */}
         {!unsafeLoading && (unsafeDeployments?.length || 0) > 0 && (
