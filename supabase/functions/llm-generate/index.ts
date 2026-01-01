@@ -1,34 +1,54 @@
 // LLM Gateway Edge Function with Streaming Support
 // Single endpoint for all AI providers: POST /llm-generate
 
+// LLM Gateway Edge Function with Streaming Support
+// Single endpoint for all AI providers: POST /llm-generate
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { validateSession, requireAuth, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// Rate limiting
-const rateLimits = new Map<string, { count: number; resetAt: number }>();
+// Rate limiting constants
 const RATE_LIMIT_REQUESTS = 100;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 
-function checkRateLimit(userId: string): { allowed: boolean; remaining: number } {
-  const now = Date.now();
-  const userLimit = rateLimits.get(userId);
+// Database-backed rate limiting
+async function checkRateLimitDB(
+  userId: string,
+  serviceClient: any
+): Promise<{ allowed: boolean; remaining: number }> {
+  const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MS).toISOString();
   
-  if (!userLimit || now > userLimit.resetAt) {
-    rateLimits.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return { allowed: true, remaining: RATE_LIMIT_REQUESTS - 1 };
+  try {
+    const { count, error } = await serviceClient
+      .from('rate_limits')
+      .select('*', { count: 'exact', head: true })
+      .eq('identifier', `user:${userId}`)
+      .gte('window_start', windowStart);
+    
+    if (error) {
+      console.error('[llm-generate] Rate limit check error:', error);
+      return { allowed: true, remaining: RATE_LIMIT_REQUESTS };
+    }
+    
+    const currentCount = count || 0;
+    
+    if (currentCount >= RATE_LIMIT_REQUESTS) {
+      return { allowed: false, remaining: 0 };
+    }
+    
+    // Insert new rate limit entry
+    await serviceClient.from('rate_limits').insert({
+      identifier: `user:${userId}`,
+      window_start: new Date().toISOString(),
+      window_ms: RATE_LIMIT_WINDOW_MS
+    });
+    
+    return { allowed: true, remaining: RATE_LIMIT_REQUESTS - currentCount - 1 };
+  } catch (error) {
+    console.error('[llm-generate] Rate limiting error:', error);
+    return { allowed: true, remaining: RATE_LIMIT_REQUESTS };
   }
-  
-  if (userLimit.count >= RATE_LIMIT_REQUESTS) {
-    return { allowed: false, remaining: 0 };
-  }
-  
-  userLimit.count++;
-  return { allowed: true, remaining: RATE_LIMIT_REQUESTS - userLimit.count };
 }
 
 const PROVIDER_ENDPOINTS: Record<string, string> = {
@@ -363,36 +383,35 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    // Use auth-helper for authentication
+    const authResult = await validateSession(req);
+    const authError = requireAuth(authResult);
     
-    // Auth
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: { code: "UNAUTHORIZED", message: "Missing authorization" } }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (authError) {
+      return authError;
     }
+    
+    const { user } = authResult;
+    const supabase = authResult.supabase!;
+    const serviceClient = getServiceClient();
 
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: { code: "UNAUTHORIZED", message: "Invalid token" } }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Rate limiting
-    const rateCheck = checkRateLimit(user.id);
+    // Database-backed rate limiting
+    const rateCheck = await checkRateLimitDB(user!.id, serviceClient);
     if (!rateCheck.allowed) {
       return new Response(
-        JSON.stringify({ error: { code: "RATE_LIMITED", message: "Too many requests" } }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ 
+          error: { code: "RATE_LIMITED", message: "Too many requests" },
+          retry_after: 60
+        }),
+        { 
+          status: 429, 
+          headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json",
+            "X-RateLimit-Remaining": "0",
+            "X-RateLimit-Reset": "60"
+          } 
+        }
       );
     }
 
@@ -416,7 +435,7 @@ serve(async (req) => {
     }
 
     // Get API key
-    const apiKey = await getApiKey(provider, user.id, system_id, supabase);
+    const apiKey = await getApiKey(provider, user!.id, system_id, supabase);
     if (!apiKey) {
       return new Response(
         JSON.stringify({ 
@@ -465,23 +484,19 @@ serve(async (req) => {
     // Non-streaming
     const result = await generateNonStreaming(provider, apiKey, requestBody);
 
-    // Log request
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (serviceKey) {
-      try {
-        const adminClient = createClient(supabaseUrl, serviceKey);
-        await adminClient.from("request_logs").insert({
-          system_id: system_id || "00000000-0000-0000-0000-000000000000",
-          user_id: user.id,
-          request_body: { provider, model: requestBody.model, message_count: messages.length },
-          response_body: { content_length: result.content?.length, usage: result.usage },
-          latency_ms: result.latency_ms,
-          status_code: 200,
-          decision: "allow",
-        });
-      } catch (e) {
-        console.error("Failed to log request:", e);
-      }
+    // Log request using service client
+    try {
+      await serviceClient.from("request_logs").insert({
+        system_id: system_id || "00000000-0000-0000-0000-000000000000",
+        user_id: user!.id,
+        request_body: { provider, model: requestBody.model, message_count: messages.length },
+        response_body: { content_length: result.content?.length, usage: result.usage },
+        latency_ms: result.latency_ms,
+        status_code: 200,
+        decision: "allow",
+      });
+    } catch (e) {
+      console.error("Failed to log request:", e);
     }
 
     return new Response(JSON.stringify(result), {

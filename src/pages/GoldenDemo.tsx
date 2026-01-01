@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { 
   Play, 
   CheckCircle2, 
@@ -21,7 +23,9 @@ import {
   Download,
   Globe,
   Clock,
-  RefreshCw
+  RefreshCw,
+  RotateCcw,
+  Settings2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { GOLDEN_DEMO_SAMPLES, GAP_DOCUMENT_BULLETS, GoldenSample } from '@/lib/test-datasets';
@@ -54,6 +58,25 @@ const getCurrentDateString = () => {
   });
 };
 
+// Retry wrapper with exponential backoff
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  addLog?: (msg: string) => void
+): Promise<T> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (attempt === maxRetries) throw error;
+      const delay = Math.pow(2, attempt) * 1000;
+      addLog?.(`  ⚠️ Attempt ${attempt} failed, retrying in ${delay / 1000}s...`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+  throw new Error('Max retries exceeded');
+}
+
 export default function GoldenDemo() {
   const [isRunning, setIsRunning] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
@@ -73,8 +96,18 @@ export default function GoldenDemo() {
     driftAlerts: 0,
   });
   
+  // Autonomous mode settings
+  const [autoStart, setAutoStart] = useState(() => 
+    localStorage.getItem('goldenDemoAutoStart') === 'true'
+  );
+  const [continuousMode, setContinuousMode] = useState(false);
+  const [autoStartCountdown, setAutoStartCountdown] = useState<number | null>(null);
+  const [agentThinking, setAgentThinking] = useState<string | null>(null);
+  
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
+  const autoStartTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const continuousModeRef = useRef<NodeJS.Timeout | null>(null);
 
   // Check for model on mount and auto-approve for demo
   useEffect(() => {
@@ -203,8 +236,71 @@ export default function GoldenDemo() {
     };
   }, [isRunning]);
 
+  // Auto-start countdown when enabled
+  useEffect(() => {
+    if (autoStart && hasModel && !isRunning && !isComplete && completedSteps.length === 0) {
+      setAutoStartCountdown(3);
+      let countdown = 3;
+      
+      const interval = setInterval(() => {
+        countdown--;
+        setAutoStartCountdown(countdown);
+        
+        if (countdown <= 0) {
+          clearInterval(interval);
+          setAutoStartCountdown(null);
+          // Trigger the demo
+          runGoldenDemo();
+        }
+      }, 1000);
+      
+      autoStartTimeoutRef.current = interval as unknown as NodeJS.Timeout;
+      
+      return () => {
+        if (autoStartTimeoutRef.current) {
+          clearInterval(autoStartTimeoutRef.current);
+        }
+      };
+    }
+  }, [autoStart, hasModel, isRunning, isComplete, completedSteps.length]);
+
+  // Continuous mode - re-run every 60 seconds after completion
+  useEffect(() => {
+    if (continuousMode && isComplete) {
+      addLog("🔄 Continuous mode: Next run in 60 seconds...");
+      
+      continuousModeRef.current = setTimeout(() => {
+        setIsComplete(false);
+        setCompletedSteps([]);
+        setStepLogs([]);
+        setKilledGaps([]);
+        runGoldenDemo();
+      }, 60000);
+      
+      return () => {
+        if (continuousModeRef.current) {
+          clearTimeout(continuousModeRef.current);
+        }
+      };
+    }
+  }, [continuousMode, isComplete]);
+
+  // Persist auto-start preference
+  const handleAutoStartToggle = (checked: boolean) => {
+    setAutoStart(checked);
+    localStorage.setItem('goldenDemoAutoStart', String(checked));
+    if (!checked && autoStartTimeoutRef.current) {
+      clearInterval(autoStartTimeoutRef.current);
+      setAutoStartCountdown(null);
+    }
+  };
+
   const addLog = (message: string) => {
     setStepLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
+  };
+
+  const setThinking = (thought: string | null) => {
+    setAgentThinking(thought);
   };
 
   const killGap = (gapIndex: number) => {
@@ -214,7 +310,8 @@ export default function GoldenDemo() {
   const executePrompt = async (prompt: string, engineType: string) => {
     if (!systemId) return null;
     
-    try {
+    // Use retry wrapper for resilience
+    return withRetry(async () => {
       const response = await supabase.functions.invoke('ai-gateway', {
         body: {
           systemId,
@@ -223,11 +320,14 @@ export default function GoldenDemo() {
           engine_type: engineType,
         }
       });
+      
+      // If there's a network error, throw to trigger retry
+      if (response.error && response.error.message?.includes('network')) {
+        throw response.error;
+      }
+      
       return response;
-    } catch (error) {
-      console.error('Gateway error:', error);
-      return { error };
-    }
+    }, 3, addLog);
   };
 
   const runGoldenDemo = useCallback(async () => {
@@ -239,6 +339,7 @@ export default function GoldenDemo() {
     const currentDate = getCurrentDateString();
 
     setIsRunning(true);
+    setAgentThinking(null);
     startTimeRef.current = Date.now();
     setElapsedTime(0);
     setCompletedSteps([]);
@@ -649,6 +750,26 @@ export default function GoldenDemo() {
             <p className="text-sm text-gray-500">
               Connected to: <span className="font-mono text-cyan-400">{modelEndpoint}</span>
             </p>
+            
+            {/* Auto-start countdown */}
+            {autoStartCountdown !== null && (
+              <div className="bg-cyan-950/50 border border-cyan-500/50 rounded-lg p-4 max-w-md mx-auto animate-pulse">
+                <div className="flex items-center justify-center gap-3">
+                  <Loader2 className="w-5 h-5 text-cyan-400 animate-spin" />
+                  <span className="text-cyan-400 font-medium">
+                    Auto-starting in {autoStartCountdown}...
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleAutoStartToggle(false)}
+                    className="text-gray-400 hover:text-white"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-4 gap-4">
@@ -683,10 +804,39 @@ export default function GoldenDemo() {
             </ul>
           </div>
 
+          {/* Autonomous Mode Controls */}
+          <div className="bg-gray-900/50 border border-cyan-500/20 rounded-lg p-4 max-w-md mx-auto">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Settings2 className="w-4 h-4 text-cyan-400" />
+                <span className="text-sm font-medium text-white">Autonomous Mode</span>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="auto-start" className="text-sm text-gray-400">Auto-start on page load</Label>
+                <Switch
+                  id="auto-start"
+                  checked={autoStart}
+                  onCheckedChange={handleAutoStartToggle}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="continuous" className="text-sm text-gray-400">Continuous mode (loop every 60s)</Label>
+                <Switch
+                  id="continuous"
+                  checked={continuousMode}
+                  onCheckedChange={setContinuousMode}
+                />
+              </div>
+            </div>
+          </div>
+
           <Button 
             size="lg" 
             onClick={runGoldenDemo}
-            className="text-xl px-10 py-7 bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-400 hover:to-teal-400 text-black font-bold shadow-xl shadow-cyan-500/30"
+            disabled={autoStartCountdown !== null}
+            className="text-xl px-10 py-7 bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-400 hover:to-teal-400 text-black font-bold shadow-xl shadow-cyan-500/30 disabled:opacity-50"
           >
             <Play className="w-7 h-7 mr-3" />
             Start Live Execution
