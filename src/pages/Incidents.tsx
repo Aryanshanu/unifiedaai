@@ -13,13 +13,17 @@ import {
   XCircle,
   AlertCircle,
   ChevronRight,
-  Shield
+  Shield,
+  Radio
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIncidents, useIncidentStats, useUpdateIncident } from "@/hooks/useIncidents";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 const severityColors = {
   critical: "bg-danger/10 text-danger border-danger/30",
@@ -45,10 +49,39 @@ const statusIcons = {
 export default function Incidents() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState("");
+  const [realtimeCount, setRealtimeCount] = useState(0);
+  const queryClient = useQueryClient();
   
   const { data: incidents, isLoading } = useIncidents();
   const { data: stats } = useIncidentStats();
   const updateIncident = useUpdateIncident();
+
+  // Realtime subscription for incidents
+  useEffect(() => {
+    const channel = supabase
+      .channel('incidents-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'incidents' },
+        (payload) => {
+          setRealtimeCount(prev => prev + 1);
+          queryClient.invalidateQueries({ queryKey: ['incidents'] });
+          queryClient.invalidateQueries({ queryKey: ['incident-stats'] });
+          
+          if (payload.eventType === 'INSERT') {
+            const newIncident = payload.new as any;
+            toast.warning(`New Incident: ${newIncident.title}`, {
+              description: `Severity: ${newIncident.severity}`,
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const filteredIncidents = incidents?.filter(incident => {
     const matchesStatus = statusFilter === 'all' || incident.status === statusFilter;
@@ -66,7 +99,23 @@ export default function Incidents() {
   };
 
   return (
-    <MainLayout title="Incidents" subtitle="Track and manage security and safety incidents">
+    <MainLayout 
+      title="Incidents" 
+      subtitle="Track and manage security and safety incidents"
+      headerActions={
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="bg-success/10 text-success border-success/30 gap-1.5">
+            <Radio className="w-3 h-3 animate-pulse" />
+            Realtime Active
+          </Badge>
+          {realtimeCount > 0 && (
+            <Badge variant="secondary" className="text-xs">
+              {realtimeCount} updates
+            </Badge>
+          )}
+        </div>
+      }
+    >
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <MetricCard

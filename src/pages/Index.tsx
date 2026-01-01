@@ -6,12 +6,18 @@ import { Badge } from "@/components/ui/badge";
 import { PlatformHealthCards } from "@/components/dashboard/PlatformHealthCards";
 import { RealityCheckDashboard } from "@/components/dashboard/RealityCheckDashboard";
 import { useUnsafeDeployments, usePlatformMetrics } from "@/hooks/usePlatformMetrics";
-import { Database, Scale, AlertCircle, ShieldAlert, Lock, Eye, Plus, AlertOctagon, ArrowRight, Shield } from "lucide-react";
+import { Database, Scale, AlertCircle, ShieldAlert, Lock, Eye, Plus, AlertOctagon, ArrowRight, Shield, Radio } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { HealthIndicator } from "@/components/shared/HealthIndicator";
 import { useDataHealth } from "@/components/shared/DataHealthWrapper";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 export default function Index() {
+  const [realtimeCount, setRealtimeCount] = useState(0);
+  const queryClient = useQueryClient();
   const { data: models, isLoading: modelsLoading, isError: modelsError, refetch: refetchModels } = useModels();
   const { data: unsafeDeployments, isLoading: deploymentsLoading } = useUnsafeDeployments();
   const { data: metrics, isLoading: metricsLoading, isError: metricsError, refetch: refetchMetrics } = usePlatformMetrics();
@@ -21,6 +27,56 @@ export default function Index() {
   const isError = modelsError || metricsError;
   const { status, lastUpdated } = useDataHealth(isLoading, isError);
   
+  // Realtime subscription for dashboard data
+  useEffect(() => {
+    const channel = supabase
+      .channel('dashboard-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'systems' },
+        () => {
+          setRealtimeCount(prev => prev + 1);
+          queryClient.invalidateQueries({ queryKey: ['platform-metrics'] });
+          queryClient.invalidateQueries({ queryKey: ['unsafe-deployments'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'incidents' },
+        (payload) => {
+          setRealtimeCount(prev => prev + 1);
+          queryClient.invalidateQueries({ queryKey: ['platform-metrics'] });
+          
+          if (payload.eventType === 'INSERT') {
+            const incident = payload.new as any;
+            toast.warning(`New Incident: ${incident.title}`, {
+              description: `Severity: ${incident.severity}`,
+            });
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'request_logs' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['platform-metrics'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'models' },
+        () => {
+          setRealtimeCount(prev => prev + 1);
+          queryClient.invalidateQueries({ queryKey: ['models'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
   const handleRetry = () => {
     refetchModels();
     refetchMetrics();
@@ -69,12 +125,23 @@ export default function Index() {
       title="Dashboard" 
       subtitle="Fractal RAI Platform Overview"
       headerActions={
-        <HealthIndicator 
-          status={status} 
-          lastUpdated={lastUpdated} 
-          onRetry={handleRetry}
-          showLabel 
-        />
+        <div className="flex items-center gap-3">
+          <Badge variant="outline" className="bg-success/10 text-success border-success/30 gap-1.5">
+            <Radio className="w-3 h-3 animate-pulse" />
+            Realtime
+          </Badge>
+          {realtimeCount > 0 && (
+            <Badge variant="secondary" className="text-xs">
+              {realtimeCount} updates
+            </Badge>
+          )}
+          <HealthIndicator 
+            status={status} 
+            lastUpdated={lastUpdated} 
+            onRetry={handleRetry}
+            showLabel 
+          />
+        </div>
       }
     >
       {/* Unsafe Deployment Alert */}
