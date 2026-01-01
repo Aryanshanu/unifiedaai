@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { validateSession, requireAuth, hasAnyRole, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
 
 interface ReasoningStep {
   step: number;
@@ -320,6 +316,18 @@ serve(async (req) => {
   }
 
   try {
+    // Use auth-helper for consistent authentication
+    const authResult = await validateSession(req);
+    const authError = requireAuth(authResult);
+    
+    if (authError) {
+      return authError;
+    }
+    
+    const { user } = authResult;
+    const userClient = authResult.supabase!;
+    const serviceClient = getServiceClient();
+
     const { modelId, engineType } = await req.json();
 
     if (!modelId || !engineType) {
@@ -329,33 +337,10 @@ serve(async (req) => {
       );
     }
 
-    // AUTHORIZATION CHECK: Verify caller identity using their JWT
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Authorization header required" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    console.log(`[rai-reasoning-engine] User ${user?.id} requesting evaluation for model ${modelId}`);
 
-    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const { data: { user }, error: userError } = await anonClient.auth.getUser();
-    if (userError || !user) {
-      console.error("User auth error:", userError);
-      return new Response(
-        JSON.stringify({ error: "Invalid or expired token" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
-    // Fetch model and system configuration
-    const { data: model, error: modelError } = await supabase
+    // Fetch model using user's client (respects RLS)
+    const { data: model, error: modelError } = await userClient
       .from("models")
       .select("*, system:systems(*)")
       .eq("id", modelId)
@@ -364,35 +349,24 @@ serve(async (req) => {
     if (modelError || !model) {
       console.error("Model fetch error:", modelError);
       return new Response(
-        JSON.stringify({ error: "Model not found" }),
+        JSON.stringify({ error: "Model not found or access denied" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // AUTHORIZATION CHECK: Verify user has access to this model
-    const isOwner = model.owner_id === user.id || model.system?.owner_id === user.id;
+    // RLS already handles authorization - if user can see the model, they can evaluate it
+    // Additional role check for extra security
+    const isOwner = model.owner_id === user?.id || model.system?.owner_id === user?.id;
     
-    if (!isOwner) {
-      // Check if user has admin or analyst role
-      const { data: roles } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id);
-
-      const hasPrivilegedRole = roles?.some((r) =>
-        ["admin", "reviewer", "analyst"].includes(r.role)
+    if (!isOwner && !hasAnyRole(user!, ['admin', 'analyst', 'reviewer'])) {
+      console.warn(`[rai-reasoning-engine] Unauthorized access attempt: user ${user?.id} tried to access model ${modelId}`);
+      return new Response(
+        JSON.stringify({ error: "You do not have permission to evaluate this model" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
-
-      if (!hasPrivilegedRole) {
-        console.warn(`Unauthorized access attempt: user ${user.id} tried to access model ${modelId}`);
-        return new Response(
-          JSON.stringify({ error: "You do not have permission to evaluate this model" }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
     }
 
-    console.log(`Authorized user ${user.id} to evaluate model ${modelId}`);
+    console.log(`[rai-reasoning-engine] Authorized user ${user?.id} to evaluate model ${modelId}`);
 
     // Get endpoint and token
     const endpoint = model.huggingface_endpoint || model.endpoint || model.system?.endpoint;
@@ -523,8 +497,8 @@ Apply rigorous step-by-step reasoning to evaluate each dimension. Be thorough an
         break;
     }
 
-    // Save to database
-    const { data: evalRun, error: insertError } = await supabase
+    // Save to database using service client for system writes
+    const { data: evalRun, error: insertError } = await serviceClient
       .from("evaluation_runs")
       .insert([{
         model_id: modelId,

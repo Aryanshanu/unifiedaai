@@ -3,24 +3,61 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { validateSession, requireAuth, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
 
 // =====================================================
-// RATE LIMITING (Per-system)
+// RATE LIMITING (Database-backed persistent rate limiting)
 // =====================================================
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT = 100; // 100 requests per minute per system
 const RATE_WINDOW_MS = 60000;
 
-function checkRateLimit(systemId: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(systemId);
+interface RateLimitResult {
+  allowed: boolean;
+  remaining: number;
+  resetIn: number;
+}
+
+async function checkRateLimitDB(
+  systemId: string, 
+  serviceClient: any
+): Promise<RateLimitResult> {
+  const windowStart = new Date(Date.now() - RATE_WINDOW_MS).toISOString();
   
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(systemId, { count: 1, resetAt: now + RATE_WINDOW_MS });
-    return true;
+  try {
+    // Count recent requests in the time window
+    const { count, error: countError } = await serviceClient
+      .from('rate_limits')
+      .select('*', { count: 'exact', head: true })
+      .eq('identifier', `system:${systemId}`)
+      .gte('window_start', windowStart);
+    
+    if (countError) {
+      console.error('[ai-gateway] Rate limit check error:', countError);
+      // Fail open on DB error - allow request but log warning
+      return { allowed: true, remaining: RATE_LIMIT, resetIn: 60 };
+    }
+    
+    const currentCount = count || 0;
+    
+    if (currentCount >= RATE_LIMIT) {
+      console.log(`[ai-gateway] Rate limit exceeded for system: ${systemId} (${currentCount}/${RATE_LIMIT})`);
+      return { allowed: false, remaining: 0, resetIn: 60 };
+    }
+    
+    // Insert new rate limit entry
+    await serviceClient.from('rate_limits').insert({
+      identifier: `system:${systemId}`,
+      window_start: new Date().toISOString(),
+      window_ms: RATE_WINDOW_MS
+    });
+    
+    return { 
+      allowed: true, 
+      remaining: RATE_LIMIT - currentCount - 1, 
+      resetIn: 60 
+    };
+  } catch (error) {
+    console.error('[ai-gateway] Rate limiting error:', error);
+    // Fail open on error
+    return { allowed: true, remaining: RATE_LIMIT, resetIn: 60 };
   }
-  
-  if (entry.count >= RATE_LIMIT) return false;
-  entry.count++;
-  return true;
 }
 
 // Simple PII detection patterns - EXPANDED with India-specific patterns
@@ -241,18 +278,27 @@ serve(async (req) => {
     }
 
     // =====================================================
-    // RATE LIMITING CHECK (Per-system enforcement)
+    // RATE LIMITING CHECK (Database-backed, per-system enforcement)
     // =====================================================
-    if (!checkRateLimit(systemId)) {
+    const rateLimitResult = await checkRateLimitDB(systemId, serviceClient);
+    if (!rateLimitResult.allowed) {
       console.log(`[ai-gateway] Rate limit exceeded for system: ${systemId}`);
       return new Response(
         JSON.stringify({
           error: "RATE_LIMITED: Too many requests",
           decision: "BLOCK",
-          retry_after: 60,
+          retry_after: rateLimitResult.resetIn,
           system_id: systemId
         }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { 
+          status: 429, 
+          headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json",
+            "X-RateLimit-Remaining": String(rateLimitResult.remaining),
+            "X-RateLimit-Reset": String(rateLimitResult.resetIn)
+          } 
+        }
       );
     }
 

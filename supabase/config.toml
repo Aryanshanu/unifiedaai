@@ -77,3 +77,6 @@ verify_jwt = true
 
 [functions.generate-audit-report]
 verify_jwt = true
+
+[functions.send-notification]
+verify_jwt = true
