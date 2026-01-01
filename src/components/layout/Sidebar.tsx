@@ -2,7 +2,7 @@ import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { FractalBadge } from "@/components/fractal";
 import { usePlatformMetrics } from "@/hooks/usePlatformMetrics";
 import {
   LayoutDashboard,
@@ -29,32 +29,29 @@ import {
 } from "lucide-react";
 
 const navItems = [
-  { path: "/", icon: LayoutDashboard, label: "Dashboard" },
-  { divider: true, label: "Registry" },
-  { path: "/projects", icon: FolderOpen, label: "Projects" },
-  { path: "/models", icon: Database, label: "Model Registry" },
-  { divider: true, label: "Governance" },
+  { path: "/", icon: LayoutDashboard, label: "Command Center" },
+  { divider: true, label: "Monitor" },
+  { path: "/observability", icon: Activity, label: "Observability" },
+  { path: "/live-logs", icon: Terminal, label: "Live Telemetry" },
+  { path: "/alerts", icon: Bell, label: "Alerts" },
+  { divider: true, label: "Govern" },
   { path: "/governance/approvals", icon: Shield, label: "Approvals", showBadge: true },
   { path: "/hitl", icon: Users, label: "HITL Console" },
   { path: "/incidents", icon: AlertCircle, label: "Incidents" },
   { path: "/lineage", icon: GitBranch, label: "Knowledge Graph" },
-  { divider: true, label: "Monitoring" },
-  { path: "/observability", icon: Activity, label: "Observability" },
-  { path: "/live-logs", icon: Terminal, label: "Live Logs & Telemetry" },
-  { path: "/alerts", icon: Bell, label: "Alerts & Notifications" },
-  { divider: true, label: "Core RAI Engines" },
-  { path: "/engine/fairness", icon: Scale, label: "Fairness Engine" },
-  { path: "/engine/hallucination", icon: AlertCircle, label: "Hallucination Engine" },
-  { path: "/engine/toxicity", icon: ShieldAlert, label: "Toxicity Engine" },
-  { path: "/engine/privacy", icon: Lock, label: "Privacy Engine" },
-  { path: "/engine/explainability", icon: Eye, label: "Explainability Engine" },
-  { divider: true, label: "Policy & Red Team" },
+  { divider: true, label: "Evaluate" },
+  { path: "/engine/fairness", icon: Scale, label: "Fairness" },
+  { path: "/engine/hallucination", icon: AlertCircle, label: "Hallucination" },
+  { path: "/engine/toxicity", icon: ShieldAlert, label: "Toxicity" },
+  { path: "/engine/privacy", icon: Lock, label: "Privacy" },
+  { path: "/engine/explainability", icon: Eye, label: "Explainability" },
+  { divider: true, label: "Respond" },
   { path: "/policy", icon: FileText, label: "Policy Studio" },
-  { divider: true, label: "Demo & Testing" },
   { path: "/golden", icon: Play, label: "Golden Demo" },
   { path: "/run-tests", icon: FlaskConical, label: "Run Tests" },
-  { path: "/architecture", icon: GitBranch, label: "Architecture" },
-  { divider: true, label: "System" },
+  { divider: true, label: "Configure" },
+  { path: "/projects", icon: FolderOpen, label: "Projects" },
+  { path: "/models", icon: Database, label: "Models" },
   { path: "/settings", icon: Settings, label: "Settings" },
   { path: "/docs", icon: BookOpen, label: "Documentation" },
 ];
@@ -121,9 +118,13 @@ export function Sidebar() {
                   <span className="truncate flex-1">{item.label}</span>
                 )}
                 {!collapsed && item.showBadge && pendingApprovals > 0 && (
-                  <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">
-                    {pendingApprovals}
-                  </Badge>
+                  <FractalBadge 
+                    type="risk" 
+                    severity="high" 
+                    label={pendingApprovals.toString()} 
+                    size="sm"
+                    showIcon={false}
+                  />
                 )}
               </div>
             </NavLink>
