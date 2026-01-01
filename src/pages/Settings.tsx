@@ -3,8 +3,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, User, Shield, Bell, Database, Key, Globe, Loader2, Check, Plus, Trash2, Copy, Eye, EyeOff, AlertTriangle, Bot } from "lucide-react";
-import { EnforcementBadge } from "@/components/shared/EnforcementBadge";
+import { Settings as SettingsIcon, User, Shield, Bell, Database, Key, Globe, Loader2, Check, Plus, Trash2, Copy, AlertTriangle, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings, useUpdateSettings } from "@/hooks/useSettings";
 import { useToast } from "@/hooks/use-toast";
@@ -18,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { PlannedFeatureCard } from "@/components/fractal";
 
 const settingsSections = [
   { id: "general", icon: SettingsIcon, label: "General", description: "Basic configuration and preferences" },
@@ -137,9 +137,6 @@ export default function Settings() {
     <MainLayout 
       title="Settings" 
       subtitle="System configuration and preferences"
-      headerActions={
-        <EnforcementBadge level="ui-only" />
-      }
     >
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Navigation */}
@@ -281,108 +278,71 @@ export default function Settings() {
               <>
                 <h2 className="text-lg font-semibold text-foreground mb-6">Security Settings</h2>
                 <div className="space-y-6">
-                  {/* MFA - DISABLED until backend enforcement */}
-                  <Card className="border-border opacity-60">
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base">Multi-Factor Authentication</CardTitle>
-                        <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/30">
-                          DISABLED
+                  {/* Active Security Controls - Only real, enforced features */}
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-4 uppercase tracking-wide">
+                      Active Controls
+                    </h3>
+                    <Card className="border-border">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Password Authentication</CardTitle>
+                        <CardDescription>Email and password authentication via Supabase Auth</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Badge className="bg-success/10 text-success border-success/30">
+                          Enforced
                         </Badge>
-                      </div>
-                      <CardDescription>Add an extra layer of security to your account</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
-                        <div className="flex items-start gap-2">
-                          <AlertTriangle className="w-4 h-4 text-destructive mt-0.5" />
-                          <div>
-                            <p className="text-sm font-medium text-destructive">Backend Enforcement Pending</p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              MFA toggle is disabled until backend enforcement is implemented via Supabase Auth configuration.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label className="mb-2 block">Session Timeout (minutes)</Label>
-                      <Select 
-                        value={String(securitySettings.sessionTimeout)}
-                        onValueChange={(v) => setSecuritySettings(prev => ({ ...prev, sessionTimeout: Number(v) }))}
-                      >
-                        <SelectTrigger className="bg-secondary">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="15">15 minutes</SelectItem>
-                          <SelectItem value="30">30 minutes</SelectItem>
-                          <SelectItem value="60">1 hour</SelectItem>
-                          <SelectItem value="120">2 hours</SelectItem>
-                          <SelectItem value="480">8 hours</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label className="mb-2 block">Minimum Password Length</Label>
-                      <Input
-                        type="number"
-                        value={securitySettings.passwordMinLength}
-                        onChange={(e) => setSecuritySettings(prev => ({ ...prev, passwordMinLength: Number(e.target.value) }))}
-                        className="bg-secondary"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between py-3">
-                    <div>
-                      <p className="font-medium">Require Special Characters</p>
-                      <p className="text-sm text-muted-foreground">Passwords must contain special characters</p>
-                    </div>
-                    <Switch
-                      checked={securitySettings.requireSpecialChars}
-                      onCheckedChange={(checked) => setSecuritySettings(prev => ({ ...prev, requireSpecialChars: checked }))}
-                    />
+                      </CardContent>
+                    </Card>
                   </div>
 
                   <Separator />
 
-                  {/* SSO - DISABLED until backend integration */}
-                  <div className="flex items-center justify-between py-3 opacity-60">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium">Single Sign-On (SSO)</p>
-                        <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/30 text-[10px]">
-                          DISABLED
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">SSO/SAML integration pending enterprise deployment</p>
-                    </div>
-                    <Switch
-                      checked={false}
-                      disabled={true}
-                    />
-                  </div>
-
+                  {/* Planned Security Controls - Honest roadmap items */}
                   <div>
-                    <Label className="mb-2 block">IP Whitelist (optional)</Label>
-                    <Input
-                      value={securitySettings.ipWhitelist}
-                      onChange={(e) => setSecuritySettings(prev => ({ ...prev, ipWhitelist: e.target.value }))}
-                      placeholder="e.g., 192.168.1.0/24, 10.0.0.0/8"
-                      className="bg-secondary"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">Comma-separated list of allowed IP ranges</p>
-                  </div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2 uppercase tracking-wide">
+                      Planned Security Controls
+                    </h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      These controls are on the roadmap and will be enforced once implemented.
+                    </p>
 
-                  <div className="pt-4 border-t border-border">
-                    <Button variant="gradient" onClick={handleSecuritySave}>
-                      Save Security Settings
-                    </Button>
+                    <div className="space-y-3">
+                      <PlannedFeatureCard
+                        title="Multi-Factor Authentication"
+                        description="Add TOTP/SMS verification to all login flows for enhanced account security."
+                        regulation="NIST 800-53 IA-2"
+                        status="Backend pending"
+                      />
+
+                      <PlannedFeatureCard
+                        title="Single Sign-On (SSO)"
+                        description="SAML/OIDC integration for enterprise identity providers like Okta, Azure AD."
+                        regulation="SOC 2 Type II"
+                        status="Enterprise feature"
+                      />
+
+                      <PlannedFeatureCard
+                        title="Session Timeout Controls"
+                        description="Configurable automatic session expiration for inactive users."
+                        regulation="NIST 800-53 AC-12"
+                        status="Planned"
+                      />
+
+                      <PlannedFeatureCard
+                        title="Password Policy Enforcement"
+                        description="Minimum length, complexity requirements, and rotation policies."
+                        regulation="NIST 800-63B"
+                        status="Planned"
+                      />
+
+                      <PlannedFeatureCard
+                        title="IP Allowlist"
+                        description="Restrict platform access to specific IP ranges or VPN networks."
+                        regulation="SOC 2 CC6.1"
+                        status="Enterprise feature"
+                      />
+                    </div>
                   </div>
                 </div>
               </>
