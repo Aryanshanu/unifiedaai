@@ -353,90 +353,60 @@ export default function Settings() {
               <>
                 <h2 className="text-lg font-semibold text-foreground mb-6">Notification Settings</h2>
                 <div className="space-y-6">
-                  {/* Slack - DISABLED */}
-                  <div className="opacity-60">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Label className="block">Slack Webhook URL</Label>
-                      <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/30 text-[10px]">
-                        DISABLED
-                      </Badge>
-                    </div>
-                    <Input
-                      value=""
-                      disabled={true}
-                      placeholder="Notification delivery pending implementation"
-                      className="bg-secondary"
-                    />
-                    <p className="text-xs text-destructive mt-1">
-                      Slack webhook integration is disabled until backend delivery is implemented
+                  {/* Honest status message */}
+                  <div className="p-4 rounded-lg bg-muted/50 border border-border text-sm">
+                    <p className="text-muted-foreground">
+                      Notification delivery is not yet implemented. The controls below show planned features that will be available once backend email/webhook delivery is complete.
                     </p>
                   </div>
 
                   <Separator />
 
-                  <div className="space-y-4">
-                    <h3 className="font-medium">Alert Preferences</h3>
-                    
-                    <div className="flex items-center justify-between py-2">
-                      <div>
-                        <p className="font-medium">Email Alerts</p>
-                        <p className="text-sm text-muted-foreground">Receive alerts via email</p>
-                      </div>
-                      <Switch
-                        checked={notificationSettings.emailAlerts}
-                        onCheckedChange={(checked) => setNotificationSettings(prev => ({ ...prev, emailAlerts: checked }))}
+                  {/* Planned Notification Controls */}
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-4 uppercase tracking-wide">
+                      Planned Notification Features
+                    </h3>
+                    <div className="space-y-3">
+                      <PlannedFeatureCard
+                        title="Email Alerts"
+                        description="Receive alerts via email when evaluation scores drop or incidents occur."
+                        regulation="EU AI Act Article 9"
+                        status="Backend pending"
+                      />
+
+                      <PlannedFeatureCard
+                        title="Critical Alerts Priority"
+                        description="Filter to only receive critical severity alerts to reduce noise."
+                        status="Backend pending"
+                      />
+
+                      <PlannedFeatureCard
+                        title="Daily Digest"
+                        description="Receive a daily summary of platform activity, evaluation results, and compliance status."
+                        status="Backend pending"
+                      />
+
+                      <PlannedFeatureCard
+                        title="Incident Notifications"
+                        description="Get notified immediately when new incidents are created or escalated."
+                        regulation="NIST AI RMF GV-4"
+                        status="Backend pending"
+                      />
+
+                      <PlannedFeatureCard
+                        title="HITL Review Reminders"
+                        description="Automated reminders for pending human-in-the-loop reviews approaching SLA deadlines."
+                        regulation="EU AI Act Article 14"
+                        status="Backend pending"
+                      />
+
+                      <PlannedFeatureCard
+                        title="Slack Integration"
+                        description="Send notifications to Slack channels for team-wide visibility."
+                        status="Integration pending"
                       />
                     </div>
-
-                    <div className="flex items-center justify-between py-2">
-                      <div>
-                        <p className="font-medium">Critical Alerts Only</p>
-                        <p className="text-sm text-muted-foreground">Only receive critical severity alerts</p>
-                      </div>
-                      <Switch
-                        checked={notificationSettings.criticalAlertsOnly}
-                        onCheckedChange={(checked) => setNotificationSettings(prev => ({ ...prev, criticalAlertsOnly: checked }))}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between py-2">
-                      <div>
-                        <p className="font-medium">Daily Digest</p>
-                        <p className="text-sm text-muted-foreground">Receive a daily summary of platform activity</p>
-                      </div>
-                      <Switch
-                        checked={notificationSettings.dailyDigest}
-                        onCheckedChange={(checked) => setNotificationSettings(prev => ({ ...prev, dailyDigest: checked }))}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between py-2">
-                      <div>
-                        <p className="font-medium">Incident Notifications</p>
-                        <p className="text-sm text-muted-foreground">Get notified when new incidents are created</p>
-                      </div>
-                      <Switch
-                        checked={notificationSettings.incidentNotifications}
-                        onCheckedChange={(checked) => setNotificationSettings(prev => ({ ...prev, incidentNotifications: checked }))}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between py-2">
-                      <div>
-                        <p className="font-medium">Review Reminders</p>
-                        <p className="text-sm text-muted-foreground">Remind about pending HITL reviews approaching SLA</p>
-                      </div>
-                      <Switch
-                        checked={notificationSettings.reviewReminders}
-                        onCheckedChange={(checked) => setNotificationSettings(prev => ({ ...prev, reviewReminders: checked }))}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-border">
-                    <Button variant="gradient" onClick={handleNotificationSave}>
-                      Save Notification Settings
-                    </Button>
                   </div>
                 </div>
               </>
@@ -470,50 +440,28 @@ export default function Settings() {
                     </CardContent>
                   </Card>
 
-                  <Card className="border-border">
-                    <CardContent className="flex items-center justify-between py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">
-                          <Database className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="font-medium">MLflow</p>
-                          <p className="text-sm text-muted-foreground">Experiment tracking and model registry</p>
-                        </div>
-                      </div>
-                      <Button variant="outline" size="sm">Connect</Button>
-                    </CardContent>
-                  </Card>
+                  <h3 className="text-sm font-medium text-muted-foreground mt-6 mb-3 uppercase tracking-wide">
+                    Planned Integrations
+                  </h3>
+                  <div className="space-y-3">
+                    <PlannedFeatureCard
+                      title="MLflow"
+                      description="Experiment tracking and model registry integration for ML lifecycle management."
+                      status="Planned"
+                    />
 
-                  <Card className="border-border">
-                    <CardContent className="flex items-center justify-between py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">
-                          <Bell className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="font-medium">Slack</p>
-                          <p className="text-sm text-muted-foreground">Alerts and notifications</p>
-                        </div>
-                      </div>
-                      <Button variant="outline" size="sm">Connect</Button>
-                    </CardContent>
-                  </Card>
+                    <PlannedFeatureCard
+                      title="Slack"
+                      description="Send alerts and notifications to Slack channels for team collaboration."
+                      status="Planned"
+                    />
 
-                  <Card className="border-border">
-                    <CardContent className="flex items-center justify-between py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">
-                          <AlertTriangle className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="font-medium">PagerDuty</p>
-                          <p className="text-sm text-muted-foreground">Incident management and on-call</p>
-                        </div>
-                      </div>
-                      <Button variant="outline" size="sm">Connect</Button>
-                    </CardContent>
-                  </Card>
+                    <PlannedFeatureCard
+                      title="PagerDuty"
+                      description="Incident management and on-call escalation for critical AI failures."
+                      status="Planned"
+                    />
+                  </div>
 
                   <Card className="border-border">
                     <CardContent className="flex items-center justify-between py-4">
@@ -625,55 +573,61 @@ export default function Settings() {
 
                   <Separator />
 
+                  {/* Active Compliance Framework */}
                   <div>
-                    <h3 className="font-medium mb-4">Compliance Frameworks</h3>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between py-2">
+                    <h3 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wide">
+                      Active Framework
+                    </h3>
+                    <Card className="border-border">
+                      <CardHeader className="pb-2">
                         <div className="flex items-center gap-2">
                           <Badge variant="default">EU AI Act</Badge>
-                          <span className="text-sm text-muted-foreground">High-risk AI requirements</span>
+                          <CardTitle className="text-base">High-Risk AI Compliance</CardTitle>
                         </div>
-                        <Switch checked={true} disabled />
-                      </div>
-                      <div className="flex items-center justify-between py-2">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">NIST AI RMF</Badge>
-                          <span className="text-sm text-muted-foreground">Risk management framework</span>
-                        </div>
-                        <Switch checked={true} />
-                      </div>
-                      <div className="flex items-center justify-between py-2">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">ISO/IEC 42001</Badge>
-                          <span className="text-sm text-muted-foreground">AI management systems</span>
-                        </div>
-                        <Switch checked={false} />
-                      </div>
-                    </div>
+                        <CardDescription>Core evaluation engines enforce EU AI Act requirements</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Badge className="bg-success/10 text-success border-success/30">
+                          Enforced via Engines
+                        </Badge>
+                      </CardContent>
+                    </Card>
                   </div>
 
                   <Separator />
 
-                  <div className="space-y-4">
-                    <h3 className="font-medium">Privacy Regulations</h3>
-                    <div className="flex items-center justify-between py-2">
-                      <div>
-                        <p className="font-medium">GDPR Compliance Mode</p>
-                        <p className="text-sm text-muted-foreground">Enable EU General Data Protection Regulation controls</p>
-                      </div>
-                      <Switch
-                        checked={complianceSettings.gdprEnabled}
-                        onCheckedChange={(checked) => setComplianceSettings(prev => ({ ...prev, gdprEnabled: checked }))}
+                  {/* Planned Compliance Features */}
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wide">
+                      Planned Compliance Controls
+                    </h3>
+                    <div className="space-y-3">
+                      <PlannedFeatureCard
+                        title="NIST AI RMF Mapping"
+                        description="Automated mapping of evaluation results to NIST AI Risk Management Framework controls."
+                        regulation="NIST AI RMF 1.0"
+                        status="Planned"
                       />
-                    </div>
-                    <div className="flex items-center justify-between py-2">
-                      <div>
-                        <p className="font-medium">CCPA Compliance Mode</p>
-                        <p className="text-sm text-muted-foreground">Enable California Consumer Privacy Act controls</p>
-                      </div>
-                      <Switch
-                        checked={complianceSettings.ccpaEnabled}
-                        onCheckedChange={(checked) => setComplianceSettings(prev => ({ ...prev, ccpaEnabled: checked }))}
+
+                      <PlannedFeatureCard
+                        title="ISO/IEC 42001 Certification"
+                        description="AI Management Systems certification readiness assessment and evidence collection."
+                        regulation="ISO/IEC 42001:2023"
+                        status="Enterprise feature"
+                      />
+
+                      <PlannedFeatureCard
+                        title="GDPR Compliance Mode"
+                        description="Automated data subject rights handling and consent management for AI processing."
+                        regulation="GDPR Articles 13-22"
+                        status="Planned"
+                      />
+
+                      <PlannedFeatureCard
+                        title="CCPA Compliance Mode"
+                        description="California Consumer Privacy Act controls including opt-out and deletion requests."
+                        regulation="CCPA §1798.100-199"
+                        status="Planned"
                       />
                     </div>
                   </div>
@@ -697,10 +651,10 @@ export default function Settings() {
                     </Select>
                   </div>
 
-                  <div className="pt-4 border-t border-border">
-                    <Button variant="gradient">
-                      Save Compliance Settings
-                    </Button>
+                  <div className="p-4 rounded-lg bg-muted/50 border border-border text-sm">
+                    <p className="text-muted-foreground">
+                      Data Residency and Audit Log Retention are configuration preferences. Actual enforcement requires infrastructure changes that are tracked separately.
+                    </p>
                   </div>
                 </div>
               </>
