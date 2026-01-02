@@ -865,7 +865,21 @@ serve(async (req) => {
       throw new Error(`AI Gateway error: ${aiResponse.status}`);
     }
 
-    const aiData = await aiResponse.json();
+    // Parse response, handling HTML error pages gracefully
+    const responseText = await aiResponse.text();
+    let aiData;
+    try {
+      aiData = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Failed to parse AI response as JSON:", responseText.substring(0, 200));
+      return new Response(
+        JSON.stringify({ 
+          error: "External AI provider returned invalid response. Please try again or check your endpoint configuration.",
+          trace_id: traceId
+        }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     const assistantMessage = aiData.choices?.[0]?.message?.content || "";
 
     // Run output evaluations
