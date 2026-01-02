@@ -641,7 +641,7 @@ export default function GoldenDemo() {
               'Authorization': authHeader,
               'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
             },
-            body: JSON.stringify({ model_id: model?.id }),
+            body: JSON.stringify({ modelId: model?.id }),
           }
         );
         
