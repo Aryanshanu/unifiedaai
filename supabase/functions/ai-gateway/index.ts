@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { validateSession, requireAuth, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
+import { validateAIGatewayInput, validationErrorResponse } from "../_shared/input-validation.ts";
 
 // =====================================================
 // RATE LIMITING (Database-backed persistent rate limiting)
@@ -246,36 +247,25 @@ serve(async (req) => {
     // This is isolated from user context and used only for system writes
     const serviceClient = getServiceClient();
 
-    const body = await req.json().catch(() => null);
+    // Parse and validate input with schema validation
+    const rawBody = await req.json().catch(() => null);
 
-    if (!body) {
+    if (!rawBody) {
       return new Response(
         JSON.stringify({ error: "Invalid JSON body" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const { systemId, traceId } = body;
-    // Support both formats: { input: { messages: [...] } } and { messages: [...] }
-    const input = body.input || {};
-    const messages = input.messages || body.messages || [];
-
-    if (!systemId) {
-      return new Response(
-        JSON.stringify({ error: "systemId is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Schema validation for input
+    const validation = validateAIGatewayInput(rawBody);
+    if (!validation.success) {
+      console.log("[ai-gateway] Input validation failed:", validation.errors);
+      return validationErrorResponse(validation.errors!, corsHeaders);
     }
 
-    if (!Array.isArray(messages) || messages.length === 0) {
-      return new Response(
-        JSON.stringify({ 
-          error: "BadRequest", 
-          message: "Expected payload: { systemId, messages: [...] } or { systemId, input: { messages: [...] } }" 
-        }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    const { systemId, traceId, messages } = validation.data!;
+    console.log(`[ai-gateway] Validated input: systemId=${systemId}, messages=${messages.length}`);
 
     // =====================================================
     // RATE LIMITING CHECK (Database-backed, per-system enforcement)
@@ -847,7 +837,7 @@ serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: input?.model || body?.model || "google/gemini-2.5-flash",
+          model: "google/gemini-2.5-flash",
           messages: [
             { role: "system", content: system.use_case || "You are a helpful AI assistant." },
             ...messages,
