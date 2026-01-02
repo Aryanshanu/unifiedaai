@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { validateSession, requireAuth, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
+import { validateEvalEngineInput, validationErrorResponse } from "../_shared/input-validation.ts";
 
 // Timeout for external API calls (30 seconds)
 const FETCH_TIMEOUT = 30000;
@@ -223,7 +224,23 @@ serve(async (req) => {
     // Service client for system writes
     const serviceClient = getServiceClient();
 
-    const { modelId, text, customPrompt, autoEscalate = true } = await req.json();
+    // Parse and validate input with schema validation
+    const rawBody = await req.json().catch(() => null);
+    
+    if (!rawBody) {
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON body" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const validation = validateEvalEngineInput(rawBody);
+    if (!validation.success) {
+      console.log("[eval-privacy] Input validation failed:", validation.errors);
+      return validationErrorResponse(validation.errors!, corsHeaders);
+    }
+
+    const { modelId, text, customPrompt, autoEscalate = true } = validation.data!;
 
     // Direct text analysis
     if (text && !modelId) {

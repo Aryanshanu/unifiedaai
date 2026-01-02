@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { validateSession, requireAuth, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
+import { validateEvalEngineInput, validationErrorResponse } from "../_shared/input-validation.ts";
 
 // Timeout for external API calls (30 seconds)
 const FETCH_TIMEOUT = 30000;
@@ -211,7 +212,23 @@ serve(async (req) => {
     // Service client for system writes (evaluation results, review queue)
     const serviceClient = getServiceClient();
 
-    const { modelId, systemId, customPrompt } = await req.json();
+    // Parse and validate input with schema validation
+    const rawBody = await req.json().catch(() => null);
+    
+    if (!rawBody) {
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON body" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const validation = validateEvalEngineInput(rawBody);
+    if (!validation.success) {
+      console.log("[eval-fairness] Input validation failed:", validation.errors);
+      return validationErrorResponse(validation.errors!, corsHeaders);
+    }
+
+    const { modelId, systemId, customPrompt } = validation.data!;
     const targetId = modelId || systemId;
 
     if (!targetId) {
