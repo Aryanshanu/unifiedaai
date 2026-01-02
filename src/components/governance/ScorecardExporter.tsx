@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { FileText, Download, Loader2, ExternalLink, CheckCircle2 } from "lucide-react";
+import { FileText, Download, Loader2, ExternalLink, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useModels } from "@/hooks/useModels";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -25,7 +25,7 @@ export function ScorecardExporter() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [scorecard, setScorecard] = useState<Scorecard | null>(null);
 
-  const { data: models } = useModels();
+  const { data: models, isLoading: modelsLoading } = useModels();
 
   const handleGenerate = async () => {
     if (!selectedModel) {
@@ -92,7 +92,16 @@ export function ScorecardExporter() {
         printWindow.document.close();
       }
       
-      toast.success('Legal-grade EU AI Act Scorecard exported — ready for regulators');
+      // Also generate JSON scorecard for display
+      const jsonResponse = await supabase.functions.invoke('generate-scorecard', {
+        body: { modelId: selectedModel, format: 'json' },
+      });
+      
+      if (jsonResponse.data?.success) {
+        setScorecard(jsonResponse.data.scorecard);
+      }
+      
+      toast.success('Scorecard exported — ready for print to PDF');
     } catch (error: any) {
       console.error('PDF generation error:', error);
       toast.error('PDF generation failed: ' + error.message);
@@ -121,6 +130,8 @@ export function ScorecardExporter() {
     'non-compliant': 'text-danger bg-danger/10',
   };
 
+  const hasNoModels = !modelsLoading && (!models || models.length === 0);
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
@@ -138,93 +149,107 @@ export function ScorecardExporter() {
         </DialogHeader>
         
         <div className="space-y-6 py-4">
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label>Select Model</Label>
-              <Select value={selectedModel} onValueChange={setSelectedModel}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a model" />
-                </SelectTrigger>
-                <SelectContent>
-                  {models?.map((model) => (
-                    <SelectItem key={model.id} value={model.id}>
-                      {model.name} ({model.model_type})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {hasNoModels ? (
+            <div className="text-center py-8">
+              <AlertTriangle className="w-12 h-12 text-warning mx-auto mb-4" />
+              <p className="text-muted-foreground mb-2">No models registered yet</p>
+              <p className="text-sm text-muted-foreground">
+                Register a model first to generate scorecards
+              </p>
             </div>
-            
-            <Button variant="gradient" onClick={handleDownloadPDF} disabled={isGenerating || !selectedModel}>
-              {isGenerating ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Download className="w-4 h-4 mr-2" />
-              )}
-              Generate 6-Page PDF Scorecard
-            </Button>
-          </div>
-          
-          {scorecard && (
-            <div className="space-y-4">
-              {/* Summary */}
-              <div className="p-4 rounded-lg bg-secondary/50 border border-border">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="font-semibold text-lg">{scorecard.model_name}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Generated {new Date(scorecard.generated_at).toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-3xl font-bold">{scorecard.overall_score}%</div>
-                    <span className={cn(
-                      "text-xs font-medium px-2 py-1 rounded-full uppercase",
-                      statusColors[scorecard.overall_status]
-                    )}>
-                      {scorecard.overall_status.replace('-', ' ')}
-                    </span>
-                  </div>
+          ) : (
+            <>
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label>Select Model</Label>
+                  <Select value={selectedModel} onValueChange={setSelectedModel}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {models?.map((model) => (
+                        <SelectItem key={model.id} value={model.id}>
+                          {model.name} ({model.model_type})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 
-                {/* Section Summary */}
-                <div className="grid grid-cols-5 gap-2 mt-4">
-                  {scorecard.sections.map((section, i) => (
-                    <div key={i} className="text-center p-2 rounded bg-background">
-                      <div className="text-xs text-muted-foreground mb-1 truncate">{section.title.split(' ')[0]}</div>
-                      <div className={cn(
-                        "font-bold",
-                        section.score >= 80 ? 'text-success' :
-                        section.score >= 60 ? 'text-warning' : 'text-danger'
-                      )}>
-                        {section.score}%
+                <Button variant="gradient" onClick={handleDownloadPDF} disabled={isGenerating || !selectedModel}>
+                  {isGenerating ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4 mr-2" />
+                  )}
+                  Generate 6-Page PDF Scorecard
+                </Button>
+              </div>
+              
+              {scorecard && (
+                <div className="space-y-4">
+                  {/* Summary */}
+                  <div className="p-4 rounded-lg bg-secondary/50 border border-border">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="font-semibold text-lg">{scorecard.model_name}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Generated {new Date(scorecard.generated_at).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-3xl font-bold">{scorecard.overall_score}%</div>
+                        <span className={cn(
+                          "text-xs font-medium px-2 py-1 rounded-full uppercase",
+                          statusColors[scorecard.overall_status]
+                        )}>
+                          {scorecard.overall_status.replace('-', ' ')}
+                        </span>
                       </div>
                     </div>
-                  ))}
+                    
+                    {/* Section Summary */}
+                    {scorecard.sections && scorecard.sections.length > 0 && (
+                      <div className="grid grid-cols-5 gap-2 mt-4">
+                        {scorecard.sections.map((section, i) => (
+                          <div key={i} className="text-center p-2 rounded bg-background">
+                            <div className="text-xs text-muted-foreground mb-1 truncate">{section.title?.split(' ')[0] || `Section ${i + 1}`}</div>
+                            <div className={cn(
+                              "font-bold",
+                              section.score >= 80 ? 'text-success' :
+                              section.score >= 60 ? 'text-warning' : 'text-danger'
+                            )}>
+                              {section.score}%
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Integrity Hash */}
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <CheckCircle2 className="w-4 h-4 text-success" />
+                    <span>Integrity Hash:</span>
+                    <code className="bg-secondary px-2 py-1 rounded text-xs font-mono">
+                      {scorecard.hash}
+                    </code>
+                  </div>
+                  
+                  {/* Download Options */}
+                  <div className="flex gap-2">
+                    <Button variant="outline" className="flex-1" onClick={handleDownloadJSON}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Download JSON
+                    </Button>
+                    <Button variant="gradient" className="flex-1" onClick={handleDownloadPDF}>
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Export PDF
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              
-              {/* Integrity Hash */}
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <CheckCircle2 className="w-4 h-4 text-success" />
-                <span>Integrity Hash:</span>
-                <code className="bg-secondary px-2 py-1 rounded text-xs font-mono">
-                  {scorecard.hash}
-                </code>
-              </div>
-              
-              {/* Download Options */}
-              <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={handleDownloadJSON}>
-                  <Download className="w-4 h-4 mr-2" />
-                  Download JSON
-                </Button>
-                <Button variant="gradient" className="flex-1" onClick={handleDownloadPDF}>
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Export PDF
-                </Button>
-              </div>
-            </div>
+              )}
+            </>
           )}
         </div>
         

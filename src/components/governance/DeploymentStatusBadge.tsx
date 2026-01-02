@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { 
   FileCheck, Clock, AlertTriangle, CheckCircle, XCircle, Rocket 
 } from "lucide-react";
@@ -74,19 +74,21 @@ export function DeploymentStatusBadge({ status, requiresApproval, size = "md" }:
   };
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Badge variant="outline" className={`${config.color} ${sizeClasses[size]} gap-1`}>
-          <Icon className={iconSizes[size]} />
-          {config.label}
-        </Badge>
-      </TooltipTrigger>
-      <TooltipContent>
-        <p>{config.label}</p>
-        {requiresApproval && status !== "approved" && status !== "deployed" && (
-          <p className="text-xs text-muted-foreground">Requires approval before deployment</p>
-        )}
-      </TooltipContent>
-    </Tooltip>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge variant="outline" className={`${config.color} ${sizeClasses[size]} gap-1`}>
+            <Icon className={iconSizes[size]} />
+            {config.label}
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{config.label}</p>
+          {requiresApproval && status !== "approved" && status !== "deployed" && (
+            <p className="text-xs text-muted-foreground">Requires approval before deployment</p>
+          )}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }

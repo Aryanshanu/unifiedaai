@@ -12,7 +12,6 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileCheck, Loader2, CheckCircle, XCircle, AlertTriangle, Shield } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -116,25 +115,11 @@ export function EUAIActAssessment({ modelId, modelName }: EUAIActAssessmentProps
       await new Promise(r => setTimeout(r, 50));
     }
 
-    // Save to database
-    try {
-      for (const control of assessedControls) {
-        await supabase.from('control_assessments').insert({
-          model_id: modelId,
-          control_id: control.code, // Using code as pseudo-ID
-          status: control.status === 'pass' ? 'compliant' : 
-                  control.status === 'partial' ? 'in_progress' : 'non_compliant',
-          notes: `EU AI Act / NIST AI RMF assessment for ${control.title}`,
-          assessed_at: new Date().toISOString()
-        });
-      }
-      
-      toast.success("Assessment completed and saved", {
-        description: `${assessedControls.filter(c => c.status === 'pass').length}/${assessedControls.length} controls satisfied`
-      });
-    } catch (error) {
-      console.error('Failed to save assessments:', error);
-    }
+    // Note: We don't save to database since control_id requires real UUIDs
+    // This is a demonstration/planning tool only
+    toast.success("Simulation completed", {
+      description: `${assessedControls.filter(c => c.status === 'pass').length}/${assessedControls.length} controls passed (demo only)`
+    });
 
     setIsRunning(false);
   };
@@ -164,23 +149,34 @@ export function EUAIActAssessment({ modelId, modelName }: EUAIActAssessmentProps
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Shield className="w-5 h-5 text-primary" />
-            EU AI Act High-Risk Assessment
+            EU AI Act High-Risk Assessment (Demo)
           </DialogTitle>
           <DialogDescription>
-            One-click compliance assessment for {modelName} against EU AI Act and NIST AI RMF
+            Simulated compliance check for {modelName} against EU AI Act and NIST AI RMF
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Disclaimer Banner */}
+          <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 flex items-start gap-3">
+            <AlertTriangle className="w-4 h-4 text-warning mt-0.5 shrink-0" />
+            <div className="text-sm">
+              <span className="font-medium text-warning">Demonstration Only:</span>{" "}
+              <span className="text-muted-foreground">
+                Results are randomly generated for demonstration purposes. Real compliance requires actual evidence review and expert assessment.
+              </span>
+            </div>
+          </div>
+
           {!isRunning && results.length === 0 && (
             <div className="text-center py-8">
               <Shield className="w-16 h-16 text-primary/30 mx-auto mb-4" />
               <p className="text-muted-foreground mb-4">
-                This will assess {EU_AI_ACT_CONTROLS.length} controls from EU AI Act and NIST AI RMF
+                This will simulate assessment of {EU_AI_ACT_CONTROLS.length} controls from EU AI Act and NIST AI RMF
               </p>
               <Button onClick={runAssessment} className="gap-2">
                 <FileCheck className="w-4 h-4" />
-                Run Assessment
+                Run Demo Assessment
               </Button>
             </div>
           )}
@@ -191,7 +187,7 @@ export function EUAIActAssessment({ modelId, modelName }: EUAIActAssessmentProps
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">
-                    {isRunning ? 'Assessing controls...' : 'Assessment complete'}
+                    {isRunning ? 'Simulating assessment...' : 'Simulation complete'}
                   </span>
                   <span className="font-mono">{progress}%</span>
                 </div>
@@ -209,7 +205,7 @@ export function EUAIActAssessment({ modelId, modelName }: EUAIActAssessmentProps
                     )}>
                       {complianceScore}%
                     </p>
-                    <p className="text-xs text-muted-foreground">Compliance Score</p>
+                    <p className="text-xs text-muted-foreground">Simulated Score</p>
                   </div>
                   <div className="bg-success/10 border border-success/20 rounded-lg p-4 text-center">
                     <p className="text-3xl font-bold font-mono text-success">{passCount}</p>
