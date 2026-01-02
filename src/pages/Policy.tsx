@@ -51,7 +51,7 @@ export default function Policy() {
     setLatestCampaignResult(null);
 
     try {
-      toast.info("🔥 Starting Red Team Campaign", {
+      toast.info("Starting Red Team Campaign", {
         description: "Executing adversarial attack scenarios...",
       });
 
@@ -81,12 +81,12 @@ export default function Policy() {
       const passRate = data?.summary?.passRate || 0;
       const findings = data?.summary?.failedTests || 0;
 
-      toast.success("✅ Red Team Campaign Complete", {
+      toast.success("Red Team Campaign Complete", {
         description: `Coverage: ${passRate}% | ${findings} vulnerabilities found`,
       });
 
       if (findings > 0) {
-        toast.warning("⚠️ Vulnerabilities detected", {
+        toast.warning("Vulnerabilities detected", {
           description: `${findings} issues added to review queue for human oversight`,
         });
       }

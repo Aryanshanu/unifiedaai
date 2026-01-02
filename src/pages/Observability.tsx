@@ -69,7 +69,7 @@ export default function Observability() {
           refetchAlerts();
           refetchStats();
           if (payload.eventType === 'INSERT') {
-            toast.warning("🚨 New Drift Alert Detected", {
+            toast.warning("New Drift Alert Detected", {
               description: `${(payload.new as any)?.feature || 'Feature'} drift detected`,
               action: {
                 label: "View",
@@ -85,7 +85,7 @@ export default function Observability() {
         (payload) => {
           console.log('New incident:', payload);
           refetchMetrics();
-          toast.error("🔥 New Incident Created", {
+          toast.error("New Incident Created", {
             description: (payload.new as any)?.title || "Incident requires attention",
           });
           // NOTE: PagerDuty escalation disabled - backend integration not implemented

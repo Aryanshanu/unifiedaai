@@ -163,7 +163,7 @@ export default function Governance() {
               <div className="text-center py-8">
                 <Shield className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground">No control frameworks configured</p>
-                <Button variant="outline" size="sm" className="mt-4">Add Framework</Button>
+                <Button variant="outline" size="sm" className="mt-4" disabled title="Framework management coming soon">Add Framework</Button>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -203,9 +203,9 @@ export default function Governance() {
 
           {/* Pending Controls */}
           <div className="bg-card border border-border rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-foreground">Controls Overview</h2>
-              <Button variant="outline" size="sm">View All</Button>
+              <Button variant="outline" size="sm" disabled title="Controls detail page coming soon">View All</Button>
             </div>
 
             {controls?.length === 0 ? (

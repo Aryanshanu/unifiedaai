@@ -112,7 +112,7 @@ export default function Models() {
         </div>
         
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="h-11 px-4">
+          <Button variant="outline" className="h-11 px-4" disabled title="Advanced filters coming soon">
             <SlidersHorizontal className="w-4 h-4 mr-2" />
             Filters
           </Button>

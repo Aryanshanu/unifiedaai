@@ -55,7 +55,7 @@ export default function Projects() {
               className="pl-10"
             />
           </div>
-          <Button variant="outline" className="gap-2">
+          <Button variant="outline" className="gap-2" disabled title="Advanced filters coming soon">
             <Filter className="h-4 w-4" />
             Filters
           </Button>
