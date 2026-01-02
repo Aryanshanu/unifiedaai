@@ -4,9 +4,9 @@ import { ComplianceGauge } from "@/components/dashboard/ComplianceGauge";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Shield, FileCheck, Download, ChevronRight, ExternalLink, Radio } from "lucide-react";
+import { Shield, FileCheck, Download, ChevronRight, ExternalLink, Radio, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useControlFrameworks, useControls, useComplianceStats, useAttestations } from "@/hooks/useGovernance";
+import { useControlFrameworks, useControls, useComplianceStats, useAttestations, useControlAssessments } from "@/hooks/useGovernance";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
 import { HealthIndicator } from "@/components/shared/HealthIndicator";
@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 
 export default function Governance() {
   const [realtimeCount, setRealtimeCount] = useState(0);
@@ -24,6 +25,7 @@ export default function Governance() {
   const { data: controls, isLoading: controlsLoading, refetch: refetchControls } = useControls();
   const { data: complianceStats, isLoading: statsLoading, refetch: refetchStats } = useComplianceStats();
   const { data: attestations, isLoading: attestationsLoading, refetch: refetchAttestations } = useAttestations();
+  const { data: controlAssessments } = useControlAssessments();
 
   const isLoading = frameworksLoading || controlsLoading || statsLoading || attestationsLoading;
   const { status, lastUpdated } = useDataHealth(isLoading, frameworksError);
@@ -35,20 +37,90 @@ export default function Governance() {
     refetchAttestations();
   };
 
-  // Control groups for compliance gauge
-  const controlGroups = frameworks?.map(f => ({
-    name: f.name,
-    satisfied: Math.round((complianceStats?.complianceScore || 0) / 100 * f.total_controls),
-    total: f.total_controls,
-  })) || [];
+  // Control groups for compliance gauge - use actual compliant count per framework
+  const controlGroups = frameworks?.map(f => {
+    const frameworkAssessments = controlAssessments?.filter(a => {
+      const control = controls?.find(c => c.id === a.control_id);
+      return control?.framework_id === f.id;
+    }) || [];
+    const satisfied = frameworkAssessments.filter(a => a.status === 'compliant').length;
+    return {
+      name: f.name,
+      satisfied,
+      total: f.total_controls,
+    };
+  }) || [];
 
-  // Get pending controls (not compliant)
-  const pendingControls = controls?.filter(c => {
-    // In a real implementation, we'd check assessments
-    return true; // For now show all controls
-  }).slice(0, 3) || [];
+  // Get pending controls (not compliant) - check actual assessments
+  const pendingControls = controls?.filter(control => {
+    const assessment = controlAssessments?.find(a => a.control_id === control.id);
+    // Show control if no assessment or if not compliant
+    return !assessment || assessment.status !== 'compliant';
+  }).slice(0, 5) || [];
 
   const recentAttestations = attestations?.slice(0, 3) || [];
+
+  // Handle attestation download
+  const handleDownloadAttestation = (attestation: typeof recentAttestations[0]) => {
+    if (!attestation.document_url) {
+      toast.error("No document available for this attestation");
+      return;
+    }
+    
+    try {
+      // Handle data URLs
+      if (attestation.document_url.startsWith('data:')) {
+        const a = document.createElement('a');
+        a.href = attestation.document_url;
+        a.download = `attestation-${attestation.id.slice(0, 8)}.json`;
+        a.click();
+        toast.success("Attestation downloaded");
+      } else {
+        // Handle external URLs
+        window.open(attestation.document_url, '_blank');
+      }
+    } catch (error) {
+      toast.error("Failed to download attestation");
+    }
+  };
+
+  // Handle attestation view
+  const handleViewAttestation = (attestation: typeof recentAttestations[0]) => {
+    if (!attestation.document_url) {
+      toast.error("No document available for this attestation");
+      return;
+    }
+    
+    try {
+      if (attestation.document_url.startsWith('data:')) {
+        // Parse and display data URL content
+        const jsonStr = decodeURIComponent(attestation.document_url.split(',')[1]);
+        const data = JSON.parse(jsonStr);
+        const newWindow = window.open('', '_blank');
+        if (newWindow) {
+          newWindow.document.write(`
+            <html>
+              <head><title>Attestation - ${attestation.title}</title>
+              <style>
+                body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; background: #f5f5f5; }
+                pre { background: white; padding: 20px; border-radius: 8px; overflow-x: auto; }
+              </style>
+              </head>
+              <body>
+                <h1>${attestation.title}</h1>
+                <pre>${JSON.stringify(data, null, 2)}</pre>
+              </body>
+            </html>
+          `);
+          newWindow.document.close();
+        }
+      } else {
+        window.open(attestation.document_url, '_blank');
+      }
+    } catch (error) {
+      toast.error("Failed to view attestation");
+    }
+  };
 
   // Realtime subscription for governance data
   useEffect(() => {
@@ -60,7 +132,7 @@ export default function Governance() {
         (payload) => {
           setRealtimeCount(prev => prev + 1);
           queryClient.invalidateQueries({ queryKey: ['attestations'] });
-          queryClient.invalidateQueries({ queryKey: ['compliance-stats'] });
+          queryClient.invalidateQueries({ queryKey: ['compliance', 'stats'] });
           
           if (payload.eventType === 'INSERT') {
             toast.info('New attestation created');
@@ -77,8 +149,8 @@ export default function Governance() {
         { event: '*', schema: 'public', table: 'control_assessments' },
         () => {
           setRealtimeCount(prev => prev + 1);
-          queryClient.invalidateQueries({ queryKey: ['controls'] });
-          queryClient.invalidateQueries({ queryKey: ['compliance-stats'] });
+          queryClient.invalidateQueries({ queryKey: ['control-assessments'] });
+          queryClient.invalidateQueries({ queryKey: ['compliance', 'stats'] });
         }
       )
       .subscribe();
@@ -103,7 +175,7 @@ export default function Governance() {
               {realtimeCount} updates
             </Badge>
           )}
-          <EnforcementBadge level="enforced" />
+          <EnforcementBadge level="advisory" />
           <HealthIndicator 
             status={status} 
             lastUpdated={lastUpdated} 
@@ -113,6 +185,17 @@ export default function Governance() {
         </div>
       }
     >
+      {/* Advisory Notice */}
+      <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 mb-6 flex items-start gap-3">
+        <AlertTriangle className="w-4 h-4 text-warning mt-0.5 shrink-0" />
+        <div className="text-sm">
+          <span className="font-medium text-warning">Advisory Mode:</span>{" "}
+          <span className="text-muted-foreground">
+            Compliance tracking is for planning purposes. Backend enforcement requires system approvals and risk gates to be configured.
+          </span>
+        </div>
+      </div>
+
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <MetricCard
@@ -121,7 +204,6 @@ export default function Governance() {
           subtitle={`${complianceStats?.compliantAssessments || 0} of ${complianceStats?.totalControls || 0} controls`}
           icon={<Shield className="w-4 h-4 text-success" />}
           status="success"
-          trend={{ value: 5, direction: "up" }}
         />
         <MetricCard
           title="Pending Controls"
@@ -163,12 +245,22 @@ export default function Governance() {
               <div className="text-center py-8">
                 <Shield className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground">No control frameworks configured</p>
-                <Button variant="outline" size="sm" className="mt-4" disabled title="Framework management coming soon">Add Framework</Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="sm" className="mt-4" disabled>Add Framework</Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Framework management coming soon</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {frameworks?.map((framework) => {
-                  const satisfied = Math.round((complianceStats?.complianceScore || 0) / 100 * framework.total_controls);
+                  const group = controlGroups.find(g => g.name === framework.name);
+                  const satisfied = group?.satisfied || 0;
                   const pct = framework.total_controls > 0 ? Math.round((satisfied / framework.total_controls) * 100) : 0;
                   const fwStatus = pct >= 90 ? "success" : pct >= 70 ? "warning" : "danger";
                   return (
@@ -204,35 +296,55 @@ export default function Governance() {
           {/* Pending Controls */}
           <div className="bg-card border border-border rounded-xl p-6">
               <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-foreground">Controls Overview</h2>
-              <Button variant="outline" size="sm" disabled title="Controls detail page coming soon">View All</Button>
+              <h2 className="text-sm font-semibold text-foreground">Pending Controls</h2>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="sm" disabled>View All</Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Controls detail page coming soon</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
 
             {controls?.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-muted-foreground">No controls defined yet</p>
               </div>
+            ) : pendingControls.length === 0 ? (
+              <div className="text-center py-8">
+                <Shield className="w-12 h-12 text-success mx-auto mb-4" />
+                <p className="text-muted-foreground">All controls are compliant</p>
+              </div>
             ) : (
               <div className="space-y-3">
-                {pendingControls.map((control) => (
-                  <div
-                    key={control.id}
-                    className="flex items-center gap-4 p-4 bg-secondary/30 rounded-xl hover:bg-secondary/50 transition-colors cursor-pointer"
-                  >
-                    <div className={cn(
-                      "w-2 h-2 rounded-full",
-                      control.severity === "high" || control.severity === "critical" ? "bg-danger" : 
-                      control.severity === "medium" ? "bg-warning" : "bg-muted-foreground"
-                    )} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono text-muted-foreground">{control.code}</span>
+                {pendingControls.map((control) => {
+                  const assessment = controlAssessments?.find(a => a.control_id === control.id);
+                  const assessmentStatus = assessment?.status || 'not_started';
+                  return (
+                    <div
+                      key={control.id}
+                      className="flex items-center gap-4 p-4 bg-secondary/30 rounded-xl"
+                    >
+                      <div className={cn(
+                        "w-2 h-2 rounded-full",
+                        control.severity === "high" || control.severity === "critical" ? "bg-danger" : 
+                        control.severity === "medium" ? "bg-warning" : "bg-muted-foreground"
+                      )} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono text-muted-foreground">{control.code}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {assessmentStatus.replace('_', ' ')}
+                          </Badge>
+                        </div>
+                        <p className="text-sm font-medium text-foreground truncate">{control.title}</p>
                       </div>
-                      <p className="text-sm font-medium text-foreground truncate">{control.title}</p>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -274,14 +386,48 @@ export default function Governance() {
                       )}
                     </div>
                     <div className="flex items-center gap-2 mt-2">
-                      <Button variant="ghost" size="sm" className="h-7 text-xs">
-                        <Download className="w-3 h-3 mr-1" />
-                        Download
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-7 text-xs">
-                        <ExternalLink className="w-3 h-3 mr-1" />
-                        View
-                      </Button>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-7 text-xs"
+                              onClick={() => handleDownloadAttestation(att)}
+                              disabled={!att.document_url}
+                            >
+                              <Download className="w-3 h-3 mr-1" />
+                              Download
+                            </Button>
+                          </TooltipTrigger>
+                          {!att.document_url && (
+                            <TooltipContent>
+                              <p>No document available</p>
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
+                      </TooltipProvider>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-7 text-xs"
+                              onClick={() => handleViewAttestation(att)}
+                              disabled={!att.document_url}
+                            >
+                              <ExternalLink className="w-3 h-3 mr-1" />
+                              View
+                            </Button>
+                          </TooltipTrigger>
+                          {!att.document_url && (
+                            <TooltipContent>
+                              <p>No document available</p>
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
                   </div>
                 ))}
