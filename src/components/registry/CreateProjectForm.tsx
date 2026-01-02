@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -130,7 +130,7 @@ export function CreateProjectForm({ open, onOpenChange }: CreateProjectFormProps
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FolderPlus className="h-5 w-5 text-primary" />
@@ -142,29 +142,31 @@ export function CreateProjectForm({ open, onOpenChange }: CreateProjectFormProps
         </DialogHeader>
 
         {/* Step Indicator */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-center gap-1 sm:gap-2 mb-6 px-2">
           {steps.map((step, index) => (
-            <div key={step.id} className="flex items-center">
-              <div
-                className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-colors ${
-                  currentStep >= step.id
-                    ? "bg-primary border-primary text-primary-foreground"
-                    : "border-muted-foreground/30 text-muted-foreground"
-                }`}
-              >
-                <step.icon className="h-5 w-5" />
+            <React.Fragment key={step.id}>
+              <div className="flex flex-col items-center gap-1">
+                <div
+                  className={`flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 transition-colors flex-shrink-0 ${
+                    currentStep >= step.id
+                      ? "bg-primary border-primary text-primary-foreground"
+                      : "border-muted-foreground/30 text-muted-foreground"
+                  }`}
+                >
+                  <step.icon className="h-4 w-4" />
+                </div>
+                <span className={`text-xs font-medium text-center whitespace-nowrap ${
+                  currentStep >= step.id ? "text-foreground" : "text-muted-foreground"
+                }`}>
+                  {step.title}
+                </span>
               </div>
-              <span className={`ml-2 text-sm font-medium ${
-                currentStep >= step.id ? "text-foreground" : "text-muted-foreground"
-              }`}>
-                {step.title}
-              </span>
               {index < steps.length - 1 && (
-                <div className={`w-12 h-0.5 mx-4 ${
+                <div className={`w-6 sm:w-10 h-0.5 mb-5 flex-shrink-0 ${
                   currentStep > step.id ? "bg-primary" : "bg-muted-foreground/30"
                 }`} />
               )}
-            </div>
+            </React.Fragment>
           ))}
         </div>
 
