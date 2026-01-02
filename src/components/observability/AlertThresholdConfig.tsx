@@ -43,7 +43,9 @@ export function AlertThresholdConfig() {
     // Simulate save - in production, this would persist to organization_settings
     await new Promise(resolve => setTimeout(resolve, 500));
     
-    toast.success('Alert thresholds saved');
+    toast.success('Alert thresholds saved locally', {
+      description: 'Backend enforcement is not yet implemented. Configuration is for preview only.'
+    });
     setIsSaving(false);
     setIsOpen(false);
   };
@@ -62,6 +64,13 @@ export function AlertThresholdConfig() {
             Alert Thresholds
           </DialogTitle>
         </DialogHeader>
+        
+        {/* Honest disclaimer banner */}
+        <div className="p-3 rounded-lg bg-muted/50 border border-border text-sm">
+          <p className="text-muted-foreground">
+            Configuration preferences only — backend enforcement is pending. Values are stored locally for preview.
+          </p>
+        </div>
         
         <div className="space-y-6 py-4">
           {/* Drift Thresholds */}

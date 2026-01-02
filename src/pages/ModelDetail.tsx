@@ -241,7 +241,12 @@ export default function ModelDetail() {
           </>
         )}
         
-        <Button variant="default" size="sm" className="bg-gradient-primary">
+        <Button 
+          variant="default" 
+          size="sm" 
+          className="bg-gradient-primary"
+          onClick={() => toast.info("Navigate to Evaluation page to run evaluations on this model", { description: "Select an engine from the sidebar" })}
+        >
           <Play className="w-4 h-4 mr-2" />
           Run Evaluation
         </Button>

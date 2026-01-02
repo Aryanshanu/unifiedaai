@@ -205,7 +205,7 @@ export default function Alerts() {
                 placeholder="Search alerts..." 
                 className="w-64 bg-secondary border-border"
               />
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" disabled title="Filter functionality coming soon">
                 <Filter className="w-4 h-4 mr-2" />
                 Filter
               </Button>
@@ -266,8 +266,8 @@ export default function Alerts() {
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm">Acknowledge</Button>
-                        <Button variant="ghost" size="sm">Resolve</Button>
+                        <Button variant="outline" size="sm" disabled title="Alert acknowledgment coming soon">Acknowledge</Button>
+                        <Button variant="ghost" size="sm" disabled title="Alert resolution coming soon">Resolve</Button>
                       </div>
                     </div>
                   </div>
@@ -407,20 +407,31 @@ export default function Alerts() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Alert Rules</h2>
-            <Button variant="default" size="sm" className="gap-2">
+            <Button variant="default" size="sm" className="gap-2" disabled title="Rule creation coming soon">
               <Plus className="w-4 h-4" />
               Create Rule
             </Button>
           </div>
 
           <div className="bg-card border border-border rounded-xl p-6">
+            <div className="p-4 rounded-lg bg-muted/50 border border-border mb-4">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-warning mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-medium text-warning">Rules Engine Pending</p>
+                  <p className="text-muted-foreground">
+                    Alert rules are displayed for reference only. Backend enforcement is not yet implemented.
+                  </p>
+                </div>
+              </div>
+            </div>
             <div className="space-y-4">
               {[
                 { name: 'Critical Drift Alert', condition: 'drift_value > 0.15', channels: ['email', 'slack'], enabled: true },
                 { name: 'High Severity Incident', condition: 'severity = critical OR severity = high', channels: ['email'], enabled: true },
                 { name: 'Policy Violation', condition: 'violation_count > 0', channels: ['slack'], enabled: false },
               ].map((rule, i) => (
-                <div key={i} className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                <div key={i} className="flex items-center justify-between p-4 bg-muted/50 rounded-lg opacity-60">
                   <div>
                     <p className="font-medium text-foreground">{rule.name}</p>
                     <p className="text-xs text-muted-foreground font-mono mt-1">{rule.condition}</p>
@@ -433,13 +444,10 @@ export default function Alerts() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className={cn(
-                      "text-xs font-medium",
-                      rule.enabled ? "text-success" : "text-muted-foreground"
-                    )}>
-                      {rule.enabled ? "Enforced" : "Disabled"}
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Not enforced
                     </span>
-                    <Switch checked={rule.enabled} />
+                    <Switch checked={rule.enabled} disabled />
                   </div>
                 </div>
               ))}
