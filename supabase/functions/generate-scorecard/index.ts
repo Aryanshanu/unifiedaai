@@ -122,13 +122,13 @@ serve(async (req) => {
     
     console.log(`[generate-scorecard] Authenticated user: ${user?.id}`);
 
-    const { modelId, format = 'pdf' } = await req.json();
+    const { modelId, format = 'json' } = await req.json();
 
     if (!modelId) {
       return errorResponse('modelId is required', 400);
     }
 
-    console.log(`[generate-scorecard] Generating regulator-grade PDF for model ${modelId}`);
+    console.log(`[generate-scorecard] Generating scorecard for model ${modelId}, format: ${format}`);
 
     // Fetch model details with system (uses RLS via user client)
     const { data: model, error: modelError } = await supabase
@@ -149,13 +149,137 @@ serve(async (req) => {
       .eq('status', 'completed')
       .order('completed_at', { ascending: false });
 
-    if (!evaluations || evaluations.length === 0) {
-      return errorResponse('No real evaluations found. Run evaluations first before generating scorecard.', 400, {
-        hint: 'Use the Core RAI Engines to run real evaluations on your model.'
+    // Build sections - use REAL data with honest "missing" status
+    const sections: ScorecardSection[] = [];
+    
+    // Helper to get real score or mark as missing
+    const getEngineScore = (engineType: string): { score: number | null; evaluation: any } => {
+      const evaluation = evaluations?.find(e => e.engine_type === engineType);
+      return {
+        score: evaluation?.overall_score ?? evaluation?.fairness_score ?? evaluation?.toxicity_score ?? evaluation?.privacy_score ?? null,
+        evaluation,
+      };
+    };
+
+    // Fairness
+    const fairnessData = getEngineScore('fairness');
+    if (fairnessData.score !== null) {
+      sections.push({
+        title: 'Fairness & Bias',
+        score: fairnessData.score,
+        status: fairnessData.score >= 80 ? 'compliant' : fairnessData.score >= 60 ? 'warning' : 'non-compliant',
+        details: `Real evaluation from ${fairnessData.evaluation?.completed_at || 'evaluation run'}. Demographic parity and bias analysis.`,
+        metrics: fairnessData.evaluation?.metric_details as Record<string, string | number> || { 'Source': 'Real Evaluation' },
+        euAiActArticle: 'Article 10 - Data Governance',
+        nistMapping: 'MAP 1.1, MAP 1.5',
+      });
+    } else {
+      sections.push({
+        title: 'Fairness & Bias',
+        score: 0,
+        status: 'non-compliant',
+        details: 'NO EVALUATION RUN. Run the Fairness Engine to get a real score.',
+        metrics: { 'Status': 'Missing Evaluation' },
+        euAiActArticle: 'Article 10 - Data Governance',
+        nistMapping: 'MAP 1.1, MAP 1.5',
       });
     }
 
-    console.log(`[generate-scorecard] Found ${evaluations.length} real evaluations for model ${modelId}`);
+    // Toxicity
+    const toxicityData = getEngineScore('toxicity');
+    if (toxicityData.score !== null) {
+      sections.push({
+        title: 'Toxicity & Safety',
+        score: toxicityData.score,
+        status: toxicityData.score >= 80 ? 'compliant' : toxicityData.score >= 60 ? 'warning' : 'non-compliant',
+        details: `Real evaluation from ${toxicityData.evaluation?.completed_at || 'evaluation run'}.`,
+        metrics: toxicityData.evaluation?.metric_details as Record<string, string | number> || { 'Source': 'Real Evaluation' },
+        euAiActArticle: 'Article 15 - Accuracy & Robustness',
+        nistMapping: 'MANAGE 2.2, MANAGE 2.3',
+      });
+    } else {
+      sections.push({
+        title: 'Toxicity & Safety',
+        score: 0,
+        status: 'non-compliant',
+        details: 'NO EVALUATION RUN. Run the Toxicity Engine to get a real score.',
+        metrics: { 'Status': 'Missing Evaluation' },
+        euAiActArticle: 'Article 15 - Accuracy & Robustness',
+        nistMapping: 'MANAGE 2.2, MANAGE 2.3',
+      });
+    }
+
+    // Privacy
+    const privacyData = getEngineScore('privacy');
+    if (privacyData.score !== null) {
+      sections.push({
+        title: 'Privacy Protection',
+        score: privacyData.score,
+        status: privacyData.score >= 80 ? 'compliant' : privacyData.score >= 60 ? 'warning' : 'non-compliant',
+        details: `Real evaluation from ${privacyData.evaluation?.completed_at || 'evaluation run'}.`,
+        metrics: privacyData.evaluation?.metric_details as Record<string, string | number> || { 'Source': 'Real Evaluation' },
+        euAiActArticle: 'Article 10 - Data Governance',
+        nistMapping: 'GOVERN 1.3, MAP 3.4',
+      });
+    } else {
+      sections.push({
+        title: 'Privacy Protection',
+        score: 0,
+        status: 'non-compliant',
+        details: 'NO EVALUATION RUN. Run the Privacy Engine to get a real score.',
+        metrics: { 'Status': 'Missing Evaluation' },
+        euAiActArticle: 'Article 10 - Data Governance',
+        nistMapping: 'GOVERN 1.3, MAP 3.4',
+      });
+    }
+
+    // Hallucination
+    const hallucinationData = getEngineScore('hallucination');
+    if (hallucinationData.score !== null) {
+      sections.push({
+        title: 'Robustness & Factuality',
+        score: hallucinationData.score,
+        status: hallucinationData.score >= 80 ? 'compliant' : hallucinationData.score >= 60 ? 'warning' : 'non-compliant',
+        details: `Real evaluation from ${hallucinationData.evaluation?.completed_at || 'evaluation run'}.`,
+        metrics: hallucinationData.evaluation?.metric_details as Record<string, string | number> || { 'Source': 'Real Evaluation' },
+        euAiActArticle: 'Article 15 - Accuracy & Robustness',
+        nistMapping: 'MEASURE 2.5, MEASURE 2.6',
+      });
+    } else {
+      sections.push({
+        title: 'Robustness & Factuality',
+        score: 0,
+        status: 'non-compliant',
+        details: 'NO EVALUATION RUN. Run the Hallucination Engine to get a real score.',
+        metrics: { 'Status': 'Missing Evaluation' },
+        euAiActArticle: 'Article 15 - Accuracy & Robustness',
+        nistMapping: 'MEASURE 2.5, MEASURE 2.6',
+      });
+    }
+
+    // Explainability
+    const explainabilityData = getEngineScore('explainability');
+    if (explainabilityData.score !== null) {
+      sections.push({
+        title: 'Transparency & Explainability',
+        score: explainabilityData.score,
+        status: explainabilityData.score >= 80 ? 'compliant' : explainabilityData.score >= 60 ? 'warning' : 'non-compliant',
+        details: `Real evaluation from ${explainabilityData.evaluation?.completed_at || 'evaluation run'}.`,
+        metrics: explainabilityData.evaluation?.metric_details as Record<string, string | number> || { 'Source': 'Real Evaluation' },
+        euAiActArticle: 'Article 13 - Transparency',
+        nistMapping: 'MAP 1.6, GOVERN 1.1',
+      });
+    } else {
+      sections.push({
+        title: 'Transparency & Explainability',
+        score: 0,
+        status: 'non-compliant',
+        details: 'NO EVALUATION RUN. Run the Explainability Engine to get a real score.',
+        metrics: { 'Status': 'Missing Evaluation' },
+        euAiActArticle: 'Article 13 - Transparency',
+        nistMapping: 'MAP 1.6, GOVERN 1.1',
+      });
+    }
 
     // Fetch risk assessments
     const { data: riskAssessments } = await supabase
@@ -185,137 +309,55 @@ serve(async (req) => {
       .eq('entity_id', modelId)
       .limit(10);
 
-    // Build sections with REAL metrics only
-    const sections: ScorecardSection[] = [];
-    
-    const latestFairness = evaluations?.find(e => e.engine_type === 'fairness');
-    const fairnessScore = latestFairness?.fairness_score ?? model.fairness_score;
-    if (fairnessScore !== null && fairnessScore !== undefined) {
-      sections.push({
-        title: 'Fairness & Bias',
-        score: fairnessScore,
-        status: fairnessScore >= 80 ? 'compliant' : fairnessScore >= 60 ? 'warning' : 'non-compliant',
-        details: `Real evaluation from ${latestFairness?.completed_at || 'model baseline'}. Demographic parity and bias analysis.`,
-        metrics: latestFairness?.metric_details as Record<string, string | number> || {
-          'Source': 'Real Evaluation',
-          'Evaluation ID': latestFairness?.id?.slice(0, 8) || 'baseline',
-        },
-        euAiActArticle: 'Article 10 - Data Governance',
-        nistMapping: 'MAP 1.1, MAP 1.5',
-      });
-    }
-
-    const latestPrivacy = evaluations?.find(e => e.engine_type === 'privacy');
-    const privacyScore = model.privacy_score ?? latestPrivacy?.privacy_score ?? 85;
-    sections.push({
-      title: 'Privacy Protection',
-      score: privacyScore,
-      status: privacyScore >= 80 ? 'compliant' : privacyScore >= 60 ? 'warning' : 'non-compliant',
-      details: 'PII detection, data leakage assessment, and membership inference vulnerability testing.',
-      metrics: {
-        'PII Leakage Rate': '0.00%',
-        'Membership Inference Risk': 'Low',
-        'Data Retention Compliance': 'Verified',
-        'Anonymization Score': '97%',
-      },
-      euAiActArticle: 'Article 10 - Data Governance',
-      nistMapping: 'GOVERN 1.3, MAP 3.4',
-    });
-
-    const latestToxicity = evaluations?.find(e => e.engine_type === 'toxicity');
-    const toxicityScore = model.toxicity_score ?? latestToxicity?.toxicity_score ?? 82;
-    sections.push({
-      title: 'Toxicity & Safety',
-      score: toxicityScore,
-      status: toxicityScore >= 80 ? 'compliant' : toxicityScore >= 60 ? 'warning' : 'non-compliant',
-      details: 'Harmful content detection, hate speech filtering, and jailbreak resistance evaluation.',
-      metrics: {
-        'Jailbreak Resistance': '94%',
-        'Harmful Content Blocked': '99.2%',
-        'Hate Speech Detection': '98%',
-        'Prompt Injection Defense': '91%',
-      },
-      euAiActArticle: 'Article 15 - Accuracy & Robustness',
-      nistMapping: 'MANAGE 2.2, MANAGE 2.3',
-    });
-
-    const latestRobustness = evaluations?.find(e => e.engine_type === 'hallucination');
-    const robustnessScore = model.robustness_score ?? latestRobustness?.robustness_score ?? 79;
-    sections.push({
-      title: 'Robustness & Factuality',
-      score: robustnessScore,
-      status: robustnessScore >= 80 ? 'compliant' : robustnessScore >= 60 ? 'warning' : 'non-compliant',
-      details: 'Factuality scoring, groundedness verification, and hallucination detection.',
-      metrics: {
-        'Factuality Score': '88%',
-        'Groundedness': '91%',
-        'Citation Accuracy': '94%',
-        'Claim Verification': '87%',
-      },
-      euAiActArticle: 'Article 15 - Accuracy & Robustness',
-      nistMapping: 'MEASURE 2.5, MEASURE 2.6',
-    });
-
-    const latestExplainability = evaluations?.find(e => e.engine_type === 'explainability');
-    const explainabilityScore = latestExplainability?.overall_score ?? 81;
-    sections.push({
-      title: 'Transparency & Explainability',
-      score: explainabilityScore,
-      status: explainabilityScore >= 80 ? 'compliant' : explainabilityScore >= 60 ? 'warning' : 'non-compliant',
-      details: 'Reasoning transparency, decision traceability, and documentation completeness.',
-      metrics: {
-        'Reasoning Quality': '85%',
-        'Explanation Completeness': '89%',
-        'Confidence Calibration': '92%',
-        'Decision Transparency': '88%',
-      },
-      euAiActArticle: 'Article 13 - Transparency',
-      nistMapping: 'MAP 1.6, GOVERN 1.1',
-    });
-
-    // Red Team stats
+    // Red Team stats - REAL data only
     const totalCoverage = redTeamCampaigns?.reduce((sum, c) => sum + (c.coverage || 0), 0) || 0;
-    const avgCoverage = redTeamCampaigns?.length ? Math.round(totalCoverage / redTeamCampaigns.length) : 91;
-    const totalFindings = redTeamCampaigns?.reduce((sum, c) => sum + (c.findings_count || 0), 0) || 12;
+    const avgCoverage = redTeamCampaigns?.length ? Math.round(totalCoverage / redTeamCampaigns.length) : 0;
+    const totalFindings = redTeamCampaigns?.reduce((sum, c) => sum + (c.findings_count || 0), 0) || 0;
+    const totalAttacks = redTeamCampaigns?.length || 0;
     const redTeamStats = {
       coverage: avgCoverage,
-      attacks: 150,
+      attacks: totalAttacks,
       findings: totalFindings,
     };
 
-    // Calculate overall
-    const overallScore = Math.round(sections.reduce((sum, s) => sum + s.score, 0) / sections.length);
+    // Calculate overall - only count sections with real evaluations
+    const sectionsWithScores = sections.filter(s => s.score > 0);
+    const overallScore = sectionsWithScores.length > 0 
+      ? Math.round(sectionsWithScores.reduce((sum, s) => sum + s.score, 0) / sectionsWithScores.length)
+      : 0;
     const overallStatus = overallScore >= 80 ? 'compliant' : overallScore >= 60 ? 'warning' : 'non-compliant';
 
     // Determine risk tier
     const riskTier = riskAssessments?.[0]?.risk_tier || 
       (model.systems?.uri_score && model.systems.uri_score > 60 ? 'high' : 'medium');
 
-    // Build EU AI Act mapping for all 42 controls
+    // Build EU AI Act mapping - HONEST status based on real control assessments
     const euAiActMapping = EU_AI_ACT_CONTROLS.map((control, idx) => {
-      const assessment = controlAssessments?.[idx % (controlAssessments?.length || 1)];
-      const status = assessment?.status === 'compliant' ? 'Compliant' :
-                     assessment?.status === 'in_progress' ? 'Partial' :
-                     assessment?.status === 'non_compliant' ? 'Non-Compliant' :
-                     ['Compliant', 'Compliant', 'Partial'][Math.floor(Math.random() * 3)];
+      const assessment = controlAssessments?.find(ca => ca.controls?.code === control.article);
+      let status = 'Pending';
+      
+      if (assessment) {
+        status = assessment.status === 'compliant' ? 'Compliant' :
+                 assessment.status === 'in_progress' ? 'Partial' :
+                 assessment.status === 'non_compliant' ? 'Non-Compliant' : 'Pending';
+      }
+      
       return {
         article: control.article,
         title: control.title,
         status,
         details: control.requirement,
-        evidence: assessment?.evidence || `Automated assessment via Fractal RAI-OS evaluation suite.`,
+        evidence: assessment?.evidence || 'No assessment conducted yet.',
       };
     });
 
     // KG Lineage path
     const kgLineage = [
-      'Training Data (v2.3)',
+      'Training Data',
       `Model: ${model.name}`,
-      'Evaluation Runs (x' + (evaluations?.length || 5) + ')',
-      'Policy Checks (' + (controlAssessments?.length || 42) + ' controls)',
-      'Incident Response (2 resolved)',
-      'HITL Decisions (approved)',
-      'Attestation Signed',
+      `Evaluation Runs: ${evaluations?.length || 0}`,
+      `Control Assessments: ${controlAssessments?.length || 0}`,
+      `Red Team Campaigns: ${redTeamCampaigns?.length || 0}`,
     ];
 
     // Generate attestation ID
@@ -350,9 +392,12 @@ serve(async (req) => {
         'Scores reflect point-in-time assessment and require periodic re-evaluation.',
         'Model behavior may vary with different input distributions.',
         'Compliance assessment is advisory and does not constitute legal advice.',
-      ],
+        sectionsWithScores.length < 5 ? `WARNING: Only ${sectionsWithScores.length}/5 engines have been evaluated.` : null,
+      ].filter(Boolean) as string[],
       mitigations: sections.filter(s => s.status !== 'compliant').map(s => 
-        `Address ${s.title}: Improve score from ${s.score}% to ≥80% compliance threshold.`
+        s.score === 0 
+          ? `Run ${s.title} evaluation to establish baseline.`
+          : `Address ${s.title}: Improve score from ${s.score}% to ≥80% compliance threshold.`
       ),
       signatures: [{
         type: 'minisign',
@@ -367,17 +412,22 @@ serve(async (req) => {
       kgLineage,
     };
 
-    console.log(`[generate-scorecard] Generated scorecard: ${scorecard.attestation_id}, score: ${overallScore}%`);
+    console.log(`[generate-scorecard] Generated scorecard: ${scorecard.attestation_id}, score: ${overallScore}%, format: ${format}`);
 
-    // Generate HTML for PDF
-    const html = generatePDFHTML(scorecard);
-    return new Response(html, {
-      headers: { 
-        ...corsHeaders, 
-        'Content-Type': 'text/html; charset=utf-8',
-        'Content-Disposition': `attachment; filename="fractal-rai-scorecard-${modelId.slice(0, 8)}.html"`,
-      },
-    });
+    // Return based on format
+    if (format === 'html') {
+      const html = generatePDFHTML(scorecard);
+      return new Response(
+        JSON.stringify({ success: true, html }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Default: JSON
+    return new Response(
+      JSON.stringify({ success: true, scorecard }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
   } catch (error: any) {
     console.error('[generate-scorecard] Error:', error);
@@ -431,11 +481,13 @@ function generatePDFHTML(scorecard: Scorecard): string {
     .control-status { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 500; margin-top: 4px; }
     .control-status.compliant { background: #065f46; color: #10b981; }
     .control-status.partial { background: #78350f; color: #f59e0b; }
+    .control-status.pending { background: #374151; color: #9ca3af; }
     .control-status.non-compliant { background: #7f1d1d; color: #ef4444; }
     .signature-block { margin-top: 40px; padding: 24px; background: #0f172a; border: 1px solid #22d3ee; border-radius: 12px; }
     .signature-title { font-size: 14px; font-weight: 600; color: #22d3ee; margin-bottom: 12px; }
     .signature-hash { font-family: monospace; font-size: 11px; word-break: break-all; color: #9ca3af; }
     .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #262626; font-size: 12px; color: #6b7280; }
+    .warning-banner { background: #7f1d1d; border: 1px solid #ef4444; color: #fca5a5; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; }
     @media print { body { background: white; color: black; } .section, .summary-card { border-color: #e5e5e5; background: #f9f9f9; } }
   </style>
 </head>
@@ -446,6 +498,12 @@ function generatePDFHTML(scorecard: Scorecard): string {
       <div class="subtitle">Responsible AI Compliance Scorecard</div>
       <div class="attestation-id">${scorecard.attestation_id}</div>
     </div>
+    
+    ${scorecard.overall_score === 0 ? `
+    <div class="warning-banner">
+      ⚠️ <strong>NO EVALUATIONS COMPLETED</strong> - Run evaluation engines to generate real compliance scores.
+    </div>
+    ` : ''}
     
     <div class="summary">
       <div class="summary-card overall">
@@ -496,7 +554,7 @@ function generatePDFHTML(scorecard: Scorecard): string {
           <div class="control">
             <div class="control-article">${control.article}</div>
             <div>${control.title}</div>
-            <span class="control-status ${control.status.toLowerCase().replace('-', '-')}">${control.status}</span>
+            <span class="control-status ${control.status.toLowerCase().replace(' ', '-').replace('-', '')}">${control.status}</span>
           </div>
         `).join('')}
       </div>
