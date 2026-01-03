@@ -86,87 +86,138 @@ serve(async (req) => {
 
     console.log(`[detect-drift] User ${user?.id} starting drift detection...`);
     
-    const serviceClient = getServiceClient();
+    // Parse request body to check for system_id filter
+    let targetSystemId: string | null = null;
+    try {
+      const body = await req.json();
+      targetSystemId = body?.system_id || null;
+      console.log(`[detect-drift] Target system_id: ${targetSystemId || 'all'}`);
+    } catch {
+      // No body or invalid JSON, that's fine
+    }
+
     const supabase = authResult.supabase!;
 
-    // Get all active systems (uses RLS)
-    const { data: systems, error: systemsError } = await supabase
+    // Query systems - support specific system_id OR all systems with endpoints
+    let systemsQuery = supabase
       .from("systems")
-      .select("id, name, project_id")
-      .eq("status", "active");
+      .select("id, name, project_id, endpoint, status, deployment_status")
+      .not("endpoint", "is", null);
+
+    // If specific system_id provided, filter to just that system
+    if (targetSystemId) {
+      systemsQuery = systemsQuery.eq("id", targetSystemId);
+    } else {
+      // Otherwise get all systems that might have traffic
+      // Don't require status='active', as many valid systems are 'draft' or other states
+      systemsQuery = systemsQuery.or("status.eq.active,deployment_status.eq.deployed,deployment_status.eq.approved");
+    }
+
+    const { data: systems, error: systemsError } = await systemsQuery;
 
     if (systemsError) throw systemsError;
+
+    if (!systems || systems.length === 0) {
+      console.log(`[detect-drift] No systems found for analysis`);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          execution_time_ms: Date.now() - startTime,
+          systems_analyzed: 0,
+          alerts_created: 0,
+          incidents_created: 0,
+          message: targetSystemId 
+            ? `System ${targetSystemId} not found or has no endpoint`
+            : "No systems with endpoints found for drift analysis",
+          details: { alerts: [], incidents: [] }
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`[detect-drift] Found ${systems.length} system(s) to analyze`);
 
     const alertsCreated: any[] = [];
     const incidentsCreated: any[] = [];
 
-    for (const system of systems || []) {
-      console.log(`Analyzing drift for system: ${system.name}`);
+    for (const system of systems) {
+      console.log(`[detect-drift] Analyzing drift for system: ${system.name} (${system.id})`);
 
-      // Get request logs from last 5 minutes (current window)
-      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      // Get request logs from last 10 minutes (current window) - extended from 5 for more data
+      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
       const { data: currentLogs } = await supabase
         .from("request_logs")
         .select("latency_ms, status_code, decision, engine_scores")
         .eq("system_id", system.id)
-        .gte("created_at", fiveMinutesAgo);
+        .gte("created_at", tenMinutesAgo);
 
       // Get request logs from 1 hour ago (baseline window)
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-      const oneHourFiveMinAgo = new Date(Date.now() - 65 * 60 * 1000).toISOString();
+      const oneHourTenMinAgo = new Date(Date.now() - 70 * 60 * 1000).toISOString();
       const { data: baselineLogs } = await supabase
         .from("request_logs")
         .select("latency_ms, status_code, decision, engine_scores")
         .eq("system_id", system.id)
-        .gte("created_at", oneHourFiveMinAgo)
+        .gte("created_at", oneHourTenMinAgo)
         .lt("created_at", oneHourAgo);
 
-      if (!currentLogs?.length || !baselineLogs?.length) {
-        console.log(`Insufficient data for system ${system.name}`);
+      console.log(`[detect-drift] System ${system.name}: current=${currentLogs?.length || 0}, baseline=${baselineLogs?.length || 0} logs`);
+
+      if (!currentLogs?.length) {
+        console.log(`[detect-drift] System ${system.name}: No current logs, skipping`);
         continue;
       }
 
+      // If no baseline, we can still detect anomalies in current data
+      const hasBaseline = baselineLogs && baselineLogs.length >= 3;
+
       // Extract metrics
       const currentLatencies = currentLogs.map(l => l.latency_ms || 0);
-      const baselineLatencies = baselineLogs.map(l => l.latency_ms || 0);
+      const baselineLatencies = hasBaseline ? baselineLogs.map(l => l.latency_ms || 0) : currentLatencies;
       
       const currentErrors = currentLogs.filter(l => (l.status_code || 0) >= 400).length;
-      const baselineErrors = baselineLogs.filter(l => (l.status_code || 0) >= 400).length;
+      const baselineErrors = hasBaseline ? baselineLogs.filter(l => (l.status_code || 0) >= 400).length : 0;
       
       const currentBlocks = currentLogs.filter(l => l.decision === "BLOCK").length;
-      const baselineBlocks = baselineLogs.filter(l => l.decision === "BLOCK").length;
+      const baselineBlocks = hasBaseline ? baselineLogs.filter(l => l.decision === "BLOCK").length : 0;
 
       // Calculate drift metrics
-      const psi = calculatePSI(baselineLatencies, currentLatencies);
-      const klDivergence = calculateKLDivergence(
-        baselineLatencies.slice(0, 100), 
-        currentLatencies.slice(0, 100)
-      );
+      let psi = 0;
+      let klDivergence = 0;
+      
+      if (hasBaseline) {
+        psi = calculatePSI(baselineLatencies, currentLatencies);
+        klDivergence = calculateKLDivergence(
+          baselineLatencies.slice(0, 100), 
+          currentLatencies.slice(0, 100)
+        );
+      }
       
       const currentErrorRate = currentErrors / currentLogs.length;
-      const baselineErrorRate = baselineErrors / baselineLogs.length || 0.01;
+      const baselineErrorRate = hasBaseline ? (baselineErrors / baselineLogs.length || 0.01) : 0.05;
       const errorRateDrift = Math.abs(currentErrorRate - baselineErrorRate);
       
       const currentBlockRate = currentBlocks / currentLogs.length;
-      const baselineBlockRate = baselineBlocks / baselineLogs.length || 0.01;
+      const baselineBlockRate = hasBaseline ? (baselineBlocks / baselineLogs.length || 0.01) : 0.1;
       const blockRateDrift = Math.abs(currentBlockRate - baselineBlockRate);
 
-      console.log(`System ${system.name} metrics:`, {
-        psi,
-        klDivergence,
-        errorRateDrift,
-        blockRateDrift,
+      console.log(`[detect-drift] System ${system.name} metrics:`, {
+        psi: psi.toFixed(4),
+        klDivergence: klDivergence.toFixed(4),
+        errorRateDrift: errorRateDrift.toFixed(4),
+        blockRateDrift: blockRateDrift.toFixed(4),
         currentSamples: currentLogs.length,
-        baselineSamples: baselineLogs.length
+        baselineSamples: baselineLogs?.length || 0,
+        hasBaseline
       });
 
       // Create alerts based on thresholds
       const alerts: any[] = [];
 
-      // PSI threshold: > 0.25 indicates significant drift
-      if (psi > 0.25) {
+      // PSI threshold: > 0.25 indicates significant drift (only if we have baseline)
+      if (hasBaseline && psi > 0.25) {
         alerts.push({
-          model_id: system.id, // Using system_id as model_id for now
+          model_id: system.id,
           drift_type: "latency_distribution",
           drift_value: psi,
           feature: "response_latency",
@@ -176,7 +227,7 @@ serve(async (req) => {
       }
 
       // KL Divergence threshold: > 0.1 indicates meaningful divergence
-      if (klDivergence > 0.1) {
+      if (hasBaseline && klDivergence > 0.1) {
         alerts.push({
           model_id: system.id,
           drift_type: "kl_divergence",
@@ -211,6 +262,18 @@ serve(async (req) => {
         });
       }
 
+      // High absolute error rate (anomaly detection without baseline)
+      if (currentErrorRate > 0.3) {
+        alerts.push({
+          model_id: system.id,
+          drift_type: "high_error_rate",
+          drift_value: currentErrorRate * 100,
+          feature: "error_rate_absolute",
+          severity: currentErrorRate > 0.5 ? "critical" : "high",
+          status: "open"
+        });
+      }
+
       // Insert alerts
       if (alerts.length > 0) {
         const { data: insertedAlerts, error: alertError } = await supabase
@@ -219,10 +282,10 @@ serve(async (req) => {
           .select();
 
         if (alertError) {
-          console.error("Error inserting drift alerts:", alertError);
+          console.error("[detect-drift] Error inserting drift alerts:", alertError);
         } else {
           alertsCreated.push(...(insertedAlerts || []));
-          console.log(`Created ${alerts.length} drift alerts for ${system.name}`);
+          console.log(`[detect-drift] Created ${alerts.length} drift alerts for ${system.name}`);
         }
 
         // Create incidents for critical alerts
@@ -260,17 +323,19 @@ serve(async (req) => {
             });
           }
         }
+      } else {
+        console.log(`[detect-drift] System ${system.name}: No significant drift detected`);
       }
     }
 
     const executionTime = Date.now() - startTime;
-    console.log(`Drift detection completed in ${executionTime}ms`);
+    console.log(`[detect-drift] Completed in ${executionTime}ms: ${alertsCreated.length} alerts, ${incidentsCreated.length} incidents`);
 
     return new Response(
       JSON.stringify({
         success: true,
         execution_time_ms: executionTime,
-        systems_analyzed: systems?.length || 0,
+        systems_analyzed: systems.length,
         alerts_created: alertsCreated.length,
         incidents_created: incidentsCreated.length,
         details: {
@@ -282,7 +347,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error("Drift detection error:", error);
+    console.error("[detect-drift] Error:", error);
     return new Response(
       JSON.stringify({ 
         error: error instanceof Error ? error.message : "Unknown error",

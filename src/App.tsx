@@ -31,7 +31,8 @@ import Settings from "./pages/Settings";
 import Documentation from "./pages/Documentation";
 import Governance from "./pages/Governance";
 import Evaluation from "./pages/Evaluation";
-import GoldenDemo from "./pages/GoldenDemo";
+import GoldenDemoV2 from "./pages/GoldenDemoV2";
+import GoldenDemoLegacy from "./pages/GoldenDemo";
 import RunTests from "./pages/RunTests";
 import GapsClosed from "./pages/GapsClosed";
 import Architecture from "./pages/Architecture";
@@ -94,7 +95,8 @@ const App = () => (
               } />
               <Route path="/docs" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
               {/* Test & Demo Routes */}
-              <Route path="/golden" element={<GoldenDemo />} />
+              <Route path="/golden" element={<ProtectedRoute><GoldenDemoV2 /></ProtectedRoute>} />
+              <Route path="/golden-legacy" element={<GoldenDemoLegacy />} />
               <Route path="/run-tests" element={<RunTests />} />
               <Route path="/gaps-closed" element={<GapsClosed />} />
               <Route path="/truth" element={<Truth />} />
