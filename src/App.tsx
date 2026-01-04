@@ -38,6 +38,7 @@ import GapsClosed from "./pages/GapsClosed";
 import Architecture from "./pages/Architecture";
 import LiveLogs from "./pages/LiveLogs";
 import Truth from "./pages/Truth";
+import RAIDashboard from "./pages/RAIDashboard";
 import NotFound from "./pages/NotFound";
 import { GlobalBanner } from "./components/layout/GlobalBanner";
 
@@ -79,6 +80,7 @@ const App = () => (
               <Route path="/live-logs" element={<ProtectedRoute><LiveLogs /></ProtectedRoute>} />
               <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
               <Route path="/evaluation" element={<ProtectedRoute><Evaluation /></ProtectedRoute>} />
+              <Route path="/rai-dashboard" element={<ProtectedRoute><RAIDashboard /></ProtectedRoute>} />
               {/* Core RAI Engines */}
               <Route path="/engine/fairness" element={<ProtectedRoute><FairnessEngine /></ProtectedRoute>} />
               <Route path="/engine/hallucination" element={<ProtectedRoute><HallucinationEngine /></ProtectedRoute>} />

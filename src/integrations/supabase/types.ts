@@ -1258,6 +1258,59 @@ export type Database = {
         }
         Relationships: []
       }
+      rai_composite_scores: {
+        Row: {
+          composite_score: number
+          created_at: string | null
+          domain: string | null
+          evaluated_at: string | null
+          explainability_score: number | null
+          fairness_score: number | null
+          hallucination_score: number | null
+          id: string
+          is_compliant: boolean | null
+          model_id: string | null
+          privacy_score: number | null
+          toxicity_score: number | null
+        }
+        Insert: {
+          composite_score: number
+          created_at?: string | null
+          domain?: string | null
+          evaluated_at?: string | null
+          explainability_score?: number | null
+          fairness_score?: number | null
+          hallucination_score?: number | null
+          id?: string
+          is_compliant?: boolean | null
+          model_id?: string | null
+          privacy_score?: number | null
+          toxicity_score?: number | null
+        }
+        Update: {
+          composite_score?: number
+          created_at?: string | null
+          domain?: string | null
+          evaluated_at?: string | null
+          explainability_score?: number | null
+          fairness_score?: number | null
+          hallucination_score?: number | null
+          id?: string
+          is_compliant?: boolean | null
+          model_id?: string | null
+          privacy_score?: number | null
+          toxicity_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rai_composite_scores_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rate_limits: {
         Row: {
           count: number
