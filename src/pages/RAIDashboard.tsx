@@ -183,7 +183,7 @@ export default function RAIDashboard() {
               <div>
                 <p className="text-sm text-muted-foreground">Eval Pass Rate</p>
                 <p className="text-2xl font-bold font-mono">
-                  {stats?.overallCompliance ?? 0}%
+                  {stats?.overallComplianceRate ?? 0}%
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Evaluations ≥70%
@@ -203,7 +203,7 @@ export default function RAIDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {PILLAR_CONFIG.map(pillar => {
             const score = avgPillarScores[pillar.key];
-            const pillarStats = stats?.byPillar[pillar.key];
+            const pillarStats = stats?.pillarCounts?.[pillar.key];
             
             return (
               <PillarOverview

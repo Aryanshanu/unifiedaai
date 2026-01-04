@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import { Target, AlertTriangle } from "lucide-react";
 import type { ModelRAIScores } from "@/hooks/useRAIDashboard";
+import { getPillarScore } from "@/hooks/useRAIDashboard";
 
 interface RAIRadarChartProps {
   models: ModelRAIScores[];
@@ -20,10 +21,10 @@ const PILLAR_LABELS: Record<string, string> = {
 
 const COLORS = [
   'hsl(var(--primary))',
-  'hsl(var(--success))',
-  'hsl(var(--warning))',
-  'hsl(var(--accent))',
-  'hsl(var(--danger))',
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))',
+  'hsl(var(--chart-5))',
 ];
 
 export function RAIRadarChart({
@@ -63,8 +64,8 @@ export function RAIRadarChart({
     };
     
     displayModels.forEach((model, idx) => {
-      const pillarScore = model.pillarScores.find(ps => ps.pillar === pillar);
-      dataPoint[`model_${idx}`] = pillarScore?.score ?? 0;
+      const score = getPillarScore(model, pillar);
+      dataPoint[`model_${idx}`] = score ?? 0;
       dataPoint[`name_${idx}`] = model.modelName;
     });
     
@@ -72,9 +73,7 @@ export function RAIRadarChart({
   });
 
   // Check for any non-compliant scores
-  const hasNonCompliant = displayModels.some(m =>
-    m.pillarScores.some(ps => ps.score !== null && ps.score < 70)
-  );
+  const hasNonCompliant = displayModels.some(m => !m.isCompliant);
 
   return (
     <Card>
@@ -85,7 +84,7 @@ export function RAIRadarChart({
             RAI Pillar Radar
           </CardTitle>
           {hasNonCompliant && (
-            <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">
+            <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">
               <AlertTriangle className="w-3 h-3 mr-1" />
               Below threshold
             </Badge>
@@ -116,7 +115,7 @@ export function RAIRadarChart({
                 <Radar
                   name="Compliance Threshold (70%)"
                   dataKey="threshold"
-                  stroke="hsl(var(--danger))"
+                  stroke="hsl(var(--destructive))"
                   fill="transparent"
                   strokeDasharray="5 5"
                   strokeWidth={2}
@@ -150,7 +149,7 @@ export function RAIRadarChart({
                             style={{ backgroundColor: COLORS[idx % COLORS.length] }}
                           />
                           <span className="text-muted-foreground">{model.modelName}:</span>
-                          <span className={data[`model_${idx}`] >= 70 ? 'text-success' : 'text-danger'}>
+                          <span className={data[`model_${idx}`] >= 70 ? 'text-green-500' : 'text-destructive'}>
                             {data[`model_${idx}`]}%
                           </span>
                         </p>

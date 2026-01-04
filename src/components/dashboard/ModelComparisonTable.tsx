@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ArrowUpDown, CheckCircle, XCircle, AlertTriangle, Minus, ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { ModelRAIScores } from "@/hooks/useRAIDashboard";
+import { getPillarScore } from "@/hooks/useRAIDashboard";
 import { formatDistanceToNow, parseISO } from "date-fns";
 
 interface ModelComparisonTableProps {
@@ -45,10 +46,8 @@ export function ModelComparisonTable({ models, isLoading = false }: ModelCompari
       aVal = a.compositeScore;
       bVal = b.compositeScore;
     } else {
-      const aScore = a.pillarScores.find(ps => ps.pillar === sortField)?.score;
-      const bScore = b.pillarScores.find(ps => ps.pillar === sortField)?.score;
-      aVal = aScore ?? -1;
-      bVal = bScore ?? -1;
+      aVal = getPillarScore(a, sortField) ?? -1;
+      bVal = getPillarScore(b, sortField) ?? -1;
     }
 
     return sortDirection === 'asc' ? (aVal as number) - (bVal as number) : (bVal as number) - (aVal as number);
@@ -59,7 +58,7 @@ export function ModelComparisonTable({ models, isLoading = false }: ModelCompari
       return <span className="text-muted-foreground flex items-center gap-1"><Minus className="w-3 h-3" /> N/A</span>;
     }
     
-    const color = score >= 70 ? 'text-success' : score >= 50 ? 'text-warning' : 'text-danger';
+    const color = score >= 70 ? 'text-green-500' : score >= 50 ? 'text-yellow-500' : 'text-destructive';
     return <span className={`font-mono font-bold ${color}`}>{score}%</span>;
   };
 
@@ -77,7 +76,7 @@ export function ModelComparisonTable({ models, isLoading = false }: ModelCompari
     
     if (model.isCompliant) {
       return (
-        <Badge className="bg-success/10 text-success border-success/20">
+        <Badge className="bg-green-500/10 text-green-500 border-green-500/20">
           <CheckCircle className="w-3 h-3 mr-1" />
           Compliant
         </Badge>
@@ -141,6 +140,8 @@ export function ModelComparisonTable({ models, isLoading = false }: ModelCompari
     );
   }
 
+  const pillars = ['fairness', 'toxicity', 'privacy', 'hallucination', 'explainability'] as const;
+
   return (
     <Card>
       <CardHeader>
@@ -196,14 +197,11 @@ export function ModelComparisonTable({ models, isLoading = false }: ModelCompari
                       {model.compositeScore}%
                     </span>
                   </TableCell>
-                  {['fairness', 'toxicity', 'privacy', 'hallucination', 'explainability'].map(pillar => {
-                    const ps = model.pillarScores.find(p => p.pillar === pillar);
-                    return (
-                      <TableCell key={pillar} className="text-center">
-                        {renderScore(ps?.score ?? null)}
-                      </TableCell>
-                    );
-                  })}
+                  {pillars.map(pillar => (
+                    <TableCell key={pillar} className="text-center">
+                      {renderScore(getPillarScore(model, pillar))}
+                    </TableCell>
+                  ))}
                   <TableCell className="text-center">
                     {renderComplianceStatus(model)}
                   </TableCell>
