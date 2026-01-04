@@ -220,7 +220,7 @@ export default function RAIDashboard() {
                   },
                   { 
                     label: 'Evaluations', 
-                    value: pillarStats?.count ?? 0 
+                    value: pillarStats?.total ?? 0 
                   },
                 ]}
               />
