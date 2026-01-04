@@ -26,10 +26,12 @@ import {
   Play,
   FlaskConical,
   Terminal,
+  Radar,
 } from "lucide-react";
 
 const navItems = [
   { path: "/", icon: LayoutDashboard, label: "Command Center" },
+  { path: "/rai-dashboard", icon: Radar, label: "RAI Dashboard" },
   { divider: true, label: "Monitor" },
   { path: "/observability", icon: Activity, label: "Observability" },
   { path: "/live-logs", icon: Terminal, label: "Live Telemetry" },

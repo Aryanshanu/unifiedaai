@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { useModels } from "@/hooks/useModels";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, Loader2, Brain, Sparkles, Layers, FileCheck } from "lucide-react";
+import { AlertCircle, Loader2, Brain, Sparkles, Layers, FileCheck, Stethoscope, Scale, Landmark } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { instrumentPageLoad } from "@/lib/telemetry";
@@ -28,6 +28,7 @@ import { NoEndpointWarning } from "@/components/engines/NoModelConnected";
 import { EngineResultsLayout } from "@/components/engines/EngineResultsLayout";
 import { EngineActionBar } from "@/components/engines/EngineActionBar";
 import { sanitizeErrorMessage } from "@/lib/ui-helpers";
+import { getDomainRegulatoryBadges, type HallucinationDomain } from "@/lib/test-datasets";
 
 interface HallucinationResult {
   id: string;
@@ -56,9 +57,17 @@ const HALLUCINATION_METRICS = [
 
 const FORMULA = "0.30×Resp + 0.25×Claim + 0.25×Faith + 0.10×Span + 0.10×Abstain";
 
+const DOMAIN_OPTIONS: { value: HallucinationDomain; label: string; icon: React.ReactNode; description: string }[] = [
+  { value: 'general', label: 'General', icon: <Brain className="w-4 h-4" />, description: 'Standard fact-checking prompts' },
+  { value: 'clinical', label: 'Clinical/Medical', icon: <Stethoscope className="w-4 h-4" />, description: 'HIPAA-aware medical prompts' },
+  { value: 'legal', label: 'Legal', icon: <Scale className="w-4 h-4" />, description: 'Legal domain with ABA compliance' },
+  { value: 'finance', label: 'Finance', icon: <Landmark className="w-4 h-4" />, description: 'SEC/FINRA regulatory prompts' },
+];
+
 function HallucinationEngineContent() {
   const [searchParams] = useSearchParams();
   const [selectedModelId, setSelectedModelId] = useState<string>("");
+  const [selectedDomain, setSelectedDomain] = useState<HallucinationDomain>('general');
   const [computationSteps, setComputationSteps] = useState<any[]>([]);
   const [rawLogs, setRawLogs] = useState<any[]>([]);
   const [realEvalResult, setRealEvalResult] = useState<any>(null);
@@ -134,7 +143,7 @@ function HallucinationEngineContent() {
     try {
       setEvalStatus('analyzing');
       const { data, error } = await supabase.functions.invoke('eval-hallucination-hf', {
-        body: { modelId: selectedModelId },
+        body: { modelId: selectedModelId, domain: selectedDomain },
       });
 
       if (error) throw error;
@@ -149,8 +158,9 @@ function HallucinationEngineContent() {
       setEvalStatus('complete');
       setRetryCount(0);
       
+      const domainLabel = DOMAIN_OPTIONS.find(d => d.value === selectedDomain)?.label || 'General';
       toast({ 
-        title: "Hallucination Evaluation Complete", 
+        title: `${domainLabel} Hallucination Evaluation Complete`, 
         description: `Score: ${data.overallScore}% - ${data.verdict}`,
         variant: data.overallScore >= 70 ? "default" : "destructive"
       });
@@ -277,12 +287,17 @@ function HallucinationEngineContent() {
           <FileCheck className="w-3 h-3 mr-1" />
           Claim-Level
         </Badge>
+        {selectedDomain !== 'general' && getDomainRegulatoryBadges(selectedDomain).map(badge => (
+          <Badge key={badge.label} variant="outline" className="text-xs bg-warning/5 text-warning border-warning/20" title={badge.description}>
+            {badge.label}
+          </Badge>
+        ))}
       </div>
 
       <Card className="mb-6">
         <CardContent className="pt-6">
-          <div className="flex items-center gap-4">
-            <div className="flex-1">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex-1 min-w-[200px]">
               <label className="text-sm font-medium text-foreground mb-2 block">Select Model</label>
               <Select value={selectedModelId} onValueChange={setSelectedModelId}>
                 <SelectTrigger>
@@ -302,6 +317,27 @@ function HallucinationEngineContent() {
                 </div>
               )}
             </div>
+            <div className="flex-1 min-w-[200px]">
+              <label className="text-sm font-medium text-foreground mb-2 block">Domain Test Pack</label>
+              <Select value={selectedDomain} onValueChange={(v) => setSelectedDomain(v as HallucinationDomain)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose domain" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DOMAIN_OPTIONS.map((domain) => (
+                    <SelectItem key={domain.value} value={domain.value}>
+                      <div className="flex items-center gap-2">
+                        {domain.icon}
+                        <span>{domain.label}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                {DOMAIN_OPTIONS.find(d => d.value === selectedDomain)?.description}
+              </p>
+            </div>
             <div className="pt-6">
               <Button 
                 onClick={() => runHallucinationEvaluation()} 
@@ -317,7 +353,7 @@ function HallucinationEngineContent() {
                 ) : (
                   <>
                     <AlertCircle className="w-4 h-4" />
-                    Run Factuality Check
+                    Run {selectedDomain !== 'general' ? DOMAIN_OPTIONS.find(d => d.value === selectedDomain)?.label : ''} Check
                   </>
                 )}
               </Button>
