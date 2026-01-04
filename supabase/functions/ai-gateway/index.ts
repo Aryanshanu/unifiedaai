@@ -31,8 +31,8 @@ async function checkRateLimitDB(
     
     if (countError) {
       console.error('[ai-gateway] Rate limit check error:', countError);
-      // Fail open on DB error - allow request but log warning
-      return { allowed: true, remaining: RATE_LIMIT, resetIn: 60 };
+      // SECURITY FIX: Fail CLOSED on DB error - security first over availability
+      return { allowed: false, remaining: 0, resetIn: 60 };
     }
     
     const currentCount = count || 0;
@@ -56,8 +56,8 @@ async function checkRateLimitDB(
     };
   } catch (error) {
     console.error('[ai-gateway] Rate limiting error:', error);
-    // Fail open on error
-    return { allowed: true, remaining: RATE_LIMIT, resetIn: 60 };
+    // SECURITY FIX: Fail CLOSED on error - security first over availability
+    return { allowed: false, remaining: 0, resetIn: 60 };
   }
 }
 

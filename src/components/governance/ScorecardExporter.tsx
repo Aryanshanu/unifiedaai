@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { FileText, Download, Loader2, ExternalLink, CheckCircle2, AlertTriangle } from "lucide-react";
+import { FileText, Download, Loader2, ExternalLink, CheckCircle2, AlertTriangle, Printer } from "lucide-react";
 import { useModels } from "@/hooks/useModels";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -24,6 +24,7 @@ export function ScorecardExporter() {
   const [selectedModel, setSelectedModel] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [scorecard, setScorecard] = useState<Scorecard | null>(null);
+  const [htmlContent, setHtmlContent] = useState<string | null>(null);
 
   const { data: models, isLoading: modelsLoading } = useModels();
 
@@ -35,8 +36,10 @@ export function ScorecardExporter() {
 
     setIsGenerating(true);
     setScorecard(null);
+    setHtmlContent(null);
 
     try {
+      // Use supabase.functions.invoke for JSON scorecard
       const { data, error } = await supabase.functions.invoke('generate-scorecard', {
         body: { modelId: selectedModel, format: 'json' },
       });
@@ -63,50 +66,65 @@ export function ScorecardExporter() {
     setIsGenerating(true);
     
     try {
-      // Call the edge function directly via fetch to get raw HTML
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-scorecard`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-          body: JSON.stringify({ modelId: selectedModel, format: 'pdf' }),
-        }
-      );
+      // Use supabase.functions.invoke for HTML scorecard
+      const { data, error } = await supabase.functions.invoke('generate-scorecard', {
+        body: { modelId: selectedModel, format: 'html' },
+      });
 
-      if (!response.ok) {
-        throw new Error('Failed to generate scorecard');
-      }
+      if (error) throw error;
 
-      // Get the raw HTML text
-      const htmlContent = await response.text();
+      // Get HTML content from response
+      const html = data?.html || (typeof data === 'string' ? data : null);
       
-      // Open in new window and write the HTML directly
-      const printWindow = window.open('', '_blank', 'width=900,height=700');
-      if (printWindow) {
-        printWindow.document.open();
-        printWindow.document.write(htmlContent);
-        printWindow.document.close();
+      if (html && typeof html === 'string') {
+        setHtmlContent(html);
+        
+        // Create downloadable HTML file instead of popup (avoids popup blockers)
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `scorecard-${selectedModel.slice(0, 8)}-${new Date().toISOString().split('T')[0]}.html`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        toast.success('HTML scorecard downloaded — open in browser and print to PDF');
+      } else {
+        throw new Error('Invalid HTML response from server');
       }
       
       // Also generate JSON scorecard for display
-      const jsonResponse = await supabase.functions.invoke('generate-scorecard', {
+      const { data: jsonData, error: jsonError } = await supabase.functions.invoke('generate-scorecard', {
         body: { modelId: selectedModel, format: 'json' },
       });
       
-      if (jsonResponse.data?.success) {
-        setScorecard(jsonResponse.data.scorecard);
+      if (!jsonError && jsonData?.success) {
+        setScorecard(jsonData.scorecard);
       }
-      
-      toast.success('Scorecard exported — ready for print to PDF');
     } catch (error: any) {
       console.error('PDF generation error:', error);
       toast.error('PDF generation failed: ' + error.message);
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleOpenPrintable = () => {
+    if (!htmlContent) {
+      toast.error('Generate the scorecard first');
+      return;
+    }
+    
+    // Open HTML in new window for printing
+    const printWindow = window.open('', '_blank', 'width=900,height=700');
+    if (printWindow) {
+      printWindow.document.open();
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+    } else {
+      toast.warning('Popup blocked — use the download button instead');
     }
   };
 
@@ -242,9 +260,15 @@ export function ScorecardExporter() {
                       <Download className="w-4 h-4 mr-2" />
                       Download JSON
                     </Button>
+                    {htmlContent && (
+                      <Button variant="outline" className="flex-1" onClick={handleOpenPrintable}>
+                        <Printer className="w-4 h-4 mr-2" />
+                        Open Printable
+                      </Button>
+                    )}
                     <Button variant="gradient" className="flex-1" onClick={handleDownloadPDF}>
                       <ExternalLink className="w-4 h-4 mr-2" />
-                      Export PDF
+                      Download HTML
                     </Button>
                   </div>
                 </div>
