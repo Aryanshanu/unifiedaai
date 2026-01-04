@@ -175,23 +175,23 @@ export function useGoldenDemoOrchestrator() {
 
     for (const prompt of prompts) {
       try {
+        // FIX: Use correct payload format with systemId (camelCase) and messages array
         const { data, error } = await supabase.functions.invoke('ai-gateway', {
           body: {
-            system_id: systemId,
-            prompt,
-            max_tokens: 100,
+            systemId, // camelCase as expected by validation
+            messages: [{ role: 'user', content: prompt }], // FIXED: Use messages array
           },
         });
 
         if (error) throw error;
 
         successCount++;
-        if (data?.blocked) blockCount++;
+        if (data?.blocked || data?.decision === 'BLOCK') blockCount++;
         
         setCounters(prev => ({
           ...prev,
           requests: prev.requests + 1,
-          blocks: prev.blocks + (data?.blocked ? 1 : 0),
+          blocks: prev.blocks + (data?.blocked || data?.decision === 'BLOCK' ? 1 : 0),
         }));
       } catch (err: any) {
         addLog('traffic-generation', `Traffic request failed: ${err.message}`, 'warning');
@@ -287,13 +287,23 @@ export function useGoldenDemoOrchestrator() {
         body: { modelId, attackTypes: ['prompt_injection', 'jailbreak', 'data_extraction'] },
       });
 
-      if (error) throw error;
+      if (error) {
+        // Check for permission/authorization errors
+        if (error.message?.includes('unauthorized') || 
+            error.message?.includes('403') ||
+            error.message?.includes('Forbidden') ||
+            error.message?.includes('admin')) {
+          addLog('red-team', 'SKIPPED: Requires admin or analyst role', 'warning');
+          return null;
+        }
+        throw error;
+      }
 
       addLog('red-team', `Red team campaign: ${data.findings || 0} findings`, 
         (data.findings || 0) > 0 ? 'warning' : 'success');
       return data.campaignId || null;
     } catch (err: any) {
-      addLog('red-team', `Red team failed: ${err.message}`, 'warning');
+      addLog('red-team', `Red team: ${err.message}`, 'warning');
       return null;
     }
   };

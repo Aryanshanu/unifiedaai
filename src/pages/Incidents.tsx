@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { 
   AlertTriangle, 
   Search, 
@@ -14,13 +15,17 @@ import {
   AlertCircle,
   ChevronRight,
   Shield,
-  Radio
+  Radio,
+  Archive,
+  Trash2,
+  Eye
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useIncidents, useIncidentStats, useUpdateIncident } from "@/hooks/useIncidents";
+import { useIncidents, useIncidentStats, useUpdateIncident, useBulkArchiveIncidents, useBulkResolveIncidents, Incident } from "@/hooks/useIncidents";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -47,14 +52,32 @@ const statusIcons = {
 };
 
 export default function Incidents() {
+  const [searchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState("");
   const [realtimeCount, setRealtimeCount] = useState(0);
+  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
+  const [showArchiveDialog, setShowArchiveDialog] = useState(false);
+  const [archiveOptions, setArchiveOptions] = useState({ olderThanDays: 30, status: 'open' as const });
   const queryClient = useQueryClient();
   
   const { data: incidents, isLoading } = useIncidents();
   const { data: stats } = useIncidentStats();
   const updateIncident = useUpdateIncident();
+  const bulkArchive = useBulkArchiveIncidents();
+  const bulkResolve = useBulkResolveIncidents();
+
+  // Initialize search from URL params (for Golden Demo integration)
+  useEffect(() => {
+    const searchFromUrl = searchParams.get('search');
+    if (searchFromUrl) {
+      setSearchQuery(searchFromUrl);
+    }
+    const statusFromUrl = searchParams.get('status');
+    if (statusFromUrl && ['all', 'open', 'investigating', 'mitigating', 'resolved'].includes(statusFromUrl)) {
+      setStatusFilter(statusFromUrl);
+    }
+  }, [searchParams]);
 
   // Realtime subscription for incidents
   useEffect(() => {
@@ -96,6 +119,21 @@ export default function Incidents() {
       status: newStatus as any,
       ...(newStatus === 'resolved' ? { resolved_at: new Date().toISOString() } : {})
     });
+  };
+
+  const handleBulkArchive = () => {
+    bulkArchive.mutate({
+      olderThanDays: archiveOptions.olderThanDays,
+      status: archiveOptions.status,
+    });
+    setShowArchiveDialog(false);
+  };
+
+  const handleQuickResolveAll = () => {
+    const openCritical = filteredIncidents.filter(i => i.status === 'open' && i.severity === 'critical');
+    if (openCritical.length > 0) {
+      bulkResolve.mutate(openCritical.map(i => i.id));
+    }
   };
 
   return (
@@ -142,13 +180,13 @@ export default function Incidents() {
         <MetricCard
           title="Total Incidents"
           value={(stats?.total || 0).toString()}
-          subtitle="All time"
+          subtitle="All time (non-archived)"
           icon={<Clock className="w-4 h-4 text-muted-foreground" />}
         />
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-4 mb-6">
+      {/* Filters & Actions */}
+      <div className="flex items-center gap-4 mb-6 flex-wrap">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -170,6 +208,31 @@ export default function Incidents() {
             <SelectItem value="resolved">Resolved</SelectItem>
           </SelectContent>
         </Select>
+        
+        {/* Bulk Actions */}
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowArchiveDialog(true)}
+            className="gap-1.5"
+          >
+            <Archive className="w-4 h-4" />
+            Bulk Archive
+          </Button>
+          {stats && stats.critical > 0 && (
+            <Button 
+              variant="destructive" 
+              size="sm"
+              onClick={handleQuickResolveAll}
+              className="gap-1.5"
+              disabled={bulkResolve.isPending}
+            >
+              <CheckCircle className="w-4 h-4" />
+              Resolve Open Critical ({stats.critical})
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Incidents List */}
@@ -207,6 +270,7 @@ export default function Incidents() {
               <div
                 key={incident.id}
                 className="bg-card border border-border rounded-xl p-4 hover:border-primary/30 transition-all cursor-pointer group"
+                onClick={() => setSelectedIncident(incident)}
               >
                 <div className="flex items-start gap-4">
                   <div className={cn(
@@ -261,9 +325,14 @@ export default function Incidents() {
                     {incident.status !== 'resolved' && (
                       <Select 
                         value={incident.status} 
-                        onValueChange={(status) => handleStatusChange(incident.id, status)}
+                        onValueChange={(status) => {
+                          handleStatusChange(incident.id, status);
+                        }}
                       >
-                        <SelectTrigger className="w-32 h-8 text-xs">
+                        <SelectTrigger 
+                          className="w-32 h-8 text-xs"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -274,7 +343,17 @@ export default function Incidents() {
                         </SelectContent>
                       </Select>
                     )}
-                    <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="opacity-0 group-hover:opacity-100"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedIncident(incident);
+                      }}
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -282,6 +361,168 @@ export default function Incidents() {
           })}
         </div>
       )}
+
+      {/* Incident Detail Dialog */}
+      <Dialog open={!!selectedIncident} onOpenChange={(open) => !open && setSelectedIncident(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className={cn(
+                "w-5 h-5",
+                selectedIncident?.severity === "critical" ? "text-danger" : 
+                selectedIncident?.severity === "high" ? "text-warning" : "text-primary"
+              )} />
+              Incident Details
+            </DialogTitle>
+            <DialogDescription>
+              {selectedIncident?.id}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedIncident && (
+            <div className="space-y-4">
+              {/* Header Info */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="outline" className={cn(
+                  severityColors[selectedIncident.severity as keyof typeof severityColors]
+                )}>
+                  {selectedIncident.severity.toUpperCase()}
+                </Badge>
+                <Badge variant="outline" className={cn(
+                  statusColors[selectedIncident.status as keyof typeof statusColors]
+                )}>
+                  {selectedIncident.status}
+                </Badge>
+                <Badge variant="outline">{selectedIncident.incident_type}</Badge>
+              </div>
+
+              {/* Title & Description */}
+              <div>
+                <h3 className="font-semibold text-lg mb-2">{selectedIncident.title}</h3>
+                {selectedIncident.description && (
+                  <p className="text-muted-foreground">{selectedIncident.description}</p>
+                )}
+              </div>
+
+              {/* Timeline */}
+              <div className="space-y-2 p-4 bg-secondary/50 rounded-lg">
+                <div className="flex items-center gap-2 text-sm">
+                  <Clock className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Created:</span>
+                  <span>{format(new Date(selectedIncident.created_at), 'PPpp')}</span>
+                </div>
+                {selectedIncident.resolved_at && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle className="w-4 h-4 text-success" />
+                    <span className="text-muted-foreground">Resolved:</span>
+                    <span className="text-success">{format(new Date(selectedIncident.resolved_at), 'PPpp')}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              {selectedIncident.status !== 'resolved' && (
+                <div className="flex gap-2">
+                  <Select 
+                    value={selectedIncident.status} 
+                    onValueChange={(status) => {
+                      handleStatusChange(selectedIncident.id, status);
+                      setSelectedIncident({ ...selectedIncident, status: status as any });
+                    }}
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="open">Open</SelectItem>
+                      <SelectItem value="investigating">Investigating</SelectItem>
+                      <SelectItem value="mitigating">Mitigating</SelectItem>
+                      <SelectItem value="resolved">Resolved</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button 
+                    variant="default"
+                    onClick={() => {
+                      handleStatusChange(selectedIncident.id, 'resolved');
+                      setSelectedIncident(null);
+                    }}
+                  >
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Resolve
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Archive Dialog */}
+      <Dialog open={showArchiveDialog} onOpenChange={setShowArchiveDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Archive className="w-5 h-5" />
+              Bulk Archive Incidents
+            </DialogTitle>
+            <DialogDescription>
+              Archive old incidents to clean up your queue. Archived incidents are hidden but not deleted.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Archive incidents older than</label>
+              <Select 
+                value={archiveOptions.olderThanDays.toString()} 
+                onValueChange={(v) => setArchiveOptions(p => ({ ...p, olderThanDays: parseInt(v) }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">7 days</SelectItem>
+                  <SelectItem value="14">14 days</SelectItem>
+                  <SelectItem value="30">30 days</SelectItem>
+                  <SelectItem value="60">60 days</SelectItem>
+                  <SelectItem value="90">90 days</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium">With status</label>
+              <Select 
+                value={archiveOptions.status} 
+                onValueChange={(v) => setArchiveOptions(p => ({ ...p, status: v as any }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="open">Open</SelectItem>
+                  <SelectItem value="investigating">Investigating</SelectItem>
+                  <SelectItem value="mitigating">Mitigating</SelectItem>
+                  <SelectItem value="resolved">Resolved</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowArchiveDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleBulkArchive}
+              disabled={bulkArchive.isPending}
+            >
+              {bulkArchive.isPending ? 'Archiving...' : 'Archive Incidents'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }

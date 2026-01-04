@@ -698,6 +698,8 @@ export type Database = {
       }
       incidents: {
         Row: {
+          archived_at: string | null
+          archived_by: string | null
           assignee_id: string | null
           created_at: string
           description: string | null
@@ -711,6 +713,8 @@ export type Database = {
           title: string
         }
         Insert: {
+          archived_at?: string | null
+          archived_by?: string | null
           assignee_id?: string | null
           created_at?: string
           description?: string | null
@@ -724,6 +728,8 @@ export type Database = {
           title: string
         }
         Update: {
+          archived_at?: string | null
+          archived_by?: string | null
           assignee_id?: string | null
           created_at?: string
           description?: string | null
@@ -1910,6 +1916,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_old_logs: { Args: never; Returns: undefined }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       has_any_role: {
         Args: {

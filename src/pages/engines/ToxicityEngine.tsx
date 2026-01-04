@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -56,6 +57,7 @@ const TOXICITY_METRICS = [
 const FORMULA = "0.30×TOR + 0.25×STOR + 0.20×Diff + 0.15×Topic + 0.10×Guard";
 
 function ToxicityEngineContent() {
+  const [searchParams] = useSearchParams();
   const [selectedModelId, setSelectedModelId] = useState<string>("");
   const [computationSteps, setComputationSteps] = useState<any[]>([]);
   const [rawLogs, setRawLogs] = useState<any[]>([]);
@@ -63,14 +65,33 @@ function ToxicityEngineContent() {
   const [evalStatus, setEvalStatus] = useState<EvalStatus>('idle');
   const [evalError, setEvalError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const hasAutoRun = useRef(false);
   const { data: models, isLoading: modelsLoading, refetch: refetchModels } = useModels();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Autorun support for Golden Demo
+  const autorunModelId = searchParams.get('modelId');
+  const shouldAutorun = searchParams.get('autorun') === '1';
 
   useEffect(() => {
     const endTrace = instrumentPageLoad('ToxicityEngine');
     return () => endTrace();
   }, []);
+
+  // Autorun effect - trigger evaluation when navigated from Golden Demo
+  useEffect(() => {
+    if (autorunModelId && shouldAutorun && !hasAutoRun.current && models && models.length > 0) {
+      const modelExists = models.some(m => m.id === autorunModelId);
+      if (modelExists) {
+        hasAutoRun.current = true;
+        setSelectedModelId(autorunModelId);
+        setTimeout(() => {
+          runToxicityEvaluation();
+        }, 500);
+      }
+    }
+  }, [autorunModelId, shouldAutorun, models]);
 
   const { data: results, isLoading: loadingResults, isError: resultsError, refetch: refetchResults } = useQuery({
     queryKey: ["toxicity-results", selectedModelId],
