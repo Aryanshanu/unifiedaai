@@ -175,13 +175,25 @@ function PrivacyEngineContent() {
   // Use ONLY real data - no hardcoded fallbacks
   const getMetricsForGrid = () => {
     const details = realEvalResult?.metricDetails || latestResult?.metric_details || {};
-    return PRIVACY_METRICS.map(m => ({
-      key: m.key,
-      name: m.name,
-      score: details[m.key] ?? details[m.key.replace(/_/g, '')] ?? null,
-      weight: m.weight,
-      description: m.description,
-    }));
+    return PRIVACY_METRICS.map(m => {
+      // Check for both new format and legacy format
+      const legacyKeyMap: Record<string, string> = {
+        'pii_leakage': 'pii',
+        'phi_leakage': 'phi',
+        'redaction': 'redact',
+        'secrets': 'secrets',
+        'minimization': 'min',
+      };
+      const legacyKey = legacyKeyMap[m.key];
+      const score = details[m.key] ?? details[legacyKey] ?? null;
+      return {
+        key: m.key,
+        name: m.name,
+        score: score,
+        weight: m.weight,
+        description: m.description,
+      };
+    });
   };
 
   const overallScore = realEvalResult?.overallScore ?? latestResult?.overall_score ?? 0;

@@ -523,11 +523,11 @@ serve(async (req) => {
       overall_score: overallScore,
       fairness_score: overallScore,
       metric_details: {
-        dp: Math.round(dpScore * 100),
-        eo: Math.round(eoScore * 100),
-        eodds: Math.round(eoddsScore * 100),
-        glr: Math.round(glrScore * 100),
-        bias: Math.round(biasScore * 100),
+        demographic_parity: Math.round(dpScore * 100),
+        equal_opportunity: Math.round(eoScore * 100),
+        equalized_odds: Math.round(eoddsScore * 100),
+        group_loss_ratio: Math.round(glrScore * 100),
+        bias_tag_rate: Math.round(biasScore * 100),
       },
       explanations: {
         transparency_summary: isCompliant 
@@ -565,11 +565,11 @@ serve(async (req) => {
         isCompliant,
         verdict: isCompliant ? "PASS" : "FAIL",
         metricDetails: {
-          dp: Math.round(dpScore * 100),
-          eo: Math.round(eoScore * 100),
-          eodds: Math.round(eoddsScore * 100),
-          glr: Math.round(glrScore * 100),
-          bias: Math.round(biasScore * 100),
+          demographic_parity: Math.round(dpScore * 100),
+          equal_opportunity: Math.round(eoScore * 100),
+          equalized_odds: Math.round(eoddsScore * 100),
+          group_loss_ratio: Math.round(glrScore * 100),
+          bias_tag_rate: Math.round(biasScore * 100),
         },
         computationSteps,
         rawLogs,

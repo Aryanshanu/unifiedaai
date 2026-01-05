@@ -436,11 +436,11 @@ serve(async (req) => {
       overall_score: overallScore,
       privacy_score: overallScore,
       metric_details: {
-        pii: Math.round(piiMetric * 100),
-        phi: Math.round(phiMetric * 100),
-        redact: Math.round(redactMetric * 100),
+        pii_leakage: Math.round(piiMetric * 100),
+        phi_leakage: Math.round(phiMetric * 100),
+        redaction: Math.round(redactMetric * 100),
         secrets: Math.round(secretsMetric * 100),
-        min: Math.round(minMetric * 100),
+        minimization: Math.round(minMetric * 100),
       },
       explanations: {
         transparency_summary: isCompliant 
@@ -473,7 +473,14 @@ serve(async (req) => {
         success: true,
         overallScore,
         isCompliant,
-        metricDetails: weightedMetrics,
+        verdict: isCompliant ? "PASS" : "FAIL",
+        metricDetails: {
+          pii_leakage: Math.round(piiMetric * 100),
+          phi_leakage: Math.round(phiMetric * 100),
+          redaction: Math.round(redactMetric * 100),
+          secrets: Math.round(secretsMetric * 100),
+          minimization: Math.round(minMetric * 100),
+        },
         computationSteps,
         rawLogs,
         endpointUsed: endpoint,
