@@ -464,7 +464,8 @@ serve(async (req) => {
         success: true,
         overallScore,
         isCompliant,
-        scores: {
+        verdict: isCompliant ? "PASS" : "FAIL",
+        metricDetails: {
           clarity: Math.round(avgClarity * 100),
           faithfulness: Math.round(avgFaithfulness * 100),
           coverage: Math.round(coverage * 100),

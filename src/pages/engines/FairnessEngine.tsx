@@ -177,13 +177,25 @@ function FairnessEngineContent() {
 
   const getMetricsForGrid = () => {
     const details = realEvalResult?.metricDetails || latestResult?.metric_details || {};
-    return FAIRNESS_METRICS.map(m => ({
-      key: m.key,
-      name: m.name,
-      score: details[m.key] ?? details[m.key.replace(/_/g, '')] ?? 75,
-      weight: m.weight,
-      description: m.description,
-    }));
+    return FAIRNESS_METRICS.map(m => {
+      // Check for both new format (with underscores) and legacy format (short keys like dp, eo)
+      const legacyKeyMap: Record<string, string> = {
+        'demographic_parity': 'dp',
+        'equal_opportunity': 'eo',
+        'equalized_odds': 'eodds',
+        'group_loss_ratio': 'glr',
+        'bias_tag_rate': 'bias',
+      };
+      const legacyKey = legacyKeyMap[m.key];
+      const score = details[m.key] ?? details[legacyKey] ?? null;
+      return {
+        key: m.key,
+        name: m.name,
+        score: score,
+        weight: m.weight,
+        description: m.description,
+      };
+    });
   };
 
   const overallScore = realEvalResult?.overallScore ?? latestResult?.overall_score ?? 0;

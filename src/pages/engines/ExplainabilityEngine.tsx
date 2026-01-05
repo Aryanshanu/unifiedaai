@@ -174,14 +174,18 @@ function ExplainabilityEngineContent() {
 
   // Use ONLY real data - no hardcoded fallbacks
   const getMetricsForGrid = () => {
-    const details = realEvalResult?.metricDetails || latestResult?.metric_details || {};
-    return EXPLAINABILITY_METRICS.map(m => ({
-      key: m.key,
-      name: m.name,
-      score: details[m.key] ?? details[m.key.replace(/_/g, '')] ?? null,
-      weight: m.weight,
-      description: m.description,
-    }));
+    const details = realEvalResult?.metricDetails || realEvalResult?.scores || latestResult?.metric_details || {};
+    return EXPLAINABILITY_METRICS.map(m => {
+      // Explainability uses straightforward keys, check for both formats
+      const score = details[m.key] ?? null;
+      return {
+        key: m.key,
+        name: m.name,
+        score: score,
+        weight: m.weight,
+        description: m.description,
+      };
+    });
   };
 
   const overallScore = realEvalResult?.overallScore ?? latestResult?.overall_score ?? 0;

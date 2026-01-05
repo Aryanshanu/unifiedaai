@@ -458,11 +458,11 @@ serve(async (req) => {
       overall_score: overallScore,
       factuality_score: overallScore,
       metric_details: {
-        resp: Math.round(respMetric * 100),
-        claim: Math.round(claimMetric * 100),
-        faith: Math.round(faithMetric * 100),
-        span: Math.round(spanMetric * 100),
-        abstain: Math.round(abstainMetric * 100),
+        response_hr: Math.round(respMetric * 100),
+        claim_chf: Math.round(claimMetric * 100),
+        faithfulness: Math.round(faithMetric * 100),
+        span_ratio: Math.round(spanMetric * 100),
+        abstention: Math.round(abstainMetric * 100),
       },
       explanations: {
         transparency_summary: isCompliant 
@@ -495,8 +495,15 @@ serve(async (req) => {
         success: true,
         overallScore,
         isCompliant,
+        verdict: isCompliant ? "PASS" : "FAIL",
         factualityScore: avgFactuality,
-        metricDetails: weightedMetrics,
+        metricDetails: {
+          response_hr: Math.round(respMetric * 100),
+          claim_chf: Math.round(claimMetric * 100),
+          faithfulness: Math.round(faithMetric * 100),
+          span_ratio: Math.round(spanMetric * 100),
+          abstention: Math.round(abstainMetric * 100),
+        },
         computationSteps,
         rawLogs,
         endpointUsed: endpoint,

@@ -437,11 +437,11 @@ serve(async (req) => {
       overall_score: overallScore,
       toxicity_score: overallScore,
       metric_details: {
-        overall: Math.round(overallMetric * 100),
-        severe: Math.round(severeMetric * 100),
-        diff: Math.round(diffMetric * 100),
-        topic: Math.round(topicMetric * 100),
-        guard: Math.round(guardMetric * 100),
+        overall_tor: Math.round(overallMetric * 100),
+        severe_stor: Math.round(severeMetric * 100),
+        differential: Math.round(diffMetric * 100),
+        topic_aware: Math.round(topicMetric * 100),
+        guardrail: Math.round(guardMetric * 100),
       },
       explanations: {
         transparency_summary: isCompliant 
@@ -475,7 +475,13 @@ serve(async (req) => {
         overallScore,
         isCompliant,
         verdict: isCompliant ? "PASS" : "FAIL",
-        metricDetails: weightedMetrics,
+        metricDetails: {
+          overall_tor: Math.round(overallMetric * 100),
+          severe_stor: Math.round(severeMetric * 100),
+          differential: Math.round(diffMetric * 100),
+          topic_aware: Math.round(topicMetric * 100),
+          guardrail: Math.round(guardMetric * 100),
+        },
         computationSteps,
         rawLogs,
         endpointUsed: endpoint,
