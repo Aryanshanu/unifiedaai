@@ -41,8 +41,9 @@ import Architecture from "./pages/Architecture";
 import LiveLogs from "./pages/LiveLogs";
 import Truth from "./pages/Truth";
 import RAIDashboard from "./pages/RAIDashboard";
+import DecisionLedger from "./pages/DecisionLedger";
+import DecisionAppeals from "./pages/DecisionAppeals";
 import NotFound from "./pages/NotFound";
-import { GlobalBanner } from "./components/layout/GlobalBanner";
 
 const queryClient = new QueryClient();
 

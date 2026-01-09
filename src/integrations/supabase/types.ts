@@ -652,6 +652,266 @@ export type Database = {
         }
         Relationships: []
       }
+      decision_appeals: {
+        Row: {
+          appeal_category: string
+          appeal_reason: string
+          appellant_reference: string
+          assigned_to: string | null
+          created_at: string
+          decision_id: string
+          final_decision: string | null
+          id: string
+          resolved_at: string | null
+          review_notes: string | null
+          sla_deadline: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          appeal_category: string
+          appeal_reason: string
+          appellant_reference: string
+          assigned_to?: string | null
+          created_at?: string
+          decision_id: string
+          final_decision?: string | null
+          id?: string
+          resolved_at?: string | null
+          review_notes?: string | null
+          sla_deadline?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          appeal_category?: string
+          appeal_reason?: string
+          appellant_reference?: string
+          assigned_to?: string | null
+          created_at?: string
+          decision_id?: string
+          final_decision?: string | null
+          id?: string
+          resolved_at?: string | null
+          review_notes?: string | null
+          sla_deadline?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "decision_appeals_decision_id_fkey"
+            columns: ["decision_id"]
+            isOneToOne: false
+            referencedRelation: "decision_ledger"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      decision_explanations: {
+        Row: {
+          counterfactual: Json | null
+          created_at: string
+          decision_id: string
+          explanation_type: string
+          feature_influences: Json | null
+          generation_method: string | null
+          id: string
+          natural_language: string | null
+        }
+        Insert: {
+          counterfactual?: Json | null
+          created_at?: string
+          decision_id: string
+          explanation_type: string
+          feature_influences?: Json | null
+          generation_method?: string | null
+          id?: string
+          natural_language?: string | null
+        }
+        Update: {
+          counterfactual?: Json | null
+          created_at?: string
+          decision_id?: string
+          explanation_type?: string
+          feature_influences?: Json | null
+          generation_method?: string | null
+          id?: string
+          natural_language?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "decision_explanations_decision_id_fkey"
+            columns: ["decision_id"]
+            isOneToOne: false
+            referencedRelation: "decision_ledger"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      decision_ledger: {
+        Row: {
+          confidence: number | null
+          context: Json | null
+          created_at: string
+          decision_ref: string
+          decision_timestamp: string
+          decision_value: string
+          id: string
+          input_hash: string
+          model_id: string
+          model_version: string
+          output_hash: string
+          previous_hash: string | null
+          record_hash: string
+        }
+        Insert: {
+          confidence?: number | null
+          context?: Json | null
+          created_at?: string
+          decision_ref: string
+          decision_timestamp: string
+          decision_value: string
+          id?: string
+          input_hash: string
+          model_id: string
+          model_version: string
+          output_hash: string
+          previous_hash?: string | null
+          record_hash: string
+        }
+        Update: {
+          confidence?: number | null
+          context?: Json | null
+          created_at?: string
+          decision_ref?: string
+          decision_timestamp?: string
+          decision_value?: string
+          id?: string
+          input_hash?: string
+          model_id?: string
+          model_version?: string
+          output_hash?: string
+          previous_hash?: string | null
+          record_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "decision_ledger_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      decision_outcomes: {
+        Row: {
+          created_at: string
+          decision_id: string
+          detected_at: string | null
+          harm_category: string | null
+          harm_severity: string | null
+          id: string
+          outcome_details: Json | null
+          outcome_type: string
+          remediation_taken: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          decision_id: string
+          detected_at?: string | null
+          harm_category?: string | null
+          harm_severity?: string | null
+          id?: string
+          outcome_details?: Json | null
+          outcome_type: string
+          remediation_taken?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          decision_id?: string
+          detected_at?: string | null
+          harm_category?: string | null
+          harm_severity?: string | null
+          id?: string
+          outcome_details?: Json | null
+          outcome_type?: string
+          remediation_taken?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "decision_outcomes_decision_id_fkey"
+            columns: ["decision_id"]
+            isOneToOne: false
+            referencedRelation: "decision_ledger"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      decision_overrides: {
+        Row: {
+          appeal_id: string | null
+          authorization_level: string
+          authorized_by: string
+          created_at: string
+          decision_id: string
+          evidence_hash: string | null
+          id: string
+          new_decision: string
+          original_decision: string
+          override_reason: string
+          previous_hash: string | null
+          record_hash: string | null
+        }
+        Insert: {
+          appeal_id?: string | null
+          authorization_level: string
+          authorized_by: string
+          created_at?: string
+          decision_id: string
+          evidence_hash?: string | null
+          id?: string
+          new_decision: string
+          original_decision: string
+          override_reason: string
+          previous_hash?: string | null
+          record_hash?: string | null
+        }
+        Update: {
+          appeal_id?: string | null
+          authorization_level?: string
+          authorized_by?: string
+          created_at?: string
+          decision_id?: string
+          evidence_hash?: string | null
+          id?: string
+          new_decision?: string
+          original_decision?: string
+          override_reason?: string
+          previous_hash?: string | null
+          record_hash?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "decision_overrides_appeal_id_fkey"
+            columns: ["appeal_id"]
+            isOneToOne: false
+            referencedRelation: "decision_appeals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "decision_overrides_decision_id_fkey"
+            columns: ["decision_id"]
+            isOneToOne: false
+            referencedRelation: "decision_ledger"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       decisions: {
         Row: {
           conditions: string | null
@@ -686,6 +946,78 @@ export type Database = {
             columns: ["review_id"]
             isOneToOne: false
             referencedRelation: "review_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deployment_attestations: {
+        Row: {
+          approved_artifact_hash: string | null
+          artifact_hash: string
+          attestation_bundle: Json | null
+          bypass_authorized_by: string | null
+          bypass_reason: string | null
+          commit_sha: string
+          created_at: string
+          deployment_id: string
+          hash_match: boolean | null
+          id: string
+          model_id: string
+          signature: string | null
+          slsa_level: number | null
+          system_id: string
+          verification_status: string
+          verified_at: string | null
+        }
+        Insert: {
+          approved_artifact_hash?: string | null
+          artifact_hash: string
+          attestation_bundle?: Json | null
+          bypass_authorized_by?: string | null
+          bypass_reason?: string | null
+          commit_sha: string
+          created_at?: string
+          deployment_id: string
+          hash_match?: boolean | null
+          id?: string
+          model_id: string
+          signature?: string | null
+          slsa_level?: number | null
+          system_id: string
+          verification_status?: string
+          verified_at?: string | null
+        }
+        Update: {
+          approved_artifact_hash?: string | null
+          artifact_hash?: string
+          attestation_bundle?: Json | null
+          bypass_authorized_by?: string | null
+          bypass_reason?: string | null
+          commit_sha?: string
+          created_at?: string
+          deployment_id?: string
+          hash_match?: boolean | null
+          id?: string
+          model_id?: string
+          signature?: string | null
+          slsa_level?: number | null
+          system_id?: string
+          verification_status?: string
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deployment_attestations_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "models"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deployment_attestations_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
             referencedColumns: ["id"]
           },
         ]
@@ -954,6 +1286,39 @@ export type Database = {
         }
         Relationships: []
       }
+      harm_taxonomy: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          regulatory_references: string[] | null
+          remediation_guidelines: string | null
+          severity_levels: Json
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          regulatory_references?: string[] | null
+          remediation_guidelines?: string | null
+          severity_levels?: Json
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          regulatory_references?: string[] | null
+          remediation_guidelines?: string | null
+          severity_levels?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       impact_assessments: {
         Row: {
           created_at: string
@@ -1171,6 +1536,57 @@ export type Database = {
           version?: number | null
         }
         Relationships: []
+      }
+      mlops_governance_events: {
+        Row: {
+          actor_id: string | null
+          event_details: Json
+          event_type: string
+          governance_decision: string
+          id: string
+          model_id: string | null
+          recorded_at: string
+          system_id: string | null
+          violations: string[] | null
+        }
+        Insert: {
+          actor_id?: string | null
+          event_details?: Json
+          event_type: string
+          governance_decision: string
+          id?: string
+          model_id?: string | null
+          recorded_at?: string
+          system_id?: string | null
+          violations?: string[] | null
+        }
+        Update: {
+          actor_id?: string | null
+          event_details?: Json
+          event_type?: string
+          governance_decision?: string
+          id?: string
+          model_id?: string | null
+          recorded_at?: string
+          system_id?: string | null
+          violations?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mlops_governance_events_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "models"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mlops_governance_events_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       model_datasets: {
         Row: {
@@ -1501,6 +1917,59 @@ export type Database = {
           },
         ]
       }
+      population_impact_metrics: {
+        Row: {
+          created_at: string
+          group_value: string
+          id: string
+          is_compliant: boolean | null
+          measurement_period_end: string
+          measurement_period_start: string
+          metric_type: string
+          metric_value: number | null
+          model_id: string
+          protected_attribute: string
+          sample_size: number | null
+          threshold: number | null
+        }
+        Insert: {
+          created_at?: string
+          group_value: string
+          id?: string
+          is_compliant?: boolean | null
+          measurement_period_end: string
+          measurement_period_start: string
+          metric_type: string
+          metric_value?: number | null
+          model_id: string
+          protected_attribute: string
+          sample_size?: number | null
+          threshold?: number | null
+        }
+        Update: {
+          created_at?: string
+          group_value?: string
+          id?: string
+          is_compliant?: boolean | null
+          measurement_period_end?: string
+          measurement_period_start?: string
+          metric_type?: string
+          metric_value?: number | null
+          model_id?: string
+          protected_attribute?: string
+          sample_size?: number | null
+          threshold?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "population_impact_metrics_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1741,6 +2210,69 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      regulatory_reports: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          document_hash: string | null
+          document_url: string | null
+          generated_at: string
+          generated_by: string | null
+          id: string
+          model_id: string | null
+          report_content: Json
+          report_type: string
+          report_version: number
+          status: string
+          system_id: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          document_hash?: string | null
+          document_url?: string | null
+          generated_at?: string
+          generated_by?: string | null
+          id?: string
+          model_id?: string | null
+          report_content?: Json
+          report_type: string
+          report_version?: number
+          status?: string
+          system_id?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          document_hash?: string | null
+          document_url?: string | null
+          generated_at?: string
+          generated_by?: string | null
+          id?: string
+          model_id?: string | null
+          report_content?: Json
+          report_type?: string
+          report_version?: number
+          status?: string
+          system_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "regulatory_reports_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "models"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "regulatory_reports_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       request_logs: {
         Row: {
