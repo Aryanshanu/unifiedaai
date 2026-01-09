@@ -62,7 +62,7 @@ export default function DecisionAppeals() {
   };
 
   return (
-    <MainLayout>
+    <MainLayout title="Decision Appeals" subtitle="Review and process appeals against AI decisions">
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Decision Appeals</h1>

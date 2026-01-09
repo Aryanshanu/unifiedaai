@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { TestRunnerOverlay } from "@/components/tests/TestRunner";
 import { ErrorBoundary } from "@/components/error/ErrorBoundary";
+import { GlobalBanner } from "@/components/layout/GlobalBanner";
 import Auth from "./pages/Auth";
 import Index from "./pages/Index";
 import Error from "./pages/Error";
