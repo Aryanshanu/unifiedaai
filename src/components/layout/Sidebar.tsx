@@ -27,6 +27,9 @@ import {
   FlaskConical,
   Terminal,
   Radar,
+  Workflow,
+  BarChart3,
+  FileCheck,
 } from "lucide-react";
 
 const navItems = [
@@ -40,6 +43,7 @@ const navItems = [
   { path: "/governance/approvals", icon: Shield, label: "Approvals", showBadge: true },
   { path: "/decision-ledger", icon: FileText, label: "Decision Ledger" },
   { path: "/decision-appeals", icon: Users, label: "Appeals" },
+  { path: "/mlops-audit", icon: Workflow, label: "MLOps Audit" },
   { path: "/hitl", icon: Users, label: "HITL Console" },
   { path: "/incidents", icon: AlertCircle, label: "Incidents" },
   { path: "/lineage", icon: GitBranch, label: "Knowledge Graph" },
@@ -55,6 +59,9 @@ const navItems = [
   { path: "/data-contracts", icon: FileText, label: "Data Contracts" },
   { path: "/golden", icon: Play, label: "Golden Demo" },
   { path: "/run-tests", icon: FlaskConical, label: "Run Tests" },
+  { divider: true, label: "Impact" },
+  { path: "/impact-dashboard", icon: BarChart3, label: "Impact Dashboard" },
+  { path: "/regulatory-reports", icon: FileCheck, label: "Regulatory Reports" },
   { divider: true, label: "Configure" },
   { path: "/projects", icon: FolderOpen, label: "Projects" },
   { path: "/models", icon: Database, label: "Models" },

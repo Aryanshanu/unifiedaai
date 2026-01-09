@@ -44,6 +44,9 @@ import Truth from "./pages/Truth";
 import RAIDashboard from "./pages/RAIDashboard";
 import DecisionLedger from "./pages/DecisionLedger";
 import DecisionAppeals from "./pages/DecisionAppeals";
+import MLOpsAudit from "./pages/MLOpsAudit";
+import ImpactDashboard from "./pages/ImpactDashboard";
+import RegulatoryReports from "./pages/RegulatoryReports";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -85,6 +88,10 @@ const App = () => (
               <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
               <Route path="/evaluation" element={<ProtectedRoute><Evaluation /></ProtectedRoute>} />
               <Route path="/rai-dashboard" element={<ProtectedRoute><RAIDashboard /></ProtectedRoute>} />
+              {/* MLOps & Impact */}
+              <Route path="/mlops-audit" element={<ProtectedRoute><MLOpsAudit /></ProtectedRoute>} />
+              <Route path="/impact-dashboard" element={<ProtectedRoute><ImpactDashboard /></ProtectedRoute>} />
+              <Route path="/regulatory-reports" element={<ProtectedRoute><RegulatoryReports /></ProtectedRoute>} />
               {/* Core RAI Engines */}
               <Route path="/engine/fairness" element={<ProtectedRoute><FairnessEngine /></ProtectedRoute>} />
               <Route path="/engine/hallucination" element={<ProtectedRoute><HallucinationEngine /></ProtectedRoute>} />
