@@ -57,7 +57,7 @@ function DataQualityEngineContent() {
   const [selectedDataset, setSelectedDataset] = useState<string>('');
   const [evaluationStatus, setEvaluationStatus] = useState<'idle' | 'running' | 'complete' | 'error'>('idle');
   const [result, setResult] = useState<QualityResult | null>(null);
-  const [rawLogs, setRawLogs] = useState<Array<{ id: string; timestamp: string; type: string; data: Record<string, unknown> }>>([]);
+  const [rawLogs, setRawLogs] = useState<Array<{ id: string; timestamp: string; type: 'input' | 'output' | 'computation'; data: Record<string, unknown> }>>([]);
   const queryClient = useQueryClient();
 
   const { data: datasets, isLoading: loadingDatasets } = useQuery({
@@ -95,12 +95,17 @@ function DataQualityEngineContent() {
     setRawLogs([]);
     const startTime = Date.now();
 
-    const addLog = (message: string, type: string = 'info') => {
+    const addLog = (message: string, logType: string = 'info') => {
+      // Map custom log types to valid RawDataLog union types
+      const validType: 'input' | 'output' | 'computation' = 
+        logType === 'success' || logType === 'info' ? 'computation' : 
+        logType === 'error' ? 'output' : 'computation';
+      
       setRawLogs(prev => [...prev, { 
         id: crypto.randomUUID(), 
         timestamp: new Date().toISOString(), 
-        type,
-        data: { message }
+        type: validType,
+        data: { message, originalType: logType }
       }]);
     };
 
@@ -142,11 +147,11 @@ function DataQualityEngineContent() {
   const getComputationSteps = () => {
     if (!result) return [];
     return [
-      { stepNumber: 1, name: 'Completeness', formula: 'non_null / total', inputs: {}, result: `${(result.metrics.completeness.score * 100).toFixed(1)}%`, status: result.metrics.completeness.score >= 0.9 ? 'pass' as const : 'warn' as const },
-      { stepNumber: 2, name: 'Validity', formula: 'valid_type / total', inputs: {}, result: `${(result.metrics.validity.score * 100).toFixed(1)}%`, status: result.metrics.validity.score >= 0.9 ? 'pass' as const : 'warn' as const },
-      { stepNumber: 3, name: 'Uniqueness', formula: 'unique / total', inputs: {}, result: `${(result.metrics.uniqueness.score * 100).toFixed(1)}%`, status: result.metrics.uniqueness.score >= 0.8 ? 'pass' as const : 'warn' as const },
-      { stepNumber: 4, name: 'Freshness', formula: '1 - age/threshold', inputs: {}, result: `${(result.metrics.freshness.score * 100).toFixed(1)}%`, status: result.metrics.freshness.score >= 0.9 ? 'pass' as const : 'warn' as const },
-      { stepNumber: 5, name: 'Overall', formula: FORMULA, inputs: {}, result: `${(result.overall_score * 100).toFixed(1)}%`, status: result.verdict === 'PASS' ? 'pass' as const : 'fail' as const }
+      { step: 1, name: 'Completeness', formula: 'non_null / total', inputs: {}, result: `${(result.metrics.completeness.score * 100).toFixed(1)}%`, status: result.metrics.completeness.score >= 0.9 ? 'pass' as const : 'warn' as const },
+      { step: 2, name: 'Validity', formula: 'valid_type / total', inputs: {}, result: `${(result.metrics.validity.score * 100).toFixed(1)}%`, status: result.metrics.validity.score >= 0.9 ? 'pass' as const : 'warn' as const },
+      { step: 3, name: 'Uniqueness', formula: 'unique / total', inputs: {}, result: `${(result.metrics.uniqueness.score * 100).toFixed(1)}%`, status: result.metrics.uniqueness.score >= 0.8 ? 'pass' as const : 'warn' as const },
+      { step: 4, name: 'Freshness', formula: '1 - age/threshold', inputs: {}, result: `${(result.metrics.freshness.score * 100).toFixed(1)}%`, status: result.metrics.freshness.score >= 0.9 ? 'pass' as const : 'warn' as const },
+      { step: 5, name: 'Overall', formula: FORMULA, inputs: {}, result: `${(result.overall_score * 100).toFixed(1)}%`, status: result.verdict === 'PASS' ? 'pass' as const : 'fail' as const }
     ];
   };
 
@@ -231,7 +236,19 @@ function DataQualityEngineContent() {
             <MetricWeightGrid metrics={getMetricsForGrid()} overallScore={result.overall_score * 100} engineName="Data Quality" formula={FORMULA} />
             <ComputationBreakdown steps={getComputationSteps()} overallScore={result.overall_score * 100} weightedFormula={FORMULA} engineType="data_quality" euAIActReference={result.eu_ai_act_reference} />
             <RawDataLog logs={rawLogs} />
-            <EvidencePackage hash={result.evidence.hash} timestamp={result.evidence.timestamp} data={{ run_id: result.run_id, metrics: result.metrics, verdict: result.verdict }} />
+            <EvidencePackage 
+              mode="download"
+              data={{ 
+                results: { run_id: result.run_id, metrics: result.metrics, verdict: result.verdict, evidence: result.evidence },
+                rawLogs: rawLogs,
+                modelId: result.dataset_id,
+                evaluationType: 'data_quality',
+                overallScore: result.overall_score * 100,
+                isCompliant: result.verdict === 'PASS',
+                complianceThreshold: 70,
+                weightedFormula: FORMULA
+              }} 
+            />
           </div>
         )}
 
