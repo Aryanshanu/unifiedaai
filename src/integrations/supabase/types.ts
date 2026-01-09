@@ -2290,6 +2290,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_manage_governance: { Args: never; Returns: boolean }
       cleanup_old_logs: { Args: never; Returns: undefined }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       has_any_role: {
@@ -2306,6 +2307,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_system_actor: { Args: never; Returns: boolean }
       lock_system: {
         Args: { p_reason?: string; p_system_id: string }
         Returns: undefined
