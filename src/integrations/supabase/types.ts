@@ -280,6 +280,327 @@ export type Database = {
           },
         ]
       }
+      data_contract_violations: {
+        Row: {
+          auto_actions_taken: Json | null
+          contract_id: string
+          created_at: string
+          dataset_id: string
+          id: string
+          impacted_models: string[] | null
+          quality_run_id: string | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          status: string
+          violation_details: Json
+          violation_type: string
+        }
+        Insert: {
+          auto_actions_taken?: Json | null
+          contract_id: string
+          created_at?: string
+          dataset_id: string
+          id?: string
+          impacted_models?: string[] | null
+          quality_run_id?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity: string
+          status?: string
+          violation_details?: Json
+          violation_type: string
+        }
+        Update: {
+          auto_actions_taken?: Json | null
+          contract_id?: string
+          created_at?: string
+          dataset_id?: string
+          id?: string
+          impacted_models?: string[] | null
+          quality_run_id?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          status?: string
+          violation_details?: Json
+          violation_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_contract_violations_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "data_contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_contract_violations_dataset_id_fkey"
+            columns: ["dataset_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_contract_violations_quality_run_id_fkey"
+            columns: ["quality_run_id"]
+            isOneToOne: false
+            referencedRelation: "dataset_quality_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      data_contracts: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          dataset_id: string
+          distribution_expectations: Json | null
+          enforcement_mode: string
+          freshness_sla_hours: number | null
+          id: string
+          name: string
+          pii_guarantees: Json | null
+          quality_thresholds: Json | null
+          schema_expectations: Json
+          status: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          dataset_id: string
+          distribution_expectations?: Json | null
+          enforcement_mode?: string
+          freshness_sla_hours?: number | null
+          id?: string
+          name: string
+          pii_guarantees?: Json | null
+          quality_thresholds?: Json | null
+          schema_expectations?: Json
+          status?: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          dataset_id?: string
+          distribution_expectations?: Json | null
+          enforcement_mode?: string
+          freshness_sla_hours?: number | null
+          id?: string
+          name?: string
+          pii_guarantees?: Json | null
+          quality_thresholds?: Json | null
+          schema_expectations?: Json
+          status?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_contracts_dataset_id_fkey"
+            columns: ["dataset_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      data_drift_events: {
+        Row: {
+          baseline_value: Json
+          current_value: Json
+          dataset_id: string
+          detected_at: string
+          drift_metric: string
+          drift_score: number | null
+          drift_type: string
+          feature: string
+          id: string
+          impacted_models: string[] | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          status: string
+          threshold: number | null
+        }
+        Insert: {
+          baseline_value: Json
+          current_value: Json
+          dataset_id: string
+          detected_at?: string
+          drift_metric: string
+          drift_score?: number | null
+          drift_type: string
+          feature: string
+          id?: string
+          impacted_models?: string[] | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity: string
+          status?: string
+          threshold?: number | null
+        }
+        Update: {
+          baseline_value?: Json
+          current_value?: Json
+          dataset_id?: string
+          detected_at?: string
+          drift_metric?: string
+          drift_score?: number | null
+          drift_type?: string
+          feature?: string
+          id?: string
+          impacted_models?: string[] | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          status?: string
+          threshold?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_drift_events_dataset_id_fkey"
+            columns: ["dataset_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dataset_lineage_edges: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          dataset_hash: string
+          id: string
+          properties: Json | null
+          relationship_type: string
+          source_dataset_id: string
+          target_entity_id: string
+          target_entity_type: string
+          transformation_hash: string | null
+          valid_from: string
+          valid_to: string | null
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          dataset_hash: string
+          id?: string
+          properties?: Json | null
+          relationship_type: string
+          source_dataset_id: string
+          target_entity_id: string
+          target_entity_type: string
+          transformation_hash?: string | null
+          valid_from?: string
+          valid_to?: string | null
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          dataset_hash?: string
+          id?: string
+          properties?: Json | null
+          relationship_type?: string
+          source_dataset_id?: string
+          target_entity_id?: string
+          target_entity_type?: string
+          transformation_hash?: string | null
+          valid_from?: string
+          valid_to?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dataset_lineage_edges_source_dataset_id_fkey"
+            columns: ["source_dataset_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dataset_quality_runs: {
+        Row: {
+          completeness_score: number | null
+          created_at: string
+          created_by: string | null
+          dataset_id: string
+          distribution_skew: Json | null
+          evidence_hash: string | null
+          freshness_score: number | null
+          id: string
+          metric_details: Json | null
+          overall_score: number | null
+          previous_hash: string | null
+          record_hash: string | null
+          run_type: string
+          sensitive_attribute_balance: Json | null
+          uniqueness_score: number | null
+          validity_score: number | null
+          verdict: string
+        }
+        Insert: {
+          completeness_score?: number | null
+          created_at?: string
+          created_by?: string | null
+          dataset_id: string
+          distribution_skew?: Json | null
+          evidence_hash?: string | null
+          freshness_score?: number | null
+          id?: string
+          metric_details?: Json | null
+          overall_score?: number | null
+          previous_hash?: string | null
+          record_hash?: string | null
+          run_type: string
+          sensitive_attribute_balance?: Json | null
+          uniqueness_score?: number | null
+          validity_score?: number | null
+          verdict: string
+        }
+        Update: {
+          completeness_score?: number | null
+          created_at?: string
+          created_by?: string | null
+          dataset_id?: string
+          distribution_skew?: Json | null
+          evidence_hash?: string | null
+          freshness_score?: number | null
+          id?: string
+          metric_details?: Json | null
+          overall_score?: number | null
+          previous_hash?: string | null
+          record_hash?: string | null
+          run_type?: string
+          sensitive_attribute_balance?: Json | null
+          uniqueness_score?: number | null
+          validity_score?: number | null
+          verdict?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dataset_quality_runs_dataset_id_fkey"
+            columns: ["dataset_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       datasets: {
         Row: {
           consent_status: string
