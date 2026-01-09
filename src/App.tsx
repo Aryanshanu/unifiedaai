@@ -27,6 +27,8 @@ import HallucinationEngine from "./pages/engines/HallucinationEngine";
 import ToxicityEngine from "./pages/engines/ToxicityEngine";
 import PrivacyEngine from "./pages/engines/PrivacyEngine";
 import ExplainabilityEngine from "./pages/engines/ExplainabilityEngine";
+import DataQualityEngine from "./pages/engines/DataQualityEngine";
+import DataContracts from "./pages/DataContracts";
 import Settings from "./pages/Settings";
 import Documentation from "./pages/Documentation";
 import Governance from "./pages/Governance";
@@ -87,6 +89,9 @@ const App = () => (
               <Route path="/engine/toxicity" element={<ProtectedRoute><ToxicityEngine /></ProtectedRoute>} />
               <Route path="/engine/privacy" element={<ProtectedRoute><PrivacyEngine /></ProtectedRoute>} />
               <Route path="/engine/explainability" element={<ProtectedRoute><ExplainabilityEngine /></ProtectedRoute>} />
+              <Route path="/engine/data-quality" element={<ProtectedRoute><DataQualityEngine /></ProtectedRoute>} />
+              {/* Data Governance */}
+              <Route path="/data-contracts" element={<ProtectedRoute><DataContracts /></ProtectedRoute>} />
               {/* Policy */}
               <Route path="/policy" element={<ProtectedRoute><Policy /></ProtectedRoute>} />
               {/* Settings & Docs */}
