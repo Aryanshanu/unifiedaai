@@ -44,7 +44,7 @@ export default function DecisionLedger() {
   });
 
   return (
-    <MainLayout>
+    <MainLayout title="Decision Ledger" subtitle="Immutable, hash-chained record of all AI decisions">
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
