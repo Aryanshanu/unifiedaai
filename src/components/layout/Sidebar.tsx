@@ -65,6 +65,7 @@ const navItems = [
   { divider: true, label: "Configure" },
   { path: "/projects", icon: FolderOpen, label: "Projects" },
   { path: "/models", icon: Database, label: "Models" },
+  { path: "/demo-seed", icon: FlaskConical, label: "Demo Seeder" },
   { path: "/target-state", icon: FileCheck, label: "Target State" },
   { path: "/security-architecture", icon: Shield, label: "Security" },
   { path: "/settings", icon: Settings, label: "Settings" },

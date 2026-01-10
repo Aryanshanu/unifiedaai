@@ -49,6 +49,7 @@ import ImpactDashboard from "./pages/ImpactDashboard";
 import RegulatoryReports from "./pages/RegulatoryReports";
 import TargetState from "./pages/TargetState";
 import SecurityArchitecture from "./pages/SecurityArchitecture";
+import DemoSeed from "./pages/DemoSeed";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -121,6 +122,7 @@ const App = () => (
               <Route path="/golden" element={<ProtectedRoute><GoldenDemoV2 /></ProtectedRoute>} />
               <Route path="/golden-legacy" element={<GoldenDemoLegacy />} />
               <Route path="/run-tests" element={<RunTests />} />
+              <Route path="/demo-seed" element={<ProtectedRoute><DemoSeed /></ProtectedRoute>} />
               <Route path="/gaps-closed" element={<GapsClosed />} />
               <Route path="/truth" element={<Truth />} />
               <Route path="/architecture" element={<ProtectedRoute><Architecture /></ProtectedRoute>} />
