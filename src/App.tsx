@@ -47,6 +47,8 @@ import DecisionAppeals from "./pages/DecisionAppeals";
 import MLOpsAudit from "./pages/MLOpsAudit";
 import ImpactDashboard from "./pages/ImpactDashboard";
 import RegulatoryReports from "./pages/RegulatoryReports";
+import TargetState from "./pages/TargetState";
+import SecurityArchitecture from "./pages/SecurityArchitecture";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -110,6 +112,8 @@ const App = () => (
                 </ProtectedRoute>
               } />
               <Route path="/docs" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
+              <Route path="/target-state" element={<ProtectedRoute><TargetState /></ProtectedRoute>} />
+              <Route path="/security-architecture" element={<ProtectedRoute><SecurityArchitecture /></ProtectedRoute>} />
               {/* Test & Demo Routes */}
               <Route path="/golden" element={<ProtectedRoute><GoldenDemoV2 /></ProtectedRoute>} />
               <Route path="/golden-legacy" element={<GoldenDemoLegacy />} />
