@@ -1286,6 +1286,39 @@ export type Database = {
         }
         Relationships: []
       }
+      governance_activation_state: {
+        Row: {
+          activated_at: string | null
+          activated_by: string | null
+          capability: string
+          created_at: string | null
+          id: string
+          notes: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          activated_at?: string | null
+          activated_by?: string | null
+          capability: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          activated_at?: string | null
+          activated_by?: string | null
+          capability?: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       harm_taxonomy: {
         Row: {
           category: string

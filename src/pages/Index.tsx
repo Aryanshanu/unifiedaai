@@ -4,7 +4,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlatformHealthCards } from "@/components/dashboard/PlatformHealthCards";
 import { RealityCheckDashboard } from "@/components/dashboard/RealityCheckDashboard";
+import GovernanceHealthCards, { GovernanceCoverageBadge } from "@/components/dashboard/GovernanceHealthCards";
 import { useUnsafeDeployments, usePlatformMetrics } from "@/hooks/usePlatformMetrics";
+import { useGovernanceMetrics } from "@/hooks/useGovernanceMetrics";
 import { Database, Scale, AlertCircle, ShieldAlert, Lock, Eye, AlertOctagon, ArrowRight, Shield } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { HealthIndicator } from "@/components/shared/HealthIndicator";
@@ -20,6 +22,7 @@ export default function Index() {
   const { data: models, isLoading: modelsLoading, isError: modelsError, refetch: refetchModels } = useModels();
   const { data: unsafeDeployments, isLoading: deploymentsLoading } = useUnsafeDeployments();
   const { data: metrics, isLoading: metricsLoading, isError: metricsError, refetch: refetchMetrics } = usePlatformMetrics();
+  const { data: governanceMetrics } = useGovernanceMetrics();
   const navigate = useNavigate();
   
   const isLoading = modelsLoading || deploymentsLoading || metricsLoading;
@@ -117,7 +120,7 @@ export default function Index() {
   return (
     <MainLayout 
       title="Command Center" 
-      subtitle="Fractal RAI Platform Overview"
+      subtitle="Unified AI Governance Operating System"
       headerActions={
         <div className="flex items-center gap-3">
           {realtimeActive && (
@@ -157,6 +160,15 @@ export default function Index() {
       {/* Reality Check Dashboard */}
       <div className="mb-6">
         <RealityCheckDashboard />
+      </div>
+
+      {/* Unified Governance Health */}
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-3">
+          Governance Health
+          <GovernanceCoverageBadge rate={governanceMetrics?.governanceCoverageRate || 0} />
+        </h2>
+        <GovernanceHealthCards />
       </div>
 
       {/* Platform Health */}
