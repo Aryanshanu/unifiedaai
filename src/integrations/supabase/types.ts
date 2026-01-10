@@ -607,6 +607,7 @@ export type Database = {
           created_at: string
           data_types: string[] | null
           description: string | null
+          environment: string | null
           id: string
           jurisdiction: string[] | null
           name: string
@@ -623,6 +624,7 @@ export type Database = {
           created_at?: string
           data_types?: string[] | null
           description?: string | null
+          environment?: string | null
           id?: string
           jurisdiction?: string[] | null
           name: string
@@ -639,6 +641,7 @@ export type Database = {
           created_at?: string
           data_types?: string[] | null
           description?: string | null
+          environment?: string | null
           id?: string
           jurisdiction?: string[] | null
           name?: string
@@ -2907,7 +2910,7 @@ export type Database = {
         | "approved"
         | "blocked"
         | "deployed"
-      environment_type: "development" | "staging" | "production"
+      environment_type: "development" | "staging" | "production" | "sandbox"
       evaluation_status: "pending" | "running" | "completed" | "failed"
       impact_quadrant:
         | "low_low"
@@ -3102,7 +3105,7 @@ export const Constants = {
         "blocked",
         "deployed",
       ],
-      environment_type: ["development", "staging", "production"],
+      environment_type: ["development", "staging", "production", "sandbox"],
       evaluation_status: ["pending", "running", "completed", "failed"],
       impact_quadrant: [
         "low_low",
