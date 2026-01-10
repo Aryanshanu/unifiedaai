@@ -81,6 +81,9 @@ const App = () => (
                 </ProtectedRoute>
               } />
               <Route path="/hitl" element={<ProtectedRoute><HITL /></ProtectedRoute>} />
+              {/* Decision Governance */}
+              <Route path="/decision-ledger" element={<ProtectedRoute><DecisionLedger /></ProtectedRoute>} />
+              <Route path="/decision-appeals" element={<ProtectedRoute><DecisionAppeals /></ProtectedRoute>} />
               <Route path="/incidents" element={<ProtectedRoute><Incidents /></ProtectedRoute>} />
               {/* Knowledge Graph */}
               <Route path="/lineage" element={<ProtectedRoute><Lineage /></ProtectedRoute>} />
