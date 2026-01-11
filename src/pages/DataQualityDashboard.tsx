@@ -2,18 +2,24 @@ import { useState } from 'react';
 import { 
   FileCheck, AlertTriangle, Clock, TrendingUp, 
   File, CheckCircle2, XCircle, Loader2, AlertCircle,
-  RefreshCw, Eye
+  RefreshCw, ArrowLeft, Download
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileUploadCard } from '@/components/data/FileUploadCard';
 import { useAllUploads, useQualityStats, useFileUploadStatus, QualityIssue } from '@/hooks/useFileUploadStatus';
-import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+
+// Transparency components
+import { InputOutputScope } from '@/components/engines/InputOutputScope';
+import { MetricWeightGrid, WeightedMetric } from '@/components/engines/MetricWeightGrid';
+import { ComputationBreakdown } from '@/components/engines/ComputationBreakdown';
+import { RawDataLog } from '@/components/engines/RawDataLog';
+import { EvidencePackage } from '@/components/engines/EvidencePackage';
+import { ColumnAnalysisGrid, ColumnAnalysis } from '@/components/engines/ColumnAnalysisGrid';
 
 function StatCard({ 
   title, 
@@ -40,8 +46,8 @@ function StatCard({
               <p className="text-2xl font-bold">{value}</p>
             )}
           </div>
-          <div className={`p-3 rounded-full ${trend === 'up' ? 'bg-green-500/10' : trend === 'down' ? 'bg-red-500/10' : 'bg-primary/10'}`}>
-            <Icon className={`h-5 w-5 ${trend === 'up' ? 'text-green-500' : trend === 'down' ? 'text-red-500' : 'text-primary'}`} />
+          <div className={`p-3 rounded-full ${trend === 'up' ? 'bg-success/10' : trend === 'down' ? 'bg-danger/10' : 'bg-primary/10'}`}>
+            <Icon className={`h-5 w-5 ${trend === 'up' ? 'text-success' : trend === 'down' ? 'text-danger' : 'text-primary'}`} />
           </div>
         </div>
       </CardContent>
@@ -52,7 +58,7 @@ function StatCard({
 function StatusBadge({ status }: { status: string }) {
   switch (status) {
     case 'completed':
-      return <Badge className="bg-green-500/10 text-green-500 border-green-500/20"><CheckCircle2 className="h-3 w-3 mr-1" /> Complete</Badge>;
+      return <Badge className="bg-success/10 text-success border-success/20"><CheckCircle2 className="h-3 w-3 mr-1" /> Complete</Badge>;
     case 'failed':
       return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" /> Failed</Badge>;
     case 'processing':
@@ -68,7 +74,7 @@ function SeverityBadge({ severity }: { severity: string }) {
     case 'critical':
       return <Badge variant="destructive">Critical</Badge>;
     case 'warning':
-      return <Badge className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20">Warning</Badge>;
+      return <Badge className="bg-warning/10 text-warning border-warning/20">Warning</Badge>;
     default:
       return <Badge variant="secondary">Info</Badge>;
   }
@@ -110,7 +116,7 @@ function IssuesList({ issues }: { issues: QualityIssue[] }) {
   if (issues.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
-        <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-green-500" />
+        <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-success" />
         <p>No quality issues detected</p>
       </div>
     );
@@ -121,14 +127,14 @@ function IssuesList({ issues }: { issues: QualityIssue[] }) {
       {issues.map((issue) => (
         <div key={issue.id} className="flex items-start gap-3 p-3 border rounded-lg">
           {issue.severity === 'critical' ? (
-            <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+            <AlertTriangle className="h-5 w-5 text-danger shrink-0 mt-0.5" />
           ) : issue.severity === 'warning' ? (
-            <AlertCircle className="h-5 w-5 text-yellow-500 shrink-0 mt-0.5" />
+            <AlertCircle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
           ) : (
             <AlertCircle className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
           )}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <SeverityBadge severity={issue.severity} />
               <Badge variant="outline">{issue.issue_type}</Badge>
               {issue.column_name && (
@@ -162,15 +168,81 @@ function UploadDetail({ uploadId, onBack }: { uploadId: string; onBack: () => vo
     );
   }
 
+  // Extract analysis details
+  const analysisDetails = status.analysis_details as {
+    column_analysis?: ColumnAnalysis[];
+    computation_steps?: any[];
+    raw_logs?: any[];
+    evidence_hash?: string;
+    weighted_formula?: string;
+    weights?: Record<string, number>;
+    verdict?: string;
+    is_compliant?: boolean;
+  } | null;
+
+  const metadata = status.metadata as {
+    metrics?: {
+      completeness: number;
+      validity: number;
+      uniqueness: number;
+      freshness: number;
+      overall: number;
+    };
+    issue_count?: number;
+  } | null;
+
+  // Build weighted metrics for MetricWeightGrid
+  const weightedMetrics: WeightedMetric[] = metadata?.metrics ? [
+    { key: 'completeness', name: 'Completeness', score: Math.round(metadata.metrics.completeness * 100), weight: 0.25, description: 'Percentage of non-null values' },
+    { key: 'validity', name: 'Validity', score: Math.round(metadata.metrics.validity * 100), weight: 0.30, description: 'Schema and format compliance' },
+    { key: 'uniqueness', name: 'Uniqueness', score: Math.round(metadata.metrics.uniqueness * 100), weight: 0.20, description: 'Duplicate detection' },
+    { key: 'freshness', name: 'Freshness', score: Math.round(metadata.metrics.freshness * 100), weight: 0.25, description: 'Data recency validation' },
+  ] : [];
+
+  // Transform computation steps for ComputationBreakdown
+  const computationSteps = analysisDetails?.computation_steps?.map((step: any) => ({
+    step: step.step,
+    name: step.name,
+    formula: step.formula,
+    inputs: step.inputs,
+    result: typeof step.result === 'number' ? `${step.result}%` : step.result,
+    status: step.status,
+    threshold: step.threshold,
+    weight: step.weight,
+    explanation: step.whyExplanation,
+  })) || [];
+
+  // Transform raw logs
+  const rawLogs = analysisDetails?.raw_logs?.map((log: any) => ({
+    id: log.id,
+    timestamp: log.timestamp,
+    type: log.type,
+    data: log.data,
+    metadata: log.metadata,
+  })) || [];
+
+  const overallScore = status.quality_score || 0;
+  const isCompliant = overallScore >= 70;
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" size="sm" onClick={onBack}>
-          ← Back to list
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to list
         </Button>
         <StatusBadge status={status.status} />
       </div>
 
+      {/* Input/Output Scope */}
+      <InputOutputScope
+        scope="BOTH"
+        inputDescription={`Raw ${status.file_type?.toUpperCase() || 'data'} file: ${status.file_name} (${status.parsed_row_count || 0} rows, ${status.parsed_column_count || 0} columns)`}
+        outputDescription="Quality scores, column statistics, computation breakdown, issue detection, and evidence package"
+      />
+
+      {/* File Info Card */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -178,53 +250,101 @@ function UploadDetail({ uploadId, onBack }: { uploadId: string; onBack: () => vo
             {status.file_name}
           </CardTitle>
           <CardDescription>
-            Uploaded {format(new Date(status.created_at), 'MMMM d, yyyy HH:mm')}
+            Uploaded {format(new Date(status.created_at), 'MMMM d, yyyy HH:mm')} • 
+            Processing time: {status.processing_time_ms || 0}ms
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center p-3 bg-muted/50 rounded-lg">
               <p className="text-sm text-muted-foreground">Quality Score</p>
               <p className="text-2xl font-bold">{status.quality_score ?? '-'}%</p>
             </div>
-            <div>
+            <div className="text-center p-3 bg-muted/50 rounded-lg">
               <p className="text-sm text-muted-foreground">Rows</p>
               <p className="text-2xl font-bold">{status.parsed_row_count ?? '-'}</p>
             </div>
-            <div>
+            <div className="text-center p-3 bg-muted/50 rounded-lg">
               <p className="text-sm text-muted-foreground">Columns</p>
               <p className="text-2xl font-bold">{status.parsed_column_count ?? '-'}</p>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Processing Time</p>
-              <p className="text-2xl font-bold">{status.processing_time_ms ?? '-'}ms</p>
+            <div className="text-center p-3 bg-muted/50 rounded-lg">
+              <p className="text-sm text-muted-foreground">Issues</p>
+              <p className="text-2xl font-bold">{issues.length}</p>
             </div>
           </div>
 
-          {status.metadata && typeof status.metadata === 'object' && (
-            <div className="grid grid-cols-4 gap-2 mb-6">
-              {['completeness', 'validity', 'uniqueness', 'freshness'].map((metric) => {
-                const value = (status.metadata as any)?.metrics?.[metric];
-                return (
-                  <div key={metric} className="text-center p-3 bg-muted/50 rounded-lg">
-                    <p className="text-xs text-muted-foreground capitalize">{metric}</p>
-                    <p className="text-lg font-semibold">
-                      {value !== undefined ? `${Math.round(value * 100)}%` : '-'}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
           {status.error_message && (
-            <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg mb-6">
-              <p className="text-sm text-destructive">{status.error_message}</p>
+            <div className="mt-4 p-3 bg-danger/10 border border-danger/20 rounded-lg">
+              <p className="text-sm text-danger">{status.error_message}</p>
             </div>
           )}
         </CardContent>
       </Card>
 
+      {/* Metric Weight Grid */}
+      {weightedMetrics.length > 0 && (
+        <MetricWeightGrid
+          metrics={weightedMetrics}
+          overallScore={overallScore}
+          engineName="Data Quality"
+          formula="0.25×Comp + 0.30×Valid + 0.20×Uniq + 0.25×Fresh"
+          complianceThreshold={70}
+        />
+      )}
+
+      {/* Column Analysis */}
+      {analysisDetails?.column_analysis && analysisDetails.column_analysis.length > 0 && (
+        <ColumnAnalysisGrid 
+          columns={analysisDetails.column_analysis}
+          showDetails={true}
+        />
+      )}
+
+      {/* Computation Breakdown */}
+      {computationSteps.length > 0 && (
+        <ComputationBreakdown
+          steps={computationSteps}
+          overallScore={overallScore}
+          weightedFormula="0.25×Completeness + 0.30×Validity + 0.20×Uniqueness + 0.25×Freshness"
+          engineType="data-quality"
+          euAIActReference="EU AI Act Article 10 - Data Quality Requirements"
+        />
+      )}
+
+      {/* Raw Data Logs */}
+      {rawLogs.length > 0 && (
+        <RawDataLog logs={rawLogs} />
+      )}
+
+      {/* Evidence Package */}
+      <EvidencePackage
+        mode="full"
+        data={{
+          results: {
+            quality_score: overallScore,
+            metrics: metadata?.metrics,
+            column_count: status.parsed_column_count,
+            row_count: status.parsed_row_count,
+            issue_count: issues.length,
+          },
+          rawLogs: rawLogs,
+          modelId: status.id,
+          evaluationType: 'data-quality',
+          overallScore: overallScore,
+          isCompliant: isCompliant,
+          complianceThreshold: 70,
+          weightedFormula: '0.25×Comp + 0.30×Valid + 0.20×Uniq + 0.25×Fresh',
+          weightedMetrics: metadata?.metrics ? {
+            completeness: metadata.metrics.completeness,
+            validity: metadata.metrics.validity,
+            uniqueness: metadata.metrics.uniqueness,
+            freshness: metadata.metrics.freshness,
+          } : undefined,
+        }}
+      />
+
+      {/* Quality Issues */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -268,9 +388,9 @@ export default function DataQualityDashboard() {
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Data Quality Dashboard</h1>
+          <h1 className="text-3xl font-bold">Data Quality Engine</h1>
           <p className="text-muted-foreground">
-            Real-time file quality auditing with semantic analysis
+            Governance-grade file quality auditing with transparent scoring
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={refetch}>
@@ -363,7 +483,7 @@ export default function DataQualityDashboard() {
         <CardContent>
           {recentIssues.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-green-500" />
+              <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-success" />
               <p>All files passed quality checks</p>
             </div>
           ) : (

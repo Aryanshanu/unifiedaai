@@ -12,6 +12,7 @@ export interface UploadStatus {
   parsed_row_count: number | null;
   parsed_column_count: number | null;
   metadata: Record<string, unknown> | null;
+  analysis_details: Record<string, unknown> | null;
   created_at: string;
   completed_at: string | null;
   processing_time_ms: number | null;

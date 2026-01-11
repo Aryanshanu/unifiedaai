@@ -53,6 +53,10 @@ const WEIGHTED_FORMULAS: Record<string, { formula: string; weights: Record<strin
     formula: "0.30×Clarity + 0.30×Faith + 0.20×Coverage + 0.10×Action + 0.10×Simple",
     weights: { clarity: 0.30, faith: 0.30, coverage: 0.20, action: 0.10, simple: 0.10 }
   },
+  'data-quality': {
+    formula: "0.25×Comp + 0.30×Valid + 0.20×Uniq + 0.25×Fresh",
+    weights: { completeness: 0.25, validity: 0.30, uniqueness: 0.20, freshness: 0.25 }
+  },
 };
 
 // HuggingFace model mappings for each engine type
@@ -62,6 +66,7 @@ const HF_MODEL_MAP: Record<string, ModelInfo> = {
   hallucination: { id: "vectara/hallucination_evaluation_model", version: "latest" },
   fairness: { id: "AIF360 (statistical)", version: "0.5.1" },
   explainability: { id: "Lovable AI (Gemini 2.5 Pro)", version: "latest" },
+  'data-quality': { id: "Lovable AI (Gemini 2.5 Flash)", version: "latest" },
 };
 
 export function EvidencePackage({ data, mode = 'full' }: EvidencePackageProps) {
