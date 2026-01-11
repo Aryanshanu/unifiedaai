@@ -1,6 +1,66 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+export interface AISummary {
+  brief_summary: string;
+  priority_categories: {
+    high: { issues: string[]; count: number; action: string };
+    medium: { issues: string[]; count: number; action: string };
+    low: { issues: string[]; count: number; action: string };
+  };
+  recommendations: string[];
+  data_quality_verdict: 'Ready for Production' | 'Needs Review' | 'Critical Issues Found';
+  confidence_score: number;
+  generated_at: string;
+  model_used: string;
+}
+
+export interface AnalysisDetails {
+  column_analysis?: Array<{
+    column: string;
+    type: string;
+    total_values: number;
+    null_count: number;
+    null_percentage: number;
+    unique_values: number;
+    unique_percentage: number;
+    min?: number;
+    max?: number;
+    mean?: number;
+    std_dev?: number;
+    sample_values: (string | number | null)[];
+    range_violations: number;
+    format_violations: number;
+    status: 'pass' | 'warn' | 'fail';
+  }>;
+  computation_steps?: Array<{
+    step: number;
+    name: string;
+    formula: string;
+    inputs: Record<string, number | string>;
+    result: number | string;
+    threshold?: number;
+    status: 'pass' | 'warn' | 'fail' | 'info';
+    weight?: number;
+    whyExplanation: string;
+  }>;
+  raw_logs?: Array<{
+    id: string;
+    timestamp: string;
+    type: 'input' | 'computation' | 'output' | 'error';
+    data: Record<string, unknown>;
+    metadata?: Record<string, unknown>;
+  }>;
+  evidence_hash?: string;
+  inferred_schema?: Record<string, string>;
+  weighted_formula?: string;
+  weights?: Record<string, number>;
+  verdict?: string;
+  compliance_threshold?: number;
+  is_compliant?: boolean;
+  ai_summary?: AISummary;
+}
+
 export interface UploadStatus {
   id: string;
   file_name: string;
@@ -12,7 +72,7 @@ export interface UploadStatus {
   parsed_row_count: number | null;
   parsed_column_count: number | null;
   metadata: Record<string, unknown> | null;
-  analysis_details: Record<string, unknown> | null;
+  analysis_details: AnalysisDetails | null;
   created_at: string;
   completed_at: string | null;
   processing_time_ms: number | null;

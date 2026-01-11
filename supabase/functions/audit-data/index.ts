@@ -69,6 +69,21 @@ const WEIGHTS = {
   freshness: 0.25,
 };
 
+// AI Summary interface
+interface AISummary {
+  brief_summary: string;
+  priority_categories: {
+    high: { issues: string[]; count: number; action: string };
+    medium: { issues: string[]; count: number; action: string };
+    low: { issues: string[]; count: number; action: string };
+  };
+  recommendations: string[];
+  data_quality_verdict: 'Ready for Production' | 'Needs Review' | 'Critical Issues Found';
+  confidence_score: number;
+  generated_at: string;
+  model_used: string;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -336,6 +351,23 @@ Deno.serve(async (req) => {
 
     const processingTime = Date.now() - startTime;
 
+    // Generate AI Summary
+    console.log(`[audit-data] Generating AI summary for ${upload_id}`);
+    const aiSummary = await generateAISummary(
+      metrics,
+      columnAnalysis,
+      issues,
+      upload.file_name,
+      rowCount
+    );
+
+    addLog('computation', {
+      step: 'ai_summary',
+      model: 'google/gemini-3-flash-preview',
+      verdict: aiSummary.data_quality_verdict,
+      confidence: aiSummary.confidence_score,
+    });
+
     // Build analysis details
     const analysisDetails = {
       column_analysis: columnAnalysis,
@@ -348,6 +380,7 @@ Deno.serve(async (req) => {
       verdict,
       compliance_threshold: 70,
       is_compliant: qualityScore >= 70,
+      ai_summary: aiSummary,
     };
 
     // Update upload with final results
@@ -692,6 +725,153 @@ function calculateDetailedQualityMetrics(
     },
     computationSteps: steps,
   };
+}
+
+async function generateAISummary(
+  metrics: QualityMetrics,
+  columnAnalysis: ColumnAnalysis[],
+  issues: QualityIssue[],
+  fileName: string,
+  rowCount: number
+): Promise<AISummary> {
+  const defaultSummary: AISummary = {
+    brief_summary: `This dataset contains ${rowCount} records with an overall quality score of ${Math.round(metrics.overall * 100)}%. ${issues.length === 0 ? 'No quality issues were detected.' : `${issues.length} issue(s) were identified during analysis.`}`,
+    priority_categories: {
+      high: { issues: [], count: 0, action: '' },
+      medium: { issues: [], count: 0, action: '' },
+      low: { issues: [], count: 0, action: '' }
+    },
+    recommendations: [],
+    data_quality_verdict: metrics.overall >= 0.9 ? 'Ready for Production' : metrics.overall >= 0.7 ? 'Needs Review' : 'Critical Issues Found',
+    confidence_score: 85,
+    generated_at: new Date().toISOString(),
+    model_used: 'google/gemini-3-flash-preview'
+  };
+
+  // Categorize issues by priority
+  const criticalIssues = issues.filter(i => i.severity === 'critical');
+  const warningIssues = issues.filter(i => i.severity === 'warning');
+  const infoIssues = issues.filter(i => i.severity === 'info');
+
+  defaultSummary.priority_categories.high = {
+    issues: criticalIssues.slice(0, 5).map(i => i.description),
+    count: criticalIssues.length,
+    action: criticalIssues.length > 0 ? 'Immediately review and fix critical data quality issues before using this data.' : ''
+  };
+
+  defaultSummary.priority_categories.medium = {
+    issues: warningIssues.slice(0, 5).map(i => i.description),
+    count: warningIssues.length,
+    action: warningIssues.length > 0 ? 'Review warning issues and apply corrections where applicable.' : ''
+  };
+
+  defaultSummary.priority_categories.low = {
+    issues: infoIssues.slice(0, 5).map(i => i.description),
+    count: infoIssues.length,
+    action: infoIssues.length > 0 ? 'Consider addressing informational issues for optimal data quality.' : ''
+  };
+
+  try {
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      console.log('[audit-data] LOVABLE_API_KEY not found, using default summary');
+      return defaultSummary;
+    }
+
+    const prompt = `You are a Data Quality Analyst. Analyze this data quality assessment and provide a structured summary.
+
+Dataset: ${fileName}
+Rows: ${rowCount}
+Columns: ${columnAnalysis.length}
+
+Quality Metrics:
+- Completeness: ${Math.round(metrics.completeness * 100)}%
+- Validity: ${Math.round(metrics.validity * 100)}%  
+- Uniqueness: ${Math.round(metrics.uniqueness * 100)}%
+- Freshness: ${Math.round(metrics.freshness * 100)}%
+- Overall Score: ${Math.round(metrics.overall * 100)}%
+
+Column Analysis:
+${columnAnalysis.slice(0, 10).map(c => `- ${c.column} (${c.type}): ${c.null_percentage.toFixed(1)}% nulls, ${c.unique_percentage.toFixed(1)}% unique${c.status !== 'pass' ? ' [' + c.status.toUpperCase() + ']' : ''}`).join('\n')}
+
+Issues Found (${issues.length}):
+${issues.slice(0, 15).map(i => `- [${i.severity.toUpperCase()}] ${i.issue_type}: ${i.description}`).join('\n')}
+
+Provide a JSON response with:
+1. brief_summary: 2-3 sentences summarizing the data quality in plain language
+2. priority_categories: Group issues into high/medium/low with specific issues list, counts, and recommended actions
+3. recommendations: 3-5 specific, actionable steps to improve quality (be concrete)
+4. data_quality_verdict: One of "Ready for Production", "Needs Review", or "Critical Issues Found"
+5. confidence_score: Your confidence in this assessment (0-100)
+
+Return ONLY valid JSON, no markdown code blocks, no explanation. Example:
+{"brief_summary":"...","priority_categories":{"high":{"issues":[],"count":0,"action":""},"medium":{"issues":[],"count":0,"action":""},"low":{"issues":[],"count":0,"action":""}},"recommendations":["..."],"data_quality_verdict":"Needs Review","confidence_score":87}`;
+
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-3-flash-preview',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.3,
+        max_tokens: 1500
+      })
+    });
+
+    if (!response.ok) {
+      console.error('[audit-data] AI summary request failed:', response.status);
+      return defaultSummary;
+    }
+
+    const result = await response.json();
+    const content = result.choices?.[0]?.message?.content || '';
+    
+    // Extract JSON from response (handle potential markdown code blocks)
+    let jsonStr = content.trim();
+    if (jsonStr.startsWith('```')) {
+      jsonStr = jsonStr.replace(/```json?\s*/g, '').replace(/```\s*$/g, '');
+    }
+    
+    const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      
+      return {
+        brief_summary: parsed.brief_summary || defaultSummary.brief_summary,
+        priority_categories: {
+          high: {
+            issues: parsed.priority_categories?.high?.issues || defaultSummary.priority_categories.high.issues,
+            count: parsed.priority_categories?.high?.count ?? defaultSummary.priority_categories.high.count,
+            action: parsed.priority_categories?.high?.action || defaultSummary.priority_categories.high.action
+          },
+          medium: {
+            issues: parsed.priority_categories?.medium?.issues || defaultSummary.priority_categories.medium.issues,
+            count: parsed.priority_categories?.medium?.count ?? defaultSummary.priority_categories.medium.count,
+            action: parsed.priority_categories?.medium?.action || defaultSummary.priority_categories.medium.action
+          },
+          low: {
+            issues: parsed.priority_categories?.low?.issues || defaultSummary.priority_categories.low.issues,
+            count: parsed.priority_categories?.low?.count ?? defaultSummary.priority_categories.low.count,
+            action: parsed.priority_categories?.low?.action || defaultSummary.priority_categories.low.action
+          }
+        },
+        recommendations: parsed.recommendations || defaultSummary.recommendations,
+        data_quality_verdict: parsed.data_quality_verdict || defaultSummary.data_quality_verdict,
+        confidence_score: parsed.confidence_score ?? defaultSummary.confidence_score,
+        generated_at: new Date().toISOString(),
+        model_used: 'google/gemini-3-flash-preview'
+      };
+    }
+    
+    console.log('[audit-data] Could not parse AI response, using default summary');
+    return defaultSummary;
+  } catch (error) {
+    console.error('[audit-data] AI summary generation error:', error);
+    return defaultSummary;
+  }
 }
 
 async function performSemanticAnalysis(sampleData: Record<string, unknown>[]): Promise<QualityIssue[]> {
