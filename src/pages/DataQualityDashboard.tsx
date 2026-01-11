@@ -20,6 +20,7 @@ import { ComputationBreakdown } from '@/components/engines/ComputationBreakdown'
 import { RawDataLog } from '@/components/engines/RawDataLog';
 import { EvidencePackage } from '@/components/engines/EvidencePackage';
 import { ColumnAnalysisGrid, ColumnAnalysis } from '@/components/engines/ColumnAnalysisGrid';
+import { AISummaryPanel } from '@/components/engines/AISummaryPanel';
 
 function StatCard({ 
   title, 
@@ -168,17 +169,8 @@ function UploadDetail({ uploadId, onBack }: { uploadId: string; onBack: () => vo
     );
   }
 
-  // Extract analysis details
-  const analysisDetails = status.analysis_details as {
-    column_analysis?: ColumnAnalysis[];
-    computation_steps?: any[];
-    raw_logs?: any[];
-    evidence_hash?: string;
-    weighted_formula?: string;
-    weights?: Record<string, number>;
-    verdict?: string;
-    is_compliant?: boolean;
-  } | null;
+  // Extract analysis details - now properly typed
+  const analysisDetails = status.analysis_details;
 
   const metadata = status.metadata as {
     metrics?: {
@@ -291,6 +283,11 @@ function UploadDetail({ uploadId, onBack }: { uploadId: string; onBack: () => vo
           formula="0.25×Comp + 0.30×Valid + 0.20×Uniq + 0.25×Fresh"
           complianceThreshold={70}
         />
+      )}
+
+      {/* AI Summary Panel */}
+      {analysisDetails?.ai_summary && (
+        <AISummaryPanel summary={analysisDetails.ai_summary} />
       )}
 
       {/* Column Analysis */}
