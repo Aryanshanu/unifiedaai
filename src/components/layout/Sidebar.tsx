@@ -54,6 +54,7 @@ const navItems = [
   { path: "/engine/privacy", icon: Lock, label: "Privacy" },
   { path: "/engine/explainability", icon: Eye, label: "Explainability" },
   { path: "/engine/data-quality", icon: Database, label: "Data Quality" },
+  { path: "/data-quality-dashboard", icon: FileCheck, label: "Quality Audit" },
   { divider: true, label: "Respond" },
   { path: "/policy", icon: FileText, label: "Policy Studio" },
   { path: "/data-contracts", icon: FileText, label: "Data Contracts" },

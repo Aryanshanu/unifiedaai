@@ -477,6 +477,63 @@ export type Database = {
           },
         ]
       }
+      data_uploads: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          error_message: string | null
+          file_name: string
+          file_path: string
+          file_size_bytes: number | null
+          file_type: string | null
+          file_url: string | null
+          id: string
+          metadata: Json | null
+          parsed_column_count: number | null
+          parsed_row_count: number | null
+          processing_time_ms: number | null
+          quality_score: number | null
+          status: string | null
+          user_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          file_name: string
+          file_path: string
+          file_size_bytes?: number | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          metadata?: Json | null
+          parsed_column_count?: number | null
+          parsed_row_count?: number | null
+          processing_time_ms?: number | null
+          quality_score?: number | null
+          status?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          file_name?: string
+          file_path?: string
+          file_size_bytes?: number | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          metadata?: Json | null
+          parsed_column_count?: number | null
+          parsed_row_count?: number | null
+          processing_time_ms?: number | null
+          quality_score?: number | null
+          status?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       dataset_lineage_edges: {
         Row: {
           created_at: string
@@ -2083,6 +2140,72 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      quality_issues: {
+        Row: {
+          column_name: string | null
+          created_at: string | null
+          dataset_id: string | null
+          description: string
+          id: string
+          issue_type: string
+          resolved_at: string | null
+          resolved_by: string | null
+          row_reference: number | null
+          severity: string | null
+          status: string | null
+          suggested_fix: string | null
+          upload_id: string | null
+          value_sample: string | null
+        }
+        Insert: {
+          column_name?: string | null
+          created_at?: string | null
+          dataset_id?: string | null
+          description: string
+          id?: string
+          issue_type: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          row_reference?: number | null
+          severity?: string | null
+          status?: string | null
+          suggested_fix?: string | null
+          upload_id?: string | null
+          value_sample?: string | null
+        }
+        Update: {
+          column_name?: string | null
+          created_at?: string | null
+          dataset_id?: string | null
+          description?: string
+          id?: string
+          issue_type?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          row_reference?: number | null
+          severity?: string | null
+          status?: string | null
+          suggested_fix?: string | null
+          upload_id?: string | null
+          value_sample?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quality_issues_dataset_id_fkey"
+            columns: ["dataset_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quality_issues_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "data_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       rai_composite_scores: {
         Row: {

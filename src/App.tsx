@@ -50,6 +50,7 @@ import RegulatoryReports from "./pages/RegulatoryReports";
 import TargetState from "./pages/TargetState";
 import SecurityArchitecture from "./pages/SecurityArchitecture";
 import DemoSeed from "./pages/DemoSeed";
+import DataQualityDashboard from "./pages/DataQualityDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -105,6 +106,7 @@ const App = () => (
               <Route path="/engine/privacy" element={<ProtectedRoute><PrivacyEngine /></ProtectedRoute>} />
               <Route path="/engine/explainability" element={<ProtectedRoute><ExplainabilityEngine /></ProtectedRoute>} />
               <Route path="/engine/data-quality" element={<ProtectedRoute><DataQualityEngine /></ProtectedRoute>} />
+              <Route path="/data-quality-dashboard" element={<ProtectedRoute><DataQualityDashboard /></ProtectedRoute>} />
               {/* Data Governance */}
               <Route path="/data-contracts" element={<ProtectedRoute><DataContracts /></ProtectedRoute>} />
               {/* Policy */}
