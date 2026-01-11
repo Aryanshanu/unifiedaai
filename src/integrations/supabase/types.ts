@@ -479,6 +479,7 @@ export type Database = {
       }
       data_uploads: {
         Row: {
+          analysis_details: Json | null
           completed_at: string | null
           created_at: string | null
           error_message: string | null
@@ -497,6 +498,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          analysis_details?: Json | null
           completed_at?: string | null
           created_at?: string | null
           error_message?: string | null
@@ -515,6 +517,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          analysis_details?: Json | null
           completed_at?: string | null
           created_at?: string | null
           error_message?: string | null
