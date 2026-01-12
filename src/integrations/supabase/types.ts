@@ -158,6 +158,41 @@ export type Database = {
           },
         ]
       }
+      bronze_data: {
+        Row: {
+          created_at: string | null
+          id: string
+          raw_data: Json
+          record_hash: string | null
+          row_index: number
+          upload_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          raw_data: Json
+          record_hash?: string | null
+          row_index: number
+          upload_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          raw_data?: Json
+          record_hash?: string | null
+          row_index?: number
+          upload_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bronze_data_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "data_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       control_assessments: {
         Row: {
           assessed_at: string | null
@@ -481,6 +516,9 @@ export type Database = {
         Row: {
           analysis_details: Json | null
           completed_at: string | null
+          contract_check_status: string | null
+          contract_id: string | null
+          contract_violations: Json | null
           created_at: string | null
           error_message: string | null
           file_name: string
@@ -500,6 +538,9 @@ export type Database = {
         Insert: {
           analysis_details?: Json | null
           completed_at?: string | null
+          contract_check_status?: string | null
+          contract_id?: string | null
+          contract_violations?: Json | null
           created_at?: string | null
           error_message?: string | null
           file_name: string
@@ -519,6 +560,9 @@ export type Database = {
         Update: {
           analysis_details?: Json | null
           completed_at?: string | null
+          contract_check_status?: string | null
+          contract_id?: string | null
+          contract_violations?: Json | null
           created_at?: string | null
           error_message?: string | null
           file_name?: string
@@ -535,7 +579,15 @@ export type Database = {
           status?: string | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "data_uploads_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "data_contracts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       dataset_lineage_edges: {
         Row: {
@@ -1349,6 +1401,68 @@ export type Database = {
         }
         Relationships: []
       }
+      gold_quality_metrics: {
+        Row: {
+          bias_score: number | null
+          completeness_score: number | null
+          created_at: string | null
+          files_processed: number | null
+          freshness_score: number | null
+          id: string
+          issue_count: number | null
+          metric_date: string
+          overall_score: number | null
+          remediation_count: number | null
+          trust_grade: string | null
+          uniqueness_score: number | null
+          upload_id: string | null
+          user_id: string | null
+          validity_score: number | null
+        }
+        Insert: {
+          bias_score?: number | null
+          completeness_score?: number | null
+          created_at?: string | null
+          files_processed?: number | null
+          freshness_score?: number | null
+          id?: string
+          issue_count?: number | null
+          metric_date: string
+          overall_score?: number | null
+          remediation_count?: number | null
+          trust_grade?: string | null
+          uniqueness_score?: number | null
+          upload_id?: string | null
+          user_id?: string | null
+          validity_score?: number | null
+        }
+        Update: {
+          bias_score?: number | null
+          completeness_score?: number | null
+          created_at?: string | null
+          files_processed?: number | null
+          freshness_score?: number | null
+          id?: string
+          issue_count?: number | null
+          metric_date?: string
+          overall_score?: number | null
+          remediation_count?: number | null
+          trust_grade?: string | null
+          uniqueness_score?: number | null
+          upload_id?: string | null
+          user_id?: string | null
+          validity_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gold_quality_metrics_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "data_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       governance_activation_state: {
         Row: {
           activated_at: string | null
@@ -2066,6 +2180,50 @@ export type Database = {
           },
         ]
       }
+      processing_queue: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          error_message: string | null
+          id: string
+          result: Json | null
+          stage: string
+          started_at: string | null
+          status: string | null
+          upload_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          result?: Json | null
+          stage: string
+          started_at?: string | null
+          status?: string | null
+          upload_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          result?: Json | null
+          stage?: string
+          started_at?: string | null
+          status?: string | null
+          upload_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "processing_queue_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "data_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -2436,6 +2594,81 @@ export type Database = {
           },
         ]
       }
+      remediation_actions: {
+        Row: {
+          action_type: string
+          affected_columns: string[] | null
+          affected_rows: number | null
+          created_at: string | null
+          description: string | null
+          estimated_impact: Json | null
+          executed_at: string | null
+          executed_by: string | null
+          execution_result: Json | null
+          id: string
+          issue_id: string | null
+          python_script: string | null
+          reversible: boolean | null
+          safety_score: number | null
+          sql_preview: string | null
+          status: string | null
+          upload_id: string
+        }
+        Insert: {
+          action_type: string
+          affected_columns?: string[] | null
+          affected_rows?: number | null
+          created_at?: string | null
+          description?: string | null
+          estimated_impact?: Json | null
+          executed_at?: string | null
+          executed_by?: string | null
+          execution_result?: Json | null
+          id?: string
+          issue_id?: string | null
+          python_script?: string | null
+          reversible?: boolean | null
+          safety_score?: number | null
+          sql_preview?: string | null
+          status?: string | null
+          upload_id: string
+        }
+        Update: {
+          action_type?: string
+          affected_columns?: string[] | null
+          affected_rows?: number | null
+          created_at?: string | null
+          description?: string | null
+          estimated_impact?: Json | null
+          executed_at?: string | null
+          executed_by?: string | null
+          execution_result?: Json | null
+          id?: string
+          issue_id?: string | null
+          python_script?: string | null
+          reversible?: boolean | null
+          safety_score?: number | null
+          sql_preview?: string | null
+          status?: string | null
+          upload_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "remediation_actions_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "quality_issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "remediation_actions_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "data_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       request_logs: {
         Row: {
           created_at: string
@@ -2695,6 +2928,54 @@ export type Database = {
         }
         Relationships: []
       }
+      silver_data: {
+        Row: {
+          bronze_id: string
+          clean_data: Json
+          created_at: string | null
+          id: string
+          remediation_ids: string[] | null
+          transformations_applied: string[] | null
+          upload_id: string
+          validation_passed: boolean | null
+        }
+        Insert: {
+          bronze_id: string
+          clean_data: Json
+          created_at?: string | null
+          id?: string
+          remediation_ids?: string[] | null
+          transformations_applied?: string[] | null
+          upload_id: string
+          validation_passed?: boolean | null
+        }
+        Update: {
+          bronze_id?: string
+          clean_data?: Json
+          created_at?: string | null
+          id?: string
+          remediation_ids?: string[] | null
+          transformations_applied?: string[] | null
+          upload_id?: string
+          validation_passed?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "silver_data_bronze_id_fkey"
+            columns: ["bronze_id"]
+            isOneToOne: false
+            referencedRelation: "bronze_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "silver_data_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "data_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       system_approvals: {
         Row: {
           approved_at: string | null
@@ -2928,6 +3209,101 @@ export type Database = {
           },
         ]
       }
+      test_run_results: {
+        Row: {
+          actual_score: number | null
+          created_at: string | null
+          detected_issues: string[] | null
+          execution_time_ms: number | null
+          failure_reasons: string[] | null
+          id: string
+          passed: boolean
+          run_by: string | null
+          scenario_id: string
+        }
+        Insert: {
+          actual_score?: number | null
+          created_at?: string | null
+          detected_issues?: string[] | null
+          execution_time_ms?: number | null
+          failure_reasons?: string[] | null
+          id?: string
+          passed: boolean
+          run_by?: string | null
+          scenario_id: string
+        }
+        Update: {
+          actual_score?: number | null
+          created_at?: string | null
+          detected_issues?: string[] | null
+          execution_time_ms?: number | null
+          failure_reasons?: string[] | null
+          id?: string
+          passed?: boolean
+          run_by?: string | null
+          scenario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "test_run_results_scenario_id_fkey"
+            columns: ["scenario_id"]
+            isOneToOne: false
+            referencedRelation: "test_scenarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      test_scenarios: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          difficulty: string | null
+          expected_issues: string[] | null
+          expected_score_max: number
+          expected_score_min: number
+          forbidden_issues: string[] | null
+          id: string
+          input_payload: Json
+          is_active: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          difficulty?: string | null
+          expected_issues?: string[] | null
+          expected_score_max: number
+          expected_score_min: number
+          forbidden_issues?: string[] | null
+          id?: string
+          input_payload: Json
+          is_active?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          difficulty?: string | null
+          expected_issues?: string[] | null
+          expected_score_max?: number
+          expected_score_min?: number
+          forbidden_issues?: string[] | null
+          id?: string
+          input_payload?: Json
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       user_provider_keys: {
         Row: {
           api_key_encrypted: string
@@ -2976,6 +3352,45 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      weight_profiles: {
+        Row: {
+          column_importance: Json | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_default: boolean | null
+          name: string
+          updated_at: string | null
+          use_case: string | null
+          weights: Json
+        }
+        Insert: {
+          column_importance?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_default?: boolean | null
+          name: string
+          updated_at?: string | null
+          use_case?: string | null
+          weights: Json
+        }
+        Update: {
+          column_importance?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          updated_at?: string | null
+          use_case?: string | null
+          weights?: Json
         }
         Relationships: []
       }
