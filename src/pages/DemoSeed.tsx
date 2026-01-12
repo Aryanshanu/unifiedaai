@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useDemoSeeder, DemoSeedResult } from "@/hooks/useDemoSeeder";
+import { useAuth } from "@/hooks/useAuth";
 import { 
   Play, 
   Trash2, 
@@ -20,10 +21,12 @@ import {
   BarChart3,
   GitBranch,
   Users,
-  RefreshCw
+  RefreshCw,
+  LogIn
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
+import { Link } from "react-router-dom";
 
 interface VerificationItem {
   label: string;
@@ -95,6 +98,9 @@ export default function DemoSeed() {
     DEMO_PROJECT_NAME
   } = useDemoSeeder();
 
+  const { user, loading: authLoading } = useAuth();
+  const isAuthenticated = !!user;
+
   const [demoExists, setDemoExists] = useState<boolean | null>(null);
   const [isChecking, setIsChecking] = useState(true);
 
@@ -123,6 +129,20 @@ export default function DemoSeed() {
   return (
     <MainLayout title="Demo Data Seeder" subtitle="Initialize end-to-end governance test data">
       <div className="space-y-6 max-w-4xl mx-auto">
+        {/* Auth Warning Banner */}
+        {!authLoading && !isAuthenticated && (
+          <Alert className="border-destructive/50 bg-destructive/10">
+            <LogIn className="h-4 w-4 text-destructive" />
+            <AlertTitle className="text-destructive">Authentication Required</AlertTitle>
+            <AlertDescription className="text-destructive/80">
+              You must be logged in to seed demo data. This is required by the database security policies.{" "}
+              <Link to="/auth" className="underline font-medium hover:text-destructive">
+                Log in or sign up here
+              </Link>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Warning Banner */}
         <Alert className="border-amber-500/50 bg-amber-500/10">
           <AlertTriangle className="h-4 w-4 text-amber-500" />
@@ -182,13 +202,18 @@ export default function DemoSeed() {
             <div className="flex gap-3">
               <Button
                 onClick={handleSeed}
-                disabled={isSeeding || isClearing}
+                disabled={isSeeding || isClearing || !isAuthenticated}
                 className="flex-1"
               >
                 {isSeeding ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Seeding...
+                  </>
+                ) : !isAuthenticated ? (
+                  <>
+                    <LogIn className="mr-2 h-4 w-4" />
+                    Login Required
                   </>
                 ) : demoExists ? (
                   <>
