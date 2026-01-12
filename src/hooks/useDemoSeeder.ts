@@ -50,7 +50,7 @@ export function useDemoSeeder() {
     return `sha256:${Math.abs(hash).toString(16).padStart(16, '0')}`;
   };
 
-  const seedDemoProject = async (): Promise<string> => {
+  const seedDemoProject = async (userId: string): Promise<string> => {
     updateProgress('Creating Demo Project', 1, 'Fractal Demo Sandbox');
     
     // Check if demo project already exists
@@ -73,7 +73,8 @@ export function useDemoSeeder() {
         description: 'Synthetic demo environment for governance testing. Contains realistic test data including PASS and FAIL cases.',
         data_sensitivity: 'high',
         business_sensitivity: 'low',
-        compliance_frameworks: ['eu-ai-act', 'gdpr']
+        compliance_frameworks: ['eu-ai-act', 'gdpr'],
+        owner_id: userId
       })
       .select('id')
       .single();
@@ -611,8 +612,14 @@ export function useDemoSeeder() {
     setSeedResult(null);
 
     try {
-      // 1. Create project
-      const projectId = await seedDemoProject();
+      // Pre-check: Must be authenticated for RLS
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        throw new Error('You must be logged in to seed demo data');
+      }
+
+      // 1. Create project (requires user ID for RLS)
+      const projectId = await seedDemoProject(user.id);
 
       // 2. Create dataset
       const datasetId = await seedDemoDataset();
