@@ -76,6 +76,9 @@ export interface UploadStatus {
   created_at: string;
   completed_at: string | null;
   processing_time_ms: number | null;
+  contract_id: string | null;
+  contract_check_status: 'pending' | 'passed' | 'failed' | 'skipped' | null;
+  contract_violations: Record<string, unknown> | null;
 }
 
 export interface QualityIssue {
