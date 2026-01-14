@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders } from "../_shared/auth-helper.ts";
+import { validateMLOpsEventInput, validationErrorResponse } from "../_shared/input-validation.ts";
 
 interface MLOpsEventRequest {
   systemId: string;
@@ -28,15 +29,14 @@ serve(async (req) => {
   const startTime = Date.now();
 
   try {
-    const body: MLOpsEventRequest = await req.json();
-    const { systemId, modelId, eventType, eventDetails, actorId, artifactHash, commitSha } = body;
-
-    if (!systemId || !eventType) {
-      return new Response(
-        JSON.stringify({ error: "systemId and eventType are required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Validate input with schema
+    const body = await req.json();
+    const validation = validateMLOpsEventInput(body);
+    if (!validation.success) {
+      return validationErrorResponse(validation.errors!, corsHeaders);
     }
+    
+    const { systemId, modelId, eventType, eventDetails, actorId, artifactHash, commitSha } = validation.data!;
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

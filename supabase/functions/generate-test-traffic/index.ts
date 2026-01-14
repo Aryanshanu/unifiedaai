@@ -1,7 +1,14 @@
+// ============================================================
+// DEVELOPMENT TOOL: Test Data Generator
+// Purpose: Generate synthetic data for UI testing and demos
+// NOTE: This is intentionally NOT production data - for development only
+// ============================================================
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { validateSession, requireAuth, hasRole, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
+import { validateTestTrafficInput, validationErrorResponse } from "../_shared/input-validation.ts";
 
 // Test prompts for each engine type
 const testPrompts = {
@@ -81,9 +88,19 @@ serve(async (req) => {
     
     const supabase = getServiceClient();
 
-    const { systemId, count = 200 } = await req.json();
+    // Validate input with schema
+    const body = await req.json();
+    const validation = validateTestTrafficInput(body);
+    if (!validation.success) {
+      return validationErrorResponse(validation.errors!, corsHeaders);
+    }
     
-    console.log(`[generate-test-traffic] Generating ${count} entries for system ${systemId || 'all systems'}`);
+    const { systemId, count = 200 } = validation.data!;
+    
+    // Rate limit: Max 1000 entries per call
+    const limitedCount = Math.min(count || 200, 1000);
+    
+    console.log(`[generate-test-traffic] Generating ${limitedCount} entries for system ${systemId || 'all systems'}`);
 
     // Get systems to generate traffic for
     let systemsQuery = supabase.from('systems').select('id, project_id, name');

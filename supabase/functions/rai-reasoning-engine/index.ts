@@ -1,6 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { validateSession, requireAuth, hasAnyRole, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
+import { validateRAIReasoningInput, validationErrorResponse, createTimeoutFetch } from "../_shared/input-validation.ts";
+
+// Timeout fetch for AI calls (45 seconds for deep reasoning)
+const aiFetch = createTimeoutFetch(45000);
 
 interface ReasoningStep {
   step: number;
@@ -244,7 +248,7 @@ async function callLovableAI(systemPrompt: string, userPrompt: string): Promise<
     throw new Error("LOVABLE_API_KEY is not configured");
   }
 
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const response = await aiFetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${LOVABLE_API_KEY}`,
@@ -328,14 +332,14 @@ serve(async (req) => {
     const userClient = authResult.supabase!;
     const serviceClient = getServiceClient();
 
-    const { modelId, engineType } = await req.json();
-
-    if (!modelId || !engineType) {
-      return new Response(
-        JSON.stringify({ error: "modelId and engineType are required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Validate input with schema
+    const body = await req.json();
+    const validation = validateRAIReasoningInput(body);
+    if (!validation.success) {
+      return validationErrorResponse(validation.errors!, corsHeaders);
     }
+    
+    const { modelId, engineType } = validation.data!;
 
     console.log(`[rai-reasoning-engine] User ${user?.id} requesting evaluation for model ${modelId}`);
 

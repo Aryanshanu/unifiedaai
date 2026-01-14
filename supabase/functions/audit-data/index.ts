@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { validateAuditDataInput, validationErrorResponse } from "../_shared/input-validation.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -107,14 +108,14 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { upload_id } = await req.json();
-
-    if (!upload_id) {
-      return new Response(
-        JSON.stringify({ error: 'upload_id is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Validate input with schema
+    const body = await req.json();
+    const validation = validateAuditDataInput(body);
+    if (!validation.success) {
+      return validationErrorResponse(validation.errors!, corsHeaders);
     }
+    
+    const { upload_id } = validation.data!;
 
     console.log(`[audit-data] Starting audit for upload: ${upload_id}`);
     addLog('input', { upload_id, action: 'start_audit' });
