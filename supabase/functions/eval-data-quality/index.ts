@@ -278,8 +278,27 @@ serve(async (req) => {
       throw new Error(`Dataset not found: ${dataset_id}`);
     }
 
-    // Use sample data or generate mock data for evaluation
-    const evaluationData = sample_data || generateMockData(dataset);
+    // Use sample data or stream from storage - NO MOCK DATA ALLOWED
+    let evaluationData: Record<string, unknown>[];
+    if (sample_data && sample_data.length > 0) {
+      evaluationData = sample_data;
+    } else if (dataset.source_url) {
+      // Stream from storage path
+      evaluationData = await streamDataFromStorage(supabase, dataset.source_url);
+    } else {
+      // EU AI Act Article 10 requires actual data - no mock data
+      return new Response(JSON.stringify({
+        success: false,
+        error: "No data source available",
+        code: "DATA_REQUIRED",
+        message: "EU AI Act Article 10 requires actual data for quality evaluation. Provide sample_data or ensure dataset has source_url.",
+        fail_closed: true,
+        eu_ai_act_reference: "Article 10 - Data and Data Governance"
+      }), { 
+        status: 422, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
     
     // Infer schema if not provided
     const schema = schema_definition || inferSchema(evaluationData);
@@ -436,25 +455,90 @@ serve(async (req) => {
   }
 });
 
-// Helper: Generate mock data for evaluation when no sample provided
-function generateMockData(dataset: Record<string, unknown>): Record<string, unknown>[] {
-  const rowCount = (dataset.row_count as number) || 100;
-  const dataTypes = (dataset.data_types as string[]) || ['id', 'name', 'value'];
-  
-  const mockData: Record<string, unknown>[] = [];
-  for (let i = 0; i < Math.min(rowCount, 1000); i++) {
-    const row: Record<string, unknown> = {};
-    for (const col of dataTypes) {
-      if (col.includes('id')) row[col] = `id_${i}`;
-      else if (col.includes('name')) row[col] = `name_${i}`;
-      else if (col.includes('date')) row[col] = new Date().toISOString();
-      else if (col.includes('value') || col.includes('amount')) row[col] = Math.random() * 1000;
-      else row[col] = `data_${i}`;
+// Helper: Stream data from Supabase Storage
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function streamDataFromStorage(supabase: any, sourceUrl: string): Promise<Record<string, unknown>[]> {
+  try {
+    // Parse storage path - format: bucket/path/to/file.csv or full URL
+    let bucket = 'fractal';
+    let path = sourceUrl;
+    
+    if (sourceUrl.includes('/')) {
+      const parts = sourceUrl.split('/');
+      if (!sourceUrl.startsWith('http')) {
+        bucket = parts[0];
+        path = parts.slice(1).join('/');
+      }
     }
-    mockData.push(row);
+
+    // Create signed URL for secure access
+    const { data: signedUrl, error: signedUrlError } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(path, 60);
+
+    if (signedUrlError || !signedUrl?.signedUrl) {
+      console.error('Failed to create signed URL:', signedUrlError);
+      throw new Error(`Storage access failed: ${signedUrlError?.message || 'Unknown error'}`);
+    }
+
+    // Fetch with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    const response = await fetch(signedUrl.signedUrl, {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`Storage fetch failed: ${response.status}`);
+    }
+
+    const text = await response.text();
+    const extension = path.split('.').pop()?.toLowerCase();
+
+    // Parse based on file type
+    if (extension === 'json') {
+      const parsed = JSON.parse(text);
+      return Array.isArray(parsed) ? parsed : [parsed];
+    } else if (extension === 'csv') {
+      // CSV parsing
+      const lines = text.split('\n').filter(l => l.trim());
+      if (lines.length === 0) return [];
+      
+      const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+      return lines.slice(1).map(line => {
+        const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+        const row: Record<string, unknown> = {};
+        headers.forEach((header, i) => {
+          const val = values[i];
+          // Try to parse numbers
+          const num = Number(val);
+          row[header] = isNaN(num) ? val : num;
+        });
+        return row;
+      });
+    } else {
+      // Try JSON first, then CSV
+      try {
+        const parsed = JSON.parse(text);
+        return Array.isArray(parsed) ? parsed : [parsed];
+      } catch {
+        const lines = text.split('\n').filter(l => l.trim());
+        if (lines.length === 0) return [];
+        const headers = lines[0].split(',').map(h => h.trim());
+        return lines.slice(1).map(line => {
+          const values = line.split(',').map(v => v.trim());
+          const row: Record<string, unknown> = {};
+          headers.forEach((header, i) => { row[header] = values[i]; });
+          return row;
+        });
+      }
+    }
+  } catch (error) {
+    console.error('streamDataFromStorage error:', error);
+    throw new Error(`Failed to stream data: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-  
-  return mockData;
 }
 
 // Helper: Infer schema from data
