@@ -1,10 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { validateSession, requireAuth, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
+import { createTimeoutFetch, isValidUUID, isValidString } from "../_shared/input-validation.ts";
 
 // HuggingFace Models for real-time scanning
 const HF_TOXICITY_MODEL = "ml6team/toxic-comment-classification";
 const HF_PRIVACY_MODEL = "obi/deid_roberta_i2b2";
+
+// Timeout fetch for HuggingFace model calls (10 seconds for real-time)
+const hfFetch = createTimeoutFetch(10000);
 
 interface TokenScanResult {
   hasPII: boolean;
@@ -16,10 +20,10 @@ interface TokenScanResult {
   latencyMs: number;
 }
 
-// Call HuggingFace toxicity model
+// Call HuggingFace toxicity model with timeout
 async function callToxicityModel(text: string, hfToken: string): Promise<{ score: number; raw: any }> {
   try {
-    const response = await fetch(
+    const response = await hfFetch(
       `https://api-inference.huggingface.co/models/${HF_TOXICITY_MODEL}`,
       {
         method: "POST",
@@ -56,10 +60,10 @@ async function callToxicityModel(text: string, hfToken: string): Promise<{ score
   }
 }
 
-// Call HuggingFace PII model
+// Call HuggingFace PII model with timeout
 async function callPrivacyModel(text: string, hfToken: string): Promise<{ entities: string[]; raw: any }> {
   try {
-    const response = await fetch(
+    const response = await hfFetch(
       `https://api-inference.huggingface.co/models/${HF_PRIVACY_MODEL}`,
       {
         method: "POST",
@@ -211,6 +215,15 @@ serve(async (req) => {
       const data = JSON.parse(event.data);
       
       if (data.type === "session.init") {
+        // Validate session.init payload
+        if (!isValidUUID(data.systemId)) {
+          socket.send(JSON.stringify({ 
+            type: "error", 
+            message: "Invalid systemId: must be a valid UUID" 
+          }));
+          return;
+        }
+        
         systemId = data.systemId;
         tokenCount = 0;
         blockedAtToken = null;
@@ -242,8 +255,25 @@ serve(async (req) => {
       }
       
       if (data.type === "message.send") {
+        // Validate message.send payload
         const messages = data.messages || [];
+        if (!Array.isArray(messages) || messages.length === 0) {
+          socket.send(JSON.stringify({ 
+            type: "error", 
+            message: "messages must be a non-empty array" 
+          }));
+          return;
+        }
+        
         const userMessage = messages.find((m: any) => m.role === "user")?.content || "";
+        if (!isValidString(userMessage, { minLength: 1, maxLength: 50000 })) {
+          socket.send(JSON.stringify({ 
+            type: "error", 
+            message: "User message must be 1-50000 characters" 
+          }));
+          return;
+        }
+        
         const hfToken = Deno.env.get("HUGGING_FACE_ACCESS_TOKEN") || null;
         
         // Pre-scan user input with HuggingFace models

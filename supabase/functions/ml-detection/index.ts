@@ -1,10 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { validateSession, requireAuth, corsHeaders } from "../_shared/auth-helper.ts";
+import { validateMLDetectionInput, validationErrorResponse, createTimeoutFetch } from "../_shared/input-validation.ts";
 
 // HuggingFace Model IDs for real ML detection
 const HF_TOXICITY_MODEL = "ml6team/toxic-comment-classification";
 const HF_PII_MODEL = "obi/deid_roberta_i2b2";
 const HF_DETOXIFY_MODEL = "unitary/toxic-bert";
+
+// Timeout fetch for HuggingFace API calls (15 seconds)
+const hfFetch = createTimeoutFetch(15000);
 
 // Enhanced PII detection patterns (Presidio-inspired)
 const PII_PATTERNS = {
@@ -120,7 +124,7 @@ interface AnalysisResult {
   modelsUsed: string[];
 }
 
-// Call HuggingFace toxicity model (Detoxify/toxic-bert)
+// Call HuggingFace toxicity model (Detoxify/toxic-bert) with timeout
 async function callHFToxicityModel(text: string, hfToken: string | null): Promise<HFToxicityResult | null> {
   if (!hfToken) {
     console.log("[ml-detection] No HF token, skipping HF toxicity model");
@@ -128,7 +132,7 @@ async function callHFToxicityModel(text: string, hfToken: string | null): Promis
   }
 
   try {
-    const response = await fetch(
+    const response = await hfFetch(
       `https://api-inference.huggingface.co/models/${HF_DETOXIFY_MODEL}`,
       {
         method: "POST",
@@ -416,14 +420,14 @@ serve(async (req) => {
 
     console.log(`[ml-detection] User ${authResult.user?.id} running ML detection...`);
 
-    const { text, mode = "full" } = await req.json();
-    
-    if (!text || typeof text !== "string") {
-      return new Response(
-        JSON.stringify({ error: "Text field is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Validate input with Zod-like schema
+    const body = await req.json();
+    const validation = validateMLDetectionInput(body);
+    if (!validation.success) {
+      return validationErrorResponse(validation.errors!, corsHeaders);
     }
+    
+    const { text, mode = "full" } = validation.data!;
 
     const hfToken = Deno.env.get("HUGGING_FACE_ACCESS_TOKEN") || null;
     const startTime = Date.now();

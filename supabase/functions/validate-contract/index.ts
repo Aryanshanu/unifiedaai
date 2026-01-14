@@ -1,9 +1,13 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { validateContractInput, validationErrorResponse, createTimeoutFetch } from "../_shared/input-validation.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Timeout fetch for large file validation (60 seconds)
+const validationFetch = createTimeoutFetch(60000);
 
 interface ContractViolation {
   type: 'missing_column' | 'type_mismatch' | 'threshold_breach' | 'format_violation' | 'null_violation';
@@ -31,16 +35,16 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { upload_id, contract_id } = await req.json();
-
-    if (!upload_id) {
-      return new Response(
-        JSON.stringify({ error: 'upload_id is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Validate input with schema
+    const body = await req.json();
+    const validation = validateContractInput(body);
+    if (!validation.success) {
+      return validationErrorResponse(validation.errors!, corsHeaders);
     }
+    
+    const { upload_id, contract_id } = validation.data!;
 
-    console.log(`[validate-contract] Validating upload ${upload_id} against contract ${contract_id || 'auto-detect'}`);
+    console.log(`[validate-contract] Validating upload ${upload_id} against contract ${contract_id || 'auto-detect'} (EU AI Act Article 10 compliance)`);
 
     // Update status to pending validation
     await supabase

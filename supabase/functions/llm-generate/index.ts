@@ -1,12 +1,14 @@
 // LLM Gateway Edge Function with Streaming Support
 // Single endpoint for all AI providers: POST /llm-generate
-
-// LLM Gateway Edge Function with Streaming Support
-// Single endpoint for all AI providers: POST /llm-generate
+// 100% Production Ready with timeouts, validation, and Lovable AI fallback
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { validateSession, requireAuth, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
+import { validateLLMGenerateInput, validationErrorResponse, createTimeoutFetch, executeWithFallback } from "../_shared/input-validation.ts";
+
+// Timeout fetch for provider API calls (30 seconds)
+const providerFetch = createTimeoutFetch(30000);
 
 // Rate limiting constants
 const RATE_LIMIT_REQUESTS = 100;
@@ -116,14 +118,14 @@ async function getApiKey(
   return envKey ? Deno.env.get(envKey) || null : null;
 }
 
-// OpenAI-compatible streaming
+// OpenAI-compatible streaming with timeout
 async function streamOpenAIFormat(
   endpoint: string,
   apiKey: string,
   body: any,
   extraHeaders: Record<string, string> = {}
 ): Promise<Response> {
-  const response = await fetch(endpoint, {
+  const response = await providerFetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -167,7 +169,7 @@ async function streamAnthropic(apiKey: string, body: any): Promise<Response> {
     anthropicBody.system = systemMessage.content;
   }
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await providerFetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -271,7 +273,7 @@ async function generateNonStreaming(
       anthropicBody.system = systemMessage.content;
     }
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await providerFetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -314,7 +316,7 @@ async function generateNonStreaming(
       },
     };
 
-    const response = await fetch(endpoint, {
+    const response = await providerFetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(geminiBody),
@@ -351,7 +353,7 @@ async function generateNonStreaming(
     headers["X-Title"] = "Fractal RAI-OS";
   }
 
-  const response = await fetch(endpoint, {
+  const response = await providerFetch(endpoint, {
     method: "POST",
     headers,
     body: JSON.stringify({
@@ -415,8 +417,13 @@ serve(async (req) => {
       );
     }
 
-    // Parse request
+    // Parse and validate request
     const body = await req.json();
+    const validation = validateLLMGenerateInput(body);
+    if (!validation.success) {
+      return validationErrorResponse(validation.errors!, corsHeaders);
+    }
+    
     const { 
       provider = "lovable", 
       model, 
@@ -425,17 +432,10 @@ serve(async (req) => {
       max_tokens = 1024, 
       stream = false,
       system_id 
-    } = body;
-
-    if (!messages || !Array.isArray(messages)) {
-      return new Response(
-        JSON.stringify({ error: { code: "INVALID_REQUEST", message: "messages array required" } }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    } = validation.data!;
 
     // Get API key
-    const apiKey = await getApiKey(provider, user!.id, system_id, supabase);
+    const apiKey = await getApiKey(provider, user!.id, system_id || null, supabase);
     if (!apiKey) {
       return new Response(
         JSON.stringify({ 
