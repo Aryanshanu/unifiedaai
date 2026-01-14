@@ -86,7 +86,8 @@ async function getEmbedding(text: string): Promise<number[] | null> {
 }
 
 // Check if semantic search is available (nodes have embeddings)
-async function checkSemanticSearchAvailable(supabase: SupabaseClient): Promise<boolean> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function checkSemanticSearchAvailable(supabase: any): Promise<boolean> {
   try {
     const { count } = await supabase
       .from('kg_nodes')
