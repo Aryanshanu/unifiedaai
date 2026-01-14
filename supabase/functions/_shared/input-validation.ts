@@ -205,6 +205,197 @@ export function validateEvalEngineInput(body: unknown): ValidationResult<EvalEng
 }
 
 /**
+ * Data Quality Engine Input Schema
+ */
+export interface DataQualityInput {
+  dataset_id: string;
+  run_type: 'scheduled' | 'on_demand' | 'pre_training' | 'contract_check';
+  sample_data?: Record<string, unknown>[];
+  schema_definition?: Record<string, string>;
+  freshness_threshold_hours?: number;
+  check_contract?: boolean;
+}
+
+export function validateDataQualityInput(body: unknown): ValidationResult<DataQualityInput> {
+  const errors: ValidationError[] = [];
+  
+  if (!body || typeof body !== 'object') {
+    return { success: false, errors: [{ field: 'body', message: 'Request body must be an object' }] };
+  }
+  
+  const input = body as Record<string, unknown>;
+  
+  if (!isValidUUID(input.dataset_id)) {
+    errors.push({ field: 'dataset_id', message: 'dataset_id must be a valid UUID' });
+  }
+  
+  const validRunTypes = ['scheduled', 'on_demand', 'pre_training', 'contract_check'];
+  if (!validRunTypes.includes(input.run_type as string)) {
+    errors.push({ field: 'run_type', message: `run_type must be one of: ${validRunTypes.join(', ')}` });
+  }
+  
+  if (input.freshness_threshold_hours !== undefined && 
+      (typeof input.freshness_threshold_hours !== 'number' || input.freshness_threshold_hours < 0)) {
+    errors.push({ field: 'freshness_threshold_hours', message: 'freshness_threshold_hours must be a positive number' });
+  }
+  
+  if (input.check_contract !== undefined && !isValidBoolean(input.check_contract)) {
+    errors.push({ field: 'check_contract', message: 'check_contract must be a boolean' });
+  }
+  
+  if (errors.length > 0) return { success: false, errors };
+  
+  return { 
+    success: true, 
+    data: {
+      dataset_id: input.dataset_id as string,
+      run_type: input.run_type as DataQualityInput['run_type'],
+      sample_data: input.sample_data as Record<string, unknown>[] | undefined,
+      schema_definition: input.schema_definition as Record<string, string> | undefined,
+      freshness_threshold_hours: input.freshness_threshold_hours as number | undefined,
+      check_contract: input.check_contract as boolean | undefined
+    }
+  };
+}
+
+/**
+ * Audit Report Input Schema
+ */
+export interface AuditReportInput {
+  systemId?: string;
+  projectId?: string;
+  startDate?: string;
+  endDate?: string;
+  includeRawLogs?: boolean;
+  format?: 'json' | 'pdf' | 'both';
+}
+
+export function validateAuditReportInput(body: unknown): ValidationResult<AuditReportInput> {
+  const errors: ValidationError[] = [];
+  
+  if (!body || typeof body !== 'object') {
+    return { success: false, errors: [{ field: 'body', message: 'Request body must be an object' }] };
+  }
+  
+  const input = body as Record<string, unknown>;
+  
+  if (input.systemId !== undefined && !isValidUUID(input.systemId)) {
+    errors.push({ field: 'systemId', message: 'systemId must be a valid UUID' });
+  }
+  
+  if (input.projectId !== undefined && !isValidUUID(input.projectId)) {
+    errors.push({ field: 'projectId', message: 'projectId must be a valid UUID' });
+  }
+  
+  if (!input.systemId && !input.projectId) {
+    errors.push({ field: 'systemId|projectId', message: 'At least systemId or projectId is required' });
+  }
+  
+  if (input.format !== undefined && !['json', 'pdf', 'both'].includes(input.format as string)) {
+    errors.push({ field: 'format', message: 'format must be json, pdf, or both' });
+  }
+  
+  if (errors.length > 0) return { success: false, errors };
+  
+  return { success: true, data: input as AuditReportInput };
+}
+
+/**
+ * Red Team Campaign Input Schema
+ */
+export interface RedTeamInput {
+  campaignName?: string;
+  attackCount?: number;
+  runFullCampaign?: boolean;
+  categories?: string[];
+  targetSystemId?: string;
+}
+
+export function validateRedTeamInput(body: unknown): ValidationResult<RedTeamInput> {
+  const errors: ValidationError[] = [];
+  
+  if (!body || typeof body !== 'object') {
+    return { success: true, data: { runFullCampaign: true } }; // Default if no body
+  }
+  
+  const input = body as Record<string, unknown>;
+  
+  if (input.campaignName !== undefined && !isValidString(input.campaignName, { maxLength: 200 })) {
+    errors.push({ field: 'campaignName', message: 'campaignName must be a string (max 200 chars)' });
+  }
+  
+  if (input.attackCount !== undefined && 
+      (typeof input.attackCount !== 'number' || input.attackCount < 1 || input.attackCount > 100)) {
+    errors.push({ field: 'attackCount', message: 'attackCount must be a number between 1 and 100' });
+  }
+  
+  if (input.targetSystemId !== undefined && !isValidUUID(input.targetSystemId)) {
+    errors.push({ field: 'targetSystemId', message: 'targetSystemId must be a valid UUID' });
+  }
+  
+  if (errors.length > 0) return { success: false, errors };
+  
+  return { success: true, data: input as RedTeamInput };
+}
+
+/**
+ * Create a fetch wrapper with timeout
+ */
+export function createTimeoutFetch(timeoutMs: number = 30000) {
+  return async (url: string, options: RequestInit = {}): Promise<Response> => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    
+    try {
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if ((error as Error).name === 'AbortError') {
+        throw new Error(`Request timeout after ${timeoutMs}ms`);
+      }
+      throw error;
+    }
+  };
+}
+
+/**
+ * Execute with fallback pattern
+ */
+export async function executeWithFallback<T>(
+  primary: () => Promise<T>,
+  fallback: () => Promise<T>,
+  label: string
+): Promise<{ result: T; degraded: boolean }> {
+  try {
+    const result = await primary();
+    return { result, degraded: false };
+  } catch (primaryError) {
+    console.warn(`[${label}] Primary failed:`, primaryError);
+    try {
+      const result = await fallback();
+      return { result, degraded: true };
+    } catch (fallbackError) {
+      console.error(`[${label}] Both primary and fallback failed`);
+      throw fallbackError;
+    }
+  }
+}
+
+/**
+ * Validate required environment variables
+ */
+export function validateEnvVars(required: string[]): { valid: boolean; missing: string[] } {
+  const missing = required.filter(key => {
+    // Deno environment only for edge functions
+    const value = Deno.env.get(key);
+    return !value;
+  });
+  return { valid: missing.length === 0, missing };
+}
+
+/**
  * Create a standardized error response for validation failures
  */
 export function validationErrorResponse(
