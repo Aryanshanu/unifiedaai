@@ -158,6 +158,69 @@ export type Database = {
           },
         ]
       }
+      audit_report_ledger: {
+        Row: {
+          content_hash: string
+          created_at: string | null
+          file_size_bytes: number | null
+          generated_at: string
+          generated_by: string | null
+          id: string
+          metadata: Json | null
+          pdf_hash: string | null
+          previous_hash: string | null
+          record_hash: string | null
+          report_id: string
+          report_period_end: string | null
+          report_period_start: string | null
+          report_type: string
+          storage_bucket: string
+          storage_path: string
+          verification_status: string | null
+          verified_at: string | null
+        }
+        Insert: {
+          content_hash: string
+          created_at?: string | null
+          file_size_bytes?: number | null
+          generated_at: string
+          generated_by?: string | null
+          id?: string
+          metadata?: Json | null
+          pdf_hash?: string | null
+          previous_hash?: string | null
+          record_hash?: string | null
+          report_id: string
+          report_period_end?: string | null
+          report_period_start?: string | null
+          report_type?: string
+          storage_bucket?: string
+          storage_path: string
+          verification_status?: string | null
+          verified_at?: string | null
+        }
+        Update: {
+          content_hash?: string
+          created_at?: string | null
+          file_size_bytes?: number | null
+          generated_at?: string
+          generated_by?: string | null
+          id?: string
+          metadata?: Json | null
+          pdf_hash?: string | null
+          previous_hash?: string | null
+          record_hash?: string | null
+          report_id?: string
+          report_period_end?: string | null
+          report_period_start?: string | null
+          report_type?: string
+          storage_bucket?: string
+          storage_path?: string
+          verification_status?: string | null
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
       bronze_data: {
         Row: {
           created_at: string | null
@@ -872,6 +935,7 @@ export type Database = {
           decision_ref: string
           decision_timestamp: string
           decision_value: string
+          demographic_context: Json | null
           id: string
           input_hash: string
           model_id: string
@@ -887,6 +951,7 @@ export type Database = {
           decision_ref: string
           decision_timestamp: string
           decision_value: string
+          demographic_context?: Json | null
           id?: string
           input_hash: string
           model_id: string
@@ -902,6 +967,7 @@ export type Database = {
           decision_ref?: string
           decision_timestamp?: string
           decision_value?: string
+          demographic_context?: Json | null
           id?: string
           input_hash?: string
           model_id?: string
@@ -1708,6 +1774,7 @@ export type Database = {
       kg_nodes: {
         Row: {
           created_at: string
+          embedding: string | null
           entity_id: string
           entity_type: string
           hash: string | null
@@ -1721,6 +1788,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          embedding?: string | null
           entity_id: string
           entity_type: string
           hash?: string | null
@@ -1734,6 +1802,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          embedding?: string | null
           entity_id?: string
           entity_type?: string
           hash?: string | null
@@ -2010,6 +2079,77 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_history: {
+        Row: {
+          channel_id: string | null
+          created_at: string | null
+          delivered_at: string | null
+          delivery_status: string
+          error_message: string | null
+          failed_at: string | null
+          id: string
+          message: string
+          metadata: Json | null
+          notification_type: string
+          provider: string | null
+          provider_message_id: string | null
+          provider_response: Json | null
+          recipient: string
+          retry_count: number | null
+          sent_at: string | null
+          severity: string | null
+          title: string
+        }
+        Insert: {
+          channel_id?: string | null
+          created_at?: string | null
+          delivered_at?: string | null
+          delivery_status?: string
+          error_message?: string | null
+          failed_at?: string | null
+          id?: string
+          message: string
+          metadata?: Json | null
+          notification_type: string
+          provider?: string | null
+          provider_message_id?: string | null
+          provider_response?: Json | null
+          recipient: string
+          retry_count?: number | null
+          sent_at?: string | null
+          severity?: string | null
+          title: string
+        }
+        Update: {
+          channel_id?: string | null
+          created_at?: string | null
+          delivered_at?: string | null
+          delivery_status?: string
+          error_message?: string | null
+          failed_at?: string | null
+          id?: string
+          message?: string
+          metadata?: Json | null
+          notification_type?: string
+          provider?: string | null
+          provider_message_id?: string | null
+          provider_response?: Json | null
+          recipient?: string
+          retry_count?: number | null
+          sent_at?: string | null
+          severity?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_history_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "notification_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_settings: {
         Row: {
           created_at: string
@@ -2228,6 +2368,7 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          demographics: Json | null
           full_name: string | null
           id: string
           updated_at: string
@@ -2236,6 +2377,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          demographics?: Json | null
           full_name?: string | null
           id?: string
           updated_at?: string
@@ -2244,6 +2386,7 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          demographics?: Json | null
           full_name?: string | null
           id?: string
           updated_at?: string
@@ -3420,6 +3563,22 @@ export type Database = {
       lock_system: {
         Args: { p_reason?: string; p_system_id: string }
         Returns: undefined
+      }
+      match_nodes: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          entity_id: string
+          entity_type: string
+          id: string
+          label: string
+          metadata: Json
+          properties: Json
+          similarity: number
+        }[]
       }
       unlock_system: {
         Args: { p_justification: string; p_system_id: string }
