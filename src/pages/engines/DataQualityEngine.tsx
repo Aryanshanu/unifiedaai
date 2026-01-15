@@ -23,7 +23,8 @@ import {
   FileText,
   Clock,
   Activity,
-  Zap
+  Zap,
+  RefreshCw
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -40,12 +41,12 @@ import { ColumnAnalysisGrid, ColumnAnalysis } from '@/components/engines/ColumnA
 import { QualityTrendChart } from '@/components/engines/QualityTrendChart';
 import { RemediationActionCenter, RemediationAction } from '@/components/engines/RemediationActionCenter';
 import { DQPipelineVisualizer } from '@/components/engines/DQPipelineVisualizer';
-import { DQProfilingPanel } from '@/components/engines/DQProfilingPanel';
-import { DQRuleLibrary } from '@/components/engines/DQRuleLibrary';
-import { DQExecutionResults } from '@/components/engines/DQExecutionResults';
-import { DQDashboardAssets } from '@/components/engines/DQDashboardAssets';
-import { DQIncidentPanel } from '@/components/engines/DQIncidentPanel';
-import { CircuitBreakerDialog } from '@/components/engines/CircuitBreakerDialog';
+import { DQFileUploader } from '@/components/engines/DQFileUploader';
+import { DQProfilingReport } from '@/components/engines/DQProfilingReport';
+import { DQRuleLibraryFull } from '@/components/engines/DQRuleLibraryFull';
+import { DQExecutionReport } from '@/components/engines/DQExecutionReport';
+import { DQDashboardAssetsFull } from '@/components/engines/DQDashboardAssetsFull';
+import { DQIncidentsFull } from '@/components/engines/DQIncidentsFull';
 import { useDQControlPlane } from '@/hooks/useDQControlPlane';
 import { useFileUploadStatus, useAllUploads, useQualityStats, UploadStatus } from '@/hooks/useFileUploadStatus';
 import { useQualityTrend } from '@/hooks/useQualityTrend';
@@ -177,14 +178,12 @@ function ImportTab() {
     queryClient.invalidateQueries({ queryKey: ['all-uploads'] });
   };
 
-  // Extract analysis details from status
   const analysisDetails = status?.analysis_details;
   const columnAnalysis = analysisDetails?.column_analysis as ColumnAnalysis[] | undefined;
   const aiSummary = analysisDetails?.ai_summary as AISummary | undefined;
   const computationSteps = analysisDetails?.computation_steps;
   const rawLogs = analysisDetails?.raw_logs;
 
-  // Convert remediation actions if available
   const remediationActions: RemediationAction[] = issues
     .filter(issue => issue.suggested_fix)
     .map(issue => ({
@@ -204,17 +203,12 @@ function ImportTab() {
   return (
     <div className="space-y-6">
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Upload Card */}
         <FileUploadCard onUploadComplete={handleUploadComplete} />
-        
-        {/* Trend Chart */}
         <QualityTrendChart data={trendData} />
       </div>
 
-      {/* Analysis Results - shown after upload completes */}
       {status?.status === 'completed' && (
         <div className="space-y-6">
-          {/* Overall Score Card */}
           <Card className={cn(
             "border-2",
             status.quality_score && status.quality_score >= 80 
@@ -252,15 +246,10 @@ function ImportTab() {
             </CardContent>
           </Card>
 
-          {/* AI Summary */}
           {aiSummary && <AISummaryPanel summary={aiSummary} />}
-
-          {/* Column Analysis */}
           {columnAnalysis && columnAnalysis.length > 0 && (
             <ColumnAnalysisGrid columns={columnAnalysis} showDetails />
           )}
-
-          {/* Computation Steps */}
           {computationSteps && computationSteps.length > 0 && (
             <ComputationBreakdown 
               steps={computationSteps.map(step => ({
@@ -276,13 +265,10 @@ function ImportTab() {
               engineType="data_quality"
             />
           )}
-
-          {/* Remediation Actions */}
           {remediationActions.length > 0 && (
             <RemediationActionCenter 
               actions={remediationActions}
               onExecute={async (actionId) => {
-                // Mark issue as resolved
                 await supabase
                   .from('quality_issues')
                   .update({ status: 'resolved' })
@@ -290,8 +276,6 @@ function ImportTab() {
               }}
             />
           )}
-
-          {/* Raw Logs */}
           {rawLogs && rawLogs.length > 0 && (
             <RawDataLog 
               logs={rawLogs.map(log => ({
@@ -302,8 +286,6 @@ function ImportTab() {
               }))} 
             />
           )}
-
-          {/* Evidence Package */}
           <EvidencePackage 
             mode="download"
             data={{ 
@@ -325,7 +307,6 @@ function ImportTab() {
         </div>
       )}
 
-      {/* Processing State */}
       {status && ['pending', 'processing', 'analyzing'].includes(status.status) && (
         <Card>
           <CardContent className="py-12 text-center">
@@ -334,25 +315,15 @@ function ImportTab() {
               {status.status === 'analyzing' ? 'Analyzing data quality...' : 'Processing file...'}
             </p>
             <p className="text-sm text-muted-foreground">{status.file_name}</p>
-            <div className="flex justify-center gap-2 mt-4">
-              <Badge variant="outline">{status.status}</Badge>
-              {status.parsed_row_count && (
-                <Badge variant="secondary">{status.parsed_row_count} rows</Badge>
-              )}
-            </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Idle State */}
       {!currentUploadId && (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center py-12">
             <Upload className="h-16 w-16 text-muted-foreground/50 mb-4" />
             <p className="text-muted-foreground">Upload a file to begin quality analysis</p>
-            <p className="text-xs text-muted-foreground mt-2">
-              Supports CSV, JSON, and PDF files up to 20MB
-            </p>
           </CardContent>
         </Card>
       )}
@@ -376,22 +347,6 @@ function EvaluateTab() {
     }
   });
 
-  const { data: pastRuns } = useQuery({
-    queryKey: ['dataset-quality-runs', selectedDataset],
-    queryFn: async () => {
-      if (!selectedDataset) return [];
-      const { data, error } = await supabase
-        .from('dataset_quality_runs')
-        .select('*')
-        .eq('dataset_id', selectedDataset)
-        .order('created_at', { ascending: false })
-        .limit(10);
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!selectedDataset
-  });
-
   const runEvaluation = async () => {
     if (!selectedDataset) {
       toast.error('Please select a dataset');
@@ -400,73 +355,21 @@ function EvaluateTab() {
 
     setEvaluationStatus('running');
     setRawLogs([]);
-    const startTime = Date.now();
-
-    const addLog = (message: string, logType: string = 'info') => {
-      const validType: 'input' | 'output' | 'computation' = 
-        logType === 'success' || logType === 'info' ? 'computation' : 
-        logType === 'error' ? 'output' : 'computation';
-      
-      setRawLogs(prev => [...prev, { 
-        id: crypto.randomUUID(), 
-        timestamp: new Date().toISOString(), 
-        type: validType,
-        data: { message, originalType: logType }
-      }]);
-    };
 
     try {
-      addLog('Initializing Data Quality Engine...');
-      addLog(`Dataset ID: ${selectedDataset}`);
-
       const { data, error } = await supabase.functions.invoke('eval-data-quality', {
         body: { dataset_id: selectedDataset, run_type: 'on_demand', check_contract: true }
       });
 
       if (error) throw error;
-
-      addLog(`Evaluation completed in ${Date.now() - startTime}ms`, 'success');
-      addLog(`Verdict: ${data.verdict}`, data.verdict === 'PASS' ? 'success' : 'error');
-
       setResult(data);
       setEvaluationStatus('complete');
       queryClient.invalidateQueries({ queryKey: ['dataset-quality-runs'] });
 
     } catch (error) {
       console.error('Data Quality evaluation error:', error);
-      addLog(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
       setEvaluationStatus('error');
       toast.error('Evaluation failed');
-    }
-  };
-
-  const getMetricsForGrid = () => {
-    if (!result) return [];
-    return [
-      { key: 'completeness', name: 'Completeness', score: result.metrics.completeness.score * 100, weight: 25, description: 'Percentage of non-null values' },
-      { key: 'validity', name: 'Validity', score: result.metrics.validity.score * 100, weight: 30, description: 'Values matching expected types' },
-      { key: 'uniqueness', name: 'Uniqueness', score: result.metrics.uniqueness.score * 100, weight: 20, description: 'Ratio of unique values' },
-      { key: 'freshness', name: 'Freshness', score: result.metrics.freshness.score * 100, weight: 25, description: 'Data recency' }
-    ];
-  };
-
-  const getComputationSteps = () => {
-    if (!result) return [];
-    return [
-      { step: 1, name: 'Completeness', formula: 'non_null / total', inputs: {}, result: `${(result.metrics.completeness.score * 100).toFixed(1)}%`, status: result.metrics.completeness.score >= 0.9 ? 'pass' as const : 'warn' as const },
-      { step: 2, name: 'Validity', formula: 'valid_type / total', inputs: {}, result: `${(result.metrics.validity.score * 100).toFixed(1)}%`, status: result.metrics.validity.score >= 0.9 ? 'pass' as const : 'warn' as const },
-      { step: 3, name: 'Uniqueness', formula: 'unique / total', inputs: {}, result: `${(result.metrics.uniqueness.score * 100).toFixed(1)}%`, status: result.metrics.uniqueness.score >= 0.8 ? 'pass' as const : 'warn' as const },
-      { step: 4, name: 'Freshness', formula: '1 - age/threshold', inputs: {}, result: `${(result.metrics.freshness.score * 100).toFixed(1)}%`, status: result.metrics.freshness.score >= 0.9 ? 'pass' as const : 'warn' as const },
-      { step: 5, name: 'Overall', formula: FORMULA, inputs: {}, result: `${(result.overall_score * 100).toFixed(1)}%`, status: result.verdict === 'PASS' ? 'pass' as const : 'fail' as const }
-    ];
-  };
-
-  const getVerdictColor = () => {
-    if (!result) return '';
-    switch (result.verdict) {
-      case 'PASS': return 'bg-success/10 text-success border-success/20';
-      case 'WARN': return 'bg-warning/10 text-warning border-warning/20';
-      case 'FAIL': return 'bg-destructive/10 text-destructive border-destructive/20';
     }
   };
 
@@ -481,12 +384,9 @@ function EvaluateTab() {
           <div className="flex gap-4">
             <Select value={selectedDataset} onValueChange={setSelectedDataset}>
               <SelectTrigger className="flex-1">
-                <SelectValue placeholder={loadingDatasets ? "Loading..." : datasets?.length === 0 ? "No datasets available" : "Select dataset..."} />
+                <SelectValue placeholder={loadingDatasets ? "Loading..." : "Select dataset..."} />
               </SelectTrigger>
               <SelectContent>
-                {datasets?.length === 0 && (
-                  <SelectItem value="none" disabled>No datasets registered yet</SelectItem>
-                )}
                 {datasets?.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -494,60 +394,24 @@ function EvaluateTab() {
               {evaluationStatus === 'running' ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Running...</> : <><Play className="mr-2 h-4 w-4" />Run</>}
             </Button>
           </div>
-          {pastRuns && pastRuns.length > 0 && (
-            <div className="flex gap-2 flex-wrap">
-              {pastRuns.slice(0, 5).map((run: any) => (
-                <Badge key={run.id} variant="outline" className={run.verdict === 'PASS' ? 'border-success/50' : 'border-destructive/50'}>
-                  {run.verdict} - {(run.overall_score * 100).toFixed(0)}%
-                </Badge>
-              ))}
-            </div>
-          )}
         </CardContent>
       </Card>
 
       {evaluationStatus === 'running' && <EngineSkeleton />}
 
       {evaluationStatus === 'complete' && result && (
-        <div className="space-y-6">
-          <Card className={`border-2 ${getVerdictColor()}`}>
-            <CardContent className="pt-6 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                {result.verdict === 'PASS' ? <CheckCircle2 className="h-8 w-8 text-success" /> : <XCircle className="h-8 w-8 text-destructive" />}
-                <div>
-                  <div className="text-4xl font-bold">{(result.overall_score * 100).toFixed(1)}%</div>
-                  <div className="text-muted-foreground">Overall Data Quality</div>
-                </div>
+        <Card className={cn("border-2", result.verdict === 'PASS' ? 'bg-success/10 border-success/30' : 'bg-destructive/10 border-destructive/30')}>
+          <CardContent className="pt-6 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              {result.verdict === 'PASS' ? <CheckCircle2 className="h-8 w-8 text-success" /> : <XCircle className="h-8 w-8 text-destructive" />}
+              <div>
+                <div className="text-4xl font-bold">{(result.overall_score * 100).toFixed(1)}%</div>
+                <div className="text-muted-foreground">Overall Data Quality</div>
               </div>
-              <Badge className={getVerdictColor()}>{result.verdict}</Badge>
-            </CardContent>
-          </Card>
-
-          {result.contract_violation && (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Contract Violation</AlertTitle>
-              <AlertDescription>This dataset violates its data contract.</AlertDescription>
-            </Alert>
-          )}
-
-          <MetricWeightGrid metrics={getMetricsForGrid()} overallScore={result.overall_score * 100} engineName="Data Quality" formula={FORMULA} />
-          <ComputationBreakdown steps={getComputationSteps()} overallScore={result.overall_score * 100} weightedFormula={FORMULA} engineType="data_quality" euAIActReference={result.eu_ai_act_reference} />
-          <RawDataLog logs={rawLogs} />
-          <EvidencePackage 
-            mode="download"
-            data={{ 
-              results: { run_id: result.run_id, metrics: result.metrics, verdict: result.verdict, evidence: result.evidence },
-              rawLogs: rawLogs,
-              modelId: result.dataset_id,
-              evaluationType: 'data_quality',
-              overallScore: result.overall_score * 100,
-              isCompliant: result.verdict === 'PASS',
-              complianceThreshold: 70,
-              weightedFormula: FORMULA
-            }} 
-          />
-        </div>
+            </div>
+            <Badge className={result.verdict === 'PASS' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}>{result.verdict}</Badge>
+          </CardContent>
+        </Card>
       )}
 
       {evaluationStatus === 'idle' && (
@@ -565,26 +429,6 @@ function EvaluateTab() {
 function HistoryTab() {
   const { uploads, loading } = useAllUploads();
   const [selectedUpload, setSelectedUpload] = useState<UploadStatus | null>(null);
-
-  const getStatusBadge = (status: string, score?: number | null) => {
-    switch (status) {
-      case 'completed':
-        return (
-          <Badge className={cn(
-            score && score >= 70 ? 'bg-success/10 text-success border-success/20' : 'bg-destructive/10 text-destructive border-destructive/20'
-          )}>
-            {score}%
-          </Badge>
-        );
-      case 'processing':
-      case 'analyzing':
-        return <Badge variant="outline"><Loader2 className="h-3 w-3 mr-1 animate-spin" />{status}</Badge>;
-      case 'failed':
-        return <Badge variant="destructive">Failed</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
-  };
 
   if (loading) {
     return (
@@ -606,18 +450,16 @@ function HistoryTab() {
             <History className="h-5 w-5" />
             Upload History
           </CardTitle>
-          <CardDescription>
-            {uploads.length} total uploads
-          </CardDescription>
+          <CardDescription>{uploads.length} total uploads</CardDescription>
         </CardHeader>
         <CardContent>
           {uploads.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No uploads yet. Import a file to get started.</p>
+              <p>No uploads yet.</p>
             </div>
           ) : (
-            <ScrollArea className="h-[500px]">
+            <ScrollArea className="h-[400px]">
               <div className="space-y-2">
                 {uploads.map(upload => (
                   <div 
@@ -629,29 +471,17 @@ function HistoryTab() {
                     onClick={() => setSelectedUpload(upload)}
                   >
                     <div className="flex items-center gap-3">
-                      <div className={cn(
-                        "p-2 rounded-lg",
-                        upload.status === 'completed' ? 'bg-success/10' : 
-                        upload.status === 'failed' ? 'bg-destructive/10' : 'bg-muted'
-                      )}>
-                        <FileText className={cn(
-                          "h-4 w-4",
-                          upload.status === 'completed' ? 'text-success' : 
-                          upload.status === 'failed' ? 'text-destructive' : 'text-muted-foreground'
-                        )} />
-                      </div>
+                      <FileText className="h-4 w-4" />
                       <div>
                         <p className="font-medium text-sm truncate max-w-[200px]">{upload.file_name}</p>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Clock className="h-3 w-3" />
+                        <p className="text-xs text-muted-foreground">
                           {format(new Date(upload.created_at), 'MMM d, yyyy HH:mm')}
-                          {upload.parsed_row_count && (
-                            <span>• {upload.parsed_row_count} rows</span>
-                          )}
-                        </div>
+                        </p>
                       </div>
                     </div>
-                    {getStatusBadge(upload.status, upload.quality_score)}
+                    <Badge variant={upload.status === 'completed' ? 'default' : 'secondary'}>
+                      {upload.quality_score ? `${upload.quality_score}%` : upload.status}
+                    </Badge>
                   </div>
                 ))}
               </div>
@@ -659,47 +489,6 @@ function HistoryTab() {
           )}
         </CardContent>
       </Card>
-
-      {/* Selected Upload Details */}
-      {selectedUpload && selectedUpload.status === 'completed' && (
-        <div className="space-y-6">
-          <Card className={cn(
-            "border-2",
-            selectedUpload.quality_score && selectedUpload.quality_score >= 70 
-              ? "bg-success/5 border-success/30" 
-              : "bg-destructive/5 border-destructive/30"
-          )}>
-            <CardContent className="pt-6 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                {selectedUpload.quality_score && selectedUpload.quality_score >= 70 ? (
-                  <CheckCircle2 className="h-10 w-10 text-success" />
-                ) : (
-                  <XCircle className="h-10 w-10 text-destructive" />
-                )}
-                <div>
-                  <div className="text-3xl font-bold">{selectedUpload.quality_score}%</div>
-                  <div className="text-muted-foreground">{selectedUpload.file_name}</div>
-                </div>
-              </div>
-              <div className="text-right text-sm text-muted-foreground">
-                <p>{selectedUpload.parsed_row_count} rows • {selectedUpload.parsed_column_count} cols</p>
-                <p>{selectedUpload.processing_time_ms}ms processing</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {selectedUpload.analysis_details?.ai_summary && (
-            <AISummaryPanel summary={selectedUpload.analysis_details.ai_summary as AISummary} />
-          )}
-
-          {selectedUpload.analysis_details?.column_analysis && (
-            <ColumnAnalysisGrid 
-              columns={selectedUpload.analysis_details.column_analysis as ColumnAnalysis[]} 
-              showDetails 
-            />
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -707,10 +496,6 @@ function HistoryTab() {
 function ControlPlaneTab() {
   const [selectedDataset, setSelectedDataset] = useState<string>('');
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newDatasetName, setNewDatasetName] = useState('');
-  const [newDatasetDescription, setNewDatasetDescription] = useState('');
-  const [sampleData, setSampleData] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
   const queryClient = useQueryClient();
   
   const { data: datasets, refetch: refetchDatasets } = useQuery({
@@ -743,97 +528,26 @@ function ControlPlaneTab() {
     stopPipeline
   } = useDQControlPlane(selectedDataset);
 
-  const handleCreateDataset = async () => {
-    if (!newDatasetName.trim()) {
-      toast.error('Please enter a dataset name');
-      return;
-    }
-
-    setIsCreating(true);
-    try {
-      // Parse sample data if provided
-      let rowCount = 0;
-      let dataTypes: string[] = [];
-      
-      if (sampleData.trim()) {
-        try {
-          const parsed = JSON.parse(sampleData);
-          if (Array.isArray(parsed)) {
-            rowCount = parsed.length;
-            if (parsed[0] && typeof parsed[0] === 'object') {
-              dataTypes = Object.keys(parsed[0]);
-            }
-          }
-        } catch {
-          // Try CSV parsing
-          const lines = sampleData.trim().split('\n');
-          rowCount = Math.max(0, lines.length - 1);
-          if (lines[0]) {
-            dataTypes = lines[0].split(',').map(h => h.trim());
-          }
-        }
-      }
-
-      const { data: newDataset, error } = await supabase
-        .from('datasets')
-        .insert({
-          name: newDatasetName.trim(),
-          description: newDatasetDescription.trim() || null,
-          source: 'control_plane_upload',
-          row_count: rowCount || null,
-          data_types: dataTypes.length > 0 ? dataTypes : null,
-          consent_status: 'pending',
-          environment: 'development'
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      toast.success('Dataset created successfully');
-      setSelectedDataset(newDataset.id);
-      setShowCreateForm(false);
-      setNewDatasetName('');
-      setNewDatasetDescription('');
-      setSampleData('');
-      refetchDatasets();
-      
-      // Auto-run pipeline after creation
-      setTimeout(() => {
-        runPipeline({
-          dataset_id: newDataset.id,
-          execution_mode: 'FULL'
-        });
-      }, 500);
-
-    } catch (error) {
-      console.error('Error creating dataset:', error);
-      toast.error('Failed to create dataset');
-    } finally {
-      setIsCreating(false);
-    }
+  const handleDatasetCreated = (datasetId: string) => {
+    setSelectedDataset(datasetId);
+    setShowCreateForm(false);
+    refetchDatasets();
   };
 
-  const handleRunPipeline = () => {
-    if (!selectedDataset) {
+  const handleRunPipeline = (datasetId?: string) => {
+    const id = datasetId || selectedDataset;
+    if (!id) {
       toast.error('Please select a dataset');
       return;
     }
     runPipeline({
-      dataset_id: selectedDataset,
+      dataset_id: id,
       execution_mode: 'FULL'
     });
   };
 
   return (
     <div className="space-y-6">
-      {/* Circuit Breaker Approval Dialog */}
-      <CircuitBreakerDialog
-        state={circuitBreakerState}
-        onContinue={continuePipeline}
-        onStop={stopPipeline}
-      />
-
       {/* Dataset Selection & Create */}
       <Card>
         <CardHeader className="pb-2">
@@ -849,104 +563,51 @@ function ControlPlaneTab() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Create Form */}
           {showCreateForm && (
-            <div className="p-4 border border-dashed border-primary/30 rounded-lg bg-primary/5 space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Dataset Name *</label>
-                  <input
-                    type="text"
-                    value={newDatasetName}
-                    onChange={(e) => setNewDatasetName(e.target.value)}
-                    placeholder="e.g., Customer Transactions Q1"
-                    className="w-full px-3 py-2 border rounded-md bg-background text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Description</label>
-                  <input
-                    type="text"
-                    value={newDatasetDescription}
-                    onChange={(e) => setNewDatasetDescription(e.target.value)}
-                    placeholder="Brief description..."
-                    className="w-full px-3 py-2 border rounded-md bg-background text-sm"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Sample Data (JSON or CSV)</label>
-                <textarea
-                  value={sampleData}
-                  onChange={(e) => setSampleData(e.target.value)}
-                  placeholder={'[\n  {"id": 1, "name": "John", "email": "john@example.com", "age": 30},\n  {"id": 2, "name": "Jane", "email": null, "age": 25}\n]'}
-                  className="w-full px-3 py-2 border rounded-md bg-background text-sm font-mono h-32 resize-none"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Paste JSON array or CSV data. This will be used for profiling and rule generation.
-                </p>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowCreateForm(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleCreateDataset} disabled={isCreating}>
-                  {isCreating ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Create & Run Pipeline
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
+            <DQFileUploader
+              onDatasetCreated={handleDatasetCreated}
+              onRunPipeline={handleRunPipeline}
+              isRunning={pipelineStatus === 'running'}
+            />
           )}
 
-          {/* Dataset Selection & Run */}
-          <div className="flex items-end gap-4">
-            <div className="flex-1">
-              <label className="text-sm font-medium mb-2 block">Select Existing Dataset</label>
-              <Select value={selectedDataset} onValueChange={setSelectedDataset}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a dataset..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {datasets?.length === 0 && (
-                    <SelectItem value="_empty" disabled>
-                      No datasets available - create one above
-                    </SelectItem>
-                  )}
-                  {datasets?.map((ds) => (
-                    <SelectItem key={ds.id} value={ds.id}>
-                      {ds.name} ({ds.row_count?.toLocaleString() || 0} rows)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button 
-              onClick={handleRunPipeline} 
-              disabled={!selectedDataset || pipelineStatus === 'running'}
-              className="gap-2"
-            >
-              {pipelineStatus === 'running' ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Play className="h-4 w-4" />
-              )}
-              Run Pipeline
-            </Button>
-            {pipelineStatus !== 'idle' && (
-              <Button variant="outline" onClick={reset}>
-                Reset
+          {!showCreateForm && (
+            <div className="flex items-end gap-4">
+              <div className="flex-1">
+                <label className="text-sm font-medium mb-2 block">Select Existing Dataset</label>
+                <Select value={selectedDataset} onValueChange={setSelectedDataset}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a dataset..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {datasets?.map((ds) => (
+                      <SelectItem key={ds.id} value={ds.id}>
+                        {ds.name} ({ds.row_count?.toLocaleString() || 0} rows)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button 
+                onClick={() => handleRunPipeline()} 
+                disabled={!selectedDataset || pipelineStatus === 'running'}
+                className="gap-2"
+              >
+                {pipelineStatus === 'running' ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
+                Run Pipeline
               </Button>
-            )}
-          </div>
+              {pipelineStatus !== 'idle' && (
+                <Button variant="outline" onClick={reset} className="gap-2">
+                  <RefreshCw className="h-4 w-4" />
+                  Reset
+                </Button>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -959,28 +620,35 @@ function ControlPlaneTab() {
         isRealtimeConnected={isRealtimeConnected}
       />
 
-      {/* 2x2 Grid: Profiling, Rules, Execution, Dashboard */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        <DQProfilingPanel 
-          profile={profilingResult} 
-          isLoading={currentStep === 1} 
-        />
-        <DQRuleLibrary 
-          rules={rulesResult} 
-          isLoading={currentStep === 2} 
-        />
-        <DQExecutionResults 
-          execution={executionResult} 
-          isLoading={currentStep === 3} 
-        />
-        <DQDashboardAssets 
-          assets={dashboardAssets} 
-          isLoading={currentStep === 4} 
-        />
-      </div>
+      {/* STEP 1: Data Profiling - Full Width */}
+      <DQProfilingReport 
+        profile={profilingResult} 
+        isLoading={currentStep === 1} 
+      />
 
-      {/* Incidents - Full Width */}
-      <DQIncidentPanel
+      {/* STEP 2: Rule Library - Full Width */}
+      <DQRuleLibraryFull 
+        rules={rulesResult} 
+        isLoading={currentStep === 2} 
+      />
+
+      {/* STEP 3: Rule Execution - Full Width */}
+      <DQExecutionReport 
+        execution={executionResult} 
+        isLoading={currentStep === 3}
+        circuitBreakerState={circuitBreakerState}
+        onContinue={continuePipeline}
+        onStop={stopPipeline}
+      />
+
+      {/* STEP 4: Dashboard Assets - Full Width */}
+      <DQDashboardAssetsFull 
+        assets={dashboardAssets} 
+        isLoading={currentStep === 4} 
+      />
+
+      {/* STEP 5: Incidents - Full Width */}
+      <DQIncidentsFull
         incidents={incidents}
         isLoading={currentStep === 5}
         onAcknowledge={acknowledgeIncident}
@@ -1007,7 +675,7 @@ function ControlPlaneTab() {
 }
 
 function DataQualityEngineContent() {
-  const [activeTab, setActiveTab] = useState('import');
+  const [activeTab, setActiveTab] = useState('control-plane');
 
   return (
     <MainLayout title="Data Quality Engine">
@@ -1025,12 +693,14 @@ function DataQualityEngineContent() {
 
         <InputOutputScope scope="BOTH" inputDescription="File uploads, datasets, schema" outputDescription="Quality scores, AI analysis, evidence" />
 
-        {/* Stats Overview */}
         <QualityStatsCards />
 
-        {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-4 max-w-lg">
+            <TabsTrigger value="control-plane" className="flex items-center gap-2">
+              <Zap className="h-4 w-4" />
+              Control Plane
+            </TabsTrigger>
             <TabsTrigger value="import" className="flex items-center gap-2">
               <Upload className="h-4 w-4" />
               Import
@@ -1039,15 +709,15 @@ function DataQualityEngineContent() {
               <BarChart3 className="h-4 w-4" />
               Evaluate
             </TabsTrigger>
-            <TabsTrigger value="control-plane" className="flex items-center gap-2">
-              <Zap className="h-4 w-4" />
-              Control Plane
-            </TabsTrigger>
             <TabsTrigger value="history" className="flex items-center gap-2">
               <History className="h-4 w-4" />
               History
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="control-plane" className="mt-6">
+            <ControlPlaneTab />
+          </TabsContent>
 
           <TabsContent value="import" className="mt-6">
             <ImportTab />
@@ -1055,10 +725,6 @@ function DataQualityEngineContent() {
 
           <TabsContent value="evaluate" className="mt-6">
             <EvaluateTab />
-          </TabsContent>
-
-          <TabsContent value="control-plane" className="mt-6">
-            <ControlPlaneTab />
           </TabsContent>
 
           <TabsContent value="history" className="mt-6">
