@@ -50,7 +50,7 @@ export default function RegulatoryReports() {
       let query = supabase
         .from("regulatory_reports")
         .select("*")
-        .order("created_at", { ascending: false });
+        .order("generated_at", { ascending: false });
 
       if (selectedSystem !== "all") {
         query = query.eq("system_id", selectedSystem);
@@ -62,7 +62,11 @@ export default function RegulatoryReports() {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as RegulatoryReport[];
+      // Map report_content to report_content for the interface
+      return (data || []).map(r => ({
+        ...r,
+        report_content: r.report_content || {}
+      })) as RegulatoryReport[];
     }
   });
 
@@ -133,17 +137,21 @@ export default function RegulatoryReports() {
 
   const getReportTypeBadge = (type: string) => {
     const colors: Record<string, string> = {
-      eu_ai_act: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+      eu_ai_act_conformity: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
       model_card: 'bg-purple-500/10 text-purple-500 border-purple-500/20',
       data_card: 'bg-green-500/10 text-green-500 border-green-500/20',
-      audit_report: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
+      impact_assessment: 'bg-cyan-500/10 text-cyan-500 border-cyan-500/20',
+      bias_audit: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
+      transparency_report: 'bg-pink-500/10 text-pink-500 border-pink-500/20',
     };
 
     const labels: Record<string, string> = {
-      eu_ai_act: 'EU AI Act',
+      eu_ai_act_conformity: 'EU AI Act',
       model_card: 'Model Card',
       data_card: 'Data Card',
-      audit_report: 'Audit Report',
+      impact_assessment: 'Impact Assessment',
+      bias_audit: 'Bias Audit',
+      transparency_report: 'Transparency Report',
     };
 
     return (
@@ -251,10 +259,12 @@ export default function RegulatoryReports() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="eu_ai_act">EU AI Act</SelectItem>
+                  <SelectItem value="eu_ai_act_conformity">EU AI Act</SelectItem>
                   <SelectItem value="model_card">Model Card</SelectItem>
                   <SelectItem value="data_card">Data Card</SelectItem>
-                  <SelectItem value="audit_report">Audit Report</SelectItem>
+                  <SelectItem value="impact_assessment">Impact Assessment</SelectItem>
+                  <SelectItem value="bias_audit">Bias Audit</SelectItem>
+                  <SelectItem value="transparency_report">Transparency Report</SelectItem>
                 </SelectContent>
               </Select>
 
