@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { 
   Database, 
@@ -13,7 +14,9 @@ import {
   Loader2,
   Circle,
   AlertOctagon,
-  ArrowRight
+  ArrowRight,
+  StopCircle,
+  PlayCircle
 } from 'lucide-react';
 import type { PipelineStep, StepStatus, PipelineStatus } from '@/hooks/useDQControlPlane';
 
@@ -23,6 +26,8 @@ interface DQPipelineVisualizerProps {
   pipelineStatus: PipelineStatus;
   elapsedTime: number;
   isRealtimeConnected: boolean;
+  onContinue?: () => void;
+  onStop?: () => void;
 }
 
 const STEP_CONFIG: Record<PipelineStep, { icon: React.ElementType; label: string; description: string }> = {
@@ -46,7 +51,9 @@ export function DQPipelineVisualizer({
   stepStatuses,
   pipelineStatus,
   elapsedTime,
-  isRealtimeConnected
+  isRealtimeConnected,
+  onContinue,
+  onStop
 }: DQPipelineVisualizerProps) {
   const formatTime = (ms: number) => {
     const seconds = Math.floor(ms / 1000);
@@ -157,16 +164,36 @@ export function DQPipelineVisualizer({
           </div>
         </div>
 
-        {/* Circuit Breaker Alert */}
+        {/* Circuit Breaker Alert with Action Buttons */}
         {pipelineStatus === 'halted' && (
           <div className="mt-4 p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg">
             <div className="flex items-start gap-3">
               <AlertOctagon className="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
-              <div>
+              <div className="flex-1">
                 <h4 className="font-semibold text-orange-500">CIRCUIT BREAKER TRIPPED</h4>
                 <p className="text-sm text-orange-500/80 mt-1">
                   Critical data quality failure detected. Downstream tasks stopped to prevent data corruption.
                 </p>
+                {onContinue && onStop && (
+                  <div className="flex gap-3 mt-4">
+                    <Button 
+                      variant="destructive" 
+                      onClick={onStop} 
+                      className="gap-2"
+                    >
+                      <StopCircle className="h-4 w-4" />
+                      Stop Pipeline
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={onContinue} 
+                      className="gap-2 border-orange-500 text-orange-500 hover:bg-orange-500/10"
+                    >
+                      <PlayCircle className="h-4 w-4" />
+                      Continue Anyway
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
