@@ -705,8 +705,14 @@ function HistoryTab() {
 
 function ControlPlaneTab() {
   const [selectedDataset, setSelectedDataset] = useState<string>('');
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newDatasetName, setNewDatasetName] = useState('');
+  const [newDatasetDescription, setNewDatasetDescription] = useState('');
+  const [sampleData, setSampleData] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+  const queryClient = useQueryClient();
   
-  const { data: datasets } = useQuery({
+  const { data: datasets, refetch: refetchDatasets } = useQuery({
     queryKey: ['datasets-for-control-plane'],
     queryFn: async () => {
       const { data, error } = await supabase.from('datasets').select('*').order('created_at', { ascending: false });
@@ -733,6 +739,77 @@ function ControlPlaneTab() {
     resolveIncident
   } = useDQControlPlane(selectedDataset);
 
+  const handleCreateDataset = async () => {
+    if (!newDatasetName.trim()) {
+      toast.error('Please enter a dataset name');
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      // Parse sample data if provided
+      let rowCount = 0;
+      let dataTypes: string[] = [];
+      
+      if (sampleData.trim()) {
+        try {
+          const parsed = JSON.parse(sampleData);
+          if (Array.isArray(parsed)) {
+            rowCount = parsed.length;
+            if (parsed[0] && typeof parsed[0] === 'object') {
+              dataTypes = Object.keys(parsed[0]);
+            }
+          }
+        } catch {
+          // Try CSV parsing
+          const lines = sampleData.trim().split('\n');
+          rowCount = Math.max(0, lines.length - 1);
+          if (lines[0]) {
+            dataTypes = lines[0].split(',').map(h => h.trim());
+          }
+        }
+      }
+
+      const { data: newDataset, error } = await supabase
+        .from('datasets')
+        .insert({
+          name: newDatasetName.trim(),
+          description: newDatasetDescription.trim() || null,
+          source: 'control_plane_upload',
+          row_count: rowCount || null,
+          data_types: dataTypes.length > 0 ? dataTypes : null,
+          consent_status: 'pending',
+          environment: 'development'
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success('Dataset created successfully');
+      setSelectedDataset(newDataset.id);
+      setShowCreateForm(false);
+      setNewDatasetName('');
+      setNewDatasetDescription('');
+      setSampleData('');
+      refetchDatasets();
+      
+      // Auto-run pipeline after creation
+      setTimeout(() => {
+        runPipeline({
+          dataset_id: newDataset.id,
+          execution_mode: 'FULL'
+        });
+      }, 500);
+
+    } catch (error) {
+      console.error('Error creating dataset:', error);
+      toast.error('Failed to create dataset');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
   const handleRunPipeline = () => {
     if (!selectedDataset) {
       toast.error('Please select a dataset');
@@ -746,17 +823,93 @@ function ControlPlaneTab() {
 
   return (
     <div className="space-y-6">
-      {/* Dataset Selection & Run Button */}
+      {/* Dataset Selection & Create */}
       <Card>
-        <CardContent className="pt-6">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-medium">Dataset Configuration</CardTitle>
+            <Button
+              variant={showCreateForm ? "secondary" : "outline"}
+              size="sm"
+              onClick={() => setShowCreateForm(!showCreateForm)}
+            >
+              {showCreateForm ? 'Cancel' : '+ New Dataset'}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Create Form */}
+          {showCreateForm && (
+            <div className="p-4 border border-dashed border-primary/30 rounded-lg bg-primary/5 space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Dataset Name *</label>
+                  <input
+                    type="text"
+                    value={newDatasetName}
+                    onChange={(e) => setNewDatasetName(e.target.value)}
+                    placeholder="e.g., Customer Transactions Q1"
+                    className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Description</label>
+                  <input
+                    type="text"
+                    value={newDatasetDescription}
+                    onChange={(e) => setNewDatasetDescription(e.target.value)}
+                    placeholder="Brief description..."
+                    className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">Sample Data (JSON or CSV)</label>
+                <textarea
+                  value={sampleData}
+                  onChange={(e) => setSampleData(e.target.value)}
+                  placeholder={'[\n  {"id": 1, "name": "John", "email": "john@example.com", "age": 30},\n  {"id": 2, "name": "Jane", "email": null, "age": 25}\n]'}
+                  className="w-full px-3 py-2 border rounded-md bg-background text-sm font-mono h-32 resize-none"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Paste JSON array or CSV data. This will be used for profiling and rule generation.
+                </p>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowCreateForm(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleCreateDataset} disabled={isCreating}>
+                  {isCreating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Create & Run Pipeline
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Dataset Selection & Run */}
           <div className="flex items-end gap-4">
             <div className="flex-1">
-              <label className="text-sm font-medium mb-2 block">Select Dataset</label>
+              <label className="text-sm font-medium mb-2 block">Select Existing Dataset</label>
               <Select value={selectedDataset} onValueChange={setSelectedDataset}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choose a dataset..." />
                 </SelectTrigger>
                 <SelectContent>
+                  {datasets?.length === 0 && (
+                    <SelectItem value="_empty" disabled>
+                      No datasets available - create one above
+                    </SelectItem>
+                  )}
                   {datasets?.map((ds) => (
                     <SelectItem key={ds.id} value={ds.id}>
                       {ds.name} ({ds.row_count?.toLocaleString() || 0} rows)
