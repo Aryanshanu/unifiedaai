@@ -22,7 +22,8 @@ import {
   TrendingUp,
   FileText,
   Clock,
-  Activity
+  Activity,
+  Zap
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -38,6 +39,13 @@ import { AISummaryPanel, AISummary } from '@/components/engines/AISummaryPanel';
 import { ColumnAnalysisGrid, ColumnAnalysis } from '@/components/engines/ColumnAnalysisGrid';
 import { QualityTrendChart } from '@/components/engines/QualityTrendChart';
 import { RemediationActionCenter, RemediationAction } from '@/components/engines/RemediationActionCenter';
+import { DQPipelineVisualizer } from '@/components/engines/DQPipelineVisualizer';
+import { DQProfilingPanel } from '@/components/engines/DQProfilingPanel';
+import { DQRuleLibrary } from '@/components/engines/DQRuleLibrary';
+import { DQExecutionResults } from '@/components/engines/DQExecutionResults';
+import { DQDashboardAssets } from '@/components/engines/DQDashboardAssets';
+import { DQIncidentPanel } from '@/components/engines/DQIncidentPanel';
+import { useDQControlPlane } from '@/hooks/useDQControlPlane';
 import { useFileUploadStatus, useAllUploads, useQualityStats, UploadStatus } from '@/hooks/useFileUploadStatus';
 import { useQualityTrend } from '@/hooks/useQualityTrend';
 import { cn } from '@/lib/utils';
@@ -695,6 +703,145 @@ function HistoryTab() {
   );
 }
 
+function ControlPlaneTab() {
+  const [selectedDataset, setSelectedDataset] = useState<string>('');
+  
+  const { data: datasets } = useQuery({
+    queryKey: ['datasets-for-control-plane'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('datasets').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    }
+  });
+
+  const {
+    pipelineStatus,
+    currentStep,
+    stepStatuses,
+    elapsedTime,
+    profilingResult,
+    rulesResult,
+    executionResult,
+    dashboardAssets,
+    incidents,
+    finalResponse,
+    runPipeline,
+    reset,
+    isRealtimeConnected,
+    acknowledgeIncident,
+    resolveIncident
+  } = useDQControlPlane(selectedDataset);
+
+  const handleRunPipeline = () => {
+    if (!selectedDataset) {
+      toast.error('Please select a dataset');
+      return;
+    }
+    runPipeline({
+      dataset_id: selectedDataset,
+      execution_mode: 'FULL'
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Dataset Selection & Run Button */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-end gap-4">
+            <div className="flex-1">
+              <label className="text-sm font-medium mb-2 block">Select Dataset</label>
+              <Select value={selectedDataset} onValueChange={setSelectedDataset}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a dataset..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {datasets?.map((ds) => (
+                    <SelectItem key={ds.id} value={ds.id}>
+                      {ds.name} ({ds.row_count?.toLocaleString() || 0} rows)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button 
+              onClick={handleRunPipeline} 
+              disabled={!selectedDataset || pipelineStatus === 'running'}
+              className="gap-2"
+            >
+              {pipelineStatus === 'running' ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
+              Run Pipeline
+            </Button>
+            {pipelineStatus !== 'idle' && (
+              <Button variant="outline" onClick={reset}>
+                Reset
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Pipeline Visualizer */}
+      <DQPipelineVisualizer
+        currentStep={currentStep}
+        stepStatuses={stepStatuses}
+        pipelineStatus={pipelineStatus}
+        elapsedTime={elapsedTime}
+        isRealtimeConnected={isRealtimeConnected}
+      />
+
+      {/* 2x2 Grid: Profiling, Rules, Execution, Dashboard */}
+      <div className="grid lg:grid-cols-2 gap-6">
+        <DQProfilingPanel 
+          profile={profilingResult} 
+          isLoading={currentStep === 1} 
+        />
+        <DQRuleLibrary 
+          rules={rulesResult} 
+          isLoading={currentStep === 2} 
+        />
+        <DQExecutionResults 
+          execution={executionResult} 
+          isLoading={currentStep === 3} 
+        />
+        <DQDashboardAssets 
+          assets={dashboardAssets} 
+          isLoading={currentStep === 4} 
+        />
+      </div>
+
+      {/* Incidents - Full Width */}
+      <DQIncidentPanel
+        incidents={incidents}
+        isLoading={currentStep === 5}
+        onAcknowledge={acknowledgeIncident}
+        onResolve={resolveIncident}
+      />
+
+      {/* Raw JSON Response */}
+      {finalResponse && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-medium">Pipeline Response (JSON)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[200px]">
+              <pre className="text-xs font-mono bg-muted p-3 rounded-lg overflow-x-auto">
+                {JSON.stringify(finalResponse, null, 2)}
+              </pre>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 function DataQualityEngineContent() {
   const [activeTab, setActiveTab] = useState('import');
 
@@ -719,7 +866,7 @@ function DataQualityEngineContent() {
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3 max-w-md">
+          <TabsList className="grid w-full grid-cols-4 max-w-lg">
             <TabsTrigger value="import" className="flex items-center gap-2">
               <Upload className="h-4 w-4" />
               Import
@@ -727,6 +874,10 @@ function DataQualityEngineContent() {
             <TabsTrigger value="evaluate" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Evaluate
+            </TabsTrigger>
+            <TabsTrigger value="control-plane" className="flex items-center gap-2">
+              <Zap className="h-4 w-4" />
+              Control Plane
             </TabsTrigger>
             <TabsTrigger value="history" className="flex items-center gap-2">
               <History className="h-4 w-4" />
@@ -740,6 +891,10 @@ function DataQualityEngineContent() {
 
           <TabsContent value="evaluate" className="mt-6">
             <EvaluateTab />
+          </TabsContent>
+
+          <TabsContent value="control-plane" className="mt-6">
+            <ControlPlaneTab />
           </TabsContent>
 
           <TabsContent value="history" className="mt-6">
