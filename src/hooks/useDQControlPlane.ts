@@ -14,19 +14,25 @@ export interface PipelineInput {
   force_continue?: boolean;
 }
 
+export interface ColumnProfile {
+  column_name: string;
+  dtype: string;
+  completeness: number;
+  uniqueness: number;
+  null_count: number;
+  distinct_count: number;
+  min_value?: string | number | null;
+  max_value?: string | number | null;
+  mean_value?: number | null;
+  sample_values: (string | number | null)[];
+}
+
 export interface DQProfile {
   id: string;
   dataset_id: string;
   dataset_version: string | null;
   row_count: number;
-  column_profiles: Record<string, {
-    dtype: string;
-    completeness: number;
-    uniqueness: number;
-    min?: number | string;
-    max?: number | string;
-    mean?: number;
-  }>;
+  column_profiles: ColumnProfile[] | Record<string, ColumnProfile>;
   profile_ts: string;
   execution_time_ms: number | null;
 }

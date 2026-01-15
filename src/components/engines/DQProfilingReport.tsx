@@ -16,29 +16,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-
-interface ColumnProfile {
-  column_name: string;
-  dtype: string;
-  completeness: number;
-  uniqueness: number;
-  null_count: number;
-  distinct_count: number;
-  min_value?: string | number | null;
-  max_value?: string | number | null;
-  mean_value?: number | null;
-  sample_values: (string | number | null)[];
-}
-
-interface DQProfile {
-  id: string;
-  dataset_id: string;
-  dataset_version: string | null;
-  row_count: number;
-  column_profiles: ColumnProfile[] | Record<string, ColumnProfile>;
-  profile_ts: string;
-  execution_time_ms: number | null;
-}
+import { DQProfile, ColumnProfile } from '@/hooks/useDQControlPlane';
 
 interface DQProfilingReportProps {
   profile: DQProfile | null;
