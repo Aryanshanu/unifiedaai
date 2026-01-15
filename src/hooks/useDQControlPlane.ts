@@ -11,6 +11,7 @@ export interface PipelineInput {
   dataset_version?: string | null;
   execution_mode: 'FULL' | 'INCREMENTAL';
   last_execution_ts?: string | null;
+  force_continue?: boolean;
 }
 
 export interface DQProfile {
@@ -116,6 +117,12 @@ export interface ControlPlaneResponse {
   detail?: string;
 }
 
+export interface CircuitBreakerState {
+  isTripped: boolean;
+  pendingInput: PipelineInput | null;
+  executionSummary: ControlPlaneResponse['execution_summary'] | null;
+}
+
 export interface UseDQControlPlaneReturn {
   pipelineStatus: PipelineStatus;
   currentStep: PipelineStep | null;
@@ -132,6 +139,10 @@ export interface UseDQControlPlaneReturn {
   isRealtimeConnected: boolean;
   acknowledgeIncident: (incidentId: string) => Promise<void>;
   resolveIncident: (incidentId: string) => Promise<void>;
+  // Circuit breaker controls
+  circuitBreakerState: CircuitBreakerState;
+  continuePipeline: () => Promise<void>;
+  stopPipeline: () => void;
 }
 
 const STEP_NAMES: Record<PipelineStep, string> = {
@@ -161,6 +172,11 @@ export function useDQControlPlane(datasetId?: string): UseDQControlPlaneReturn {
   const [incidents, setIncidents] = useState<DQIncident[]>([]);
   const [finalResponse, setFinalResponse] = useState<ControlPlaneResponse | null>(null);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
+  const [circuitBreakerState, setCircuitBreakerState] = useState<CircuitBreakerState>({
+    isTripped: false,
+    pendingInput: null,
+    executionSummary: null
+  });
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const activeDatasetRef = useRef<string | null>(null);
@@ -335,6 +351,11 @@ export function useDQControlPlane(datasetId?: string): UseDQControlPlaneReturn {
     setDashboardAssets(null);
     setIncidents([]);
     setFinalResponse(null);
+    setCircuitBreakerState({
+      isTripped: false,
+      pendingInput: null,
+      executionSummary: null
+    });
     activeDatasetRef.current = input.dataset_id;
 
     try {
@@ -364,10 +385,17 @@ export function useDQControlPlane(datasetId?: string): UseDQControlPlaneReturn {
           description: `DQ pipeline completed successfully. ${response.incident_count || 0} incidents raised.`,
         });
       } else if (response.status === 'halted') {
+        // Circuit breaker tripped - await user decision
+        setCircuitBreakerState({
+          isTripped: true,
+          pendingInput: input,
+          executionSummary: response.execution_summary || null
+        });
         setPipelineStatus('halted');
+        setStepStatuses(prev => ({ ...prev, 3: 'halted', 4: 'pending', 5: 'pending' }));
         toast({
-          title: 'Pipeline Halted',
-          description: response.message,
+          title: 'Circuit Breaker Tripped',
+          description: 'Critical failure detected. Choose to continue or stop the pipeline.',
           variant: 'destructive',
         });
       } else {
@@ -405,7 +433,47 @@ export function useDQControlPlane(datasetId?: string): UseDQControlPlaneReturn {
       5: 'pending'
     });
     setFinalResponse(null);
+    setCircuitBreakerState({
+      isTripped: false,
+      pendingInput: null,
+      executionSummary: null
+    });
   }, []);
+
+  // Continue pipeline after circuit breaker approval
+  const continuePipeline = useCallback(async () => {
+    if (!circuitBreakerState.pendingInput) return;
+    
+    const input = { ...circuitBreakerState.pendingInput, force_continue: true };
+    setCircuitBreakerState({
+      isTripped: false,
+      pendingInput: null,
+      executionSummary: null
+    });
+    
+    toast({
+      title: 'Pipeline Continuing',
+      description: 'Circuit breaker override approved. Completing remaining tasks...',
+    });
+    
+    // Re-run with force_continue flag
+    await runPipeline(input);
+  }, [circuitBreakerState.pendingInput, runPipeline, toast]);
+
+  // Stop pipeline after circuit breaker
+  const stopPipeline = useCallback(() => {
+    setCircuitBreakerState({
+      isTripped: false,
+      pendingInput: null,
+      executionSummary: null
+    });
+    setPipelineStatus('error');
+    setStepStatuses(prev => ({ ...prev, 3: 'failed', 4: 'failed', 5: 'failed' }));
+    toast({
+      title: 'Pipeline Stopped',
+      description: 'Pipeline halted by user decision. Data corruption prevented.',
+    });
+  }, [toast]);
 
   const acknowledgeIncident = useCallback(async (incidentId: string) => {
     const { error } = await supabase
@@ -452,7 +520,10 @@ export function useDQControlPlane(datasetId?: string): UseDQControlPlaneReturn {
     reset,
     isRealtimeConnected,
     acknowledgeIncident,
-    resolveIncident
+    resolveIncident,
+    circuitBreakerState,
+    continuePipeline,
+    stopPipeline
   };
 }
 
