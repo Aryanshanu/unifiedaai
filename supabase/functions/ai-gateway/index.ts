@@ -766,7 +766,6 @@ serve(async (req) => {
     
     if (system.endpoint && system.api_token_encrypted) {
       // Use user's configured model endpoint
-      console.log(`Using user endpoint: ${system.endpoint}`);
       usedUserEndpoint = true;
       
       try {
@@ -774,13 +773,43 @@ serve(async (req) => {
         const isOpenAI = system.endpoint.includes("openai.com") || system.endpoint.includes("api.openai");
         const isHuggingFace = system.endpoint.includes("huggingface") || system.endpoint.includes("hf.space");
         const isAzure = system.endpoint.includes("azure") || system.endpoint.includes("openai.azure");
+        const isOpenRouter = system.endpoint.includes("openrouter.ai");
         
         let requestBody: any;
         let headers: Record<string, string> = {
           "Content-Type": "application/json",
         };
         
-        if (isOpenAI || isAzure) {
+        // CRITICAL FIX: Determine the actual API endpoint URL
+        let apiEndpoint = system.endpoint;
+        
+        // OpenRouter endpoints need special handling - the stored endpoint might be a model URL
+        if (isOpenRouter) {
+          // Always use the correct OpenRouter API endpoint
+          apiEndpoint = "https://openrouter.ai/api/v1/chat/completions";
+          
+          // Extract model name from the stored endpoint if it looks like a model URL
+          // e.g., "https://openrouter.ai/openai/gpt-oss-120b" -> "openai/gpt-oss-120b"
+          let modelName = system.model_name;
+          if (!modelName && system.endpoint) {
+            const modelMatch = system.endpoint.match(/openrouter\.ai\/(.+)$/);
+            if (modelMatch) {
+              modelName = modelMatch[1].replace(/:free$/, ''); // Remove :free suffix if present
+            }
+          }
+          
+          headers["Authorization"] = `Bearer ${system.api_token_encrypted}`;
+          headers["HTTP-Referer"] = "https://fractal-rai-os.lovable.app";
+          headers["X-Title"] = "Fractal RAI-OS";
+          requestBody = {
+            model: modelName || "openai/gpt-4o-mini",
+            messages: [
+              { role: "system", content: system.use_case || "You are a helpful AI assistant." },
+              ...messages,
+            ],
+          };
+          console.log(`Using OpenRouter API with model: ${modelName}`);
+        } else if (isOpenAI || isAzure) {
           headers["Authorization"] = `Bearer ${system.api_token_encrypted}`;
           requestBody = {
             model: system.model_name || "gpt-4",
@@ -807,7 +836,8 @@ serve(async (req) => {
           };
         }
         
-        aiResponse = await fetch(system.endpoint, {
+        console.log(`Using endpoint: ${apiEndpoint}`);
+        aiResponse = await fetch(apiEndpoint, {
           method: "POST",
           headers,
           body: JSON.stringify(requestBody),
