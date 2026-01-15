@@ -1203,6 +1203,316 @@ export type Database = {
           },
         ]
       }
+      dq_dashboard_assets: {
+        Row: {
+          dataset_id: string
+          dimension_breakdown_sql: string
+          execution_id: string
+          generated_at: string | null
+          hotspots_sql: string
+          id: string
+          summary_sql: string
+        }
+        Insert: {
+          dataset_id: string
+          dimension_breakdown_sql: string
+          execution_id: string
+          generated_at?: string | null
+          hotspots_sql: string
+          id?: string
+          summary_sql: string
+        }
+        Update: {
+          dataset_id?: string
+          dimension_breakdown_sql?: string
+          execution_id?: string
+          generated_at?: string | null
+          hotspots_sql?: string
+          id?: string
+          summary_sql?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dq_dashboard_assets_dataset_id_fkey"
+            columns: ["dataset_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dq_dashboard_assets_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "dq_rule_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dq_incidents: {
+        Row: {
+          action: string
+          created_at: string | null
+          dataset_id: string
+          dimension: string
+          example_failed_rows: Json | null
+          execution_id: string | null
+          failure_signature: string | null
+          id: string
+          profiling_reference: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          rule_id: string | null
+          severity: string
+          status: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          dataset_id: string
+          dimension: string
+          example_failed_rows?: Json | null
+          execution_id?: string | null
+          failure_signature?: string | null
+          id?: string
+          profiling_reference?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          rule_id?: string | null
+          severity: string
+          status?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          dataset_id?: string
+          dimension?: string
+          example_failed_rows?: Json | null
+          execution_id?: string | null
+          failure_signature?: string | null
+          id?: string
+          profiling_reference?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          rule_id?: string | null
+          severity?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dq_incidents_dataset_id_fkey"
+            columns: ["dataset_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dq_incidents_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "dq_rule_executions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dq_incidents_profiling_reference_fkey"
+            columns: ["profiling_reference"]
+            isOneToOne: false
+            referencedRelation: "dq_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dq_incidents_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "dq_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dq_profiles: {
+        Row: {
+          column_profiles: Json
+          created_at: string | null
+          created_by: string | null
+          dataset_id: string
+          dataset_version: string | null
+          execution_time_ms: number | null
+          id: string
+          profile_ts: string
+          record_hash: string | null
+          row_count: number
+        }
+        Insert: {
+          column_profiles?: Json
+          created_at?: string | null
+          created_by?: string | null
+          dataset_id: string
+          dataset_version?: string | null
+          execution_time_ms?: number | null
+          id?: string
+          profile_ts?: string
+          record_hash?: string | null
+          row_count: number
+        }
+        Update: {
+          column_profiles?: Json
+          created_at?: string | null
+          created_by?: string | null
+          dataset_id?: string
+          dataset_version?: string | null
+          execution_time_ms?: number | null
+          id?: string
+          profile_ts?: string
+          record_hash?: string | null
+          row_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dq_profiles_dataset_id_fkey"
+            columns: ["dataset_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dq_rule_executions: {
+        Row: {
+          circuit_breaker_tripped: boolean | null
+          created_by: string | null
+          dataset_id: string
+          execution_mode: string
+          execution_time_ms: number | null
+          execution_ts: string | null
+          id: string
+          metrics: Json
+          previous_hash: string | null
+          profile_id: string | null
+          record_hash: string | null
+          rules_version: number
+          summary: Json
+        }
+        Insert: {
+          circuit_breaker_tripped?: boolean | null
+          created_by?: string | null
+          dataset_id: string
+          execution_mode: string
+          execution_time_ms?: number | null
+          execution_ts?: string | null
+          id?: string
+          metrics?: Json
+          previous_hash?: string | null
+          profile_id?: string | null
+          record_hash?: string | null
+          rules_version: number
+          summary?: Json
+        }
+        Update: {
+          circuit_breaker_tripped?: boolean | null
+          created_by?: string | null
+          dataset_id?: string
+          execution_mode?: string
+          execution_time_ms?: number | null
+          execution_ts?: string | null
+          id?: string
+          metrics?: Json
+          previous_hash?: string | null
+          profile_id?: string | null
+          record_hash?: string | null
+          rules_version?: number
+          summary?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dq_rule_executions_dataset_id_fkey"
+            columns: ["dataset_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dq_rule_executions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "dq_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dq_rules: {
+        Row: {
+          business_impact: string | null
+          calibration_metadata: Json | null
+          column_name: string | null
+          confidence: number | null
+          created_at: string | null
+          dataset_id: string
+          dimension: string
+          id: string
+          is_active: boolean | null
+          logic_code: string
+          logic_type: string
+          profile_id: string | null
+          rule_name: string
+          severity: string
+          threshold: number
+          updated_at: string | null
+          version: number
+        }
+        Insert: {
+          business_impact?: string | null
+          calibration_metadata?: Json | null
+          column_name?: string | null
+          confidence?: number | null
+          created_at?: string | null
+          dataset_id: string
+          dimension: string
+          id?: string
+          is_active?: boolean | null
+          logic_code: string
+          logic_type: string
+          profile_id?: string | null
+          rule_name: string
+          severity: string
+          threshold: number
+          updated_at?: string | null
+          version?: number
+        }
+        Update: {
+          business_impact?: string | null
+          calibration_metadata?: Json | null
+          column_name?: string | null
+          confidence?: number | null
+          created_at?: string | null
+          dataset_id?: string
+          dimension?: string
+          id?: string
+          is_active?: boolean | null
+          logic_code?: string
+          logic_type?: string
+          profile_id?: string | null
+          rule_name?: string
+          severity?: string
+          threshold?: number
+          updated_at?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dq_rules_dataset_id_fkey"
+            columns: ["dataset_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dq_rules_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "dq_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       drift_alerts: {
         Row: {
           detected_at: string
