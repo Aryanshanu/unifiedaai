@@ -24,6 +24,7 @@ interface PipelineInput {
   dataset_version?: string | null;
   execution_mode: "FULL" | "INCREMENTAL";
   last_execution_ts?: string | null;
+  force_continue?: boolean; // Skip circuit breaker and continue pipeline
 }
 
 function validateInput(input: unknown): { valid: boolean; error?: string; data?: PipelineInput } {
@@ -52,6 +53,7 @@ function validateInput(input: unknown): { valid: boolean; error?: string; data?:
       dataset_version: (obj.dataset_version as string) || null,
       execution_mode: obj.execution_mode as "FULL" | "INCREMENTAL",
       last_execution_ts: (obj.last_execution_ts as string) || null,
+      force_continue: obj.force_continue === true,
     },
   };
 }
@@ -243,17 +245,23 @@ serve(async (req) => {
 
     // 🚨 CIRCUIT BREAKER CHECK 🚨
     if (executionResult.status === "halted" || executionResult.summary?.critical_failure === true) {
-      console.log("[DQ Control Plane] 🚨 CIRCUIT BREAKER TRIPPED - Halting pipeline");
-      const response: ControlPlaneResponse = {
-        status: "halted",
-        code: "CIRCUIT_BREAKER_TRIPPED",
-        message: "Critical data quality failure detected. Downstream tasks stopped.",
-        execution_summary: executionResult.summary,
-      };
-      return new Response(JSON.stringify(response), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      // Check if user has forced continuation
+      if (!pipelineInput.force_continue) {
+        console.log("[DQ Control Plane] 🚨 CIRCUIT BREAKER TRIPPED - Awaiting user decision");
+        const response: ControlPlaneResponse = {
+          status: "halted",
+          code: "CIRCUIT_BREAKER_TRIPPED",
+          message: "Critical data quality failure detected. Awaiting approval to continue or stop.",
+          execution_summary: executionResult.summary,
+          profiling_run_id: profilingResult.profiling_run_id,
+          rules_version: rulesResult.rules_version,
+        };
+        return new Response(JSON.stringify(response), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      console.log("[DQ Control Plane] ⚠️ CIRCUIT BREAKER OVERRIDE - Continuing pipeline by user request");
     }
 
     console.log("[DQ Control Plane] Task 3: Execution complete. Execution ID:", executionResult.execution_id);

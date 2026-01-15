@@ -45,6 +45,7 @@ import { DQRuleLibrary } from '@/components/engines/DQRuleLibrary';
 import { DQExecutionResults } from '@/components/engines/DQExecutionResults';
 import { DQDashboardAssets } from '@/components/engines/DQDashboardAssets';
 import { DQIncidentPanel } from '@/components/engines/DQIncidentPanel';
+import { CircuitBreakerDialog } from '@/components/engines/CircuitBreakerDialog';
 import { useDQControlPlane } from '@/hooks/useDQControlPlane';
 import { useFileUploadStatus, useAllUploads, useQualityStats, UploadStatus } from '@/hooks/useFileUploadStatus';
 import { useQualityTrend } from '@/hooks/useQualityTrend';
@@ -736,7 +737,10 @@ function ControlPlaneTab() {
     reset,
     isRealtimeConnected,
     acknowledgeIncident,
-    resolveIncident
+    resolveIncident,
+    circuitBreakerState,
+    continuePipeline,
+    stopPipeline
   } = useDQControlPlane(selectedDataset);
 
   const handleCreateDataset = async () => {
@@ -823,6 +827,13 @@ function ControlPlaneTab() {
 
   return (
     <div className="space-y-6">
+      {/* Circuit Breaker Approval Dialog */}
+      <CircuitBreakerDialog
+        state={circuitBreakerState}
+        onContinue={continuePipeline}
+        onStop={stopPipeline}
+      />
+
       {/* Dataset Selection & Create */}
       <Card>
         <CardHeader className="pb-2">
