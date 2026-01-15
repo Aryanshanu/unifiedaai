@@ -9,15 +9,10 @@ import { useModels } from "@/hooks/useModels";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, Loader2, Brain, Sparkles, Layers, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { instrumentPageLoad } from "@/lib/telemetry";
 import { CustomPromptTest } from "@/components/engines/CustomPromptTest";
 import { InputOutputScope } from "@/components/engines/InputOutputScope";
-import { ComputationBreakdown } from "@/components/engines/ComputationBreakdown";
-import { RawDataLog } from "@/components/engines/RawDataLog";
-import { EvidencePackage } from "@/components/engines/EvidencePackage";
-import { MetricWeightGrid } from "@/components/engines/MetricWeightGrid";
-import { WhyScorePanel } from "@/components/engines/WhyScorePanel";
 import { HealthIndicator } from "@/components/shared/HealthIndicator";
 import { useDataHealth } from "@/components/shared/DataHealthWrapper";
 import { ComponentErrorBoundary } from "@/components/error/ErrorBoundary";
@@ -25,43 +20,11 @@ import { EngineSkeleton } from "@/components/engines/EngineSkeleton";
 import { EngineLoadingStatus, EvalStatus } from "@/components/engines/EngineLoadingStatus";
 import { EngineErrorCard } from "@/components/engines/EngineErrorCard";
 import { NoEndpointWarning } from "@/components/engines/NoModelConnected";
-import { EngineResultsLayout } from "@/components/engines/EngineResultsLayout";
-import { EngineActionBar } from "@/components/engines/EngineActionBar";
 import { sanitizeErrorMessage } from "@/lib/ui-helpers";
-
-interface ExplainabilityResult {
-  id: string;
-  model_id: string;
-  created_at: string;
-  overall_score: number;
-  metric_details: Record<string, number>;
-  explanations: {
-    reasoning_chain?: any[];
-    transparency_summary?: string;
-    evidence?: string[];
-    risk_factors?: string[];
-    recommendations?: string[];
-    analysis_model?: string;
-    computation_steps?: any[];
-  };
-}
-
-const EXPLAINABILITY_METRICS = [
-  { key: 'clarity', name: 'Clarity', weight: 0.30, description: 'LLM-judged explanation clarity (1-5)' },
-  { key: 'faithfulness', name: 'Faithfulness', weight: 0.30, description: 'Explanation matches actual factors' },
-  { key: 'coverage', name: 'Coverage', weight: 0.20, description: 'Outputs with explanations %' },
-  { key: 'actionability', name: 'Actionability', weight: 0.10, description: 'Counterfactual hints provided' },
-  { key: 'simplicity', name: 'Simplicity', weight: 0.10, description: 'Flesch readability / length score' },
-];
-
-const FORMULA = "0.30×Clarity + 0.30×Faith + 0.20×Coverage + 0.10×Action + 0.10×Simple";
 
 function ExplainabilityEngineContent() {
   const [searchParams] = useSearchParams();
   const [selectedModelId, setSelectedModelId] = useState<string>("");
-  const [computationSteps, setComputationSteps] = useState<any[]>([]);
-  const [rawLogs, setRawLogs] = useState<any[]>([]);
-  const [realEvalResult, setRealEvalResult] = useState<any>(null);
   const [evalStatus, setEvalStatus] = useState<EvalStatus>('idle');
   const [evalError, setEvalError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -70,7 +33,6 @@ function ExplainabilityEngineContent() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Autorun support for Golden Demo
   const autorunModelId = searchParams.get('modelId');
   const shouldAutorun = searchParams.get('autorun') === '1';
 
@@ -79,7 +41,6 @@ function ExplainabilityEngineContent() {
     return () => endTrace();
   }, []);
 
-  // Autorun effect - trigger evaluation when navigated from Golden Demo
   useEffect(() => {
     if (autorunModelId && shouldAutorun && !hasAutoRun.current && models && models.length > 0) {
       const modelExists = models.some(m => m.id === autorunModelId);
@@ -93,33 +54,13 @@ function ExplainabilityEngineContent() {
     }
   }, [autorunModelId, shouldAutorun, models]);
 
-  const { data: results, isLoading: loadingResults, isError: resultsError, refetch: refetchResults } = useQuery({
-    queryKey: ["explainability-results", selectedModelId],
-    queryFn: async () => {
-      if (!selectedModelId) return [];
-      const { data, error } = await supabase
-        .from("evaluation_runs")
-        .select("*")
-        .eq("model_id", selectedModelId)
-        .eq("engine_type", "explainability")
-        .order("created_at", { ascending: false })
-        .limit(10);
-      if (error) throw error;
-      return (data || []) as unknown as ExplainabilityResult[];
-    },
-    enabled: !!selectedModelId,
-  });
-
   const selectedModel = models?.find(m => m.id === selectedModelId);
   const hasEndpoint = selectedModel?.huggingface_endpoint || selectedModel?.endpoint;
-  const latestResult = results?.[0];
-  const isLoading = modelsLoading || loadingResults;
-  const { status, lastUpdated } = useDataHealth(isLoading, resultsError);
+  const { status, lastUpdated } = useDataHealth(modelsLoading, false);
 
   const handleRetry = () => {
     setEvalError(null);
     refetchModels();
-    if (selectedModelId) refetchResults();
   };
 
   const runExplainabilityEvaluation = async (isRetry = false) => {
@@ -140,10 +81,6 @@ function ExplainabilityEngineContent() {
       if (error) throw error;
 
       setEvalStatus('computing');
-      setComputationSteps(data.computationSteps || []);
-      setRawLogs(data.rawLogs || []);
-      setRealEvalResult(data);
-
       queryClient.invalidateQueries({ queryKey: ["explainability-results", selectedModelId] });
       
       setEvalStatus('complete');
@@ -172,69 +109,6 @@ function ExplainabilityEngineContent() {
     }
   };
 
-  // Use ONLY real data - no hardcoded fallbacks
-  const getMetricsForGrid = () => {
-    const details = realEvalResult?.metricDetails || realEvalResult?.scores || latestResult?.metric_details || {};
-    return EXPLAINABILITY_METRICS.map(m => {
-      // Explainability uses straightforward keys, check for both formats
-      const score = details[m.key] ?? null;
-      return {
-        key: m.key,
-        name: m.name,
-        score: score,
-        weight: m.weight,
-        description: m.description,
-      };
-    });
-  };
-
-  const overallScore = realEvalResult?.overallScore ?? latestResult?.overall_score ?? 0;
-
-  const getMetricBreakdown = () => {
-    const metrics = getMetricsForGrid();
-    return metrics.filter(m => m.score !== null).map(m => ({
-      name: m.name,
-      score: m.score!,
-      weight: m.weight,
-      contribution: m.score! * m.weight,
-    }));
-  };
-
-  // Use ONLY real data from API - no hardcoded fallbacks
-  const getSummaryBullets = () => {
-    const bullets: Array<{ type: 'success' | 'warning' | 'error' | 'info'; text: string }> = [];
-    
-    const riskFactors = latestResult?.explanations?.risk_factors || realEvalResult?.riskFactors || [];
-    const evidence = latestResult?.explanations?.evidence || realEvalResult?.evidence || [];
-    
-    riskFactors.forEach((factor: any) => {
-      const text = typeof factor === 'string' ? factor : (factor?.text || factor?.description || JSON.stringify(factor));
-      if (text) bullets.push({ type: 'warning', text });
-    });
-    
-    evidence.forEach((item: any) => {
-      if (typeof item === 'string') {
-        bullets.push({ type: 'success', text: item });
-      } else if (item && typeof item === 'object') {
-        const text = item.text || item.description || 
-          (item.input ? `Test: "${item.input}" → ${item.prediction || item.output || 'evaluated'}` : null);
-        if (text) bullets.push({ type: 'success', text });
-      }
-    });
-    
-    return bullets;
-  };
-
-  const getKeyInsight = () => {
-    const realSummary = latestResult?.explanations?.transparency_summary || realEvalResult?.transparencySummary;
-    if (realSummary) return realSummary;
-    return overallScore >= 70 ? "Evaluation complete - see detailed metrics" : "Review required - see detailed metrics";
-  };
-
-  const getRecommendations = () => {
-    return latestResult?.explanations?.recommendations || realEvalResult?.recommendations || [];
-  };
-
   if (modelsLoading) {
     return (
       <MainLayout title="Explainability Engine" subtitle="Loading...">
@@ -242,8 +116,6 @@ function ExplainabilityEngineContent() {
       </MainLayout>
     );
   }
-
-  const hasResults = (latestResult || realEvalResult) && !evalError;
 
   return (
     <MainLayout 
@@ -356,104 +228,12 @@ function ExplainabilityEngineContent() {
         </div>
       )}
 
-      {selectedModelId && hasResults && (
-        <EngineResultsLayout
-          score={overallScore}
-          threshold={70}
-          engineName="Explainability"
-          keyInsight={getKeyInsight()}
-          summaryBullets={getSummaryBullets()}
-          recommendations={getRecommendations()}
-          metricsContent={
-            <div className="space-y-6">
-              <MetricWeightGrid
-                metrics={getMetricsForGrid().filter(m => m.score !== null)}
-                overallScore={overallScore}
-                engineName="Explainability"
-                formula={FORMULA}
-                complianceThreshold={70}
-              />
-              <WhyScorePanel
-                score={overallScore}
-                engineName="Explainability"
-                computationSteps={computationSteps.length > 0 ? computationSteps : realEvalResult?.computationSteps || []}
-                weightedFormula={`Score = ${FORMULA} = ${overallScore.toFixed(0)}%`}
-                metricBreakdown={getMetricBreakdown()}
-                threshold={70}
-              />
-              {(computationSteps.length > 0 || realEvalResult?.computationSteps) && (
-                <ComputationBreakdown 
-                  steps={computationSteps.length > 0 ? computationSteps : realEvalResult?.computationSteps || []}
-                  overallScore={overallScore}
-                  engineType="explainability"
-                />
-              )}
-            </div>
-          }
-          rawDataContent={
-            <div className="space-y-4">
-              {rawLogs.length > 0 ? (
-                <RawDataLog logs={rawLogs.map((log, idx) => ({
-                  id: `log-${idx}`,
-                  timestamp: new Date().toISOString(),
-                  type: 'computation' as const,
-                  data: typeof log === 'object' ? log : { value: log },
-                }))} />
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>Raw data logs will appear here after running an evaluation</p>
-                </div>
-              )}
-            </div>
-          }
-          evidenceContent={
-            <EvidencePackage
-              data={{
-                results: realEvalResult?.metricDetails || latestResult?.metric_details,
-                rawLogs: rawLogs,
-                modelId: selectedModelId,
-                evaluationType: "explainability",
-                overallScore: overallScore,
-                isCompliant: overallScore >= 70
-              }}
-            />
-          }
-        />
-      )}
-
       {selectedModelId && (
         <div className="mt-6">
           <CustomPromptTest
             modelId={selectedModelId}
             engineType="explainability"
             engineName="Explainability"
-          />
-        </div>
-      )}
-
-      {selectedModelId && !latestResult && !realEvalResult && !loadingResults && !evalError && (
-        <div className="text-center py-16 bg-card rounded-xl border border-border">
-          <Brain className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">No Evaluations Yet</h3>
-          <p className="text-muted-foreground mb-4">Run your first 2025 SOTA explainability analysis</p>
-          <Button onClick={() => runExplainabilityEvaluation()} disabled={evalStatus !== 'idle'} className="gap-2">
-            <Eye className="w-4 h-4" />
-            Run Deep Analysis
-          </Button>
-        </div>
-      )}
-
-      {loadingResults && <EngineSkeleton showMetrics={false} />}
-
-      {selectedModelId && hasResults && (
-        <div className="mt-6">
-          <EngineActionBar
-            onRetry={() => runExplainabilityEvaluation()}
-            modelId={selectedModelId}
-            systemId={selectedModel?.system_id}
-            engineName="Explainability"
-            score={overallScore}
-            isRetrying={evalStatus === 'sending' || evalStatus === 'analyzing'}
           />
         </div>
       )}
