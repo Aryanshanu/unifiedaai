@@ -3,7 +3,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, User, Shield, Bell, Database, Key, Globe, Loader2, Check, Plus, Trash2, Copy, AlertTriangle, Bot } from "lucide-react";
+import { Settings as SettingsIcon, User, Shield, Bell, Database, Key, Globe, Loader2, Check, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings, useUpdateSettings } from "@/hooks/useSettings";
 import { useToast } from "@/hooks/use-toast";
@@ -28,12 +28,6 @@ const settingsSections = [
   { id: "providers", icon: Bot, label: "LLM Providers", description: "Configure AI provider API keys" },
   { id: "api", icon: Key, label: "API Keys", description: "Manage API access tokens" },
   { id: "regions", icon: Globe, label: "Regions & Compliance", description: "Jurisdictional settings" },
-];
-
-// Mock API keys for demonstration
-const MOCK_API_KEYS = [
-  { id: '1', name: 'Production API Key', key: 'fra_prod_****...8x2k', created: '2025-11-15', lastUsed: '2025-12-08', status: 'active' },
-  { id: '2', name: 'Development Key', key: 'fra_dev_****...j4mn', created: '2025-10-20', lastUsed: '2025-12-07', status: 'active' },
 ];
 
 export default function Settings() {
@@ -491,54 +485,14 @@ export default function Settings() {
             {/* API Keys Section */}
             {activeSection === "api" && (
               <>
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-lg font-semibold text-foreground">API Keys</h2>
-                  <Button variant="gradient" size="sm" onClick={handleGenerateApiKey}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Generate New Key
-                  </Button>
-                </div>
-
+                <h2 className="text-lg font-semibold text-foreground mb-6">API Keys</h2>
                 <div className="space-y-4">
-                  {MOCK_API_KEYS.map((apiKey) => (
-                    <Card key={apiKey.id} className="border-border">
-                      <CardContent className="flex items-center justify-between py-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className="font-medium">{apiKey.name}</p>
-                            <Badge variant="outline" className="text-success bg-success/10">
-                              {apiKey.status}
-                            </Badge>
-                          </div>
-                          <code className="text-sm text-muted-foreground font-mono">{apiKey.key}</code>
-                          <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
-                            <span>Created: {apiKey.created}</span>
-                            <span>Last used: {apiKey.lastUsed}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button variant="ghost" size="icon">
-                            <Copy className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="text-danger hover:text-danger">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-
-                  <div className="p-4 rounded-lg bg-warning/10 border border-warning/20 text-sm">
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle className="w-4 h-4 text-warning mt-0.5" />
-                      <div>
-                        <p className="font-medium text-warning">Security Notice</p>
-                        <p className="text-muted-foreground">
-                          API keys grant full access to your organization's data. Keep them secure and rotate them regularly.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                  <PlannedFeatureCard
+                    title="API Key Management"
+                    description="Generate and manage API keys for programmatic access to the Fractal RAI-OS API. Includes key rotation, scope permissions, and audit logging."
+                    regulation="SOC 2 CC6.1"
+                    status="Backend pending"
+                  />
                 </div>
               </>
             )}

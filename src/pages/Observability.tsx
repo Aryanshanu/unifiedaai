@@ -374,7 +374,7 @@ export default function Observability() {
                   </Badge>
                 )}
               </h2>
-              <Button variant="outline" size="sm">Configure Thresholds</Button>
+              <Button variant="outline" size="sm" disabled title="Threshold configuration coming in next release">Configure Thresholds</Button>
             </div>
 
             {alertsLoading ? (
