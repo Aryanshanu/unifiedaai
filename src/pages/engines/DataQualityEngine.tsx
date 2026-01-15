@@ -618,6 +618,8 @@ function ControlPlaneTab() {
         pipelineStatus={pipelineStatus}
         elapsedTime={elapsedTime}
         isRealtimeConnected={isRealtimeConnected}
+        onContinue={continuePipeline}
+        onStop={stopPipeline}
       />
 
       {/* STEP 1: Data Profiling - Full Width */}
