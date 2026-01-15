@@ -138,9 +138,9 @@ export function DQProfilingPanel({ profile, isLoading }: DQProfilingPanelProps) 
                     </span>
                   </div>
                   <div className="col-span-1 text-muted-foreground">
-                    {stats.min !== undefined && stats.max !== undefined ? (
-                      <span title={`${stats.min} - ${stats.max}`}>
-                        {typeof stats.min === 'number' ? `${stats.min}-${stats.max}` : '—'}
+                    {stats.min_value !== undefined && stats.max_value !== undefined ? (
+                      <span title={`${stats.min_value} - ${stats.max_value}`}>
+                        {typeof stats.min_value === 'number' ? `${stats.min_value}-${stats.max_value}` : '—'}
                       </span>
                     ) : '—'}
                   </div>
