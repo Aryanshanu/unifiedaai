@@ -8,7 +8,7 @@ import { useProjects } from "@/hooks/useProjects";
 import { useSystems } from "@/hooks/useSystems";
 import { CreateProjectForm } from "@/components/registry/CreateProjectForm";
 import { ProjectCard } from "@/components/registry/ProjectCard";
-import { Search, Plus, FolderOpen, Filter } from "lucide-react";
+import { Search, Plus, FolderOpen } from "lucide-react";
 
 export default function Projects() {
   const [search, setSearch] = useState("");
@@ -55,10 +55,6 @@ export default function Projects() {
               className="pl-10"
             />
           </div>
-          <Button variant="outline" className="gap-2" disabled title="Advanced filters coming soon">
-            <Filter className="h-4 w-4" />
-            Filters
-          </Button>
         </div>
 
         {/* Projects Grid */}

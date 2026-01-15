@@ -136,20 +136,9 @@ export default function HITL() {
               <AlertTriangle className="w-4 h-4 text-risk-high" />
               Review Queue
             </h2>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" disabled title="Filter functionality coming soon">Filter</Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                disabled 
-                title="Self-assignment coming in next release"
-              >
-                Assign to me
-              </Button>
-              <Button variant="ghost" size="sm" onClick={handleRefresh}>
-                <RefreshCw className="w-4 h-4" />
-              </Button>
-            </div>
+            <Button variant="ghost" size="sm" onClick={handleRefresh}>
+              <RefreshCw className="w-4 h-4" />
+            </Button>
           </div>
 
           {isLoading ? (
@@ -216,15 +205,6 @@ export default function HITL() {
             ) : (
               <p className="text-sm text-muted-foreground text-center py-4">No recent decisions</p>
             )}
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="w-full mt-4"
-              disabled
-              title="Decision history page coming soon"
-            >
-              View all decisions
-            </Button>
           </div>
 
           {/* Queue Distribution */}
