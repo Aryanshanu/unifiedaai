@@ -16,6 +16,13 @@ interface DQRule {
   severity: string;
 }
 
+interface FailedRow {
+  row_index: number;
+  row_id: string;
+  column_value: string | number | null;
+  failure_reason: string;
+}
+
 interface RuleMetric {
   rule_id: string;
   rule_name: string;
@@ -23,23 +30,34 @@ interface RuleMetric {
   severity: string;
   success_rate: number;
   failed_count: number;
+  passed_count: number;
   total_count: number;
   threshold: number;
+  margin: number; // Difference from threshold
   violated: boolean;
+  failed_rows_sample?: FailedRow[];
+}
+
+interface ExecutionSummary {
+  critical_failure: boolean;
+  execution_mode: string;
+  total_rules: number;
+  passed_rules: number;
+  failed_rules: number;
+  critical_violations: number;
+  error_rate: number;
+  null_blank_percentage: number;
+  duplicate_rate: number;
+  overall_pass_rate: number;
 }
 
 interface ExecutionOutput {
   status: "success" | "error" | "halted";
   execution_id?: string;
+  execution_ts?: string;
+  execution_time_ms?: number;
   metrics?: RuleMetric[];
-  summary?: {
-    critical_failure: boolean;
-    execution_mode: string;
-    total_rules: number;
-    passed_rules: number;
-    failed_rules: number;
-    critical_violations: number;
-  };
+  summary?: ExecutionSummary;
   code?: string;
   message?: string;
   detail?: string;
@@ -74,70 +92,135 @@ serve(async (req) => {
     // Get sample data for rule execution
     const { data: bronzeData } = await supabase
       .from("bronze_data")
-      .select("raw_data")
+      .select("raw_data, row_index, id")
       .limit(1000);
 
     const totalRecords = bronzeData?.length || 100;
     const metrics: RuleMetric[] = [];
     let criticalViolations = 0;
+    let totalNullCount = 0;
+    let totalDuplicates = 0;
 
     // Execute each rule
     for (const rule of rules as DQRule[]) {
       let failedCount = 0;
       let successRate = 1.0;
+      const failedRowsSample: FailedRow[] = [];
 
       if (bronzeData && bronzeData.length > 0 && rule.column_name) {
         // Execute rule against actual data
         switch (rule.logic_type) {
           case "null_check": {
-            failedCount = bronzeData.filter((row) => {
+            for (let i = 0; i < bronzeData.length; i++) {
+              const row = bronzeData[i];
               const data = row.raw_data as Record<string, unknown>;
               const value = data?.[rule.column_name!];
-              return value === null || value === undefined || value === "";
-            }).length;
+              if (value === null || value === undefined || value === "") {
+                failedCount++;
+                totalNullCount++;
+                if (failedRowsSample.length < 5) {
+                  failedRowsSample.push({
+                    row_index: row.row_index || i,
+                    row_id: row.id || `row_${i}`,
+                    column_value: value as string | number | null,
+                    failure_reason: "Value is null or empty",
+                  });
+                }
+              }
+            }
             break;
           }
           case "duplicate_check": {
-            const valueCounts = new Map<string, number>();
-            for (const row of bronzeData) {
+            const valueCounts = new Map<string, { count: number; indices: number[] }>();
+            for (let i = 0; i < bronzeData.length; i++) {
+              const row = bronzeData[i];
               const data = row.raw_data as Record<string, unknown>;
               const value = String(data?.[rule.column_name!] ?? "");
-              valueCounts.set(value, (valueCounts.get(value) || 0) + 1);
+              const existing = valueCounts.get(value);
+              if (existing) {
+                existing.count++;
+                existing.indices.push(i);
+              } else {
+                valueCounts.set(value, { count: 1, indices: [i] });
+              }
             }
-            failedCount = Array.from(valueCounts.values()).filter((c) => c > 1).reduce((a, b) => a + b, 0);
+            for (const [value, info] of valueCounts.entries()) {
+              if (info.count > 1) {
+                failedCount += info.count;
+                totalDuplicates += info.count - 1;
+                if (failedRowsSample.length < 5) {
+                  failedRowsSample.push({
+                    row_index: info.indices[0],
+                    row_id: bronzeData[info.indices[0]]?.id || `row_${info.indices[0]}`,
+                    column_value: value,
+                    failure_reason: `Duplicate value (${info.count} occurrences)`,
+                  });
+                }
+              }
+            }
             break;
           }
           case "range_check": {
-            // For numeric range checks
-            failedCount = bronzeData.filter((row) => {
+            for (let i = 0; i < bronzeData.length; i++) {
+              const row = bronzeData[i];
               const data = row.raw_data as Record<string, unknown>;
               const value = data?.[rule.column_name!];
-              if (typeof value !== "number") return false;
-              return value < 0 || value > 1000000; // Default range
-            }).length;
+              if (typeof value === "number" && (value < 0 || value > 1000000)) {
+                failedCount++;
+                if (failedRowsSample.length < 5) {
+                  failedRowsSample.push({
+                    row_index: row.row_index || i,
+                    row_id: row.id || `row_${i}`,
+                    column_value: value,
+                    failure_reason: value < 0 ? "Value < 0 (min range)" : "Value > 1,000,000 (max range)",
+                  });
+                }
+              }
+            }
             break;
           }
           case "regex_match": {
-            // Email validation
             const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-            failedCount = bronzeData.filter((row) => {
+            for (let i = 0; i < bronzeData.length; i++) {
+              const row = bronzeData[i];
               const data = row.raw_data as Record<string, unknown>;
               const value = data?.[rule.column_name!];
-              if (typeof value !== "string") return true;
-              return !emailRegex.test(value);
-            }).length;
+              if (typeof value !== "string" || !emailRegex.test(value)) {
+                failedCount++;
+                if (failedRowsSample.length < 5) {
+                  failedRowsSample.push({
+                    row_index: row.row_index || i,
+                    row_id: row.id || `row_${i}`,
+                    column_value: value as string | null,
+                    failure_reason: "Invalid email format",
+                  });
+                }
+              }
+            }
             break;
           }
           case "freshness_check": {
             const thirtyDaysAgo = new Date();
             thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-            failedCount = bronzeData.filter((row) => {
+            for (let i = 0; i < bronzeData.length; i++) {
+              const row = bronzeData[i];
               const data = row.raw_data as Record<string, unknown>;
               const value = data?.[rule.column_name!];
-              if (!value) return false;
-              const date = new Date(String(value));
-              return date < thirtyDaysAgo;
-            }).length;
+              if (value) {
+                const date = new Date(String(value));
+                if (date < thirtyDaysAgo) {
+                  failedCount++;
+                  if (failedRowsSample.length < 5) {
+                    failedRowsSample.push({
+                      row_index: row.row_index || i,
+                      row_id: row.id || `row_${i}`,
+                      column_value: String(value),
+                      failure_reason: "Data older than 30 days",
+                    });
+                  }
+                }
+              }
+            }
             break;
           }
           default:
@@ -148,13 +231,14 @@ serve(async (req) => {
         successRate = 1 - failedCount / totalRecords;
       } else {
         // Simulate execution for datasets without bronze data
-        // Use threshold as baseline with some variance
         const variance = (Math.random() - 0.5) * 0.1;
         successRate = Math.min(1, Math.max(0, rule.threshold + variance));
         failedCount = Math.floor((1 - successRate) * totalRecords);
       }
 
       const violated = successRate < rule.threshold;
+      const margin = (successRate - rule.threshold) * 100;
+      
       if (violated && rule.severity === "critical") {
         criticalViolations++;
       }
@@ -166,9 +250,12 @@ serve(async (req) => {
         severity: rule.severity,
         success_rate: successRate,
         failed_count: failedCount,
+        passed_count: totalRecords - failedCount,
         total_count: totalRecords,
         threshold: rule.threshold,
+        margin,
         violated,
+        failed_rows_sample: failedRowsSample.length > 0 ? failedRowsSample : undefined,
       });
     }
 
@@ -176,14 +263,22 @@ serve(async (req) => {
     const passedRules = metrics.filter((m) => !m.violated).length;
     const failedRules = metrics.filter((m) => m.violated).length;
     const criticalFailure = criticalViolations > 0;
+    const errorRate = (failedRules / metrics.length) * 100;
+    const nullBlankPercentage = (totalNullCount / (totalRecords * metrics.length)) * 100;
+    const duplicateRate = (totalDuplicates / totalRecords) * 100;
+    const overallPassRate = (passedRules / metrics.length) * 100;
 
-    const summary = {
+    const summary: ExecutionSummary = {
       critical_failure: criticalFailure,
       execution_mode: execution_mode || "FULL",
       total_rules: metrics.length,
       passed_rules: passedRules,
       failed_rules: failedRules,
       critical_violations: criticalViolations,
+      error_rate: errorRate,
+      null_blank_percentage: nullBlankPercentage,
+      duplicate_rate: duplicateRate,
+      overall_pass_rate: overallPassRate,
     };
 
     // Store execution result
@@ -214,6 +309,8 @@ serve(async (req) => {
         code: "CIRCUIT_BREAKER_TRIPPED",
         message: "Critical data quality failure detected. Downstream tasks stopped.",
         execution_id: executionRecord?.id,
+        execution_ts: new Date().toISOString(),
+        execution_time_ms: executionTime,
         metrics,
         summary,
       };
@@ -226,6 +323,8 @@ serve(async (req) => {
     const response: ExecutionOutput = {
       status: "success",
       execution_id: executionRecord?.id || crypto.randomUUID(),
+      execution_ts: new Date().toISOString(),
+      execution_time_ms: executionTime,
       metrics,
       summary,
     };

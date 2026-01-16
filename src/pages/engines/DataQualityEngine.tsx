@@ -42,11 +42,11 @@ import { QualityTrendChart } from '@/components/engines/QualityTrendChart';
 import { RemediationActionCenter, RemediationAction } from '@/components/engines/RemediationActionCenter';
 import { DQPipelineVisualizer } from '@/components/engines/DQPipelineVisualizer';
 import { DQFileUploader } from '@/components/engines/DQFileUploader';
-import { DQProfilingReport } from '@/components/engines/DQProfilingReport';
-import { DQRuleLibraryFull } from '@/components/engines/DQRuleLibraryFull';
-import { DQExecutionReport } from '@/components/engines/DQExecutionReport';
-import { DQDashboardAssetsFull } from '@/components/engines/DQDashboardAssetsFull';
-import { DQIncidentsFull } from '@/components/engines/DQIncidentsFull';
+import { DQProfilingReportTabular } from '@/components/engines/DQProfilingReportTabular';
+import { DQRuleLibraryTabular } from '@/components/engines/DQRuleLibraryTabular';
+import { DQExecutionReportTabular } from '@/components/engines/DQExecutionReportTabular';
+import { DQDashboardVisual } from '@/components/engines/DQDashboardVisual';
+import { DQIncidentsTabular } from '@/components/engines/DQIncidentsTabular';
 import { useDQControlPlane } from '@/hooks/useDQControlPlane';
 import { useFileUploadStatus, useAllUploads, useQualityStats, UploadStatus } from '@/hooks/useFileUploadStatus';
 import { useQualityTrend } from '@/hooks/useQualityTrend';
@@ -622,20 +622,20 @@ function ControlPlaneTab() {
         onStop={stopPipeline}
       />
 
-      {/* STEP 1: Data Profiling - Full Width */}
-      <DQProfilingReport 
+      {/* STEP 1: Data Profiling - Full Width Tabular */}
+      <DQProfilingReportTabular 
         profile={profilingResult} 
         isLoading={currentStep === 1} 
       />
 
-      {/* STEP 2: Rule Library - Full Width */}
-      <DQRuleLibraryFull 
+      {/* STEP 2: Rule Library - Full Width Tabular */}
+      <DQRuleLibraryTabular 
         rules={rulesResult} 
         isLoading={currentStep === 2} 
       />
 
-      {/* STEP 3: Rule Execution - Full Width */}
-      <DQExecutionReport 
+      {/* STEP 3: Rule Execution - Full Width Tabular */}
+      <DQExecutionReportTabular 
         execution={executionResult} 
         isLoading={currentStep === 3}
         circuitBreakerState={circuitBreakerState}
@@ -643,14 +643,15 @@ function ControlPlaneTab() {
         onStop={stopPipeline}
       />
 
-      {/* STEP 4: Dashboard Assets - Full Width */}
-      <DQDashboardAssetsFull 
+      {/* STEP 4: Dashboard Visual - Full Width */}
+      <DQDashboardVisual 
         assets={dashboardAssets} 
+        executionMetrics={executionResult?.metrics}
         isLoading={currentStep === 4} 
       />
 
-      {/* STEP 5: Incidents - Full Width */}
-      <DQIncidentsFull
+      {/* STEP 5: Incidents - Full Width Tabular */}
+      <DQIncidentsTabular
         incidents={incidents}
         isLoading={currentStep === 5}
         onAcknowledge={acknowledgeIncident}
