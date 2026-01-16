@@ -5,10 +5,12 @@ import { ModelCard } from "@/components/dashboard/ModelCard";
 import { ModelRegistrationForm } from "@/components/models/ModelRegistrationForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, SlidersHorizontal, Plus } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Search, SlidersHorizontal, Plus, Settings } from "lucide-react";
 import { useModels, ModelWithSystem } from "@/hooks/useModels";
 import { useIncidents } from "@/hooks/useIncidents";
 import { Skeleton } from "@/components/ui/skeleton";
+import { HuggingFaceSettings } from "@/components/settings/HuggingFaceSettings";
 
 // Helper to derive status from system data or fallback to model scores
 function getModelStatus(model: ModelWithSystem): "healthy" | "warning" | "critical" {
@@ -99,113 +101,129 @@ export default function Models() {
 
   return (
     <MainLayout title="Model Registry" subtitle="Manage and track all AI models">
-      {/* Search and Actions */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search models by name, type, project..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 h-11 bg-card border-border text-sm"
-          />
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <Button
-            className="h-11 px-4 bg-gradient-primary text-primary-foreground" 
-            onClick={() => setShowRegistration(true)}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Model
-          </Button>
-        </div>
-      </div>
+      <Tabs defaultValue="models" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="models">Models</TabsTrigger>
+          <TabsTrigger value="huggingface" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            HuggingFace Settings
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Count */}
-      <p className="text-sm text-muted-foreground mb-6">
-        Showing <span className="font-semibold text-foreground">{filteredModels.length}</span> of{" "}
-        <span className="font-semibold text-foreground">{totalModels}</span> models
-      </p>
-
-      {/* Loading State */}
-      {isLoading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-            <div key={i} className="bg-card border border-border rounded-xl p-5">
-              <div className="flex justify-between mb-4">
-                <Skeleton className="h-10 w-10 rounded-lg" />
-                <div className="text-right">
-                  <Skeleton className="h-3 w-20 mb-1" />
-                  <Skeleton className="h-3 w-16" />
-                </div>
-              </div>
-              <Skeleton className="h-5 w-40 mb-2" />
-              <Skeleton className="h-4 w-full mb-4" />
-              <div className="flex justify-between mb-3">
-                <Skeleton className="h-8 w-16" />
-                <Skeleton className="h-8 w-16" />
-              </div>
-              <Skeleton className="h-px w-full mb-3" />
-              <div className="flex justify-between">
-                <Skeleton className="h-3 w-16" />
-                <Skeleton className="h-3 w-24" />
-              </div>
+        <TabsContent value="models" className="space-y-6">
+          {/* Search and Actions */}
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search models by name, type, project..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-10 h-11 bg-card border-border text-sm"
+              />
             </div>
-          ))}
-        </div>
-      )}
+            
+            <div className="flex items-center gap-3">
+              <Button
+                className="h-11 px-4 bg-gradient-primary text-primary-foreground" 
+                onClick={() => setShowRegistration(true)}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Model
+              </Button>
+            </div>
+          </div>
 
-      {/* Error State */}
-      {error && (
-        <div className="text-center py-12">
-          <p className="text-destructive">Failed to load models</p>
-          <p className="text-sm text-muted-foreground mt-1">{error.message}</p>
-        </div>
-      )}
-
-      {/* Empty State */}
-      {!isLoading && !error && filteredModels.length === 0 && (
-        <div className="text-center py-16 bg-card border border-border rounded-xl">
-          <p className="text-foreground font-medium text-lg">No models found</p>
-          <p className="text-sm text-muted-foreground mt-2">
-            {search ? "Try adjusting your search" : "Register your first model to get started"}
+          {/* Count */}
+          <p className="text-sm text-muted-foreground">
+            Showing <span className="font-semibold text-foreground">{filteredModels.length}</span> of{" "}
+            <span className="font-semibold text-foreground">{totalModels}</span> models
           </p>
-          {!search && (
-            <Button 
-              className="mt-6 bg-gradient-primary text-primary-foreground" 
-              onClick={() => setShowRegistration(true)}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Model
-            </Button>
-          )}
-        </div>
-      )}
 
-      {/* Model Grid */}
-      {!isLoading && !error && filteredModels.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {filteredModels.map((model) => (
-            <ModelCard
-              key={model.id}
-              id={model.id}
-              name={model.name}
-              type={model.model_type}
-              version={model.version}
-              description={model.description || undefined}
-              status={getModelStatus(model)}
-              riskLevel={getRiskLevel(model)}
-              environment={getEnvironment(model)}
-              fairnessScore={model.fairness_score}
-              robustnessScore={model.robustness_score}
-              team={getTeamName(model.model_type)}
-              incidents={incidentCountByModel[model.id] || 0}
-              updatedAt={model.updated_at}
-            />
-          ))}
-        </div>
-      )}
+          {/* Loading State */}
+          {isLoading && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                <div key={i} className="bg-card border border-border rounded-xl p-5">
+                  <div className="flex justify-between mb-4">
+                    <Skeleton className="h-10 w-10 rounded-lg" />
+                    <div className="text-right">
+                      <Skeleton className="h-3 w-20 mb-1" />
+                      <Skeleton className="h-3 w-16" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-5 w-40 mb-2" />
+                  <Skeleton className="h-4 w-full mb-4" />
+                  <div className="flex justify-between mb-3">
+                    <Skeleton className="h-8 w-16" />
+                    <Skeleton className="h-8 w-16" />
+                  </div>
+                  <Skeleton className="h-px w-full mb-3" />
+                  <div className="flex justify-between">
+                    <Skeleton className="h-3 w-16" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Error State */}
+          {error && (
+            <div className="text-center py-12">
+              <p className="text-destructive">Failed to load models</p>
+              <p className="text-sm text-muted-foreground mt-1">{error.message}</p>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!isLoading && !error && filteredModels.length === 0 && (
+            <div className="text-center py-16 bg-card border border-border rounded-xl">
+              <p className="text-foreground font-medium text-lg">No models found</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                {search ? "Try adjusting your search" : "Register your first model to get started"}
+              </p>
+              {!search && (
+                <Button 
+                  className="mt-6 bg-gradient-primary text-primary-foreground" 
+                  onClick={() => setShowRegistration(true)}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Model
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* Model Grid */}
+          {!isLoading && !error && filteredModels.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              {filteredModels.map((model) => (
+                <ModelCard
+                  key={model.id}
+                  id={model.id}
+                  name={model.name}
+                  type={model.model_type}
+                  version={model.version}
+                  description={model.description || undefined}
+                  status={getModelStatus(model)}
+                  riskLevel={getRiskLevel(model)}
+                  environment={getEnvironment(model)}
+                  fairnessScore={model.fairness_score}
+                  robustnessScore={model.robustness_score}
+                  team={getTeamName(model.model_type)}
+                  incidents={incidentCountByModel[model.id] || 0}
+                  updatedAt={model.updated_at}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="huggingface">
+          <HuggingFaceSettings />
+        </TabsContent>
+      </Tabs>
 
       {/* Registration Form Modal */}
       <ModelRegistrationForm open={showRegistration} onOpenChange={setShowRegistration} />

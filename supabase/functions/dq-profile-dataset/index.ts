@@ -230,6 +230,7 @@ serve(async (req) => {
               medianValue = median(numericValues);
               stdDevValue = stdDev(numericValues, meanValue);
               modeValue = mode(numericValues);
+            }
           } else if (dtype === "STRING") {
             const stringValues = nonNullValues.filter((v) => typeof v === "string") as string[];
             if (stringValues.length > 0) {
