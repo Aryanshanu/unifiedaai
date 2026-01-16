@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  MessageCircle,
   Send,
   X,
   ChevronRight,
@@ -17,7 +17,9 @@ import {
   Lightbulb,
   RefreshCw,
   Maximize2,
-  Minimize2
+  Minimize2,
+  Settings,
+  KeyRound
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -29,6 +31,7 @@ interface Message {
   content: string;
   timestamp: Date;
   isStreaming?: boolean;
+  errorCode?: string;
 }
 
 interface DQContext {
@@ -53,17 +56,18 @@ const QUICK_ACTIONS = [
 ];
 
 export function DQChatbotPanel({ isOpen, onClose, context }: DQChatbotPanelProps) {
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom when messages change
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (bottomRef.current) {
+      bottomRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
 
@@ -131,7 +135,10 @@ export function DQChatbotPanel({ isOpen, onClose, context }: DQChatbotPanelProps
       timestamp: new Date()
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    // Build conversation history including the new message
+    const conversationHistory = [...messages, userMessage];
+    
+    setMessages(conversationHistory);
     setInput('');
     setIsLoading(true);
 
@@ -148,13 +155,27 @@ export function DQChatbotPanel({ isOpen, onClose, context }: DQChatbotPanelProps
     try {
       const contextSummary = buildContextSummary();
       
+      // Load config from localStorage
+      let config: { model?: string; temperature?: number; maxTokens?: number } = {};
+      try {
+        const savedConfig = localStorage.getItem('huggingface_config');
+        if (savedConfig) {
+          const parsed = JSON.parse(savedConfig);
+          config = {
+            model: parsed.instructModel,
+            temperature: parsed.temperature,
+            maxTokens: parsed.maxTokens
+          };
+        }
+      } catch (e) {
+        console.warn('Could not load HuggingFace config:', e);
+      }
+      
       const response = await supabase.functions.invoke('dq-chatbot', {
         body: {
-          messages: [
-            ...messages.map(m => ({ role: m.role, content: m.content })),
-            { role: 'user', content: content.trim() }
-          ],
-          context: contextSummary
+          messages: conversationHistory.map(m => ({ role: m.role, content: m.content })),
+          context: contextSummary,
+          config
         }
       });
 
@@ -163,18 +184,29 @@ export function DQChatbotPanel({ isOpen, onClose, context }: DQChatbotPanelProps
       }
 
       const data = response.data;
+      const errorCode = data.error_code;
       
       // Update assistant message with response
       setMessages(prev => prev.map(m => 
         m.id === assistantId 
-          ? { ...m, content: data.response || 'I apologize, but I could not generate a response.', isStreaming: false }
+          ? { 
+              ...m, 
+              content: data.response || 'I apologize, but I could not generate a response.', 
+              isStreaming: false,
+              errorCode
+            }
           : m
       ));
     } catch (error) {
       console.error('Chatbot error:', error);
       setMessages(prev => prev.map(m => 
         m.id === assistantId 
-          ? { ...m, content: 'Sorry, I encountered an error. Please check if the HuggingFace API key is configured in Settings.', isStreaming: false }
+          ? { 
+              ...m, 
+              content: 'Sorry, I encountered an error. Please check if the HuggingFace API key is configured in Models → HuggingFace Settings.', 
+              isStreaming: false,
+              errorCode: 'HF_UNKNOWN'
+            }
           : m
       ));
     } finally {
@@ -193,17 +225,71 @@ export function DQChatbotPanel({ isOpen, onClose, context }: DQChatbotPanelProps
     setMessages([]);
   };
 
+  const goToSettings = () => {
+    navigate('/models');
+    onClose();
+  };
+
+  // Render error action buttons based on error code
+  const renderErrorActions = (errorCode?: string) => {
+    if (!errorCode) return null;
+
+    if (errorCode === 'NO_API_KEY' || errorCode === 'HF_AUTH_INVALID') {
+      return (
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="mt-2 gap-2"
+          onClick={goToSettings}
+        >
+          <KeyRound className="h-3 w-3" />
+          Configure API Key
+        </Button>
+      );
+    }
+
+    if (errorCode === 'HF_FORBIDDEN_MODEL') {
+      return (
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="mt-2 gap-2"
+          onClick={goToSettings}
+        >
+          <Settings className="h-3 w-3" />
+          Change Model Settings
+        </Button>
+      );
+    }
+
+    if (errorCode === 'HF_MODEL_LOADING' || errorCode === 'HF_RATE_LIMITED') {
+      return (
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="mt-2 gap-2"
+          onClick={() => {
+            // Retry the last user message
+            const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+            if (lastUserMsg) {
+              // Remove the error message and retry
+              setMessages(prev => prev.filter(m => m.errorCode !== errorCode));
+              setTimeout(() => sendMessage(lastUserMsg.content), 500);
+            }
+          }}
+        >
+          <RefreshCw className="h-3 w-3" />
+          Retry
+        </Button>
+      );
+    }
+
+    return null;
+  };
+
+  // Don't render anything when closed - the button is in DataQualityEngine
   if (!isOpen) {
-    return (
-      <Button
-        variant="outline"
-        size="icon"
-        className="fixed bottom-6 right-6 h-20 w-20 rounded-full shadow-lg bg-primary text-primary-foreground hover:bg-primary/90 z-50"
-        onClick={() => onClose()}
-      >
-        <MessageCircle className="h-9 w-9" />
-      </Button>
-    );
+    return null;
   }
 
   return (
@@ -253,7 +339,7 @@ export function DQChatbotPanel({ isOpen, onClose, context }: DQChatbotPanelProps
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+      <ScrollArea className="flex-1 p-4">
         {messages.length === 0 ? (
           <div className="space-y-4">
             <div className="text-center py-8">
@@ -306,7 +392,9 @@ export function DQChatbotPanel({ isOpen, onClose, context }: DQChatbotPanelProps
                     "max-w-[80%] rounded-lg px-4 py-2",
                     message.role === 'user' 
                       ? "bg-primary text-primary-foreground" 
-                      : "bg-muted"
+                      : message.errorCode
+                        ? "bg-destructive/10 border border-destructive/30"
+                        : "bg-muted"
                   )}
                 >
                   {message.isStreaming ? (
@@ -315,7 +403,16 @@ export function DQChatbotPanel({ isOpen, onClose, context }: DQChatbotPanelProps
                       <span className="text-sm">Thinking...</span>
                     </div>
                   ) : (
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    <>
+                      {message.errorCode && (
+                        <div className="flex items-center gap-1 text-destructive text-xs mb-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          <span>Error</span>
+                        </div>
+                      )}
+                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      {message.role === 'assistant' && renderErrorActions(message.errorCode)}
+                    </>
                   )}
                   <p className="text-[10px] opacity-50 mt-1">
                     {message.timestamp.toLocaleTimeString()}
@@ -328,6 +425,8 @@ export function DQChatbotPanel({ isOpen, onClose, context }: DQChatbotPanelProps
                 )}
               </div>
             ))}
+            {/* Scroll anchor */}
+            <div ref={bottomRef} />
           </div>
         )}
       </ScrollArea>
@@ -353,7 +452,7 @@ export function DQChatbotPanel({ isOpen, onClose, context }: DQChatbotPanelProps
           </Button>
         </div>
         <p className="text-[10px] text-muted-foreground mt-2 text-center">
-          Using LLM360/K2-Think + Llama-3.1-8B-Instruct
+          Using Llama-3.1-8B-Instruct
         </p>
       </div>
     </div>

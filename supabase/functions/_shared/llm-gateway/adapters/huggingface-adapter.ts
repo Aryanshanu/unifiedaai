@@ -24,7 +24,8 @@ export class HuggingFaceAdapter extends BaseAdapter {
     if (customEndpoint) {
       return customEndpoint;
     }
-    return `https://api-inference.huggingface.co/models/${model}`;
+    // Use the new router endpoint instead of deprecated api-inference
+    return `https://router.huggingface.co/hf-inference/models/${model}`;
   }
 
   async generate(request: UnifiedRequest, config: ProviderConfig): Promise<UnifiedResponse> {
