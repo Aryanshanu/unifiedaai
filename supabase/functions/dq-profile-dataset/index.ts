@@ -172,11 +172,33 @@ serve(async (req) => {
           const uniqueValues = new Set(nonNullValues);
           const distinctCount = uniqueValues.size;
           
-          // Infer dtype
+          // Infer dtype - improved numeric detection for columns like age, amount, price
           let dtype = "STRING";
           const sampleValue = nonNullValues[0];
-          if (typeof sampleValue === "number") {
-            dtype = Number.isInteger(sampleValue) ? "INTEGER" : "FLOAT";
+          const colLower = col.toLowerCase();
+          
+          // Check if column name suggests numeric type
+          const numericColumnPatterns = ['age', 'amount', 'price', 'cost', 'total', 'count', 'quantity', 'rate', 'score', 'value', 'salary', 'income', 'balance', 'weight', 'height', 'size', 'number', 'num', 'id'];
+          const looksNumeric = numericColumnPatterns.some(p => colLower.includes(p));
+          
+          // Check actual values for numeric content
+          const numericValues = nonNullValues.filter((v) => {
+            if (typeof v === "number") return true;
+            if (typeof v === "string") {
+              const parsed = parseFloat(v);
+              return !isNaN(parsed) && isFinite(parsed);
+            }
+            return false;
+          });
+          const isActuallyNumeric = numericValues.length > nonNullValues.length * 0.8;
+          
+          if (typeof sampleValue === "number" || (looksNumeric && isActuallyNumeric)) {
+            // Determine if integer or float
+            const allInts = numericValues.every((v) => {
+              const n = typeof v === "number" ? v : parseFloat(v as string);
+              return Number.isInteger(n);
+            });
+            dtype = allInts ? "INTEGER" : "FLOAT";
           } else if (typeof sampleValue === "boolean") {
             dtype = "BOOLEAN";
           } else if (sampleValue instanceof Date || (typeof sampleValue === "string" && !isNaN(Date.parse(sampleValue)) && sampleValue.match(/^\d{4}-\d{2}-\d{2}/))) {
@@ -196,7 +218,11 @@ serve(async (req) => {
           let maxLength: number | null = null;
 
           if (dtype === "INTEGER" || dtype === "FLOAT") {
-            const numericValues = nonNullValues.filter((v) => typeof v === "number") as number[];
+            // Parse all values as numbers (handles string numbers too)
+            const numericValues = nonNullValues
+              .map((v) => typeof v === "number" ? v : parseFloat(v as string))
+              .filter((v) => !isNaN(v) && isFinite(v));
+            
             if (numericValues.length > 0) {
               minValue = Math.min(...numericValues);
               maxValue = Math.max(...numericValues);
@@ -204,7 +230,6 @@ serve(async (req) => {
               medianValue = median(numericValues);
               stdDevValue = stdDev(numericValues, meanValue);
               modeValue = mode(numericValues);
-            }
           } else if (dtype === "STRING") {
             const stringValues = nonNullValues.filter((v) => typeof v === "string") as string[];
             if (stringValues.length > 0) {
