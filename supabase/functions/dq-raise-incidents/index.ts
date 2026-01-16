@@ -6,6 +6,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+interface FailedRow {
+  row_index: number;
+  row_id: string;
+  column_value: string | number | null;
+  failure_reason: string;
+}
+
 interface RuleMetric {
   rule_id: string;
   rule_name: string;
@@ -16,17 +23,27 @@ interface RuleMetric {
   total_count: number;
   threshold: number;
   violated: boolean;
+  failed_rows_sample?: FailedRow[];
 }
 
 interface Incident {
   id: string;
   dataset_id: string;
   rule_id: string;
+  rule_name: string;
   dimension: string;
   severity: "P0" | "P1" | "P2";
   action: string;
-  example_failed_rows: unknown[];
+  example_failed_rows: FailedRow[];
   failure_signature: string;
+  execution_reference: string;
+  profiling_reference: string | null;
+  dashboard_reference: string | null;
+  traceability: {
+    step2_rule_link: string;
+    step3_execution_link: string;
+    step4_dashboard_link: string | null;
+  };
 }
 
 interface IncidentsOutput {
@@ -51,49 +68,50 @@ function mapSeverityToPriority(severity: string): "P0" | "P1" | "P2" {
 }
 
 // Generate remediation action based on dimension and severity
-function generateAction(dimension: string, severity: string, ruleName: string): string {
+function generateAction(dimension: string, severity: string, ruleName: string, failedCount: number, totalCount: number): string {
+  const failPercentage = ((failedCount / totalCount) * 100).toFixed(1);
+  
   const actions: Record<string, Record<string, string>> = {
     completeness: {
-      critical: `IMMEDIATE: Halt data pipeline. Investigate source for missing ${ruleName.split("_")[0]} values. Contact data owner.`,
-      warning: `REVIEW: Check data extraction for ${ruleName.split("_")[0]} field. May require backfill.`,
-      info: `MONITOR: Low completeness in ${ruleName.split("_")[0]}. Add to watchlist.`,
+      critical: `🚨 IMMEDIATE ACTION: ${failPercentage}% missing values in ${ruleName.split("_")[0]}. Halt data pipeline. Investigate source system. Contact data owner for root cause analysis.`,
+      warning: `⚠️ REVIEW REQUIRED: ${failPercentage}% missing values in ${ruleName.split("_")[0]}. Check data extraction process. May require backfill operation.`,
+      info: `ℹ️ MONITOR: Low completeness (${failPercentage}% missing) in ${ruleName.split("_")[0]}. Add to watchlist for trend analysis.`,
     },
     uniqueness: {
-      critical: `IMMEDIATE: Duplicate keys detected. Block downstream consumers. Deduplicate before proceeding.`,
-      warning: `REVIEW: Potential duplicates in ${ruleName.split("_")[0]}. Review merge logic.`,
-      info: `MONITOR: Uniqueness below threshold. Track trend.`,
+      critical: `🚨 IMMEDIATE ACTION: ${failedCount} duplicate records detected. Block downstream consumers. Execute deduplication before proceeding.`,
+      warning: `⚠️ REVIEW REQUIRED: Potential duplicates in ${ruleName.split("_")[0]} (${failedCount} records). Review merge/join logic in ETL.`,
+      info: `ℹ️ MONITOR: Uniqueness below threshold (${failPercentage}% duplicates). Track trend over time.`,
     },
     validity: {
-      critical: `IMMEDIATE: Invalid data format. Quarantine affected records. Review data entry process.`,
-      warning: `REVIEW: Format violations detected. Update validation rules at source.`,
-      info: `MONITOR: Minor validity issues. Consider stricter input validation.`,
+      critical: `🚨 IMMEDIATE ACTION: ${failPercentage}% invalid format in ${ruleName.split("_")[0]}. Quarantine affected records. Review data entry validation.`,
+      warning: `⚠️ REVIEW REQUIRED: Format violations detected (${failedCount} records). Update input validation rules at source.`,
+      info: `ℹ️ MONITOR: Minor validity issues (${failPercentage}%). Consider stricter input constraints.`,
     },
     accuracy: {
-      critical: `IMMEDIATE: Data accuracy below acceptable threshold. Suspend automated decisions.`,
-      warning: `REVIEW: Accuracy drift detected. Compare with reference data.`,
-      info: `MONITOR: Slight accuracy decline. Schedule data audit.`,
+      critical: `🚨 IMMEDIATE ACTION: Data accuracy below threshold (${failPercentage}% mismatch). Suspend automated decisions. Cross-validate with reference data.`,
+      warning: `⚠️ REVIEW REQUIRED: Accuracy drift detected (${failPercentage}%). Compare with authoritative source.`,
+      info: `ℹ️ MONITOR: Slight accuracy decline (${failPercentage}%). Schedule data audit.`,
     },
     timeliness: {
-      critical: `IMMEDIATE: Data freshness SLA breached. Escalate to data engineering.`,
-      warning: `REVIEW: Data staleness detected. Check pipeline schedules.`,
-      info: `MONITOR: Minor delays in data refresh. Monitor trend.`,
+      critical: `🚨 IMMEDIATE ACTION: Data freshness SLA breached (${failedCount} stale records). Escalate to data engineering team.`,
+      warning: `⚠️ REVIEW REQUIRED: Data staleness detected (${failedCount} records older than threshold). Check pipeline schedules.`,
+      info: `ℹ️ MONITOR: Minor delays in data refresh. Track latency trend.`,
     },
     consistency: {
-      critical: `IMMEDIATE: Cross-system consistency failure. Reconcile data sources.`,
-      warning: `REVIEW: Inconsistencies between related datasets. Investigate joins.`,
-      info: `MONITOR: Minor consistency variations. Document known discrepancies.`,
+      critical: `🚨 IMMEDIATE ACTION: Cross-system consistency failure (${failPercentage}% mismatch). Reconcile data sources immediately.`,
+      warning: `⚠️ REVIEW REQUIRED: Inconsistencies between related datasets (${failedCount} records). Investigate join conditions.`,
+      info: `ℹ️ MONITOR: Minor consistency variations. Document known discrepancies.`,
     },
   };
 
   return (
-    actions[dimension]?.[severity] ||
-    `ACTION REQUIRED: Review ${dimension} violation for ${ruleName}. Severity: ${severity.toUpperCase()}.`
+    actions[dimension.toLowerCase()]?.[severity] ||
+    `⚠️ ACTION REQUIRED: Review ${dimension} violation for ${ruleName}. ${failedCount}/${totalCount} records affected (${failPercentage}%). Severity: ${severity.toUpperCase()}.`
   );
 }
 
 // Generate failure signature for deduplication
 function generateFailureSignature(ruleId: string, dimension: string, successRate: number): string {
-  // Round success rate to nearest 5% for signature grouping
   const roundedRate = Math.round(successRate * 20) * 5;
   return `${dimension}_${ruleId.slice(0, 8)}_${roundedRate}`;
 }
@@ -104,7 +122,7 @@ serve(async (req) => {
   }
 
   try {
-    const { dataset_id, execution_id, profile_id, execution_metrics } = await req.json();
+    const { dataset_id, execution_id, profile_id, dashboard_id, execution_metrics } = await req.json();
 
     if (!dataset_id || !execution_metrics) {
       const response: IncidentsOutput = {
@@ -125,12 +143,6 @@ serve(async (req) => {
     const metrics: RuleMetric[] = execution_metrics;
     const violatedMetrics = metrics.filter((m) => m.violated);
     const incidents: Incident[] = [];
-
-    // Get sample failed rows for examples
-    const { data: bronzeData } = await supabase
-      .from("bronze_data")
-      .select("raw_data")
-      .limit(5);
 
     for (const metric of violatedMetrics) {
       const failureSignature = generateFailureSignature(
@@ -158,11 +170,20 @@ serve(async (req) => {
         id: crypto.randomUUID(),
         dataset_id,
         rule_id: metric.rule_id,
+        rule_name: metric.rule_name,
         dimension: metric.dimension,
         severity: mapSeverityToPriority(metric.severity),
-        action: generateAction(metric.dimension, metric.severity, metric.rule_name),
-        example_failed_rows: bronzeData?.slice(0, 3).map((r) => r.raw_data) || [],
+        action: generateAction(metric.dimension, metric.severity, metric.rule_name, metric.failed_count, metric.total_count),
+        example_failed_rows: metric.failed_rows_sample || [],
         failure_signature: failureSignature,
+        execution_reference: execution_id || '',
+        profiling_reference: profile_id || null,
+        dashboard_reference: dashboard_id || null,
+        traceability: {
+          step2_rule_link: `/rules/${metric.rule_id}`,
+          step3_execution_link: `/executions/${execution_id}`,
+          step4_dashboard_link: dashboard_id ? `/dashboards/${dashboard_id}` : null,
+        },
       };
 
       incidents.push(incident);
@@ -174,12 +195,12 @@ serve(async (req) => {
         id: incident.id,
         dataset_id: incident.dataset_id,
         rule_id: incident.rule_id,
-        execution_id,
+        execution_id: incident.execution_reference,
         dimension: incident.dimension,
         severity: incident.severity,
         action: incident.action,
         example_failed_rows: incident.example_failed_rows,
-        profiling_reference: profile_id,
+        profiling_reference: incident.profiling_reference,
         failure_signature: incident.failure_signature,
         status: "open",
       }));
@@ -190,7 +211,6 @@ serve(async (req) => {
 
       if (insertError) {
         console.error("Failed to store incidents:", insertError);
-        // Don't fail the whole operation, just log
       }
     }
 
