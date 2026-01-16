@@ -57,9 +57,9 @@ Respond in a helpful, professional manner. Focus on the specific data and issues
 
     console.log("[DQ-Chatbot] Calling HuggingFace API...");
 
-    // Call HuggingFace Inference API with Llama model
+    // Call HuggingFace Inference API with Llama model (using new router endpoint)
     const response = await fetch(
-      "https://api-inference.huggingface.co/models/meta-llama/Llama-3.1-8B-Instruct",
+      "https://router.huggingface.co/hf-inference/models/meta-llama/Llama-3.1-8B-Instruct",
       {
         method: "POST",
         headers: {

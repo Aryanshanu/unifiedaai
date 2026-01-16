@@ -198,10 +198,10 @@ export function DQChatbotPanel({ isOpen, onClose, context }: DQChatbotPanelProps
       <Button
         variant="outline"
         size="icon"
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg bg-primary text-primary-foreground hover:bg-primary/90 z-50"
+        className="fixed bottom-6 right-6 h-20 w-20 rounded-full shadow-lg bg-primary text-primary-foreground hover:bg-primary/90 z-50"
         onClick={() => onClose()}
       >
-        <MessageCircle className="h-6 w-6" />
+        <MessageCircle className="h-9 w-9" />
       </Button>
     );
   }
@@ -221,7 +221,6 @@ export function DQChatbotPanel({ isOpen, onClose, context }: DQChatbotPanelProps
           </div>
           <div>
             <h3 className="font-semibold">DQ Assistant</h3>
-            <p className="text-xs text-muted-foreground">Powered by HuggingFace</p>
           </div>
         </div>
         <div className="flex items-center gap-1">

@@ -715,10 +715,10 @@ function ControlPlaneTab() {
       {/* Floating Chat Button */}
       {!isChatOpen && (
         <Button
-          className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg bg-primary hover:bg-primary/90 z-50"
+          className="fixed bottom-6 right-6 h-20 w-20 rounded-full shadow-lg bg-primary hover:bg-primary/90 z-50"
           onClick={() => setIsChatOpen(true)}
         >
-          <MessageCircle className="h-6 w-6" />
+          <MessageCircle className="h-9 w-9" />
         </Button>
       )}
     </div>
