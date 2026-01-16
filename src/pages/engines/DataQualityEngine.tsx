@@ -24,7 +24,8 @@ import {
   Clock,
   Activity,
   Zap,
-  RefreshCw
+  RefreshCw,
+  MessageCircle
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -47,6 +48,9 @@ import { DQRuleLibraryTabular } from '@/components/engines/DQRuleLibraryTabular'
 import { DQExecutionReportTabular } from '@/components/engines/DQExecutionReportTabular';
 import { DQDashboardVisual } from '@/components/engines/DQDashboardVisual';
 import { DQIncidentsTabular } from '@/components/engines/DQIncidentsTabular';
+import { DQStreamingDashboard } from '@/components/engines/DQStreamingDashboard';
+import { DQRuleSummary } from '@/components/engines/DQRuleSummary';
+import { DQChatbotPanel } from '@/components/engines/DQChatbotPanel';
 import { useDQControlPlane } from '@/hooks/useDQControlPlane';
 import { useFileUploadStatus, useAllUploads, useQualityStats, UploadStatus } from '@/hooks/useFileUploadStatus';
 import { useQualityTrend } from '@/hooks/useQualityTrend';
@@ -496,6 +500,7 @@ function HistoryTab() {
 function ControlPlaneTab() {
   const [selectedDataset, setSelectedDataset] = useState<string>('');
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const queryClient = useQueryClient();
   
   const { data: datasets, refetch: refetchDatasets } = useQuery({
@@ -606,6 +611,14 @@ function ControlPlaneTab() {
                   Reset
                 </Button>
               )}
+              <Button 
+                variant="outline" 
+                onClick={() => setIsChatOpen(true)}
+                className="gap-2"
+              >
+                <MessageCircle className="h-4 w-4" />
+                AI Assistant
+              </Button>
             </div>
           )}
         </CardContent>
@@ -628,7 +641,12 @@ function ControlPlaneTab() {
         isLoading={currentStep === 1} 
       />
 
-      {/* STEP 2: Rule Library - Full Width Tabular */}
+      {/* STEP 2: Rule Library - Summary + Tabular */}
+      <DQRuleSummary 
+        rules={rulesResult || []}
+        profile={profilingResult}
+        isLoading={currentStep === 2}
+      />
       <DQRuleLibraryTabular 
         rules={rulesResult} 
         isLoading={currentStep === 2} 
@@ -643,7 +661,14 @@ function ControlPlaneTab() {
         onStop={stopPipeline}
       />
 
-      {/* STEP 4: Dashboard Visual - Full Width */}
+      {/* STEP 4: Streaming Dashboard - Real-time Power BI Style */}
+      <DQStreamingDashboard 
+        datasetId={selectedDataset}
+        executionId={executionResult?.id}
+        isActive={pipelineStatus === 'running' || !!executionResult}
+      />
+
+      {/* Legacy Dashboard Visual (fallback) */}
       <DQDashboardVisual 
         assets={dashboardAssets} 
         executionMetrics={executionResult?.metrics}
@@ -672,6 +697,29 @@ function ControlPlaneTab() {
             </ScrollArea>
           </CardContent>
         </Card>
+      )}
+
+      {/* RAG Chatbot Panel */}
+      <DQChatbotPanel
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        context={{
+          profile: profilingResult,
+          rules: rulesResult,
+          execution: executionResult,
+          incidents: incidents,
+          datasetName: datasets?.find(d => d.id === selectedDataset)?.name
+        }}
+      />
+
+      {/* Floating Chat Button */}
+      {!isChatOpen && (
+        <Button
+          className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg bg-primary hover:bg-primary/90 z-50"
+          onClick={() => setIsChatOpen(true)}
+        >
+          <MessageCircle className="h-6 w-6" />
+        </Button>
       )}
     </div>
   );

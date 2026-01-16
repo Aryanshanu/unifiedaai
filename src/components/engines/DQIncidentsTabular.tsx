@@ -47,6 +47,16 @@ interface DQIncident {
   status: 'open' | 'acknowledged' | 'resolved';
   created_at: string;
   resolved_at: string | null;
+  // Enhanced fields
+  rule_name?: string;
+  column_name?: string;
+  dataset_name?: string;
+  description?: string;
+  impact_statement?: string;
+  affected_records_count?: number;
+  affected_records_percentage?: number;
+  root_cause?: string;
+  recommendation?: string;
 }
 
 interface DQIncidentsTabularProps {
@@ -105,6 +115,63 @@ function getStatusConfig(status: string) {
         label: status.toUpperCase()
       };
   }
+}
+
+// Generate human-readable description based on incident data
+function generateIncidentDescription(incident: DQIncident): string {
+  if (incident.description) return incident.description;
+  
+  const dim = incident.dimension.toLowerCase();
+  const col = incident.column_name || 'data';
+  const pct = incident.affected_records_percentage?.toFixed(1) || 'N/A';
+  const count = incident.affected_records_count?.toLocaleString() || 'multiple';
+  
+  const templates: Record<string, string> = {
+    completeness: `${pct}% of records have missing or null values in the "${col}" column, affecting ${count} records.`,
+    validity: `${pct}% of records failed validation checks in the "${col}" column. Values are outside expected range or format.`,
+    uniqueness: `Duplicate values detected in "${col}" column affecting ${pct}% of records. This may cause data integrity issues.`,
+    timeliness: `Data freshness check failed. Records in "${col}" are stale and exceed the freshness threshold.`,
+    consistency: `Inconsistent values detected in "${col}" column. Cross-reference validation failed for ${count} records.`,
+    accuracy: `Accuracy check failed for "${col}". ${pct}% of values don't match expected reference data.`,
+  };
+  
+  return templates[dim] || incident.action || 'Data quality issue detected requiring attention.';
+}
+
+// Generate root cause analysis
+function generateRootCause(incident: DQIncident): string {
+  if (incident.root_cause) return incident.root_cause;
+  
+  const dim = incident.dimension.toLowerCase();
+  const rootCauses: Record<string, string> = {
+    completeness: 'Missing data from source system or ETL pipeline failure',
+    validity: 'Data format mismatch or out-of-range values from upstream source',
+    uniqueness: 'Duplicate records from source or merge operation failure',
+    timeliness: 'Data ingestion delay or stale source system',
+    consistency: 'Cross-system synchronization failure',
+    accuracy: 'Source data corruption or transformation error',
+  };
+  
+  return rootCauses[dim] || 'Root cause analysis pending investigation';
+}
+
+// Generate recommendation based on incident
+function generateRecommendation(incident: DQIncident): string {
+  if (incident.recommendation) return incident.recommendation;
+  
+  const dim = incident.dimension.toLowerCase();
+  const col = incident.column_name || 'affected column';
+  
+  const recommendations: Record<string, string> = {
+    completeness: `1. Check source system for ${col} data availability\n2. Review ETL pipeline for extraction errors\n3. Consider adding default values or making field optional`,
+    validity: `1. Review data validation rules for ${col}\n2. Check source system data types\n3. Add data transformation step to normalize values`,
+    uniqueness: `1. Add deduplication step in ETL pipeline\n2. Review primary key constraints\n3. Investigate source system for duplicate generation`,
+    timeliness: `1. Check data ingestion schedule\n2. Verify source system update frequency\n3. Review SLA with data provider`,
+    consistency: `1. Align data formats across systems\n2. Review cross-reference mappings\n3. Implement reconciliation process`,
+    accuracy: `1. Validate against authoritative source\n2. Review data transformation logic\n3. Implement data correction workflow`,
+  };
+  
+  return recommendations[dim] || 'Review and investigate the data quality issue. Contact data engineering team if needed.';
 }
 
 export function DQIncidentsTabular({ 
@@ -188,10 +255,10 @@ export function DQIncidentsTabular({
               <TableRow className="bg-muted/50">
                 <TableHead className="w-8"></TableHead>
                 <TableHead className="font-semibold">Severity</TableHead>
-                <TableHead className="font-semibold">Rule</TableHead>
+                <TableHead className="font-semibold">Rule / Column</TableHead>
+                <TableHead className="font-semibold">Description</TableHead>
                 <TableHead className="font-semibold">Dimension</TableHead>
                 <TableHead className="font-semibold">Status</TableHead>
-                <TableHead className="font-semibold">Created</TableHead>
                 <TableHead className="font-semibold">Time Open</TableHead>
                 <TableHead className="font-semibold">Actions</TableHead>
               </TableRow>
@@ -228,8 +295,22 @@ export function DQIncidentsTabular({
                               {severityConfig.label}
                             </Badge>
                           </TableCell>
-                          <TableCell className="font-mono text-sm">
-                            {incident.rule_id?.slice(0, 8) || 'N/A'}
+                          <TableCell>
+                            <div className="space-y-1">
+                              <p className="font-medium text-sm">
+                                {incident.rule_name || incident.rule_id?.slice(0, 8) || 'N/A'}
+                              </p>
+                              {incident.column_name && (
+                                <p className="text-xs text-muted-foreground font-mono">
+                                  Column: {incident.column_name}
+                                </p>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="max-w-xs">
+                            <p className="text-sm truncate" title={generateIncidentDescription(incident)}>
+                              {generateIncidentDescription(incident).slice(0, 60)}...
+                            </p>
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline" className="uppercase text-xs">
@@ -240,9 +321,6 @@ export function DQIncidentsTabular({
                             <Badge className={statusConfig.className}>
                               {statusConfig.label}
                             </Badge>
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {format(new Date(incident.created_at), 'HH:mm:ss')}
                           </TableCell>
                           <TableCell className={cn(
                             "font-medium",
@@ -290,35 +368,67 @@ export function DQIncidentsTabular({
                         <TableRow className="bg-muted/20">
                           <TableCell colSpan={8} className="p-4">
                             <div className="space-y-4">
-                              {/* IDs */}
-                              <div className="grid grid-cols-4 gap-4 text-sm">
-                                <div>
-                                  <span className="text-muted-foreground">Incident ID:</span>
-                                  <p className="font-mono text-xs">{incident.id}</p>
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground">Rule ID:</span>
-                                  <p className="font-mono text-xs">{incident.rule_id || 'N/A'}</p>
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground">Execution ID:</span>
-                                  <p className="font-mono text-xs">{incident.execution_id || 'N/A'}</p>
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground">Profiling Ref:</span>
-                                  <p className="font-mono text-xs">{incident.profiling_reference || 'N/A'}</p>
+                              {/* Full Description */}
+                              <div className="bg-card border rounded-lg p-4 space-y-3">
+                                <h5 className="font-semibold text-sm flex items-center gap-2">
+                                  <AlertCircle className="h-4 w-4 text-primary" />
+                                  Incident Details
+                                </h5>
+                                <p className="text-sm leading-relaxed">
+                                  {generateIncidentDescription(incident)}
+                                </p>
+                                
+                                {/* Impact Statement */}
+                                <div className="flex items-center gap-4 text-sm pt-2 border-t">
+                                  <span className="text-muted-foreground">Impact:</span>
+                                  <span className="font-medium text-destructive">
+                                    {incident.affected_records_count?.toLocaleString() || 'Multiple'} records affected
+                                    {incident.affected_records_percentage && ` (${incident.affected_records_percentage.toFixed(1)}%)`}
+                                  </span>
                                 </div>
                               </div>
 
-                              {/* Recommended Action */}
-                              <div className="space-y-2">
-                                <h5 className="font-medium text-sm flex items-center gap-2">
-                                  <AlertTriangle className="h-4 w-4 text-warning" />
-                                  Recommended Action
-                                </h5>
-                                <p className="text-sm bg-muted rounded-lg p-3">
-                                  {incident.action}
-                                </p>
+                              {/* Root Cause & Recommendation */}
+                              <div className="grid md:grid-cols-2 gap-4">
+                                <div className="bg-warning/5 border border-warning/20 rounded-lg p-4 space-y-2">
+                                  <h5 className="font-medium text-sm flex items-center gap-2 text-warning">
+                                    <AlertTriangle className="h-4 w-4" />
+                                    Root Cause Analysis
+                                  </h5>
+                                  <p className="text-sm">
+                                    {generateRootCause(incident)}
+                                  </p>
+                                </div>
+                                
+                                <div className="bg-success/5 border border-success/20 rounded-lg p-4 space-y-2">
+                                  <h5 className="font-medium text-sm flex items-center gap-2 text-success">
+                                    <CheckCircle2 className="h-4 w-4" />
+                                    Recommended Actions
+                                  </h5>
+                                  <p className="text-sm whitespace-pre-line">
+                                    {generateRecommendation(incident)}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* IDs - Collapsed */}
+                              <div className="grid grid-cols-4 gap-4 text-xs border-t pt-3">
+                                <div>
+                                  <span className="text-muted-foreground">Incident ID:</span>
+                                  <p className="font-mono">{incident.id.slice(0, 8)}...</p>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Rule ID:</span>
+                                  <p className="font-mono">{incident.rule_id?.slice(0, 8) || 'N/A'}</p>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Execution ID:</span>
+                                  <p className="font-mono">{incident.execution_id?.slice(0, 8) || 'N/A'}</p>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Profiling Ref:</span>
+                                  <p className="font-mono">{incident.profiling_reference?.slice(0, 8) || 'N/A'}</p>
+                                </div>
                               </div>
 
                               {/* Failed Row Samples */}
