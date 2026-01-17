@@ -14,6 +14,10 @@ interface DQRule {
   column_name: string | null;
   threshold: number;
   severity: string;
+  calibration_metadata?: {
+    observed_min?: number;
+    observed_max?: number;
+  };
 }
 
 interface FailedRow {
@@ -36,6 +40,7 @@ interface RuleMetric {
   margin: number; // Difference from threshold
   violated: boolean;
   failed_rows_sample?: FailedRow[];
+  computed_from_data: boolean; // TRUE = real execution, never false in this version
 }
 
 interface ExecutionSummary {
@@ -49,6 +54,7 @@ interface ExecutionSummary {
   null_blank_percentage: number;
   duplicate_rate: number;
   overall_pass_rate: number;
+  data_rows_evaluated: number;
 }
 
 interface ExecutionOutput {
@@ -85,9 +91,54 @@ serve(async (req) => {
       });
     }
 
+    if (rules.length === 0) {
+      const response: ExecutionOutput = {
+        status: "error",
+        code: "NO_RULES_PROVIDED",
+        message: "At least one rule is required for execution",
+      };
+      return new Response(JSON.stringify(response), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // 🚨 HALT CONDITION #1: Check if bronze_data has ANY rows
+    const { count: bronzeCount, error: countError } = await supabase
+      .from("bronze_data")
+      .select("id", { count: 'exact', head: true });
+
+    if (countError) {
+      const response: ExecutionOutput = {
+        status: "error",
+        code: "DATA_ACCESS_FAILED",
+        message: "Failed to access bronze_data table",
+        detail: countError.message,
+      };
+      return new Response(JSON.stringify(response), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 🚨 HALT CONDITION #2: Empty dataset = STOP
+    if (!bronzeCount || bronzeCount === 0) {
+      console.log(`[DQ Execute] HALT: No data in bronze_data table. Cannot execute rules on empty dataset.`);
+      const response: ExecutionOutput = {
+        status: "error",
+        code: "EMPTY_DATASET",
+        message: "Cannot execute rules on empty dataset. Upload data to bronze_data first.",
+        detail: "The pipeline cannot continue without real data. No simulated execution will be performed.",
+      };
+      return new Response(JSON.stringify(response), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Get sample data for rule execution
     const { data: bronzeData } = await supabase
@@ -95,96 +146,110 @@ serve(async (req) => {
       .select("raw_data, row_index, id")
       .limit(1000);
 
-    const totalRecords = bronzeData?.length || 100;
+    // At this point we KNOW bronzeData exists and has rows
+    const totalRecords = bronzeData!.length;
     const metrics: RuleMetric[] = [];
     let criticalViolations = 0;
     let totalNullCount = 0;
     let totalDuplicates = 0;
 
-    // Execute each rule
+    // Execute each rule against REAL DATA
     for (const rule of rules as DQRule[]) {
       let failedCount = 0;
-      let successRate = 1.0;
       const failedRowsSample: FailedRow[] = [];
 
-      if (bronzeData && bronzeData.length > 0 && rule.column_name) {
-        // Execute rule against actual data
-        switch (rule.logic_type) {
-          case "null_check": {
-            for (let i = 0; i < bronzeData.length; i++) {
-              const row = bronzeData[i];
-              const data = row.raw_data as Record<string, unknown>;
-              const value = data?.[rule.column_name!];
-              if (value === null || value === undefined || value === "") {
-                failedCount++;
-                totalNullCount++;
-                if (failedRowsSample.length < 5) {
-                  failedRowsSample.push({
-                    row_index: row.row_index || i,
-                    row_id: row.id || `row_${i}`,
-                    column_value: value as string | number | null,
-                    failure_reason: "Value is null or empty",
-                  });
-                }
+      if (!rule.column_name) {
+        // Skip rules without column_name specified
+        console.log(`[DQ Execute] Skipping rule ${rule.rule_name} - no column_name specified`);
+        continue;
+      }
+
+      // Execute rule against actual data - NO SIMULATION
+      switch (rule.logic_type) {
+        case "null_check": {
+          for (let i = 0; i < bronzeData!.length; i++) {
+            const row = bronzeData![i];
+            const data = row.raw_data as Record<string, unknown>;
+            const value = data?.[rule.column_name!];
+            if (value === null || value === undefined || value === "") {
+              failedCount++;
+              totalNullCount++;
+              if (failedRowsSample.length < 5) {
+                failedRowsSample.push({
+                  row_index: row.row_index || i,
+                  row_id: row.id || `row_${i}`,
+                  column_value: value as string | number | null,
+                  failure_reason: "Value is null or empty",
+                });
               }
             }
-            break;
           }
-          case "duplicate_check": {
-            const valueCounts = new Map<string, { count: number; indices: number[] }>();
-            for (let i = 0; i < bronzeData.length; i++) {
-              const row = bronzeData[i];
-              const data = row.raw_data as Record<string, unknown>;
-              const value = String(data?.[rule.column_name!] ?? "");
-              const existing = valueCounts.get(value);
-              if (existing) {
-                existing.count++;
-                existing.indices.push(i);
-              } else {
-                valueCounts.set(value, { count: 1, indices: [i] });
-              }
+          break;
+        }
+        case "duplicate_check": {
+          const valueCounts = new Map<string, { count: number; indices: number[] }>();
+          for (let i = 0; i < bronzeData!.length; i++) {
+            const row = bronzeData![i];
+            const data = row.raw_data as Record<string, unknown>;
+            const value = String(data?.[rule.column_name!] ?? "");
+            const existing = valueCounts.get(value);
+            if (existing) {
+              existing.count++;
+              existing.indices.push(i);
+            } else {
+              valueCounts.set(value, { count: 1, indices: [i] });
             }
-            for (const [value, info] of valueCounts.entries()) {
-              if (info.count > 1) {
-                failedCount += info.count;
-                totalDuplicates += info.count - 1;
-                if (failedRowsSample.length < 5) {
-                  failedRowsSample.push({
-                    row_index: info.indices[0],
-                    row_id: bronzeData[info.indices[0]]?.id || `row_${info.indices[0]}`,
-                    column_value: value,
-                    failure_reason: `Duplicate value (${info.count} occurrences)`,
-                  });
-                }
-              }
-            }
-            break;
           }
-          case "range_check": {
-            for (let i = 0; i < bronzeData.length; i++) {
-              const row = bronzeData[i];
-              const data = row.raw_data as Record<string, unknown>;
-              const value = data?.[rule.column_name!];
-              if (typeof value === "number" && (value < 0 || value > 1000000)) {
-                failedCount++;
-                if (failedRowsSample.length < 5) {
-                  failedRowsSample.push({
-                    row_index: row.row_index || i,
-                    row_id: row.id || `row_${i}`,
-                    column_value: value,
-                    failure_reason: value < 0 ? "Value < 0 (min range)" : "Value > 1,000,000 (max range)",
-                  });
-                }
+          for (const [value, info] of valueCounts.entries()) {
+            if (info.count > 1) {
+              failedCount += info.count;
+              totalDuplicates += info.count - 1;
+              if (failedRowsSample.length < 5) {
+                failedRowsSample.push({
+                  row_index: info.indices[0],
+                  row_id: bronzeData![info.indices[0]]?.id || `row_${info.indices[0]}`,
+                  column_value: value,
+                  failure_reason: `Duplicate value (${info.count} occurrences)`,
+                });
               }
             }
-            break;
           }
-          case "regex_match": {
-            const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-            for (let i = 0; i < bronzeData.length; i++) {
-              const row = bronzeData[i];
-              const data = row.raw_data as Record<string, unknown>;
-              const value = data?.[rule.column_name!];
+          break;
+        }
+        case "range_check": {
+          // Use calibration_metadata for observed min/max if available
+          const observedMin = rule.calibration_metadata?.observed_min ?? 0;
+          const observedMax = rule.calibration_metadata?.observed_max ?? 1000000;
+          
+          for (let i = 0; i < bronzeData!.length; i++) {
+            const row = bronzeData![i];
+            const data = row.raw_data as Record<string, unknown>;
+            const rawValue = data?.[rule.column_name!];
+            const value = typeof rawValue === "number" ? rawValue : parseFloat(String(rawValue));
+            
+            if (!isNaN(value) && (value < observedMin || value > observedMax)) {
+              failedCount++;
+              if (failedRowsSample.length < 5) {
+                failedRowsSample.push({
+                  row_index: row.row_index || i,
+                  row_id: row.id || `row_${i}`,
+                  column_value: value,
+                  failure_reason: value < observedMin 
+                    ? `Value ${value} < min ${observedMin}` 
+                    : `Value ${value} > max ${observedMax}`,
+                });
+              }
+            }
+          }
+          break;
+        }
+        case "regex_match": {
+          const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+          for (let i = 0; i < bronzeData!.length; i++) {
+            const row = bronzeData![i];
+            const data = row.raw_data as Record<string, unknown>;
+            const value = data?.[rule.column_name!];
+            if (value !== null && value !== undefined && value !== "") {
               if (typeof value !== "string" || !emailRegex.test(value)) {
                 failedCount++;
                 if (failedRowsSample.length < 5) {
@@ -197,45 +262,40 @@ serve(async (req) => {
                 }
               }
             }
-            break;
           }
-          case "freshness_check": {
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-            for (let i = 0; i < bronzeData.length; i++) {
-              const row = bronzeData[i];
-              const data = row.raw_data as Record<string, unknown>;
-              const value = data?.[rule.column_name!];
-              if (value) {
-                const date = new Date(String(value));
-                if (date < thirtyDaysAgo) {
-                  failedCount++;
-                  if (failedRowsSample.length < 5) {
-                    failedRowsSample.push({
-                      row_index: row.row_index || i,
-                      row_id: row.id || `row_${i}`,
-                      column_value: String(value),
-                      failure_reason: "Data older than 30 days",
-                    });
-                  }
+          break;
+        }
+        case "freshness_check": {
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          for (let i = 0; i < bronzeData!.length; i++) {
+            const row = bronzeData![i];
+            const data = row.raw_data as Record<string, unknown>;
+            const value = data?.[rule.column_name!];
+            if (value) {
+              const date = new Date(String(value));
+              if (!isNaN(date.getTime()) && date < thirtyDaysAgo) {
+                failedCount++;
+                if (failedRowsSample.length < 5) {
+                  failedRowsSample.push({
+                    row_index: row.row_index || i,
+                    row_id: row.id || `row_${i}`,
+                    column_value: String(value),
+                    failure_reason: "Data older than 30 days",
+                  });
                 }
               }
             }
-            break;
           }
-          default:
-            // Simulate random pass/fail for unknown logic types
-            failedCount = Math.floor(Math.random() * totalRecords * 0.1);
+          break;
         }
-
-        successRate = 1 - failedCount / totalRecords;
-      } else {
-        // Simulate execution for datasets without bronze data
-        const variance = (Math.random() - 0.5) * 0.1;
-        successRate = Math.min(1, Math.max(0, rule.threshold + variance));
-        failedCount = Math.floor((1 - successRate) * totalRecords);
+        default:
+          // Unknown logic type - log and skip, do NOT simulate
+          console.log(`[DQ Execute] Unknown logic_type: ${rule.logic_type} for rule ${rule.rule_name}. Skipping.`);
+          continue;
       }
 
+      const successRate = 1 - failedCount / totalRecords;
       const violated = successRate < rule.threshold;
       const margin = (successRate - rule.threshold) * 100;
       
@@ -256,6 +316,19 @@ serve(async (req) => {
         margin,
         violated,
         failed_rows_sample: failedRowsSample.length > 0 ? failedRowsSample : undefined,
+        computed_from_data: true, // Always true - we never simulate
+      });
+    }
+
+    if (metrics.length === 0) {
+      const response: ExecutionOutput = {
+        status: "error",
+        code: "NO_EXECUTABLE_RULES",
+        message: "No rules could be executed. Check that rules have valid column_name and logic_type.",
+      };
+      return new Response(JSON.stringify(response), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -279,6 +352,7 @@ serve(async (req) => {
       null_blank_percentage: nullBlankPercentage,
       duplicate_rate: duplicateRate,
       overall_pass_rate: overallPassRate,
+      data_rows_evaluated: totalRecords,
     };
 
     // Store execution result
@@ -303,11 +377,11 @@ serve(async (req) => {
 
     // 🚨 CIRCUIT BREAKER CHECK 🚨
     if (criticalFailure) {
-      console.log(`[DQ Execute] 🚨 CIRCUIT BREAKER TRIPPED - ${criticalViolations} critical violations`);
+      console.log(`[DQ Execute] 🚨 CIRCUIT BREAKER TRIPPED - ${criticalViolations} critical violations in ${totalRecords} rows`);
       const response: ExecutionOutput = {
         status: "halted",
         code: "CIRCUIT_BREAKER_TRIPPED",
-        message: "Critical data quality failure detected. Downstream tasks stopped.",
+        message: `Critical data quality failure detected. ${criticalViolations} critical rule(s) violated. Downstream tasks stopped.`,
         execution_id: executionRecord?.id,
         execution_ts: new Date().toISOString(),
         execution_time_ms: executionTime,
@@ -329,7 +403,7 @@ serve(async (req) => {
       summary,
     };
 
-    console.log(`[DQ Execute] Executed ${metrics.length} rules in ${executionTime}ms. Passed: ${passedRules}, Failed: ${failedRules}`);
+    console.log(`[DQ Execute] Executed ${metrics.length} rules against ${totalRecords} rows in ${executionTime}ms. Passed: ${passedRules}, Failed: ${failedRules}`);
 
     return new Response(JSON.stringify(response), {
       status: 200,

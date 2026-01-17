@@ -38,13 +38,12 @@ interface Hotspot {
   priority: string;
 }
 
+// Quality metrics computed ONLY from execution data - no hardcoded defaults
 interface QualityMetrics {
   total_records: number;
   error_rate: number;
   null_blank_percentage: number;
   duplicate_rate: number;
-  freshness_score: number;
-  consistency_score: number;
 }
 
 interface DashboardData {
@@ -59,16 +58,14 @@ interface DashboardData {
   dimension_scores: DimensionScore[];
   hotspots: Hotspot[];
   quality_metrics: QualityMetrics;
+  computed_from_data: boolean;
+  data_rows_evaluated: number;
 }
 
 interface DashboardOutput {
   status: "success" | "error";
   dashboard_data?: DashboardData;
   asset_id?: string;
-  // Keep SQL for backward compatibility
-  summary_sql?: string;
-  hotspots_sql?: string;
-  dimension_breakdown_sql?: string;
   code?: string;
   message?: string;
   detail?: string;
@@ -94,13 +91,25 @@ serve(async (req) => {
       });
     }
 
+    if (!Array.isArray(execution_metrics) || execution_metrics.length === 0) {
+      const response: DashboardOutput = {
+        status: "error",
+        code: "NO_METRICS_PROVIDED",
+        message: "execution_metrics must be a non-empty array of rule metrics",
+      };
+      return new Response(JSON.stringify(response), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const metrics: RuleMetric[] = execution_metrics;
 
-    // Calculate overall score
+    // Calculate overall score from REAL metrics only
     const overallScore = (metrics.reduce((sum, m) => sum + m.success_rate, 0) / metrics.length) * 100;
     
     // Determine quality grade
@@ -110,7 +119,7 @@ serve(async (req) => {
     else if (overallScore >= 70) qualityGrade = 'C';
     else if (overallScore >= 50) qualityGrade = 'D';
 
-    // Calculate dimension scores
+    // Calculate dimension scores - ONLY from execution metrics
     const dimensionGroups = metrics.reduce((acc, m) => {
       if (!acc[m.dimension]) {
         acc[m.dimension] = { total: 0, sum: 0, violated: 0 };
@@ -138,12 +147,12 @@ serve(async (req) => {
       };
     }).sort((a, b) => a.score - b.score); // Sort by score ascending (worst first)
 
-    // Generate hotspots (worst performers)
+    // Generate hotspots (worst performers) - ONLY from violated rules
     const violatedMetrics = metrics.filter((m) => m.violated);
     const hotspots: Hotspot[] = violatedMetrics
       .sort((a, b) => {
         const severityOrder: Record<string, number> = { critical: 0, warning: 1, info: 2 };
-        const sevDiff = severityOrder[a.severity] - severityOrder[b.severity];
+        const sevDiff = (severityOrder[a.severity] ?? 3) - (severityOrder[b.severity] ?? 3);
         if (sevDiff !== 0) return sevDiff;
         return a.success_rate - b.success_rate;
       })
@@ -157,17 +166,16 @@ serve(async (req) => {
         required_threshold: m.threshold * 100,
         gap: (m.success_rate - m.threshold) * 100,
         failed_records: `${m.failed_count}/${m.total_count}`,
-        priority: m.severity === 'critical' ? '🔴 CRITICAL' : m.severity === 'warning' ? '🟡 WARNING' : '🟢 OK',
+        priority: m.severity === 'critical' ? '🔴 CRITICAL' : m.severity === 'warning' ? '🟡 WARNING' : '🟢 INFO',
       }));
 
-    // Quality metrics from execution summary or defaults
+    // Quality metrics from execution summary ONLY - NO hardcoded defaults
+    const dataRowsEvaluated = execution_summary?.data_rows_evaluated || metrics[0]?.total_count || 0;
     const qualityMetrics: QualityMetrics = {
-      total_records: metrics[0]?.total_count || 0,
-      error_rate: execution_summary?.error_rate || ((metrics.filter(m => m.violated).length / metrics.length) * 100),
-      null_blank_percentage: execution_summary?.null_blank_percentage || 2.1,
-      duplicate_rate: execution_summary?.duplicate_rate || 0.01,
-      freshness_score: execution_summary?.freshness_score || 94.1,
-      consistency_score: execution_summary?.consistency_score || 99.0,
+      total_records: dataRowsEvaluated,
+      error_rate: execution_summary?.error_rate ?? ((metrics.filter(m => m.violated).length / metrics.length) * 100),
+      null_blank_percentage: execution_summary?.null_blank_percentage ?? 0,
+      duplicate_rate: execution_summary?.duplicate_rate ?? 0,
     };
 
     const dashboardData: DashboardData = {
@@ -182,22 +190,19 @@ serve(async (req) => {
       dimension_scores: dimensionScores,
       hotspots,
       quality_metrics: qualityMetrics,
+      computed_from_data: true,
+      data_rows_evaluated: dataRowsEvaluated,
     };
 
-    // Generate legacy SQL for backward compatibility
-    const summarySql = `-- Overall Score: ${overallScore.toFixed(2)}%, Grade: ${qualityGrade}`;
-    const hotspotsSql = `-- ${hotspots.length} hotspots identified`;
-    const dimensionBreakdownSql = `-- ${dimensionScores.length} dimensions analyzed`;
-
-    // Store dashboard assets
+    // Store dashboard assets - store structured JSON, not SQL comments
     const { data: assetRecord, error: insertError } = await supabase
       .from("dq_dashboard_assets")
       .insert({
         execution_id,
         dataset_id,
-        summary_sql: JSON.stringify(dashboardData), // Store full data in summary_sql
-        hotspots_sql: hotspotsSql,
-        dimension_breakdown_sql: dimensionBreakdownSql,
+        summary_sql: JSON.stringify(dashboardData), // Full structured data
+        hotspots_sql: JSON.stringify(hotspots),
+        dimension_breakdown_sql: JSON.stringify(dimensionScores),
       })
       .select("id")
       .single();
@@ -210,12 +215,9 @@ serve(async (req) => {
       status: "success",
       dashboard_data: dashboardData,
       asset_id: assetRecord?.id,
-      summary_sql: summarySql,
-      hotspots_sql: hotspotsSql,
-      dimension_breakdown_sql: dimensionBreakdownSql,
     };
 
-    console.log(`[DQ Dashboard] Generated dashboard for execution ${execution_id}. Grade: ${qualityGrade}`);
+    console.log(`[DQ Dashboard] Generated dashboard for execution ${execution_id}. Grade: ${qualityGrade}, ${dimensionScores.length} dimensions, ${hotspots.length} hotspots`);
 
     return new Response(JSON.stringify(response), {
       status: 200,
