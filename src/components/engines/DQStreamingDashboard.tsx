@@ -203,13 +203,12 @@ export function DQStreamingDashboard({ datasetId, executionId, isActive = true }
     lastUpdated: new Date()
   });
   
+  // ALLOWED DIMENSIONS ONLY - Consistency and Accuracy removed (cannot compute without external data)
   const [dimensions, setDimensions] = useState<DimensionData[]>([
     { name: 'Completeness', score: 0, previousScore: 0, trend: 'stable', color: 'bg-blue-500' },
     { name: 'Validity', score: 0, previousScore: 0, trend: 'stable', color: 'bg-green-500' },
     { name: 'Uniqueness', score: 0, previousScore: 0, trend: 'stable', color: 'bg-purple-500' },
     { name: 'Timeliness', score: 0, previousScore: 0, trend: 'stable', color: 'bg-orange-500' },
-    { name: 'Consistency', score: 0, previousScore: 0, trend: 'stable', color: 'bg-cyan-500' },
-    { name: 'Accuracy', score: 0, previousScore: 0, trend: 'stable', color: 'bg-pink-500' },
   ]);
 
   const [hotspots, setHotspots] = useState<HotspotData[]>([]);

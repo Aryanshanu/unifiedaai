@@ -38,12 +38,6 @@ interface Incident {
   failure_signature: string;
   execution_reference: string;
   profiling_reference: string | null;
-  dashboard_reference: string | null;
-  traceability: {
-    step2_rule_link: string;
-    step3_execution_link: string;
-    step4_dashboard_link: string | null;
-  };
 }
 
 interface IncidentsOutput {
@@ -71,6 +65,7 @@ function mapSeverityToPriority(severity: string): "P0" | "P1" | "P2" {
 function generateAction(dimension: string, severity: string, ruleName: string, failedCount: number, totalCount: number): string {
   const failPercentage = ((failedCount / totalCount) * 100).toFixed(1);
   
+  // ALLOWED DIMENSIONS ONLY: completeness, uniqueness, validity, timeliness
   const actions: Record<string, Record<string, string>> = {
     completeness: {
       critical: `🚨 IMMEDIATE ACTION: ${failPercentage}% missing values in ${ruleName.split("_")[0]}. Halt data pipeline. Investigate source system. Contact data owner for root cause analysis.`,
@@ -87,20 +82,10 @@ function generateAction(dimension: string, severity: string, ruleName: string, f
       warning: `⚠️ REVIEW REQUIRED: Format violations detected (${failedCount} records). Update input validation rules at source.`,
       info: `ℹ️ MONITOR: Minor validity issues (${failPercentage}%). Consider stricter input constraints.`,
     },
-    accuracy: {
-      critical: `🚨 IMMEDIATE ACTION: Data accuracy below threshold (${failPercentage}% mismatch). Suspend automated decisions. Cross-validate with reference data.`,
-      warning: `⚠️ REVIEW REQUIRED: Accuracy drift detected (${failPercentage}%). Compare with authoritative source.`,
-      info: `ℹ️ MONITOR: Slight accuracy decline (${failPercentage}%). Schedule data audit.`,
-    },
     timeliness: {
       critical: `🚨 IMMEDIATE ACTION: Data freshness SLA breached (${failedCount} stale records). Escalate to data engineering team.`,
       warning: `⚠️ REVIEW REQUIRED: Data staleness detected (${failedCount} records older than threshold). Check pipeline schedules.`,
       info: `ℹ️ MONITOR: Minor delays in data refresh. Track latency trend.`,
-    },
-    consistency: {
-      critical: `🚨 IMMEDIATE ACTION: Cross-system consistency failure (${failPercentage}% mismatch). Reconcile data sources immediately.`,
-      warning: `⚠️ REVIEW REQUIRED: Inconsistencies between related datasets (${failedCount} records). Investigate join conditions.`,
-      info: `ℹ️ MONITOR: Minor consistency variations. Document known discrepancies.`,
     },
   };
 
@@ -136,12 +121,40 @@ serve(async (req) => {
       });
     }
 
+    if (!Array.isArray(execution_metrics)) {
+      const response: IncidentsOutput = {
+        status: "error",
+        code: "INVALID_METRICS_FORMAT",
+        message: "execution_metrics must be an array",
+      };
+      return new Response(JSON.stringify(response), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const metrics: RuleMetric[] = execution_metrics;
-    const violatedMetrics = metrics.filter((m) => m.violated);
+    
+    // Only create incidents for ACTUALLY violated rules
+    const violatedMetrics = metrics.filter((m) => m.violated === true);
+    
+    if (violatedMetrics.length === 0) {
+      console.log(`[DQ Incidents] No violated rules. 0 incidents created.`);
+      const response: IncidentsOutput = {
+        status: "success",
+        incident_count: 0,
+        incidents: [],
+      };
+      return new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const incidents: Incident[] = [];
 
     for (const metric of violatedMetrics) {
@@ -178,12 +191,6 @@ serve(async (req) => {
         failure_signature: failureSignature,
         execution_reference: execution_id || '',
         profiling_reference: profile_id || null,
-        dashboard_reference: dashboard_id || null,
-        traceability: {
-          step2_rule_link: `/rules/${metric.rule_id}`,
-          step3_execution_link: `/executions/${execution_id}`,
-          step4_dashboard_link: dashboard_id ? `/dashboards/${dashboard_id}` : null,
-        },
       };
 
       incidents.push(incident);
@@ -220,7 +227,7 @@ serve(async (req) => {
       incidents,
     };
 
-    console.log(`[DQ Incidents] Created ${incidents.length} new incidents (${violatedMetrics.length - incidents.length} deduplicated)`);
+    console.log(`[DQ Incidents] Created ${incidents.length} new incidents from ${violatedMetrics.length} violations (${violatedMetrics.length - incidents.length} deduplicated)`);
 
     return new Response(JSON.stringify(response), {
       status: 200,
