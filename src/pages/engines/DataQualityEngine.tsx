@@ -50,7 +50,7 @@ import { DQDashboardVisual } from '@/components/engines/DQDashboardVisual';
 import { DQIncidentsTabular } from '@/components/engines/DQIncidentsTabular';
 import { DQStreamingDashboard } from '@/components/engines/DQStreamingDashboard';
 import { DQRuleSummary } from '@/components/engines/DQRuleSummary';
-import { DQChatbotPanel } from '@/components/engines/DQChatbotPanel';
+import { DQChatPanel } from '@/components/engines/DQChatPanel';
 import { useDQControlPlane } from '@/hooks/useDQControlPlane';
 import { useFileUploadStatus, useAllUploads, useQualityStats, UploadStatus } from '@/hooks/useFileUploadStatus';
 import { useQualityTrend } from '@/hooks/useQualityTrend';
@@ -699,8 +699,8 @@ function ControlPlaneTab() {
         </Card>
       )}
 
-      {/* RAG Chatbot Panel */}
-      <DQChatbotPanel
+      {/* DQ Chat Panel - Truth-only implementation */}
+      <DQChatPanel
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
         context={{
