@@ -346,12 +346,12 @@ serve(async (req) => {
             errors.push(validation.error!);
           }
           
-          // GOVERNANCE: Detect simulated metrics
+          // GOVERNANCE: Detect unavailable metrics
           // If a dimension that requires prerequisites (like accuracy) claims to be computed, it's suspicious
           const prereq = DIMENSION_PREREQUISITES[dim.dimension];
           if (prereq && prereq.status === 'never_without_ground_truth') {
             simulatedMetricsCount++;
-            errors.push(`SIMULATED_METRIC: ${dim.dimension} claims to be computed but requires ${prereq.requires}`);
+            errors.push(`UNAVAILABLE_METRIC: ${dim.dimension} claims to be computed but requires ${prereq.requires}`);
           }
         } else {
           unavailableDimensions.push(dim.dimension);

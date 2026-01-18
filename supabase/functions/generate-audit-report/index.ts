@@ -362,7 +362,7 @@ async function generateAuditPDF(report: any): Promise<Uint8Array> {
   const leftMargin = 50;
   
   // Header
-  page.drawText('FRACTAL RAI-OS AUDIT REPORT', { 
+  page.drawText('FRACTAL UNIFIED-OS GOVERNANCE REPORT', { 
     x: leftMargin, y, size: 18, font: boldFont, color: rgb(0.1, 0.1, 0.3) 
   });
   y -= 30;
@@ -424,8 +424,8 @@ async function generateAuditPDF(report: any): Promise<Uint8Array> {
   
   // Footer on last page
   const lastPage = pdfDoc.getPages()[pdfDoc.getPageCount() - 1];
-  lastPage.drawText('FRACTAL RAI-OS - Responsible AI Operating System', { 
-    x: leftMargin, y: 40, size: 9, font, color: rgb(0.5, 0.5, 0.5) 
+  lastPage.drawText('FRACTAL UNIFIED-OS - Autonomous Governance Platform', { 
+    x: leftMargin, y: 40, size: 9, font, color: rgb(0.5, 0.5, 0.5)
   });
   lastPage.drawText(`This is an immutable audit record. Hash: ${report.content_hash.substring(0, 40)}...`, { 
     x: leftMargin, y: 28, size: 8, font, color: rgb(0.5, 0.5, 0.5) 

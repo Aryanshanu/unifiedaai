@@ -17,9 +17,9 @@ export function Footer({ className }: FooterProps) {
               <span className="text-xs font-bold text-primary-foreground">F</span>
             </div>
             <div>
-              <span className="text-sm font-semibold text-foreground">Fractal RAI-OS</span>
+            <span className="text-sm font-semibold text-foreground">Fractal Unified-OS</span>
               <span className="text-xs text-muted-foreground ml-2">
-                The Global Responsible AI Operating System
+                Autonomous Governance Platform
               </span>
             </div>
           </div>

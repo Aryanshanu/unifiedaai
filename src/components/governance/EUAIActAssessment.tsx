@@ -117,7 +117,7 @@ export function EUAIActAssessment({ modelId, modelName }: EUAIActAssessmentProps
 
     // Note: We don't save to database since control_id requires real UUIDs
     // This is a demonstration/planning tool only
-    toast.success("Simulation completed", {
+    toast.success("Demonstration completed", {
       description: `${assessedControls.filter(c => c.status === 'pass').length}/${assessedControls.length} controls passed (demo only)`
     });
 
@@ -152,7 +152,7 @@ export function EUAIActAssessment({ modelId, modelName }: EUAIActAssessmentProps
             EU AI Act High-Risk Assessment (Demo)
           </DialogTitle>
           <DialogDescription>
-            Simulated compliance check for {modelName} against EU AI Act and NIST AI RMF
+            Demonstration compliance check for {modelName} against EU AI Act and NIST AI RMF
           </DialogDescription>
         </DialogHeader>
 
@@ -172,7 +172,7 @@ export function EUAIActAssessment({ modelId, modelName }: EUAIActAssessmentProps
             <div className="text-center py-8">
               <Shield className="w-16 h-16 text-primary/30 mx-auto mb-4" />
               <p className="text-muted-foreground mb-4">
-                This will simulate assessment of {EU_AI_ACT_CONTROLS.length} controls from EU AI Act and NIST AI RMF
+                This will run a demonstration assessment of {EU_AI_ACT_CONTROLS.length} controls from EU AI Act and NIST AI RMF
               </p>
               <Button onClick={runAssessment} className="gap-2">
                 <FileCheck className="w-4 h-4" />
@@ -187,7 +187,7 @@ export function EUAIActAssessment({ modelId, modelName }: EUAIActAssessmentProps
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">
-                    {isRunning ? 'Simulating assessment...' : 'Simulation complete'}
+                    {isRunning ? 'Running demonstration...' : 'Demonstration complete'}
                   </span>
                   <span className="font-mono">{progress}%</span>
                 </div>
@@ -205,7 +205,7 @@ export function EUAIActAssessment({ modelId, modelName }: EUAIActAssessmentProps
                     )}>
                       {complianceScore}%
                     </p>
-                    <p className="text-xs text-muted-foreground">Simulated Score</p>
+                    <p className="text-xs text-muted-foreground">Demo Score</p>
                   </div>
                   <div className="bg-success/10 border border-success/20 rounded-lg p-4 text-center">
                     <p className="text-3xl font-bold font-mono text-success">{passCount}</p>

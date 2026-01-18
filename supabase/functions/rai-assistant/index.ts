@@ -2,12 +2,12 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { validateSession, requireAuth, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
 
-// Fractal RAI-OS System Knowledge Base
+// Fractal Unified-OS System Knowledge Base
 const SYSTEM_KNOWLEDGE = `
-# Fractal RAI-OS - Responsible AI Operating System
+# Fractal Unified-OS - Autonomous Governance Platform
 
 ## Overview
-Fractal RAI-OS is the world's first end-to-end, open-source Responsible AI Operating System. It provides:
+Fractal Unified-OS is the world's first end-to-end, open-source Autonomous Governance Platform. It provides:
 - 5 RAI Evaluation Engines (Fairness, Toxicity, Privacy, Hallucination, Explainability)
 - Real-time monitoring and drift detection
 - Human-in-the-loop (HITL) governance workflows
@@ -256,7 +256,7 @@ serve(async (req) => {
       }
     }
 
-    const systemPrompt = `You are Fractal, the AI assistant for Fractal RAI-OS - a Responsible AI Operating System.
+    const systemPrompt = `You are Fractal, the AI assistant for Fractal Unified-OS - an Autonomous Governance Platform.
 
 Your role:
 1. Answer questions about RAI metrics, formulas, and their interpretation

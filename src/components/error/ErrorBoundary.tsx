@@ -109,7 +109,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
             {/* Fractal Branding */}
             <p className="text-xs text-muted-foreground pt-4">
-              Fractal RAI-OS • Global Responsible AI Operating System
+              Fractal Unified-OS • Autonomous Governance Platform
             </p>
           </div>
         </div>
