@@ -335,11 +335,13 @@ serve(async (req) => {
           }
           
           // RULE CONSISTENCY CHECK: Validate executed rules exist in library
-          const executedRuleIds = new Set(metrics.map(m => m.rule_id as string));
+          // TRUTH CONTRACT: Rules use 'id' property, metrics use 'rule_id' 
+          const executedRuleIds = new Set(metrics.map(m => m.rule_id as string).filter(Boolean));
           const libraryRules = rulesResult.rules as Array<{ id: string }>;
-          const libraryRuleIds = new Set(libraryRules.map(r => r.id));
+          // Map library rules by id (the property name used in dq-generate-rules)
+          const libraryRuleIds = new Set(libraryRules.map(r => r.id).filter(Boolean));
           
-          const phantomRules = [...executedRuleIds].filter(id => !libraryRuleIds.has(id));
+          const phantomRules = [...executedRuleIds].filter(id => id && !libraryRuleIds.has(id));
           if (phantomRules.length > 0) {
             inconsistencies.push(`PHANTOM_RULES: ${phantomRules.length} rules executed but not in library`);
           }

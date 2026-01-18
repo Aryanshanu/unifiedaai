@@ -96,9 +96,13 @@ function generateAction(dimension: string, severity: string, ruleName: string, f
 }
 
 // Generate failure signature for deduplication
-function generateFailureSignature(ruleId: string, dimension: string, successRate: number): string {
+// TRUTH CONTRACT: Validate inputs before using
+function generateFailureSignature(ruleId: string | undefined | null, dimension: string, successRate: number): string {
+  // TRUTH CONTRACT: Handle undefined/null rule_id defensively
+  const safeRuleId = ruleId || 'unknown';
+  const safeSlice = safeRuleId.length >= 8 ? safeRuleId.slice(0, 8) : safeRuleId;
   const roundedRate = Math.round(successRate * 20) * 5;
-  return `${dimension}_${ruleId.slice(0, 8)}_${roundedRate}`;
+  return `${dimension}_${safeSlice}_${roundedRate}`;
 }
 
 serve(async (req) => {
@@ -158,6 +162,12 @@ serve(async (req) => {
     const incidents: Incident[] = [];
 
     for (const metric of violatedMetrics) {
+      // TRUTH CONTRACT: Skip metrics without valid rule_id
+      if (!metric.rule_id) {
+        console.warn(`[DQ Incidents] Skipping metric without rule_id: ${metric.rule_name}`);
+        continue;
+      }
+
       const failureSignature = generateFailureSignature(
         metric.rule_id,
         metric.dimension,
