@@ -10,13 +10,33 @@ const corsHeaders = {
 // ============================================
 // 
 // ABSOLUTE INVARIANTS:
-// 1. Percentages ∈ [0, 100]
-// 2. Rates ∈ [0, 1]
-// 3. success_rate + failure_rate = 1 ± 0.01
-// 4. passed + failed = total
-// 5. All executed rules MUST exist in library
-// 6. Incidents ONLY from failed rules
+// 1. Trust Score is INTEGER (0-100), NOT ratio
+// 2. Overall Score = average(success_rate of EXECUTED RULES)
+// 3. Rates ∈ [0, 1]
+// 4. success_rate + failure_rate = 1 ± 0.01
+// 5. passed + failed = total
+// 6. All executed rules MUST exist in library
+// 7. Incidents ONLY from failed rules
 // ============================================
+
+// ============================================
+// DIMENSION PREREQUISITES (STRICT ENFORCEMENT)
+// ============================================
+const DIMENSION_PREREQUISITES: Record<string, { requires: string; status: string }> = {
+  completeness: { requires: 'null_counts', status: 'always_computable' },
+  uniqueness: { requires: 'distinct_counts', status: 'always_computable' },
+  validity: { requires: 'schema_validation_rules', status: 'requires_schema' },
+  accuracy: { requires: 'ground_truth', status: 'never_without_ground_truth' },
+  timeliness: { requires: 'freshness_sla', status: 'requires_sla' },
+  consistency: { requires: 'cross_dataset_logic', status: 'requires_cross_system' }
+};
+
+// Severity to priority mapping for incidents
+const SEVERITY_TO_PRIORITY: Record<string, string> = {
+  'critical': 'P0',
+  'warning': 'P1',
+  'info': 'P2'
+};
 
 interface ExecutionMetric {
   rule_id: string;
@@ -95,21 +115,22 @@ interface NormalizedProfiling {
   computed_dimensions: string[];
   unavailable_dimensions: string[];
   dimension_scores: DimensionScore[];
-  overall_score: number | null;
-  can_display_overall: boolean;
+  dimension_prerequisites: Record<string, { requires: string; status: string; reason: string }>;
 }
 
 interface NormalizedExecution {
   execution_id: string | null;
   metrics: ExecutionMetric[];
   summary: ExecutionSummary | null;
+  overall_score: number | null; // GOVERNANCE: Overall from execution, NOT profiling
+  overall_score_status: 'COMPUTED' | 'NOT_AVAILABLE';
   all_rates_valid: boolean;
   truth_verified: boolean;
 }
 
 interface NormalizedIncidents {
   incident_count: number;
-  incidents: Incident[];
+  incidents: Array<Incident & { priority: string }>;
   orphan_count: number;
   consistency_verified: boolean;
 }
@@ -118,7 +139,7 @@ interface TrustReport {
   discarded_metrics: string[];
   deduplicated_rules: number;
   inconsistencies_found: string[];
-  truth_score: number;
+  trust_score: number; // INTEGER 0-100
   // Enhanced fields for governance
   missing_dimensions_count: number;
   simulated_metrics_count: number;
@@ -158,7 +179,7 @@ function validateRatio(value: number, context: string): { valid: boolean; error?
     return { valid: false, error: `${context}: Negative ratio ${value} < 0` };
   }
   if (value > 1) {
-    return { valid: false, error: `${context}: Ratio overflow ${value} > 1` };
+    return { valid: false, error: `INVALID_INTERNAL_RATE: ${context} = ${value} > 1 (rates must be in [0,1])` };
   }
   return { valid: true };
 }
@@ -168,7 +189,7 @@ function validateCount(value: number, context: string): { valid: boolean; error?
     return { valid: false, error: `${context}: Value is not a number` };
   }
   if (value < 0) {
-    return { valid: false, error: `${context}: Negative count ${value} < 0` };
+    return { valid: false, error: `NEGATIVE_COUNT: ${context} = ${value} < 0` };
   }
   return { valid: true };
 }
@@ -222,11 +243,12 @@ function validateExecutionTruth(
 // ============================================
 // TRUST SCORE CALCULATION
 // ============================================
-// Trust Score = 100
+// Trust Score = 100 (INTEGER)
 //   - 20 per missing dimension
 //   - 15 per simulated metric
 //   - 10 per critical inconsistency
 //   - 5 per warning-level inconsistency
+// OUTPUT: INTEGER 0-100 (NOT ratio!)
 // ============================================
 
 function computeTrustScore(
@@ -241,10 +263,11 @@ function computeTrustScore(
   const criticalPenalty = criticalInconsistencies * 10;
   const warningPenalty = warningInconsistencies * 5;
 
-  const score = Math.max(0, base - dimensionPenalty - simulatedPenalty - criticalPenalty - warningPenalty);
+  // GOVERNANCE: Trust Score is INTEGER 0-100, NOT ratio
+  const score = Math.max(0, Math.min(100, base - dimensionPenalty - simulatedPenalty - criticalPenalty - warningPenalty));
 
   return {
-    score: score / 100, // Return as ratio 0-1
+    score: Math.round(score), // INTEGER 0-100
     breakdown: {
       base,
       dimension_penalty: dimensionPenalty,
@@ -253,6 +276,24 @@ function computeTrustScore(
       warning_penalty: warningPenalty,
     },
   };
+}
+
+// ============================================
+// OVERALL SCORE CALCULATION (FROM EXECUTION ONLY)
+// ============================================
+// GOVERNANCE: Overall Score = average(success_rate of EXECUTED RULES)
+// If no rules executed → NOT_AVAILABLE
+// ============================================
+
+function computeOverallScoreFromExecution(
+  metrics: ExecutionMetric[]
+): { score: number | null; status: 'COMPUTED' | 'NOT_AVAILABLE' } {
+  if (!metrics || metrics.length === 0) {
+    return { score: null, status: 'NOT_AVAILABLE' };
+  }
+
+  const avgSuccessRate = metrics.reduce((sum, m) => sum + m.success_rate, 0) / metrics.length;
+  return { score: avgSuccessRate, status: 'COMPUTED' };
 }
 
 serve(async (req) => {
@@ -279,6 +320,21 @@ serve(async (req) => {
       const dimensionScores = input.profiling.dimension_scores || [];
       const computedDimensions: string[] = [];
       const unavailableDimensions: string[] = [];
+      const dimensionPrerequisites: Record<string, { requires: string; status: string; reason: string }> = {};
+
+      // GOVERNANCE: Check each dimension against prerequisites
+      for (const dimName of Object.keys(DIMENSION_PREREQUISITES)) {
+        const prereq = DIMENSION_PREREQUISITES[dimName];
+        const dimScore = dimensionScores.find(d => d.dimension === dimName);
+        
+        dimensionPrerequisites[dimName] = {
+          requires: prereq.requires,
+          status: prereq.status,
+          reason: dimScore?.computed 
+            ? 'Computed successfully' 
+            : `Cannot compute: requires ${prereq.requires}`
+        };
+      }
 
       for (const dim of dimensionScores) {
         if (dim.computed && dim.score !== null) {
@@ -289,17 +345,22 @@ serve(async (req) => {
           if (!validation.valid) {
             errors.push(validation.error!);
           }
+          
+          // GOVERNANCE: Detect simulated metrics
+          // If a dimension that requires prerequisites (like accuracy) claims to be computed, it's suspicious
+          const prereq = DIMENSION_PREREQUISITES[dim.dimension];
+          if (prereq && prereq.status === 'never_without_ground_truth') {
+            simulatedMetricsCount++;
+            errors.push(`SIMULATED_METRIC: ${dim.dimension} claims to be computed but requires ${prereq.requires}`);
+          }
         } else {
           unavailableDimensions.push(dim.dimension);
           discardedMetrics.push(dim.dimension);
         }
       }
 
-      // Calculate overall score from computed dimensions only
-      const computedScores = dimensionScores.filter(d => d.computed && d.score !== null);
-      const overallScore = computedScores.length > 0
-        ? computedScores.reduce((sum, d) => sum + (d.score || 0), 0) / computedScores.length
-        : null;
+      // GOVERNANCE: Do NOT calculate overall score from profiling
+      // Overall score comes from EXECUTION only
 
       normalizedProfiling = {
         profiling_run_id: input.profiling.profiling_run_id || null,
@@ -308,8 +369,7 @@ serve(async (req) => {
         computed_dimensions: computedDimensions,
         unavailable_dimensions: unavailableDimensions,
         dimension_scores: dimensionScores,
-        overall_score: overallScore,
-        can_display_overall: computedDimensions.length > 0,
+        dimension_prerequisites: dimensionPrerequisites,
       };
 
       console.log(`[DQ Truth Enforcer] Profiling: ${computedDimensions.length} computed, ${unavailableDimensions.length} unavailable`);
@@ -366,15 +426,20 @@ serve(async (req) => {
         truthVerified = truthValidation.valid;
       }
 
+      // GOVERNANCE: Calculate overall score from execution metrics ONLY
+      const { score: overallScore, status: overallStatus } = computeOverallScoreFromExecution(metrics);
+
       normalizedExecution = {
         execution_id: input.execution.execution_id || null,
         metrics,
         summary,
+        overall_score: overallScore,
+        overall_score_status: overallStatus,
         all_rates_valid: allRatesValid,
         truth_verified: truthVerified,
       };
 
-      console.log(`[DQ Truth Enforcer] Execution: ${metrics.length} metrics, rates valid: ${allRatesValid}, truth verified: ${truthVerified}`);
+      console.log(`[DQ Truth Enforcer] Execution: ${metrics.length} metrics, overall=${overallScore?.toFixed(3) || 'N/A'}, rates valid: ${allRatesValid}, truth verified: ${truthVerified}`);
     }
 
     // ============================================
@@ -421,9 +486,22 @@ serve(async (req) => {
         errors.push(`ORPHAN_INCIDENTS: ${orphanIncidents.length} incidents reference rules that did not fail`);
       }
 
+      // GOVERNANCE: Map severity to priority and validate
+      const incidentsWithPriority = incidents.map(incident => ({
+        ...incident,
+        priority: SEVERITY_TO_PRIORITY[incident.severity] || 'P2'
+      }));
+
+      // Validate severity mapping
+      for (const incident of incidents) {
+        if (!SEVERITY_TO_PRIORITY[incident.severity]) {
+          warnings.push(`UNKNOWN_SEVERITY: Incident ${incident.id || 'unknown'} has unmapped severity '${incident.severity}'`);
+        }
+      }
+
       normalizedIncidents = {
         incident_count: incidents.length,
-        incidents,
+        incidents: incidentsWithPriority,
         orphan_count: orphanIncidents.length,
         consistency_verified: orphanIncidents.length === 0,
       };
@@ -449,7 +527,7 @@ serve(async (req) => {
       discarded_metrics: discardedMetrics,
       deduplicated_rules: input.rules?.deduplicated_count || 0,
       inconsistencies_found: [...errors, ...warnings],
-      truth_score: trustScore,
+      trust_score: trustScore,
       missing_dimensions_count: missingDimensionsCount,
       simulated_metrics_count: simulatedMetricsCount,
       critical_inconsistencies: criticalErrors,
@@ -487,14 +565,16 @@ serve(async (req) => {
         violations: contractViolations,
       };
 
+      // GOVERNANCE: Return HTTP 422 for contract violations
       return new Response(JSON.stringify(response), {
-        status: 200, // Return 200 so frontend can display the violations
+        status: 422, // Unprocessable Entity - pipeline output not governance-safe
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     // Success - governance certified
-    console.log(`[DQ Truth Enforcer] GOVERNANCE CERTIFIED: Trust Score ${(trustScore * 100).toFixed(1)}%`);
+    // GOVERNANCE: Trust score is now INTEGER 0-100
+    console.log(`[DQ Truth Enforcer] GOVERNANCE CERTIFIED: Trust Score ${trustScore}%`);
 
     const response: GovernanceOutput = {
       status: "success",
@@ -553,15 +633,18 @@ function buildExplanation(
     if (profiling.unavailable_dimensions.length > 0) {
       parts.push(`${profiling.unavailable_dimensions.length} dimensions unavailable (${profiling.unavailable_dimensions.join(", ")})`);
     }
-    if (profiling.overall_score !== null) {
-      parts.push(`Overall quality: ${(profiling.overall_score * 100).toFixed(1)}%`);
-    }
   }
 
   if (execution) {
     const summary = execution.summary;
     if (summary) {
       parts.push(`${summary.passed}/${summary.total_rules} rules passed`);
+    }
+    // GOVERNANCE: Overall score comes from execution
+    if (execution.overall_score !== null) {
+      parts.push(`Overall Quality Score: ${(execution.overall_score * 100).toFixed(1)}%`);
+    } else {
+      parts.push("Overall Score: NOT_AVAILABLE (no rules executed)");
     }
     if (execution.truth_verified) {
       parts.push("Execution truth verified ✓");
@@ -572,7 +655,8 @@ function buildExplanation(
     parts.push(`${incidents.incident_count} incidents raised`);
   }
 
-  parts.push(`Trust Score: ${(trustScore * 100).toFixed(0)}%`);
+  // GOVERNANCE: Trust Score is INTEGER 0-100
+  parts.push(`Trust Score: ${trustScore}%`);
 
   return parts.join(". ") + ".";
 }

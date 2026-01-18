@@ -124,7 +124,7 @@ export interface TrustReport {
   discarded_metrics: string[];
   deduplicated_rules: number;
   inconsistencies_found: string[];
-  truth_score: number;
+  trust_score: number; // GOVERNANCE: INTEGER 0-100, not ratio
   // Enhanced governance fields
   missing_dimensions_count?: number;
   simulated_metrics_count?: number;

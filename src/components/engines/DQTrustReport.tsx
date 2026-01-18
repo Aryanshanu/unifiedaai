@@ -19,7 +19,7 @@ interface TrustReport {
   discarded_metrics: string[];
   deduplicated_rules: number;
   inconsistencies_found: string[];
-  truth_score: number;
+  trust_score: number; // GOVERNANCE: INTEGER 0-100, not ratio
   // Enhanced governance fields
   missing_dimensions_count?: number;
   simulated_metrics_count?: number;
@@ -54,11 +54,15 @@ export function DQTrustReport({ trustReport, isLoading, governanceStatus, violat
     discarded_metrics, 
     deduplicated_rules, 
     inconsistencies_found, 
-    truth_score,
+    trust_score,
     critical_inconsistencies,
     warning_inconsistencies,
     score_breakdown
   } = trustReport;
+  
+  // GOVERNANCE: Helper functions now expect ratio (0-1) for consistency
+  // Convert trust_score (0-100) to ratio for color/icon functions
+  const scoreAsRatio = trust_score / 100;
   
   const getScoreColor = (score: number) => {
     if (score >= 0.95) return 'text-success';
@@ -128,10 +132,10 @@ export function DQTrustReport({ trustReport, isLoading, governanceStatus, violat
           </Alert>
         )}
 
-        {/* Trust Score */}
+        {/* Trust Score - GOVERNANCE: Now displayed as INTEGER 0-100 */}
         <div className="flex items-center justify-between p-4 bg-background rounded-lg border">
           <div className="flex items-center gap-3">
-            {getScoreIcon(truth_score)}
+            {getScoreIcon(scoreAsRatio)}
             <div>
               <p className="font-medium">Trust Score</p>
               <p className="text-sm text-muted-foreground">
@@ -140,10 +144,11 @@ export function DQTrustReport({ trustReport, isLoading, governanceStatus, violat
             </div>
           </div>
           <div className="text-right">
-            <p className={cn("text-3xl font-bold", getScoreColor(truth_score))}>
-              {(truth_score * 100).toFixed(0)}%
+            {/* GOVERNANCE: trust_score is now INTEGER 0-100, not ratio */}
+            <p className={cn("text-3xl font-bold", getScoreColor(scoreAsRatio))}>
+              {Math.round(trust_score)}%
             </p>
-            <Progress value={truth_score * 100} className="w-24 h-2 mt-1" />
+            <Progress value={trust_score} className="w-24 h-2 mt-1" />
           </div>
         </div>
 
@@ -280,19 +285,20 @@ export function DQTrustReport({ trustReport, isLoading, governanceStatus, violat
         <div className="pt-2 border-t text-xs text-muted-foreground flex items-center justify-between">
           <span className="flex items-center gap-1">
             <Info className="h-3 w-3" />
-            Trust Score = 100% only if all dimensions computed, no violations, no simulated metrics.
+            Trust Score = 100 only if all dimensions computed, no violations, no simulated metrics.
           </span>
+          {/* GOVERNANCE: trust_score is now INTEGER 0-100 */}
           <Badge 
             variant="outline" 
             className={cn(
-              truth_score >= 0.95 
+              trust_score >= 95 
                 ? 'border-success/30 text-success' 
-                : truth_score >= 0.80 
+                : trust_score >= 80 
                   ? 'border-warning/30 text-warning' 
                   : 'border-destructive/30 text-destructive'
             )}
           >
-            {truth_score >= 0.95 ? 'VERIFIED' : truth_score >= 0.80 ? 'PARTIAL' : 'INCONSISTENT'}
+            {trust_score >= 95 ? 'VERIFIED' : trust_score >= 80 ? 'PARTIAL' : 'INCONSISTENT'}
           </Badge>
         </div>
       </CardContent>
