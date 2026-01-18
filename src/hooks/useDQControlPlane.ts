@@ -120,6 +120,13 @@ export interface DQIncident {
   resolved_at: string | null;
 }
 
+export interface TrustReport {
+  discarded_metrics: string[];
+  deduplicated_rules: number;
+  inconsistencies_found: string[];
+  truth_score: number;
+}
+
 export interface ControlPlaneResponse {
   status: 'success' | 'error';
   code: string;
@@ -136,6 +143,7 @@ export interface ControlPlaneResponse {
   completed_steps?: string[];
   failed_steps?: string[];
   detail?: string;
+  TRUST_REPORT?: TrustReport;
 }
 
 export interface UseDQControlPlaneReturn {
