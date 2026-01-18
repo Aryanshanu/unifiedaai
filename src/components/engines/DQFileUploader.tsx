@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Upload, FileText, X, Loader2, Play, CheckCircle2 } from 'lucide-react';
+import { Upload, FileText, X, Loader2, Play, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -22,6 +22,16 @@ interface ParsedData {
   sampleRows: Record<string, unknown>[];
 }
 
+interface IngestResponse {
+  status: 'success' | 'error';
+  code: string;
+  message: string;
+  dataset_id?: string;
+  upload_id?: string;
+  rows_ingested?: number;
+  detail?: string;
+}
+
 export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: DQFileUploaderProps) {
   const [datasetName, setDatasetName] = useState('');
   const [datasetDescription, setDatasetDescription] = useState('');
@@ -31,6 +41,7 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
   const [isDragging, setIsDragging] = useState(false);
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
   const [createdDatasetId, setCreatedDatasetId] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const parseData = useCallback((content: string, fileName?: string): ParsedData | null => {
@@ -42,7 +53,7 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
         return {
           rowCount: parsed.length,
           columns,
-          sampleRows: parsed.slice(0, 10)
+          sampleRows: parsed.slice(0, 100) // Take up to 100 rows for processing
         };
       }
     } catch {
@@ -51,11 +62,19 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
       if (lines.length > 1) {
         const headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, ''));
         const rows: Record<string, unknown>[] = [];
-        for (let i = 1; i < Math.min(lines.length, 11); i++) {
+        for (let i = 1; i < Math.min(lines.length, 101); i++) { // Take up to 100 rows
           const values = lines[i].split(',').map(v => v.trim().replace(/^["']|["']$/g, ''));
           const row: Record<string, unknown> = {};
           headers.forEach((h, idx) => {
-            row[h] = values[idx] || null;
+            const val = values[idx];
+            // Try to parse numbers
+            if (val && !isNaN(Number(val))) {
+              row[h] = Number(val);
+            } else if (val === '' || val === 'null' || val === 'NULL') {
+              row[h] = null;
+            } else {
+              row[h] = val || null;
+            }
           });
           rows.push(row);
         }
@@ -70,6 +89,8 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
   }, []);
 
   const handleFileSelect = useCallback(async (file: File) => {
+    setUploadError(null);
+    
     if (file.size > 50 * 1024 * 1024) {
       toast.error('File too large. Maximum size is 50MB.');
       return;
@@ -96,9 +117,12 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
       if (parsed) {
         setParsedData(parsed);
         toast.success(`Parsed ${parsed.rowCount} rows with ${parsed.columns.length} columns`);
+      } else {
+        toast.error('Could not parse file. Ensure it is valid JSON or CSV.');
       }
     } catch (error) {
       console.error('Error parsing file:', error);
+      toast.error('Failed to read file');
     }
   }, [datasetName, parseData]);
 
@@ -120,6 +144,7 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
 
   const handlePastedDataChange = useCallback((value: string) => {
     setPastedData(value);
+    setUploadError(null);
     if (value.trim()) {
       const parsed = parseData(value);
       setParsedData(parsed);
@@ -129,6 +154,8 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
   }, [parseData]);
 
   const handleCreateAndRun = async () => {
+    setUploadError(null);
+    
     if (!datasetName.trim()) {
       toast.error('Please enter a dataset name');
       return;
@@ -139,70 +166,62 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
       return;
     }
 
+    if (!parsedData || !parsedData.sampleRows || parsedData.sampleRows.length === 0) {
+      toast.error('No valid data to upload. Please check your file or pasted data.');
+      return;
+    }
+
     setIsUploading(true);
+    
     try {
-      // Create dataset record
-      const { data: dataset, error } = await supabase
-        .from('datasets')
-        .insert({
-          name: datasetName.trim(),
-          description: datasetDescription.trim() || null,
+      console.log('[DQFileUploader] Invoking dq-ingest-data edge function...');
+      
+      // Use edge function to ingest data (bypasses RLS issues)
+      const { data, error } = await supabase.functions.invoke<IngestResponse>('dq-ingest-data', {
+        body: {
+          dataset_name: datasetName.trim(),
+          dataset_description: datasetDescription.trim() || null,
           source: selectedFile ? 'file_upload' : 'manual_entry',
-          row_count: parsedData?.rowCount || null,
-          data_types: parsedData?.columns || null,
-          consent_status: 'pending',
-          environment: 'development'
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // If we have sample rows, insert them into bronze_data
-      if (parsedData?.sampleRows && parsedData.sampleRows.length > 0) {
-        const bronzeRecords = parsedData.sampleRows.map((row, idx) => ({
-          upload_id: dataset.id, // Using dataset id as upload reference
-          row_index: idx,
-          raw_data: row
-        }));
-
-        // First create a data_upload record
-        const { data: upload } = await supabase
-          .from('data_uploads')
-          .insert({
-            file_name: selectedFile?.name || `${datasetName}_manual.json`,
-            file_path: `/uploads/${dataset.id}`,
-            status: 'completed',
-            parsed_row_count: parsedData.rowCount,
-            parsed_column_count: parsedData.columns.length,
-            quality_score: null
-          })
-          .select()
-          .single();
-
-        if (upload) {
-          const bronzeData = parsedData.sampleRows.map((row, idx) => ({
-            upload_id: upload.id,
-            row_index: idx,
-            raw_data: row as unknown as Record<string, never>
-          }));
-
-          await supabase.from('bronze_data').insert(bronzeData);
+          rows: parsedData.sampleRows,
+          columns: parsedData.columns,
+          file_name: selectedFile?.name,
         }
+      });
+
+      if (error) {
+        console.error('[DQFileUploader] Edge function error:', error);
+        throw new Error(error.message || 'Failed to invoke ingestion function');
       }
 
-      setCreatedDatasetId(dataset.id);
-      toast.success('Dataset created successfully!');
-      onDatasetCreated(dataset.id, dataset.name);
+      if (!data) {
+        throw new Error('No response from ingestion function');
+      }
 
-      // Auto-run pipeline
+      if (data.status === 'error') {
+        console.error('[DQFileUploader] Ingestion failed:', data);
+        throw new Error(data.detail || data.message || 'Data ingestion failed');
+      }
+
+      if (!data.dataset_id) {
+        throw new Error('No dataset ID returned from ingestion');
+      }
+
+      console.log('[DQFileUploader] ✅ Data ingested successfully:', data);
+      
+      setCreatedDatasetId(data.dataset_id);
+      toast.success(`Dataset created with ${data.rows_ingested} rows!`);
+      onDatasetCreated(data.dataset_id, datasetName.trim());
+
+      // Auto-run pipeline after short delay
       setTimeout(() => {
-        onRunPipeline(dataset.id);
+        onRunPipeline(data.dataset_id!);
       }, 300);
 
     } catch (error) {
-      console.error('Error creating dataset:', error);
-      toast.error('Failed to create dataset');
+      console.error('[DQFileUploader] Error creating dataset:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create dataset';
+      setUploadError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsUploading(false);
     }
@@ -211,6 +230,20 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
   const clearFile = () => {
     setSelectedFile(null);
     setParsedData(null);
+    setUploadError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const resetForm = () => {
+    setDatasetName('');
+    setDatasetDescription('');
+    setPastedData('');
+    setSelectedFile(null);
+    setParsedData(null);
+    setCreatedDatasetId(null);
+    setUploadError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -225,12 +258,28 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
             <h3 className="font-semibold">Create New Dataset</h3>
           </div>
           {createdDatasetId && (
-            <Badge className="bg-success/10 text-success border-success/20">
-              <CheckCircle2 className="h-3 w-3 mr-1" />
-              Created
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge className="bg-success/10 text-success border-success/20">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                Created
+              </Badge>
+              <Button variant="ghost" size="sm" onClick={resetForm}>
+                New Dataset
+              </Button>
+            </div>
           )}
         </div>
+
+        {/* Error Display */}
+        {uploadError && (
+          <div className="flex items-start gap-3 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+            <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-destructive">Upload Failed</p>
+              <p className="text-sm text-destructive/80 mt-1">{uploadError}</p>
+            </div>
+          </div>
+        )}
 
         {/* Dataset Name & Description */}
         <div className="grid md:grid-cols-2 gap-4">
@@ -241,7 +290,7 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
               value={datasetName}
               onChange={(e) => setDatasetName(e.target.value)}
               placeholder="e.g., Customer Transactions Q1 2026"
-              disabled={isUploading}
+              disabled={isUploading || !!createdDatasetId}
             />
           </div>
           <div className="space-y-2">
@@ -251,7 +300,7 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
               value={datasetDescription}
               onChange={(e) => setDatasetDescription(e.target.value)}
               placeholder="Brief description of the dataset..."
-              disabled={isUploading}
+              disabled={isUploading || !!createdDatasetId}
             />
           </div>
         </div>
@@ -261,12 +310,13 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
           className={cn(
             "border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer",
             isDragging ? "border-primary bg-primary/10" : "border-muted-foreground/25 hover:border-primary/50",
-            selectedFile && "border-success bg-success/5"
+            selectedFile && "border-success bg-success/5",
+            (isUploading || createdDatasetId) && "pointer-events-none opacity-60"
           )}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => !createdDatasetId && fileInputRef.current?.click()}
         >
           <input
             ref={fileInputRef}
@@ -274,7 +324,7 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
             accept=".csv,.json,.xlsx,.txt"
             className="hidden"
             onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
-            disabled={isUploading}
+            disabled={isUploading || !!createdDatasetId}
           />
           
           {selectedFile ? (
@@ -289,16 +339,18 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
                   {parsedData && ` • ${parsedData.rowCount} rows • ${parsedData.columns.length} columns`}
                 </p>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  clearFile();
-                }}
-              >
-                <X className="h-4 w-4" />
-              </Button>
+              {!createdDatasetId && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    clearFile();
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           ) : (
             <>
@@ -332,7 +384,7 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
             onChange={(e) => handlePastedDataChange(e.target.value)}
             placeholder={`[\n  {"id": 1, "name": "John", "email": "john@example.com", "age": 30},\n  {"id": 2, "name": "Jane", "email": null, "age": 25}\n]`}
             className="font-mono text-sm min-h-[120px]"
-            disabled={isUploading || !!selectedFile}
+            disabled={isUploading || !!selectedFile || !!createdDatasetId}
           />
           <p className="text-xs text-muted-foreground">
             Paste JSON array or CSV with headers. This data will be used for profiling and rule generation.
@@ -365,23 +417,29 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
 
         {/* Action Button */}
         <div className="flex justify-end gap-3">
-          <Button
-            onClick={handleCreateAndRun}
-            disabled={isUploading || isRunning || !datasetName.trim() || (!selectedFile && !pastedData.trim())}
-            className="gap-2"
-          >
-            {isUploading || isRunning ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {isUploading ? 'Creating...' : 'Running Pipeline...'}
-              </>
-            ) : (
-              <>
-                <Play className="h-4 w-4" />
-                Create & Run Pipeline
-              </>
-            )}
-          </Button>
+          {createdDatasetId ? (
+            <Button onClick={resetForm} variant="outline">
+              Create Another Dataset
+            </Button>
+          ) : (
+            <Button
+              onClick={handleCreateAndRun}
+              disabled={isUploading || isRunning || !datasetName.trim() || (!selectedFile && !pastedData.trim()) || !parsedData}
+              className="gap-2"
+            >
+              {isUploading || isRunning ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {isUploading ? 'Creating...' : 'Running Pipeline...'}
+                </>
+              ) : (
+                <>
+                  <Play className="h-4 w-4" />
+                  Create & Run Pipeline
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>
