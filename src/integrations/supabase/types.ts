@@ -221,44 +221,6 @@ export type Database = {
         }
         Relationships: []
       }
-      bronze_data: {
-        Row: {
-          created_at: string | null
-          dataset_id: string | null
-          id: string
-          raw_data: Json
-          record_hash: string | null
-          row_index: number
-          upload_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          dataset_id?: string | null
-          id?: string
-          raw_data: Json
-          record_hash?: string | null
-          row_index: number
-          upload_id: string
-        }
-        Update: {
-          created_at?: string | null
-          dataset_id?: string | null
-          id?: string
-          raw_data?: Json
-          record_hash?: string | null
-          row_index?: number
-          upload_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "bronze_data_upload_id_fkey"
-            columns: ["upload_id"]
-            isOneToOne: false
-            referencedRelation: "data_uploads"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       control_assessments: {
         Row: {
           assessed_at: string | null
@@ -787,6 +749,7 @@ export type Database = {
           description: string | null
           environment: string | null
           id: string
+          ingested_row_count: number
           jurisdiction: string[] | null
           name: string
           owner_id: string | null
@@ -804,6 +767,7 @@ export type Database = {
           description?: string | null
           environment?: string | null
           id?: string
+          ingested_row_count?: number
           jurisdiction?: string[] | null
           name: string
           owner_id?: string | null
@@ -821,6 +785,7 @@ export type Database = {
           description?: string | null
           environment?: string | null
           id?: string
+          ingested_row_count?: number
           jurisdiction?: string[] | null
           name?: string
           owner_id?: string | null
@@ -1247,6 +1212,44 @@ export type Database = {
             columns: ["execution_id"]
             isOneToOne: false
             referencedRelation: "dq_rule_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dq_data: {
+        Row: {
+          created_at: string | null
+          dataset_id: string | null
+          id: string
+          raw_data: Json
+          record_hash: string | null
+          row_index: number
+          upload_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          dataset_id?: string | null
+          id?: string
+          raw_data: Json
+          record_hash?: string | null
+          row_index: number
+          upload_id: string
+        }
+        Update: {
+          created_at?: string | null
+          dataset_id?: string | null
+          id?: string
+          raw_data?: Json
+          record_hash?: string | null
+          row_index?: number
+          upload_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bronze_data_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "data_uploads"
             referencedColumns: ["id"]
           },
         ]
@@ -3424,6 +3427,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "silver_data_bronze_id_fkey"
+            columns: ["bronze_id"]
+            isOneToOne: false
+            referencedRelation: "dq_data"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "silver_data_upload_id_fkey"
             columns: ["upload_id"]
             isOneToOne: false
@@ -3852,7 +3862,44 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      bronze_data: {
+        Row: {
+          created_at: string | null
+          dataset_id: string | null
+          id: string | null
+          raw_data: Json | null
+          record_hash: string | null
+          row_index: number | null
+          upload_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          dataset_id?: string | null
+          id?: string | null
+          raw_data?: Json | null
+          record_hash?: string | null
+          row_index?: number | null
+          upload_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          dataset_id?: string | null
+          id?: string | null
+          raw_data?: Json | null
+          record_hash?: string | null
+          row_index?: number | null
+          upload_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bronze_data_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "data_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       can_manage_governance: { Args: never; Returns: boolean }

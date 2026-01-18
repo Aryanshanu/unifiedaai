@@ -125,9 +125,9 @@ serve(async (req) => {
       });
     }
 
-    // Check for data
-    const { count: bronzeCount, error: countError } = await supabase
-      .from("bronze_data")
+    // Check for data in dq_data (the single pipeline table)
+    const { count: dqDataCount, error: countError } = await supabase
+      .from("dq_data")
       .select("id", { count: 'exact', head: true })
       .eq("dataset_id", dataset_id);
 
@@ -144,7 +144,7 @@ serve(async (req) => {
       });
     }
 
-    if (!bronzeCount || bronzeCount === 0) {
+    if (!dqDataCount || dqDataCount === 0) {
       const response: ProfilingOutput = {
         status: "error",
         code: "NO_DATA",
@@ -160,18 +160,18 @@ serve(async (req) => {
     }
 
     // Get data for profiling (sample for large datasets)
-    const { data: bronzeData } = await supabase
-      .from("bronze_data")
+    const { data: dqData } = await supabase
+      .from("dq_data")
       .select("raw_data")
       .eq("dataset_id", dataset_id)
       .limit(1000);
 
     const columnProfiles: ColumnProfile[] = [];
-    const rowCount = bronzeData!.length;
+    const rowCount = dqData!.length;
     let hasDatetimeColumns = false;
 
     // Get all column names from first row
-    const firstRow = bronzeData![0]?.raw_data as Record<string, unknown>;
+    const firstRow = dqData![0]?.raw_data as Record<string, unknown>;
     if (!firstRow) {
       const response: ProfilingOutput = {
         status: "error",
@@ -193,7 +193,7 @@ serve(async (req) => {
       const numericValues: number[] = [];
       let inferredType = "string";
 
-      for (const row of bronzeData!) {
+      for (const row of dqData!) {
         const data = row.raw_data as Record<string, unknown>;
         const value = data?.[colName];
 

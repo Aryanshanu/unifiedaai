@@ -505,11 +505,15 @@ function ControlPlaneTab() {
   const { data: datasets, refetch: refetchDatasets } = useQuery({
     queryKey: ['datasets-for-control-plane'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('datasets').select('*').order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('datasets').select('id, name, row_count, ingested_row_count, created_at').order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
     }
   });
+
+  // Get the selected dataset info for validation
+  const selectedDatasetInfo = datasets?.find(d => d.id === selectedDataset);
+  const selectedDatasetHasData = (selectedDatasetInfo?.ingested_row_count ?? 0) > 0;
 
   const {
     pipelineStatus,
@@ -585,24 +589,30 @@ function ControlPlaneTab() {
           <CardContent>
             <div className="flex items-end gap-4">
               <div className="flex-1">
-                <Select value={selectedDataset} onValueChange={setSelectedDataset}>
+              <Select value={selectedDataset} onValueChange={setSelectedDataset}>
                   <SelectTrigger>
                     <SelectValue placeholder="Choose a dataset..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {datasets?.map((ds) => (
-                      <SelectItem key={ds.id} value={ds.id}>
-                        {ds.name} ({ds.row_count?.toLocaleString() || 0} rows)
-                      </SelectItem>
-                    ))}
+                    {datasets?.map((ds) => {
+                      const ingestedRows = ds.ingested_row_count ?? 0;
+                      const hasData = ingestedRows > 0;
+                      return (
+                        <SelectItem key={ds.id} value={ds.id} disabled={!hasData}>
+                          {ds.name} ({ingestedRows.toLocaleString()} ingested rows)
+                          {!hasData && ' — No data'}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
               <Button 
                 onClick={() => handleRunPipeline()} 
-                disabled={!selectedDataset || pipelineStatus === 'running'}
+                disabled={!selectedDataset || pipelineStatus === 'running' || !selectedDatasetHasData}
                 className="gap-2"
                 variant="outline"
+                title={!selectedDatasetHasData && selectedDataset ? 'Dataset has no ingested data' : undefined}
               >
                 {pipelineStatus === 'running' ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
