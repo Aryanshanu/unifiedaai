@@ -122,18 +122,18 @@ serve(async (req) => {
       });
     }
 
-    // Check if dataset has data in bronze_data
-    const { count: bronzeCount } = await supabase
-      .from("bronze_data")
+    // Check if dataset has data in dq_data (the single pipeline table)
+    const { count: dqDataCount } = await supabase
+      .from("dq_data")
       .select("id", { count: "exact", head: true })
       .eq("dataset_id", pipelineInput.dataset_id);
 
-    if (!bronzeCount || bronzeCount === 0) {
+    if (!dqDataCount || dqDataCount === 0) {
       const response: ControlPlaneResponse = {
         status: "error",
         code: "NO_DATA",
-        message: "Dataset has no data. Upload data first before running the pipeline.",
-        detail: `Dataset "${dataset.name}" has 0 rows in bronze_data.`,
+        message: "Dataset has no ingested data. Upload data first before running the pipeline.",
+        detail: `Dataset "${dataset.name}" has 0 rows in dq_data. Use the uploader to ingest rows.`,
       };
       return new Response(JSON.stringify(response), {
         status: 400,
@@ -141,7 +141,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[DQ Control Plane] Starting pipeline for dataset: ${dataset.name} (${bronzeCount} rows)`);
+    console.log(`[DQ Control Plane] Starting pipeline for dataset: ${dataset.name} (${dqDataCount} rows)`);
 
     // ============================================
     // STEP 1: DATA PROFILING (always runs)

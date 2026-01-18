@@ -7,12 +7,17 @@ const corsHeaders = {
 };
 
 interface IngestInput {
-  dataset_name: string;
+  // For creating new dataset
+  dataset_name?: string;
   dataset_description?: string | null;
-  source: 'file_upload' | 'manual_entry';
+  source?: 'file_upload' | 'manual_entry';
+  file_name?: string;
+  // For attaching to existing dataset
+  dataset_id?: string;
+  overwrite?: boolean;
+  // Required data
   rows: Record<string, unknown>[];
   columns: string[];
-  file_name?: string;
 }
 
 interface IngestOutput {
@@ -32,8 +37,12 @@ function validateInput(input: unknown): { valid: boolean; error?: string; data?:
 
   const obj = input as Record<string, unknown>;
 
-  if (!obj.dataset_name || typeof obj.dataset_name !== "string" || obj.dataset_name.trim() === "") {
-    return { valid: false, error: "dataset_name is required and must be a non-empty string" };
+  // Must have either dataset_name (create mode) or dataset_id (attach mode)
+  const hasDatasetName = obj.dataset_name && typeof obj.dataset_name === "string" && (obj.dataset_name as string).trim() !== "";
+  const hasDatasetId = obj.dataset_id && typeof obj.dataset_id === "string" && (obj.dataset_id as string).trim() !== "";
+
+  if (!hasDatasetName && !hasDatasetId) {
+    return { valid: false, error: "Either dataset_name (for new) or dataset_id (for attach) is required" };
   }
 
   if (!obj.rows || !Array.isArray(obj.rows) || obj.rows.length === 0) {
@@ -51,12 +60,14 @@ function validateInput(input: unknown): { valid: boolean; error?: string; data?:
   return {
     valid: true,
     data: {
-      dataset_name: (obj.dataset_name as string).trim(),
+      dataset_name: hasDatasetName ? (obj.dataset_name as string).trim() : undefined,
       dataset_description: obj.dataset_description ? String(obj.dataset_description).trim() : null,
       source: (obj.source as 'file_upload' | 'manual_entry') || 'manual_entry',
       rows: obj.rows as Record<string, unknown>[],
       columns: obj.columns as string[],
       file_name: obj.file_name ? String(obj.file_name) : undefined,
+      dataset_id: hasDatasetId ? (obj.dataset_id as string).trim() : undefined,
+      overwrite: obj.overwrite === true,
     },
   };
 }
@@ -100,52 +111,89 @@ serve(async (req) => {
       });
     }
 
-    const { dataset_name, dataset_description, source, rows, columns, file_name } = validation.data;
+    const { dataset_name, dataset_description, source, rows, columns, file_name, dataset_id: existingDatasetId, overwrite } = validation.data;
 
-    console.log(`[DQ Ingest] Ingesting ${rows.length} rows for dataset: ${dataset_name}`);
+    console.log(`[DQ Ingest] Mode: ${existingDatasetId ? 'attach' : 'create'}, Rows: ${rows.length}`);
 
     // Initialize Supabase client with service role (bypasses RLS)
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Step 1: Create dataset record
-    const { data: dataset, error: datasetError } = await supabase
-      .from("datasets")
-      .insert({
-        name: dataset_name,
-        description: dataset_description,
-        source: source,
-        row_count: rows.length,
-        data_types: columns,
-        consent_status: "pending",
-        environment: "development",
-      })
-      .select()
-      .single();
+    let datasetId: string;
+    let datasetName: string;
 
-    if (datasetError) {
-      console.error("[DQ Ingest] Failed to create dataset:", datasetError);
-      const response: IngestOutput = {
-        status: "error",
-        code: "DATASET_CREATE_FAILED",
-        message: "Failed to create dataset record",
-        detail: datasetError.message,
-      };
-      return new Response(JSON.stringify(response), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // === ATTACH MODE: Use existing dataset ===
+    if (existingDatasetId) {
+      // Verify dataset exists
+      const { data: existingDataset, error: fetchError } = await supabase
+        .from("datasets")
+        .select("id, name")
+        .eq("id", existingDatasetId)
+        .single();
+
+      if (fetchError || !existingDataset) {
+        const response: IngestOutput = {
+          status: "error",
+          code: "DATASET_NOT_FOUND",
+          message: `Dataset not found: ${existingDatasetId}`,
+        };
+        return new Response(JSON.stringify(response), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      datasetId = existingDataset.id;
+      datasetName = existingDataset.name;
+
+      // If overwrite, delete existing dq_data rows for this dataset
+      if (overwrite) {
+        console.log(`[DQ Ingest] Overwrite mode: deleting existing dq_data for dataset ${datasetId}`);
+        await supabase.from("dq_data").delete().eq("dataset_id", datasetId);
+      }
+    } else {
+      // === CREATE MODE: Create new dataset ===
+      const { data: dataset, error: datasetError } = await supabase
+        .from("datasets")
+        .insert({
+          name: dataset_name!,
+          description: dataset_description,
+          source: source || 'manual_entry',
+          row_count: rows.length,
+          data_types: columns,
+          consent_status: "pending",
+          environment: "development",
+          ingested_row_count: 0, // Will be updated after insert
+        })
+        .select()
+        .single();
+
+      if (datasetError) {
+        console.error("[DQ Ingest] Failed to create dataset:", datasetError);
+        const response: IngestOutput = {
+          status: "error",
+          code: "DATASET_CREATE_FAILED",
+          message: "Failed to create dataset record",
+          detail: datasetError.message,
+        };
+        return new Response(JSON.stringify(response), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      datasetId = dataset.id;
+      datasetName = dataset.name;
+      console.log(`[DQ Ingest] Dataset created: ${datasetId}`);
     }
-
-    console.log(`[DQ Ingest] Dataset created: ${dataset.id}`);
 
     // Step 2: Create data_uploads record
     const { data: upload, error: uploadError } = await supabase
       .from("data_uploads")
       .insert({
-        file_name: file_name || `${dataset_name}_manual.json`,
-        file_path: `/uploads/${dataset.id}`,
+        file_name: file_name || `${datasetName}_manual.json`,
+        file_path: `/uploads/${datasetId}`,
         status: "completed",
         parsed_row_count: rows.length,
         parsed_column_count: columns.length,
@@ -156,8 +204,10 @@ serve(async (req) => {
 
     if (uploadError) {
       console.error("[DQ Ingest] Failed to create upload record:", uploadError);
-      // Rollback dataset creation
-      await supabase.from("datasets").delete().eq("id", dataset.id);
+      // Rollback dataset creation if we created it
+      if (!existingDatasetId) {
+        await supabase.from("datasets").delete().eq("id", datasetId);
+      }
       
       const response: IngestOutput = {
         status: "error",
@@ -173,29 +223,31 @@ serve(async (req) => {
 
     console.log(`[DQ Ingest] Upload record created: ${upload.id}`);
 
-    // Step 3: Insert bronze_data rows
-    const bronzeRecords = rows.map((row, idx) => ({
-      dataset_id: dataset.id,
+    // Step 3: Insert dq_data rows (the single pipeline table)
+    const dqRecords = rows.map((row, idx) => ({
+      dataset_id: datasetId,
       upload_id: upload.id,
       row_index: idx,
       raw_data: row,
     }));
 
-    const { error: bronzeError } = await supabase
-      .from("bronze_data")
-      .insert(bronzeRecords);
+    const { error: dqDataError } = await supabase
+      .from("dq_data")
+      .insert(dqRecords);
 
-    if (bronzeError) {
-      console.error("[DQ Ingest] Failed to insert bronze data:", bronzeError);
+    if (dqDataError) {
+      console.error("[DQ Ingest] Failed to insert dq_data:", dqDataError);
       // Rollback upload and dataset creation
       await supabase.from("data_uploads").delete().eq("id", upload.id);
-      await supabase.from("datasets").delete().eq("id", dataset.id);
+      if (!existingDatasetId) {
+        await supabase.from("datasets").delete().eq("id", datasetId);
+      }
       
       const response: IngestOutput = {
         status: "error",
-        code: "BRONZE_INSERT_FAILED",
-        message: "Failed to insert bronze data records",
-        detail: bronzeError.message,
+        code: "DQ_DATA_INSERT_FAILED",
+        message: "Failed to insert data records",
+        detail: dqDataError.message,
       };
       return new Response(JSON.stringify(response), {
         status: 500,
@@ -203,23 +255,37 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[DQ Ingest] ✅ Successfully ingested ${rows.length} rows into bronze_data`);
+    console.log(`[DQ Ingest] ✅ Successfully ingested ${rows.length} rows into dq_data`);
 
-    // Step 4: Verify data was inserted
+    // Step 4: Verify data was inserted and update ingested_row_count
     const { count: verifyCount } = await supabase
-      .from("bronze_data")
+      .from("dq_data")
       .select("id", { count: "exact", head: true })
-      .eq("upload_id", upload.id);
+      .eq("dataset_id", datasetId);
 
-    console.log(`[DQ Ingest] Verification: ${verifyCount} rows in bronze_data for upload ${upload.id}`);
+    console.log(`[DQ Ingest] Verification: ${verifyCount} rows in dq_data for dataset ${datasetId}`);
+
+    // Update the dataset's ingested_row_count to reflect truth
+    const { error: updateError } = await supabase
+      .from("datasets")
+      .update({ 
+        ingested_row_count: verifyCount || 0,
+        row_count: verifyCount || 0 // Keep row_count in sync
+      })
+      .eq("id", datasetId);
+
+    if (updateError) {
+      console.error("[DQ Ingest] Warning: Failed to update ingested_row_count:", updateError);
+      // Not fatal, continue
+    }
 
     const response: IngestOutput = {
       status: "success",
       code: "DATA_INGESTED",
-      message: `Successfully ingested ${rows.length} rows`,
-      dataset_id: dataset.id,
+      message: `Successfully ingested ${verifyCount || rows.length} rows`,
+      dataset_id: datasetId,
       upload_id: upload.id,
-      rows_ingested: rows.length,
+      rows_ingested: verifyCount || rows.length,
     };
 
     return new Response(JSON.stringify(response), {

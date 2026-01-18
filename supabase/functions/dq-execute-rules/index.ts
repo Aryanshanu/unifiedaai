@@ -105,9 +105,9 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Check if bronze_data has data for this dataset
-    const { count: bronzeCount, error: countError } = await supabase
-      .from("bronze_data")
+    // Check if dq_data has data for this dataset
+    const { count: dqDataCount, error: countError } = await supabase
+      .from("dq_data")
       .select("id", { count: 'exact', head: true })
       .eq("dataset_id", dataset_id);
 
@@ -124,7 +124,7 @@ serve(async (req) => {
       });
     }
 
-    if (!bronzeCount || bronzeCount === 0) {
+    if (!dqDataCount || dqDataCount === 0) {
       const response: ExecutionOutput = {
         status: "error",
         code: "NO_DATA",
@@ -136,14 +136,14 @@ serve(async (req) => {
       });
     }
 
-    // Get sample data for rule execution
-    const { data: bronzeData } = await supabase
-      .from("bronze_data")
+    // Get sample data for rule execution from dq_data
+    const { data: dqData } = await supabase
+      .from("dq_data")
       .select("raw_data, row_index, id")
       .eq("dataset_id", dataset_id)
       .limit(1000);
 
-    const totalRecords = bronzeData!.length;
+    const totalRecords = dqData!.length;
     const metrics: RuleMetric[] = [];
     let criticalViolations = 0;
 
@@ -160,8 +160,8 @@ serve(async (req) => {
       // Execute rule against actual data
       switch (rule.logic_type) {
         case "null_check": {
-          for (let i = 0; i < bronzeData!.length; i++) {
-            const row = bronzeData![i];
+          for (let i = 0; i < dqData!.length; i++) {
+            const row = dqData![i];
             const data = row.raw_data as Record<string, unknown>;
             const value = data?.[rule.column_name!];
             if (value === null || value === undefined || value === "") {
@@ -181,8 +181,8 @@ serve(async (req) => {
 
         case "duplicate_check": {
           const seenValues = new Map<string, number>();
-          for (let i = 0; i < bronzeData!.length; i++) {
-            const row = bronzeData![i];
+          for (let i = 0; i < dqData!.length; i++) {
+            const row = dqData![i];
             const data = row.raw_data as Record<string, unknown>;
             const value = String(data?.[rule.column_name!] ?? "");
             if (seenValues.has(value)) {
@@ -206,8 +206,8 @@ serve(async (req) => {
           const minVal = codeMatch ? parseFloat(codeMatch[1]) : Number.MIN_SAFE_INTEGER;
           const maxVal = codeMatch ? parseFloat(codeMatch[2]) : Number.MAX_SAFE_INTEGER;
 
-          for (let i = 0; i < bronzeData!.length; i++) {
-            const row = bronzeData![i];
+          for (let i = 0; i < dqData!.length; i++) {
+            const row = dqData![i];
             const data = row.raw_data as Record<string, unknown>;
             const value = data?.[rule.column_name!];
             const numValue = parseFloat(String(value));
@@ -231,8 +231,8 @@ serve(async (req) => {
           const pattern = regexMatch ? regexMatch[1].replace(/%/g, ".*") : ".*";
           const regex = new RegExp(`^${pattern}$`, "i");
 
-          for (let i = 0; i < bronzeData!.length; i++) {
-            const row = bronzeData![i];
+          for (let i = 0; i < dqData!.length; i++) {
+            const row = dqData![i];
             const data = row.raw_data as Record<string, unknown>;
             const value = String(data?.[rule.column_name!] ?? "");
             if (!regex.test(value)) {
@@ -254,8 +254,8 @@ serve(async (req) => {
           const now = new Date();
           const maxAgeHours = 24;
 
-          for (let i = 0; i < bronzeData!.length; i++) {
-            const row = bronzeData![i];
+          for (let i = 0; i < dqData!.length; i++) {
+            const row = dqData![i];
             const data = row.raw_data as Record<string, unknown>;
             const value = data?.[rule.column_name!];
             if (value) {
