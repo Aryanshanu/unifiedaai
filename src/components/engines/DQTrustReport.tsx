@@ -1,14 +1,17 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
   Shield, 
   CheckCircle2, 
   AlertTriangle,
   XCircle,
   Layers,
-  Copy,
-  FileWarning
+  FileWarning,
+  ShieldCheck,
+  ShieldAlert,
+  Info
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -17,23 +20,45 @@ interface TrustReport {
   deduplicated_rules: number;
   inconsistencies_found: string[];
   truth_score: number;
+  // Enhanced governance fields
+  missing_dimensions_count?: number;
+  simulated_metrics_count?: number;
+  critical_inconsistencies?: string[];
+  warning_inconsistencies?: string[];
+  score_breakdown?: {
+    base: number;
+    dimension_penalty: number;
+    simulated_penalty: number;
+    critical_penalty: number;
+    warning_penalty: number;
+  };
 }
 
 interface DQTrustReportProps {
   trustReport: TrustReport | null;
   isLoading?: boolean;
+  governanceStatus?: 'GOVERNANCE_CERTIFIED' | 'DQ_CONTRACT_VIOLATION';
+  violations?: string[];
 }
 
-export function DQTrustReport({ trustReport, isLoading }: DQTrustReportProps) {
+export function DQTrustReport({ trustReport, isLoading, governanceStatus, violations }: DQTrustReportProps) {
   if (isLoading) {
-    return null; // Don't show skeleton, just hide
+    return null;
   }
 
   if (!trustReport) {
     return null;
   }
 
-  const { discarded_metrics, deduplicated_rules, inconsistencies_found, truth_score } = trustReport;
+  const { 
+    discarded_metrics, 
+    deduplicated_rules, 
+    inconsistencies_found, 
+    truth_score,
+    critical_inconsistencies,
+    warning_inconsistencies,
+    score_breakdown
+  } = trustReport;
   
   const getScoreColor = (score: number) => {
     if (score >= 0.95) return 'text-success';
@@ -47,24 +72,68 @@ export function DQTrustReport({ trustReport, isLoading }: DQTrustReportProps) {
     return <XCircle className="h-5 w-5 text-destructive" />;
   };
 
+  const isCertified = governanceStatus === 'GOVERNANCE_CERTIFIED';
+  const hasViolations = violations && violations.length > 0;
+
   return (
-    <Card className="border-primary/30 bg-primary/5">
+    <Card className={cn(
+      "border-2",
+      isCertified ? "border-success/30 bg-success/5" : hasViolations ? "border-destructive/30 bg-destructive/5" : "border-primary/30 bg-primary/5"
+    )}>
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Shield className="h-5 w-5 text-primary" />
-          TRUST REPORT
+        <CardTitle className="flex items-center justify-between text-lg">
+          <div className="flex items-center gap-2">
+            {isCertified ? (
+              <ShieldCheck className="h-5 w-5 text-success" />
+            ) : hasViolations ? (
+              <ShieldAlert className="h-5 w-5 text-destructive" />
+            ) : (
+              <Shield className="h-5 w-5 text-primary" />
+            )}
+            TRUST REPORT
+          </div>
+          {governanceStatus && (
+            <Badge 
+              className={cn(
+                isCertified 
+                  ? 'bg-success/10 text-success border-success/30' 
+                  : 'bg-destructive/10 text-destructive border-destructive/30'
+              )}
+            >
+              {isCertified ? 'CERTIFIED' : 'VIOLATION'}
+            </Badge>
+          )}
         </CardTitle>
         <p className="text-sm text-muted-foreground">
           Pipeline reconciliation and data integrity verification
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Truth Score */}
+        {/* Contract Violations Alert */}
+        {hasViolations && (
+          <Alert className="border-destructive/30 bg-destructive/5">
+            <ShieldAlert className="h-4 w-4 text-destructive" />
+            <AlertDescription className="text-sm">
+              <span className="font-semibold text-destructive">GOVERNANCE VIOLATION:</span>{' '}
+              Pipeline output is not governance-safe.
+              <ul className="list-disc list-inside mt-2 space-y-1 text-muted-foreground">
+                {violations.slice(0, 5).map((v, i) => (
+                  <li key={i} className="text-xs">{v}</li>
+                ))}
+                {violations.length > 5 && (
+                  <li className="text-xs">...and {violations.length - 5} more</li>
+                )}
+              </ul>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Trust Score */}
         <div className="flex items-center justify-between p-4 bg-background rounded-lg border">
           <div className="flex items-center gap-3">
             {getScoreIcon(truth_score)}
             <div>
-              <p className="font-medium">Truth Score</p>
+              <p className="font-medium">Trust Score</p>
               <p className="text-sm text-muted-foreground">
                 Pipeline integrity verification
               </p>
@@ -77,6 +146,28 @@ export function DQTrustReport({ trustReport, isLoading }: DQTrustReportProps) {
             <Progress value={truth_score * 100} className="w-24 h-2 mt-1" />
           </div>
         </div>
+
+        {/* Score Breakdown (if available) */}
+        {score_breakdown && (
+          <div className="p-3 bg-muted/50 rounded-lg text-xs space-y-1">
+            <p className="font-medium text-muted-foreground">Score Breakdown:</p>
+            <div className="flex flex-wrap gap-2">
+              <span>Base: {score_breakdown.base}</span>
+              {score_breakdown.dimension_penalty > 0 && (
+                <span className="text-warning">- {score_breakdown.dimension_penalty} (dimensions)</span>
+              )}
+              {score_breakdown.simulated_penalty > 0 && (
+                <span className="text-warning">- {score_breakdown.simulated_penalty} (simulated)</span>
+              )}
+              {score_breakdown.critical_penalty > 0 && (
+                <span className="text-destructive">- {score_breakdown.critical_penalty} (critical)</span>
+              )}
+              {score_breakdown.warning_penalty > 0 && (
+                <span className="text-warning">- {score_breakdown.warning_penalty} (warnings)</span>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Metrics Grid */}
         <div className="grid grid-cols-3 gap-4">
@@ -143,8 +234,38 @@ export function DQTrustReport({ trustReport, isLoading }: DQTrustReportProps) {
           </div>
         </div>
 
-        {/* Inconsistencies Detail (if any) */}
-        {inconsistencies_found.length > 0 && (
+        {/* Critical Inconsistencies (if any) */}
+        {critical_inconsistencies && critical_inconsistencies.length > 0 && (
+          <div className="p-4 border border-destructive/30 bg-destructive/5 rounded-lg space-y-2">
+            <p className="font-medium text-destructive flex items-center gap-2">
+              <XCircle className="h-4 w-4" />
+              Critical Issues:
+            </p>
+            <ul className="list-disc list-inside text-sm space-y-1">
+              {critical_inconsistencies.map((issue, idx) => (
+                <li key={idx} className="text-muted-foreground">{issue}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Warning Inconsistencies (if any) */}
+        {warning_inconsistencies && warning_inconsistencies.length > 0 && (
+          <div className="p-4 border border-warning/30 bg-warning/5 rounded-lg space-y-2">
+            <p className="font-medium text-warning flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              Warnings:
+            </p>
+            <ul className="list-disc list-inside text-sm space-y-1">
+              {warning_inconsistencies.map((issue, idx) => (
+                <li key={idx} className="text-muted-foreground">{issue}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Legacy Inconsistencies (if no breakdown available) */}
+        {!critical_inconsistencies && inconsistencies_found.length > 0 && (
           <div className="p-4 border border-destructive/30 bg-destructive/5 rounded-lg space-y-2">
             <p className="font-medium text-destructive">Inconsistencies Found:</p>
             <ul className="list-disc list-inside text-sm space-y-1">
@@ -157,8 +278,9 @@ export function DQTrustReport({ trustReport, isLoading }: DQTrustReportProps) {
 
         {/* Summary */}
         <div className="pt-2 border-t text-xs text-muted-foreground flex items-center justify-between">
-          <span>
-            This report verifies pipeline integrity. Truth Score = 100% means all data is reconciled.
+          <span className="flex items-center gap-1">
+            <Info className="h-3 w-3" />
+            Trust Score = 100% only if all dimensions computed, no violations, no simulated metrics.
           </span>
           <Badge 
             variant="outline" 
