@@ -286,18 +286,35 @@ serve(async (req) => {
       // Stream from storage path
       evaluationData = await streamDataFromStorage(supabase, dataset.source_url);
     } else {
-      // EU AI Act Article 10 requires actual data - no mock data
-      return new Response(JSON.stringify({
-        success: false,
-        error: "No data source available",
-        code: "DATA_REQUIRED",
-        message: "EU AI Act Article 10 requires actual data for quality evaluation. Provide sample_data or ensure dataset has source_url.",
-        fail_closed: true,
-        eu_ai_act_reference: "Article 10 - Data and Data Governance"
-      }), { 
-        status: 422, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      });
+      // Try to fetch from dq_data table (where control plane uploads data)
+      console.log(`Attempting to fetch data from dq_data for dataset: ${dataset_id}`);
+      const { data: dqData, error: dqError } = await supabase
+        .from('dq_data')
+        .select('raw_data')
+        .eq('dataset_id', dataset_id)
+        .limit(10000);
+      
+      if (dqError) {
+        console.error('Error fetching dq_data:', dqError);
+      }
+      
+      if (dqData && dqData.length > 0) {
+        console.log(`Found ${dqData.length} rows in dq_data`);
+        evaluationData = dqData.map(row => row.raw_data as Record<string, unknown>);
+      } else {
+        // EU AI Act Article 10 requires actual data - no mock data
+        return new Response(JSON.stringify({
+          success: false,
+          error: "No data source available",
+          code: "DATA_REQUIRED",
+          message: "EU AI Act Article 10 requires actual data for quality evaluation. Provide sample_data, ensure dataset has source_url, or upload data via the Data Quality pipeline.",
+          fail_closed: true,
+          eu_ai_act_reference: "Article 10 - Data and Data Governance"
+        }), { 
+          status: 422, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        });
+      }
     }
     
     // Infer schema if not provided
