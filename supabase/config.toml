@@ -104,3 +104,6 @@ verify_jwt = false
 
 [functions.dq-ingest-data]
 verify_jwt = false
+
+[functions.dq-truth-enforcer]
+verify_jwt = false

@@ -125,6 +125,18 @@ export interface TrustReport {
   deduplicated_rules: number;
   inconsistencies_found: string[];
   truth_score: number;
+  // Enhanced governance fields
+  missing_dimensions_count?: number;
+  simulated_metrics_count?: number;
+  critical_inconsistencies?: string[];
+  warning_inconsistencies?: string[];
+  score_breakdown?: {
+    base: number;
+    dimension_penalty: number;
+    simulated_penalty: number;
+    critical_penalty: number;
+    warning_penalty: number;
+  };
 }
 
 export interface ControlPlaneResponse {
@@ -144,6 +156,9 @@ export interface ControlPlaneResponse {
   failed_steps?: string[];
   detail?: string;
   TRUST_REPORT?: TrustReport;
+  // Governance fields from truth enforcer
+  governance_status?: 'GOVERNANCE_CERTIFIED' | 'DQ_CONTRACT_VIOLATION';
+  violations?: string[];
 }
 
 export interface UseDQControlPlaneReturn {

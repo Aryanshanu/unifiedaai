@@ -28,6 +28,12 @@ interface ControlPlaneResponse {
   failed_steps?: string[];
   // TRUTH CONTRACT: Reconciliation report
   TRUST_REPORT?: TrustReport;
+  // GOVERNANCE: From truth enforcer
+  governance_status?: "GOVERNANCE_CERTIFIED" | "DQ_CONTRACT_VIOLATION";
+  violations?: string[];
+  normalized_profiling?: Record<string, unknown>;
+  normalized_execution?: Record<string, unknown>;
+  normalized_incidents?: Record<string, unknown>;
 }
 
 // Input validation
@@ -467,19 +473,54 @@ serve(async (req) => {
     }
 
     // ============================================
+    // STEP 6: GOVERNANCE VALIDATION (Truth Enforcer)
+    // ============================================
+    console.log("[DQ Control Plane] Step 6: Governance Validation...");
+    let governanceResult: Record<string, unknown> = {};
+
+    try {
+      const governanceResponse = await fetch(`${supabaseUrl}/functions/v1/dq-truth-enforcer`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${supabaseKey}`,
+        },
+        body: JSON.stringify({
+          profiling: profilingResult,
+          rules: rulesResult,
+          execution: executionResult,
+          dashboard: dashboardResult,
+          incidents: incidentsResult,
+        }),
+      });
+
+      governanceResult = await governanceResponse.json();
+      console.log(`[DQ Control Plane] Governance: ${governanceResult.code}`);
+    } catch (err) {
+      console.error("[DQ Control Plane] Governance exception:", err);
+      governanceResult = {
+        code: "GOVERNANCE_ERROR",
+        trust_report: {
+          discarded_metrics: discardedMetrics,
+          deduplicated_rules: deduplicatedRulesCount,
+          inconsistencies_found: [...inconsistencies, `GOVERNANCE_ERROR: ${err}`],
+          truth_score: 0,
+        },
+      };
+    }
+
+    // ============================================
     // FINAL RESPONSE WITH TRUST_REPORT
     // ============================================
     const totalTime = Date.now() - startTime;
     console.log(`[DQ Control Plane] Pipeline completed in ${totalTime}ms. Completed: ${completedSteps.join(", ")}. Failed: ${failedSteps.join(", ") || "none"}`);
 
-    // Calculate truth score: 1.0 if no inconsistencies, degrade for each issue
-    const truthScore = inconsistencies.length === 0 ? 1.0 : Math.max(0, 1 - (inconsistencies.length * 0.1));
-
-    const trustReport: TrustReport = {
+    // Use trust report from governance enforcer if available
+    const trustReport: TrustReport = (governanceResult.trust_report as TrustReport) || {
       discarded_metrics: discardedMetrics,
       deduplicated_rules: deduplicatedRulesCount,
       inconsistencies_found: inconsistencies,
-      truth_score: truthScore,
+      truth_score: inconsistencies.length === 0 ? 1.0 : Math.max(0, 1 - (inconsistencies.length * 0.1)),
     };
 
     const response: ControlPlaneResponse = {
@@ -498,6 +539,12 @@ serve(async (req) => {
       completed_steps: completedSteps,
       failed_steps: failedSteps,
       TRUST_REPORT: trustReport,
+      // GOVERNANCE: Include truth enforcer results
+      governance_status: governanceResult.code as "GOVERNANCE_CERTIFIED" | "DQ_CONTRACT_VIOLATION",
+      violations: governanceResult.violations as string[],
+      normalized_profiling: governanceResult.normalized_profiling as Record<string, unknown>,
+      normalized_execution: governanceResult.normalized_execution as Record<string, unknown>,
+      normalized_incidents: governanceResult.normalized_incidents as Record<string, unknown>,
     };
 
     return new Response(JSON.stringify(response), {
