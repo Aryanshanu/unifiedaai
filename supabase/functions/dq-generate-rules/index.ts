@@ -18,8 +18,9 @@ interface ColumnProfile {
   mean_value?: number | null;
 }
 
+// TRUTH CONTRACT: Use 'id' property (matches database column name)
 interface DQRule {
-  rule_id: string;
+  id: string;
   version: number;
   dimension: "completeness" | "validity" | "accuracy" | "uniqueness" | "timeliness" | "consistency";
   rule_name: string;
@@ -44,25 +45,40 @@ interface RulesOutput {
   detail?: string;
 }
 
+// TRUTH CONTRACT: Clamp value to valid ratio range [0, 1]
+function clampRatio(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
 // Auto-calibrate threshold based on observed data
 function calibrateThreshold(observedValue: number, dimension: string): number {
+  // TRUTH CONTRACT: Normalize observed value if it's a percentage
+  const normalizedObs = observedValue > 1 ? observedValue / 100 : observedValue;
+  
   // Set thresholds slightly below observed to catch degradation
   const buffer = 0.05; // 5% buffer
   
+  let threshold: number;
   switch (dimension) {
     case "completeness":
       // Expect at least 95% of observed completeness
-      return Math.max(0.7, observedValue - buffer);
+      threshold = Math.max(0.7, normalizedObs - buffer);
+      break;
     case "uniqueness":
       // For unique columns, expect high uniqueness
-      if (observedValue > 0.99) return 0.99;
-      if (observedValue > 0.9) return 0.9;
-      return Math.max(0.5, observedValue - buffer);
+      if (normalizedObs > 0.99) threshold = 0.99;
+      else if (normalizedObs > 0.9) threshold = 0.9;
+      else threshold = Math.max(0.5, normalizedObs - buffer);
+      break;
     case "validity":
-      return Math.max(0.8, observedValue - buffer);
+      threshold = Math.max(0.8, normalizedObs - buffer);
+      break;
     default:
-      return Math.max(0.7, observedValue - buffer);
+      threshold = Math.max(0.7, normalizedObs - buffer);
   }
+  
+  // TRUTH CONTRACT: Always return clamped ratio
+  return clampRatio(threshold);
 }
 
 // Determine severity based on column name and dimension
@@ -128,7 +144,7 @@ serve(async (req) => {
       if (!existingRuleKeys.has(completenessKey)) {
         const completenessThreshold = calibrateThreshold(col.completeness, "completeness");
         const completenessRule: DQRule = {
-          rule_id: crypto.randomUUID(),
+          id: crypto.randomUUID(),
           version: newVersion,
           dimension: "completeness",
           rule_name: `${col.column_name}_completeness`,
@@ -137,7 +153,7 @@ serve(async (req) => {
           column_name: col.column_name,
           threshold: completenessThreshold,
           severity: determineSeverity(col.column_name, "completeness", completenessThreshold),
-          confidence: 0.95,
+          confidence: clampRatio(0.95),
           business_impact: `Missing ${col.column_name} values may cause downstream processing failures`,
           calibration_metadata: {
             observed_completeness: col.completeness,
@@ -157,7 +173,7 @@ serve(async (req) => {
         if (!existingRuleKeys.has(uniquenessKey)) {
           const uniquenessThreshold = calibrateThreshold(col.uniqueness, "uniqueness");
           const uniquenessRule: DQRule = {
-            rule_id: crypto.randomUUID(),
+            id: crypto.randomUUID(),
             version: newVersion,
             dimension: "uniqueness",
             rule_name: `${col.column_name}_uniqueness`,
@@ -166,7 +182,7 @@ serve(async (req) => {
             column_name: col.column_name,
             threshold: uniquenessThreshold,
             severity: determineSeverity(col.column_name, "uniqueness", uniquenessThreshold),
-            confidence: 0.9,
+            confidence: clampRatio(0.9),
             business_impact: `Duplicate ${col.column_name} values may indicate data integrity issues`,
             calibration_metadata: {
               observed_uniqueness: col.uniqueness,
@@ -186,16 +202,16 @@ serve(async (req) => {
         const validityKey = `${col.column_name}_validity_range_check`;
         if (!existingRuleKeys.has(validityKey)) {
           const validityRule: DQRule = {
-            rule_id: crypto.randomUUID(),
+            id: crypto.randomUUID(),
             version: newVersion,
             dimension: "validity",
             rule_name: `${col.column_name}_numeric_validity`,
             logic_type: "range_check",
             logic_code: `SELECT COUNT(*) as failed FROM data WHERE ${col.column_name} < ${col.min_value ?? 0} OR ${col.column_name} > ${col.max_value ?? 999999}`,
             column_name: col.column_name,
-            threshold: 0.95,
+            threshold: clampRatio(0.95),
             severity: "warning",
-            confidence: 0.85,
+            confidence: clampRatio(0.85),
             business_impact: `Out-of-range ${col.column_name} values may indicate data entry errors`,
             calibration_metadata: {
               observed_min: col.min_value,
@@ -216,16 +232,16 @@ serve(async (req) => {
         const emailKey = `${col.column_name}_validity_regex_match`;
         if (!existingRuleKeys.has(emailKey)) {
           const emailRule: DQRule = {
-            rule_id: crypto.randomUUID(),
+            id: crypto.randomUUID(),
             version: newVersion,
             dimension: "validity",
             rule_name: `${col.column_name}_email_format`,
             logic_type: "regex_match",
             logic_code: `SELECT COUNT(*) as failed FROM data WHERE ${col.column_name} !~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$'`,
             column_name: col.column_name,
-            threshold: 0.98,
+            threshold: clampRatio(0.98),
             severity: "critical",
-            confidence: 0.95,
+            confidence: clampRatio(0.95),
             business_impact: "Invalid email addresses will cause notification failures",
             calibration_metadata: {
               profiling_run_id: profiling_output.profiling_run_id,
@@ -243,16 +259,16 @@ serve(async (req) => {
         const timelinessKey = `${col.column_name}_timeliness_freshness_check`;
         if (!existingRuleKeys.has(timelinessKey)) {
           const timelinessRule: DQRule = {
-            rule_id: crypto.randomUUID(),
+            id: crypto.randomUUID(),
             version: newVersion,
             dimension: "timeliness",
             rule_name: `${col.column_name}_freshness`,
             logic_type: "freshness_check",
             logic_code: `SELECT COUNT(*) as failed FROM data WHERE ${col.column_name} < NOW() - INTERVAL '30 days'`,
             column_name: col.column_name,
-            threshold: 0.8,
+            threshold: clampRatio(0.8),
             severity: "info",
-            confidence: 0.7,
+            confidence: clampRatio(0.7),
             business_impact: `Stale ${col.column_name} records may need review`,
             calibration_metadata: {
               profiling_run_id: profiling_output.profiling_run_id,
@@ -269,7 +285,7 @@ serve(async (req) => {
     // Store rules in database (only new ones)
     if (candidateRules.length > 0) {
       const rulesToInsert = candidateRules.map((rule) => ({
-        id: rule.rule_id,
+        id: rule.id,
         dataset_id: profiling_output.dataset_id,
         profile_id: profiling_output.profiling_run_id,
         version: rule.version,
@@ -278,9 +294,9 @@ serve(async (req) => {
         logic_type: rule.logic_type,
         logic_code: rule.logic_code,
         column_name: rule.column_name,
-        threshold: rule.threshold,
+        threshold: clampRatio(rule.threshold),  // Ensure clamped before insert
         severity: rule.severity,
-        confidence: rule.confidence,
+        confidence: clampRatio(rule.confidence),  // Ensure clamped before insert
         business_impact: rule.business_impact,
         is_active: true,
         calibration_metadata: rule.calibration_metadata,
