@@ -8,7 +8,7 @@ const corsHeaders = {
 
 // Response type definitions
 interface ControlPlaneResponse {
-  status: "success" | "error" | "halted";
+  status: "success" | "error";
   code: string;
   message: string;
   detail?: string;
@@ -16,6 +16,9 @@ interface ControlPlaneResponse {
   rules_version?: number;
   execution_summary?: Record<string, unknown>;
   incident_count?: number;
+  // Track partial success
+  completed_steps?: string[];
+  failed_steps?: string[];
 }
 
 // Input validation
@@ -24,7 +27,6 @@ interface PipelineInput {
   dataset_version?: string | null;
   execution_mode: "FULL" | "INCREMENTAL";
   last_execution_ts?: string | null;
-  force_continue?: boolean; // Skip circuit breaker and continue pipeline
 }
 
 function validateInput(input: unknown): { valid: boolean; error?: string; data?: PipelineInput } {
@@ -42,10 +44,6 @@ function validateInput(input: unknown): { valid: boolean; error?: string; data?:
     return { valid: false, error: "execution_mode must be 'FULL' or 'INCREMENTAL'" };
   }
 
-  if (obj.last_execution_ts && typeof obj.last_execution_ts !== "string") {
-    return { valid: false, error: "last_execution_ts must be an ISO-8601 string or null" };
-  }
-
   return {
     valid: true,
     data: {
@@ -53,7 +51,6 @@ function validateInput(input: unknown): { valid: boolean; error?: string; data?:
       dataset_version: (obj.dataset_version as string) || null,
       execution_mode: obj.execution_mode as "FULL" | "INCREMENTAL",
       last_execution_ts: (obj.last_execution_ts as string) || null,
-      force_continue: obj.force_continue === true,
     },
   };
 }
@@ -65,6 +62,8 @@ serve(async (req) => {
   }
 
   const startTime = Date.now();
+  const completedSteps: string[] = [];
+  const failedSteps: string[] = [];
 
   try {
     // Parse input
@@ -74,9 +73,8 @@ serve(async (req) => {
     } catch {
       const response: ControlPlaneResponse = {
         status: "error",
-        code: "INVALID_USER_INPUT_JSON",
-        message: "User input must be a valid JSON object.",
-        detail: "Failed to parse request body as JSON",
+        code: "INVALID_JSON",
+        message: "Request body must be valid JSON",
       };
       return new Response(JSON.stringify(response), {
         status: 400,
@@ -89,9 +87,8 @@ serve(async (req) => {
     if (!validation.valid || !validation.data) {
       const response: ControlPlaneResponse = {
         status: "error",
-        code: "INVALID_USER_INPUT_JSON",
-        message: "User input must be a valid JSON object.",
-        detail: validation.error,
+        code: "INVALID_INPUT",
+        message: validation.error || "Invalid input",
       };
       return new Response(JSON.stringify(response), {
         status: 400,
@@ -116,9 +113,27 @@ serve(async (req) => {
     if (datasetError || !dataset) {
       const response: ControlPlaneResponse = {
         status: "error",
-        code: "INVALID_USER_INPUT_JSON",
-        message: "User input must be a valid JSON object.",
-        detail: `Dataset not found: ${pipelineInput.dataset_id}`,
+        code: "DATASET_NOT_FOUND",
+        message: `Dataset not found: ${pipelineInput.dataset_id}`,
+      };
+      return new Response(JSON.stringify(response), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Check if dataset has data in bronze_data
+    const { count: bronzeCount } = await supabase
+      .from("bronze_data")
+      .select("id", { count: "exact", head: true })
+      .eq("dataset_id", pipelineInput.dataset_id);
+
+    if (!bronzeCount || bronzeCount === 0) {
+      const response: ControlPlaneResponse = {
+        status: "error",
+        code: "NO_DATA",
+        message: "Dataset has no data. Upload data first before running the pipeline.",
+        detail: `Dataset "${dataset.name}" has 0 rows in bronze_data.`,
       };
       return new Response(JSON.stringify(response), {
         status: 400,
@@ -126,183 +141,50 @@ serve(async (req) => {
       });
     }
 
+    console.log(`[DQ Control Plane] Starting pipeline for dataset: ${dataset.name} (${bronzeCount} rows)`);
+
     // ============================================
-    // TASK 1: DATA PROFILING
+    // STEP 1: DATA PROFILING (always runs)
     // ============================================
-    console.log("[DQ Control Plane] Task 1: Starting data profiling...");
+    console.log("[DQ Control Plane] Step 1: Data Profiling...");
+    let profilingResult: Record<string, unknown> = {};
     
-    const profilingResponse = await fetch(`${supabaseUrl}/functions/v1/dq-profile-dataset`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${supabaseKey}`,
-      },
-      body: JSON.stringify({
-        dataset_id: pipelineInput.dataset_id,
-        dataset_version: pipelineInput.dataset_version,
-      }),
-    });
-
-    const profilingResult = await profilingResponse.json();
-
-    // Validate profiling output
-    if (profilingResult.status === "error") {
-      return new Response(JSON.stringify(profilingResult), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    try {
+      const profilingResponse = await fetch(`${supabaseUrl}/functions/v1/dq-profile-dataset`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${supabaseKey}`,
+        },
+        body: JSON.stringify({
+          dataset_id: pipelineInput.dataset_id,
+          dataset_version: pipelineInput.dataset_version,
+        }),
       });
-    }
 
-    const requiredProfilingKeys = ["profiling_run_id", "dataset_id", "row_count", "column_profiles", "profile_ts"];
-    const missingProfilingKeys = requiredProfilingKeys.filter((k) => !(k in profilingResult));
-
-    if (missingProfilingKeys.length > 0) {
-      const response: ControlPlaneResponse = {
-        status: "error",
-        code: "INVALID_PROFILING_OUTPUT",
-        message: "Profiling output is not conformant. Downstream tasks halted.",
-        detail: `Missing keys: ${missingProfilingKeys.join(", ")}`,
-      };
-      return new Response(JSON.stringify(response), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    console.log("[DQ Control Plane] Task 1: Profiling complete. Run ID:", profilingResult.profiling_run_id);
-
-    // ============================================
-    // TASK 2: RULE DEVELOPMENT
-    // ============================================
-    console.log("[DQ Control Plane] Task 2: Starting rule generation...");
-
-    const rulesResponse = await fetch(`${supabaseUrl}/functions/v1/dq-generate-rules`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${supabaseKey}`,
-      },
-      body: JSON.stringify({
-        profiling_output: profilingResult,
-      }),
-    });
-
-    const rulesResult = await rulesResponse.json();
-
-    // Validate rules output
-    if (rulesResult.status === "error") {
-      return new Response(JSON.stringify(rulesResult), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (!rulesResult.rules_version || !rulesResult.rules || !Array.isArray(rulesResult.rules)) {
-      const response: ControlPlaneResponse = {
-        status: "error",
-        code: "INVALID_RULE_DEFINITION",
-        message: "Rule generation output is invalid or incomplete.",
-        detail: "Missing rules_version or rules array",
-      };
-      return new Response(JSON.stringify(response), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    console.log("[DQ Control Plane] Task 2: Rules generated. Version:", rulesResult.rules_version, "Count:", rulesResult.rules.length);
-
-    // ============================================
-    // TASK 3: RULE EXECUTION
-    // ============================================
-    console.log("[DQ Control Plane] Task 3: Starting rule execution...");
-
-    const executionResponse = await fetch(`${supabaseUrl}/functions/v1/dq-execute-rules`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${supabaseKey}`,
-      },
-      body: JSON.stringify({
-        dataset_id: pipelineInput.dataset_id,
-        profile_id: profilingResult.profiling_run_id,
-        rules: rulesResult.rules,
-        rules_version: rulesResult.rules_version,
-        execution_mode: pipelineInput.execution_mode,
-        last_execution_ts: pipelineInput.last_execution_ts,
-      }),
-    });
-
-    const executionResult = await executionResponse.json();
-
-    // Check for errors
-    if (executionResult.status === "error") {
-      return new Response(JSON.stringify(executionResult), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // 🚨 CIRCUIT BREAKER CHECK 🚨
-    if (executionResult.status === "halted" || executionResult.summary?.critical_failure === true) {
-      // Check if user has forced continuation
-      if (!pipelineInput.force_continue) {
-        console.log("[DQ Control Plane] 🚨 CIRCUIT BREAKER TRIPPED - Awaiting user decision");
-        const response: ControlPlaneResponse = {
-          status: "halted",
-          code: "CIRCUIT_BREAKER_TRIPPED",
-          message: "Critical data quality failure detected. Awaiting approval to continue or stop.",
-          execution_summary: executionResult.summary,
-          profiling_run_id: profilingResult.profiling_run_id,
-          rules_version: rulesResult.rules_version,
-        };
-        return new Response(JSON.stringify(response), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      profilingResult = await profilingResponse.json();
+      
+      if (profilingResult.status === "error") {
+        console.error("[DQ Control Plane] Profiling failed:", profilingResult.message);
+        failedSteps.push("profiling");
+      } else {
+        completedSteps.push("profiling");
+        console.log("[DQ Control Plane] Profiling complete. Run ID:", profilingResult.profiling_run_id);
       }
-      console.log("[DQ Control Plane] ⚠️ CIRCUIT BREAKER OVERRIDE - Continuing pipeline by user request");
+    } catch (err) {
+      console.error("[DQ Control Plane] Profiling exception:", err);
+      failedSteps.push("profiling");
     }
 
-    console.log("[DQ Control Plane] Task 3: Execution complete. Execution ID:", executionResult.execution_id);
-
-    // ============================================
-    // TASK 4: DASHBOARD ASSET GENERATION
-    // ============================================
-    console.log("[DQ Control Plane] Task 4: Generating dashboard assets...");
-
-    const dashboardResponse = await fetch(`${supabaseUrl}/functions/v1/dq-generate-dashboard-assets`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${supabaseKey}`,
-      },
-      body: JSON.stringify({
-        execution_id: executionResult.execution_id,
-        dataset_id: pipelineInput.dataset_id,
-        execution_metrics: executionResult.metrics,
-      }),
-    });
-
-    const dashboardResult = await dashboardResponse.json();
-
-    // Validate dashboard output
-    if (dashboardResult.status === "error") {
-      return new Response(JSON.stringify(dashboardResult), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const requiredDashboardKeys = ["summary_sql", "hotspots_sql", "dimension_breakdown_sql"];
-    const missingDashboardKeys = requiredDashboardKeys.filter((k) => !(k in dashboardResult));
-
-    if (missingDashboardKeys.length > 0) {
+    // If profiling failed, we can't continue
+    if (failedSteps.includes("profiling")) {
       const response: ControlPlaneResponse = {
         status: "error",
-        code: "INVALID_DASHBOARD_ASSETS",
-        message: "Dashboard asset output is non-conformant.",
-        detail: `Missing keys: ${missingDashboardKeys.join(", ")}`,
+        code: "PROFILING_FAILED",
+        message: profilingResult.message as string || "Profiling step failed",
+        detail: profilingResult.detail as string,
+        completed_steps: completedSteps,
+        failed_steps: failedSteps,
       };
       return new Response(JSON.stringify(response), {
         status: 400,
@@ -310,57 +192,206 @@ serve(async (req) => {
       });
     }
 
-    console.log("[DQ Control Plane] Task 4: Dashboard assets generated");
-
     // ============================================
-    // TASK 5: ISSUE MANAGEMENT & ALERTS
+    // STEP 2: RULE GENERATION (always runs)
     // ============================================
-    console.log("[DQ Control Plane] Task 5: Raising incidents...");
+    console.log("[DQ Control Plane] Step 2: Rule Generation...");
+    let rulesResult: Record<string, unknown> = {};
 
-    const incidentsResponse = await fetch(`${supabaseUrl}/functions/v1/dq-raise-incidents`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${supabaseKey}`,
-      },
-      body: JSON.stringify({
-        dataset_id: pipelineInput.dataset_id,
-        execution_id: executionResult.execution_id,
-        profile_id: profilingResult.profiling_run_id,
-        execution_metrics: executionResult.metrics,
-      }),
-    });
+    try {
+      const rulesResponse = await fetch(`${supabaseUrl}/functions/v1/dq-generate-rules`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${supabaseKey}`,
+        },
+        body: JSON.stringify({
+          profiling_output: profilingResult,
+        }),
+      });
 
-    const incidentsResult = await incidentsResponse.json();
+      rulesResult = await rulesResponse.json();
 
-    if (incidentsResult.status === "error") {
-      return new Response(JSON.stringify(incidentsResult), {
+      if (rulesResult.status === "error" || !rulesResult.rules) {
+        console.error("[DQ Control Plane] Rule generation failed:", rulesResult.message);
+        failedSteps.push("rules");
+      } else {
+        completedSteps.push("rules");
+        console.log("[DQ Control Plane] Rules generated. Version:", rulesResult.rules_version, "Count:", (rulesResult.rules as unknown[]).length);
+      }
+    } catch (err) {
+      console.error("[DQ Control Plane] Rules exception:", err);
+      failedSteps.push("rules");
+    }
+
+    // If rules failed, we can't continue
+    if (failedSteps.includes("rules")) {
+      const response: ControlPlaneResponse = {
+        status: "error",
+        code: "RULES_FAILED",
+        message: rulesResult.message as string || "Rule generation failed",
+        profiling_run_id: profilingResult.profiling_run_id as string,
+        completed_steps: completedSteps,
+        failed_steps: failedSteps,
+      };
+      return new Response(JSON.stringify(response), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    console.log("[DQ Control Plane] Task 5: Incidents raised. Count:", incidentsResult.incident_count);
+    // ============================================
+    // STEP 3: RULE EXECUTION (always runs - NO CIRCUIT BREAKER)
+    // ============================================
+    console.log("[DQ Control Plane] Step 3: Rule Execution...");
+    let executionResult: Record<string, unknown> = {};
+
+    try {
+      const executionResponse = await fetch(`${supabaseUrl}/functions/v1/dq-execute-rules`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${supabaseKey}`,
+        },
+        body: JSON.stringify({
+          dataset_id: pipelineInput.dataset_id,
+          profile_id: profilingResult.profiling_run_id,
+          rules: rulesResult.rules,
+          rules_version: rulesResult.rules_version,
+          execution_mode: pipelineInput.execution_mode,
+          last_execution_ts: pipelineInput.last_execution_ts,
+        }),
+      });
+
+      executionResult = await executionResponse.json();
+
+      if (executionResult.status === "error") {
+        console.error("[DQ Control Plane] Execution failed:", executionResult.message);
+        failedSteps.push("execution");
+      } else {
+        completedSteps.push("execution");
+        console.log("[DQ Control Plane] Execution complete. ID:", executionResult.execution_id);
+        
+        // Log if there were critical failures but DON'T STOP
+        const summary = executionResult.summary as Record<string, unknown>;
+        if (summary?.critical_failure) {
+          console.log("[DQ Control Plane] ⚠️ Critical failures detected - continuing to dashboard and incidents");
+        }
+      }
+    } catch (err) {
+      console.error("[DQ Control Plane] Execution exception:", err);
+      failedSteps.push("execution");
+    }
+
+    // If execution failed, we still try to generate dashboard with what we have
+    if (failedSteps.includes("execution")) {
+      // Return partial success
+      const response: ControlPlaneResponse = {
+        status: "error",
+        code: "EXECUTION_FAILED",
+        message: executionResult.message as string || "Rule execution failed",
+        profiling_run_id: profilingResult.profiling_run_id as string,
+        rules_version: rulesResult.rules_version as number,
+        completed_steps: completedSteps,
+        failed_steps: failedSteps,
+      };
+      return new Response(JSON.stringify(response), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // ============================================
-    // FINAL SUCCESS RESPONSE
+    // STEP 4: DASHBOARD ASSETS (always runs)
+    // ============================================
+    console.log("[DQ Control Plane] Step 4: Dashboard Assets...");
+    let dashboardResult: Record<string, unknown> = {};
+
+    try {
+      const dashboardResponse = await fetch(`${supabaseUrl}/functions/v1/dq-generate-dashboard-assets`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${supabaseKey}`,
+        },
+        body: JSON.stringify({
+          execution_id: executionResult.execution_id,
+          dataset_id: pipelineInput.dataset_id,
+          execution_metrics: executionResult.metrics,
+          execution_summary: executionResult.summary,
+        }),
+      });
+
+      dashboardResult = await dashboardResponse.json();
+
+      if (dashboardResult.status === "error") {
+        console.error("[DQ Control Plane] Dashboard failed:", dashboardResult.message);
+        failedSteps.push("dashboard");
+      } else {
+        completedSteps.push("dashboard");
+        console.log("[DQ Control Plane] Dashboard assets generated");
+      }
+    } catch (err) {
+      console.error("[DQ Control Plane] Dashboard exception:", err);
+      failedSteps.push("dashboard");
+    }
+
+    // ============================================
+    // STEP 5: INCIDENTS (always runs)
+    // ============================================
+    console.log("[DQ Control Plane] Step 5: Incident Management...");
+    let incidentsResult: Record<string, unknown> = {};
+
+    try {
+      const incidentsResponse = await fetch(`${supabaseUrl}/functions/v1/dq-raise-incidents`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${supabaseKey}`,
+        },
+        body: JSON.stringify({
+          dataset_id: pipelineInput.dataset_id,
+          execution_id: executionResult.execution_id,
+          profile_id: profilingResult.profiling_run_id,
+          execution_metrics: executionResult.metrics,
+        }),
+      });
+
+      incidentsResult = await incidentsResponse.json();
+
+      if (incidentsResult.status === "error") {
+        console.error("[DQ Control Plane] Incidents failed:", incidentsResult.message);
+        failedSteps.push("incidents");
+      } else {
+        completedSteps.push("incidents");
+        console.log("[DQ Control Plane] Incidents raised. Count:", incidentsResult.incident_count);
+      }
+    } catch (err) {
+      console.error("[DQ Control Plane] Incidents exception:", err);
+      failedSteps.push("incidents");
+    }
+
+    // ============================================
+    // FINAL RESPONSE
     // ============================================
     const totalTime = Date.now() - startTime;
-    console.log(`[DQ Control Plane] Pipeline completed in ${totalTime}ms`);
+    console.log(`[DQ Control Plane] Pipeline completed in ${totalTime}ms. Completed: ${completedSteps.join(", ")}. Failed: ${failedSteps.join(", ") || "none"}`);
 
     const response: ControlPlaneResponse = {
       status: "success",
-      code: "DQ_PIPELINE_COMPLETED",
-      message: "Data Quality lifecycle completed successfully.",
-      profiling_run_id: profilingResult.profiling_run_id,
-      rules_version: rulesResult.rules_version,
+      code: "PIPELINE_COMPLETE",
+      message: `Pipeline completed. ${completedSteps.length}/5 steps successful.`,
+      profiling_run_id: profilingResult.profiling_run_id as string,
+      rules_version: rulesResult.rules_version as number,
       execution_summary: {
-        ...executionResult.summary,
+        ...(executionResult.summary as Record<string, unknown>),
         execution_id: executionResult.execution_id,
-        total_rules: executionResult.metrics?.length || 0,
+        total_rules: (executionResult.metrics as unknown[])?.length || 0,
         execution_time_ms: totalTime,
       },
-      incident_count: incidentsResult.incident_count || 0,
+      incident_count: (incidentsResult.incident_count as number) || 0,
+      completed_steps: completedSteps,
+      failed_steps: failedSteps,
     };
 
     return new Response(JSON.stringify(response), {
@@ -372,8 +403,10 @@ serve(async (req) => {
     const response: ControlPlaneResponse = {
       status: "error",
       code: "INTERNAL_ERROR",
-      message: "An unexpected error occurred in the control plane.",
+      message: "An unexpected error occurred",
       detail: error instanceof Error ? error.message : "Unknown error",
+      completed_steps: completedSteps,
+      failed_steps: failedSteps,
     };
     return new Response(JSON.stringify(response), {
       status: 500,

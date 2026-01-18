@@ -1,7 +1,6 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { 
   Database, 
@@ -13,10 +12,7 @@ import {
   XCircle,
   Loader2,
   Circle,
-  AlertOctagon,
-  ArrowRight,
-  StopCircle,
-  PlayCircle
+  ArrowRight
 } from 'lucide-react';
 import type { PipelineStep, StepStatus, PipelineStatus } from '@/hooks/useDQControlPlane';
 
@@ -26,8 +22,6 @@ interface DQPipelineVisualizerProps {
   pipelineStatus: PipelineStatus;
   elapsedTime: number;
   isRealtimeConnected: boolean;
-  onContinue?: () => void;
-  onStop?: () => void;
 }
 
 const STEP_CONFIG: Record<PipelineStep, { icon: React.ElementType; label: string; description: string }> = {
@@ -42,8 +36,7 @@ const STATUS_STYLES: Record<StepStatus, { bg: string; text: string; border: stri
   pending: { bg: 'bg-muted', text: 'text-muted-foreground', border: 'border-muted', icon: Circle },
   running: { bg: 'bg-primary/10', text: 'text-primary', border: 'border-primary', icon: Loader2 },
   passed: { bg: 'bg-green-500/10', text: 'text-green-500', border: 'border-green-500', icon: CheckCircle2 },
-  failed: { bg: 'bg-destructive/10', text: 'text-destructive', border: 'border-destructive', icon: XCircle },
-  halted: { bg: 'bg-orange-500/10', text: 'text-orange-500', border: 'border-orange-500', icon: AlertOctagon }
+  failed: { bg: 'bg-destructive/10', text: 'text-destructive', border: 'border-destructive', icon: XCircle }
 };
 
 export function DQPipelineVisualizer({
@@ -51,9 +44,7 @@ export function DQPipelineVisualizer({
   stepStatuses,
   pipelineStatus,
   elapsedTime,
-  isRealtimeConnected,
-  onContinue,
-  onStop
+  isRealtimeConnected
 }: DQPipelineVisualizerProps) {
   const formatTime = (ms: number) => {
     const seconds = Math.floor(ms / 1000);
@@ -65,7 +56,6 @@ export function DQPipelineVisualizer({
     if (pipelineStatus === 'idle') return 'Ready to run pipeline';
     if (pipelineStatus === 'success') return 'Pipeline completed successfully';
     if (pipelineStatus === 'error') return 'Pipeline encountered an error';
-    if (pipelineStatus === 'halted') return 'Pipeline halted by circuit breaker';
     if (currentStep) return `${STEP_CONFIG[currentStep].description}... (Step ${currentStep} of 5)`;
     return 'Processing...';
   };
@@ -76,7 +66,7 @@ export function DQPipelineVisualizer({
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold flex items-center gap-2">
             <Database className="h-5 w-5 text-primary" />
-            DATA QUALITY CONTROL PLANE
+            DATA QUALITY PIPELINE
           </CardTitle>
           <div className="flex items-center gap-3">
             <Badge 
@@ -152,52 +142,15 @@ export function DQPipelineVisualizer({
           pipelineStatus === 'idle' && "bg-muted/50 border-muted text-muted-foreground",
           pipelineStatus === 'running' && "bg-primary/5 border-primary/20 text-primary",
           pipelineStatus === 'success' && "bg-green-500/5 border-green-500/20 text-green-500",
-          pipelineStatus === 'error' && "bg-destructive/5 border-destructive/20 text-destructive",
-          pipelineStatus === 'halted' && "bg-orange-500/5 border-orange-500/20 text-orange-500"
+          pipelineStatus === 'error' && "bg-destructive/5 border-destructive/20 text-destructive"
         )}>
           <div className="flex items-center justify-center gap-2">
             {pipelineStatus === 'running' && <Loader2 className="h-4 w-4 animate-spin" />}
             {pipelineStatus === 'success' && <CheckCircle2 className="h-4 w-4" />}
             {pipelineStatus === 'error' && <XCircle className="h-4 w-4" />}
-            {pipelineStatus === 'halted' && <AlertOctagon className="h-4 w-4" />}
             <span className="text-sm font-medium">{getStatusMessage()}</span>
           </div>
         </div>
-
-        {/* Circuit Breaker Alert with Action Buttons */}
-        {pipelineStatus === 'halted' && (
-          <div className="mt-4 p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg">
-            <div className="flex items-start gap-3">
-              <AlertOctagon className="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <h4 className="font-semibold text-orange-500">CIRCUIT BREAKER TRIPPED</h4>
-                <p className="text-sm text-orange-500/80 mt-1">
-                  Critical data quality failure detected. Downstream tasks stopped to prevent data corruption.
-                </p>
-                {onContinue && onStop && (
-                  <div className="flex gap-3 mt-4">
-                    <Button 
-                      variant="destructive" 
-                      onClick={onStop} 
-                      className="gap-2"
-                    >
-                      <StopCircle className="h-4 w-4" />
-                      Stop Pipeline
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={onContinue} 
-                      className="gap-2 border-orange-500 text-orange-500 hover:bg-orange-500/10"
-                    >
-                      <PlayCircle className="h-4 w-4" />
-                      Continue Anyway
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
