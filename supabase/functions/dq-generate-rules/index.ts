@@ -311,15 +311,43 @@ serve(async (req) => {
       }
     }
 
+    // TRUTH CONTRACT: Always return ALL active rules for execution (not just new ones)
+    // Fetch all active rules from database to ensure execution has complete rule set
+    const { data: allActiveRules, error: fetchError } = await supabase
+      .from("dq_rules")
+      .select("id, version, dimension, rule_name, logic_type, logic_code, column_name, threshold, severity, confidence, business_impact, calibration_metadata")
+      .eq("dataset_id", profiling_output.dataset_id)
+      .eq("is_active", true);
+
+    if (fetchError) {
+      console.error("Failed to fetch active rules:", fetchError);
+    }
+
+    // Map database rules to DQRule format for execution
+    const rulesForExecution: DQRule[] = (allActiveRules || []).map(r => ({
+      id: r.id,
+      version: r.version,
+      dimension: r.dimension as DQRule["dimension"],
+      rule_name: r.rule_name,
+      logic_type: r.logic_type,
+      logic_code: r.logic_code,
+      column_name: r.column_name,
+      threshold: r.threshold,
+      severity: r.severity as DQRule["severity"],
+      confidence: r.confidence,
+      business_impact: r.business_impact,
+      calibration_metadata: r.calibration_metadata || {},
+    }));
+
     const response: RulesOutput = {
       status: "success",
       rules_version: newVersion,
-      rules: candidateRules,
+      rules: rulesForExecution,  // Return ALL active rules, not just new ones
       profiling_run_id: profiling_output.profiling_run_id,
       deduplicated_count: deduplicatedCount,
     };
 
-    console.log(`[DQ Rules] Generated ${candidateRules.length} rules (${deduplicatedCount} deduplicated), version ${newVersion}`);
+    console.log(`[DQ Rules] Generated ${candidateRules.length} new rules, returning ${rulesForExecution.length} total active rules (${deduplicatedCount} deduplicated), version ${newVersion}`);
 
     return new Response(JSON.stringify(response), {
       status: 200,
