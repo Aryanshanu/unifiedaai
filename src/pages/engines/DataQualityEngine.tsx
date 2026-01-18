@@ -499,7 +499,6 @@ function HistoryTab() {
 
 function ControlPlaneTab() {
   const [selectedDataset, setSelectedDataset] = useState<string>('');
-  const [showCreateForm, setShowCreateForm] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const queryClient = useQueryClient();
   
@@ -532,7 +531,6 @@ function ControlPlaneTab() {
 
   const handleDatasetCreated = (datasetId: string) => {
     setSelectedDataset(datasetId);
-    setShowCreateForm(false);
     refetchDatasets();
   };
 
@@ -548,35 +546,45 @@ function ControlPlaneTab() {
     });
   };
 
+  // Check for error response to display inline
+  const hasErrorResponse = finalResponse?.status === 'error';
+  const errorCode = finalResponse?.code;
+  const errorMessage = finalResponse?.message;
+  const errorDetail = finalResponse?.detail;
+
   return (
     <div className="space-y-6">
-      {/* Dataset Selection & Create */}
-      <Card>
+      {/* ALWAYS SHOW: Data Upload Form - Primary Path */}
+      <Card className="border-primary/30 bg-primary/5">
         <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base font-medium">Dataset Configuration</CardTitle>
-            <Button
-              variant={showCreateForm ? "secondary" : "outline"}
-              size="sm"
-              onClick={() => setShowCreateForm(!showCreateForm)}
-            >
-              {showCreateForm ? 'Cancel' : '+ New Dataset'}
-            </Button>
-          </div>
+          <CardTitle className="text-base font-medium flex items-center gap-2">
+            <Upload className="h-4 w-4 text-primary" />
+            Upload & Run Pipeline
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Paste or upload data → automatically runs all 5 pipeline steps
+          </p>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {showCreateForm && (
-            <DQFileUploader
-              onDatasetCreated={handleDatasetCreated}
-              onRunPipeline={handleRunPipeline}
-              isRunning={pipelineStatus === 'running'}
-            />
-          )}
+        <CardContent>
+          <DQFileUploader
+            onDatasetCreated={handleDatasetCreated}
+            onRunPipeline={handleRunPipeline}
+            isRunning={pipelineStatus === 'running'}
+          />
+        </CardContent>
+      </Card>
 
-          {!showCreateForm && (
+      {/* Secondary: Select Existing Dataset */}
+      {datasets && datasets.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Or run on existing dataset
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
             <div className="flex items-end gap-4">
               <div className="flex-1">
-                <label className="text-sm font-medium mb-2 block">Select Existing Dataset</label>
                 <Select value={selectedDataset} onValueChange={setSelectedDataset}>
                   <SelectTrigger>
                     <SelectValue placeholder="Choose a dataset..." />
@@ -594,6 +602,7 @@ function ControlPlaneTab() {
                 onClick={() => handleRunPipeline()} 
                 disabled={!selectedDataset || pipelineStatus === 'running'}
                 className="gap-2"
+                variant="outline"
               >
                 {pipelineStatus === 'running' ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -603,23 +612,44 @@ function ControlPlaneTab() {
                 Run Pipeline
               </Button>
               {pipelineStatus !== 'idle' && (
-                <Button variant="outline" onClick={reset} className="gap-2">
+                <Button variant="ghost" onClick={reset} className="gap-2">
                   <RefreshCw className="h-4 w-4" />
                   Reset
                 </Button>
               )}
               <Button 
-                variant="outline" 
+                variant="ghost" 
                 onClick={() => setIsChatOpen(true)}
                 className="gap-2"
               >
                 <MessageCircle className="h-4 w-4" />
-                AI Assistant
+                AI
               </Button>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Inline Error Display - NO BLANK SCREEN */}
+      {hasErrorResponse && (
+        <Alert variant="destructive" className="border-2">
+          <AlertTriangle className="h-5 w-5" />
+          <AlertTitle className="font-bold">
+            Pipeline Error: {errorCode}
+          </AlertTitle>
+          <AlertDescription className="mt-2 space-y-2">
+            <p>{errorMessage}</p>
+            {errorDetail && (
+              <p className="text-sm opacity-80">{errorDetail}</p>
+            )}
+            {errorCode === 'NO_DATA' && (
+              <p className="text-sm font-medium mt-3">
+                👆 Use the uploader above to add data to your dataset first.
+              </p>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Pipeline Visualizer */}
       <DQPipelineVisualizer

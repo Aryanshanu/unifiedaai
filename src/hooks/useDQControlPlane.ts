@@ -348,8 +348,51 @@ export function useDQControlPlane(datasetId?: string): UseDQControlPlaneReturn {
         body: input
       });
 
+      // Handle edge function errors gracefully - parse JSON response if available
       if (error) {
-        throw new Error(error.message);
+        // Try to extract structured error from the message
+        let parsedError: ControlPlaneResponse | null = null;
+        try {
+          // Edge function errors often contain JSON in the message
+          const jsonMatch = error.message?.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            parsedError = JSON.parse(jsonMatch[0]) as ControlPlaneResponse;
+          }
+        } catch {
+          // Ignore parse errors
+        }
+
+        if (parsedError) {
+          setFinalResponse(parsedError);
+          setPipelineStatus('error');
+          setStepStatuses({
+            1: parsedError.code === 'NO_DATA' || parsedError.code === 'DATASET_NOT_FOUND' ? 'failed' : 'pending',
+            2: 'pending',
+            3: 'pending',
+            4: 'pending',
+            5: 'pending'
+          });
+          toast({
+            title: 'Pipeline Error',
+            description: parsedError.message,
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        // Fallback: generic error handling
+        setFinalResponse({
+          status: 'error',
+          code: 'EDGE_FUNCTION_ERROR',
+          message: error.message || 'Failed to invoke pipeline',
+        });
+        setPipelineStatus('error');
+        toast({
+          title: 'Pipeline Failed',
+          description: error.message || 'Failed to invoke pipeline',
+          variant: 'destructive',
+        });
+        return;
       }
 
       const response = data as ControlPlaneResponse;
@@ -370,11 +413,18 @@ export function useDQControlPlane(datasetId?: string): UseDQControlPlaneReturn {
           description: `${response.incident_count || 0} incidents raised.`,
         });
       } else {
-        // Error occurred
+        // Error response from pipeline
         setPipelineStatus('error');
         
-        // Mark failed steps
-        const newStatuses = { ...stepStatuses };
+        // Mark failed steps based on response
+        const newStatuses: Record<PipelineStep, StepStatus> = {
+          1: 'pending',
+          2: 'pending',
+          3: 'pending',
+          4: 'pending',
+          5: 'pending'
+        };
+        
         if (response.completed_steps?.includes('profiling')) newStatuses[1] = 'passed';
         if (response.completed_steps?.includes('rules')) newStatuses[2] = 'passed';
         if (response.completed_steps?.includes('execution')) newStatuses[3] = 'passed';
@@ -386,6 +436,11 @@ export function useDQControlPlane(datasetId?: string): UseDQControlPlaneReturn {
         if (response.failed_steps?.includes('execution')) newStatuses[3] = 'failed';
         if (response.failed_steps?.includes('dashboard')) newStatuses[4] = 'failed';
         if (response.failed_steps?.includes('incidents')) newStatuses[5] = 'failed';
+        
+        // Special case: NO_DATA means step 1 failed
+        if (response.code === 'NO_DATA' || response.code === 'DATASET_NOT_FOUND') {
+          newStatuses[1] = 'failed';
+        }
         
         setStepStatuses(newStatuses);
         
@@ -408,7 +463,7 @@ export function useDQControlPlane(datasetId?: string): UseDQControlPlaneReturn {
         variant: 'destructive',
       });
     }
-  }, [toast, stepStatuses]);
+  }, [toast]);
 
   const reset = useCallback(() => {
     setPipelineStatus('idle');

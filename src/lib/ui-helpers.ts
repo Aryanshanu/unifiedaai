@@ -10,18 +10,22 @@ export function sanitizeErrorMessage(message: string): string {
 
   // Map technical errors to friendly messages (order matters - more specific first)
   const errorMappings: [RegExp | string, string][] = [
+    // DQ Pipeline specific errors - DO NOT MASK, show real message
+    [/NO_DATA/i, 'No data found. Upload data using the uploader before running the pipeline.'],
+    [/DATASET_NOT_FOUND/i, 'Dataset not found. Please create a dataset first.'],
+    [/PROFILING_FAILED/i, 'Data profiling failed. Check your data format.'],
+    [/RULES_FAILED/i, 'Rule generation failed.'],
+    [/EXECUTION_FAILED/i, 'Rule execution failed.'],
+    
     // Rate limits (most common user-facing issue)
     [/rate limit/i, 'The model is busy. Please wait a moment and try again.'],
     [/429/i, 'Too many requests. Please wait a moment and try again.'],
     [/too many requests/i, 'Too many requests. Please wait a moment and try again.'],
     [/model.*busy/i, 'The model is busy. Please wait and try again.'],
     
-    // Edge function errors (catch all variations)
-    [/edge function returned.*non.?2xx/i, 'Temporary service issue. Retrying...'],
+    // Edge function errors - only mask 500s, not 400s (validation errors)
     [/edge function.*500/i, 'Temporary service issue. Retrying...'],
-    [/edge function.*error/i, 'Temporary service issue. Please retry.'],
-    [/non.?2xx status/i, 'Temporary service issue. Please retry.'],
-    [/returned.*error/i, 'Temporary service issue. Please retry.'],
+    [/edge function returned.*non.?2xx.*500/i, 'Temporary service issue. Retrying...'],
     
     // Auth errors
     [/authentication failed/i, 'Please check your API token in Settings.'],
