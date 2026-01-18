@@ -104,15 +104,15 @@ export function DQExecutionResults({ execution, isLoading }: DQExecutionResultsP
         )}
       </CardHeader>
       <CardContent>
-        {/* Circuit Breaker Alert */}
+        {/* Critical Issues Warning */}
         {criticalFailure && (
-          <div className="mb-4 p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg">
+          <div className="mb-4 p-3 bg-warning/10 border border-warning/30 rounded-lg">
             <div className="flex items-start gap-2">
-              <AlertOctagon className="h-5 w-5 text-orange-500 flex-shrink-0" />
+              <AlertOctagon className="h-5 w-5 text-warning flex-shrink-0" />
               <div>
-                <h4 className="font-semibold text-orange-500 text-sm">CIRCUIT BREAKER TRIPPED</h4>
-                <p className="text-xs text-orange-500/80 mt-0.5">
-                  Critical failure detected. Review failed rules below.
+                <h4 className="font-semibold text-warning text-sm">Critical Issues Detected</h4>
+                <p className="text-xs text-warning/80 mt-0.5">
+                  Review failed rules below. Pipeline continued automatically.
                 </p>
               </div>
             </div>
