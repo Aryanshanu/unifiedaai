@@ -520,8 +520,41 @@ serve(async (req) => {
       discarded_metrics: discardedMetrics,
       deduplicated_rules: deduplicatedRulesCount,
       inconsistencies_found: inconsistencies,
-      truth_score: inconsistencies.length === 0 ? 1.0 : Math.max(0, 1 - (inconsistencies.length * 0.1)),
+      truth_score: inconsistencies.length === 0 ? 100 : Math.max(0, 100 - (inconsistencies.length * 10)),
     };
+
+    // GOVERNANCE: If truth enforcer returned DQ_CONTRACT_VIOLATION, propagate as error
+    const isGovernanceViolation = governanceResult.code === 'DQ_CONTRACT_VIOLATION';
+    
+    if (isGovernanceViolation) {
+      console.log(`[DQ Control Plane] GOVERNANCE VIOLATION detected - returning 422`);
+      const response: ControlPlaneResponse = {
+        status: "error",
+        code: "DQ_CONTRACT_VIOLATION",
+        message: "Pipeline output is not governance-safe and must not be displayed.",
+        profiling_run_id: profilingResult.profiling_run_id as string,
+        rules_version: rulesResult.rules_version as number,
+        execution_summary: {
+          ...(executionResult.summary as Record<string, unknown>),
+          execution_id: executionResult.execution_id,
+          total_rules: (executionResult.metrics as unknown[])?.length || 0,
+          execution_time_ms: totalTime,
+        },
+        incident_count: (incidentsResult.incident_count as number) || 0,
+        completed_steps: completedSteps,
+        failed_steps: failedSteps,
+        TRUST_REPORT: trustReport,
+        governance_status: "DQ_CONTRACT_VIOLATION",
+        violations: governanceResult.violations as string[],
+        normalized_profiling: governanceResult.normalized_profiling as Record<string, unknown>,
+        normalized_execution: governanceResult.normalized_execution as Record<string, unknown>,
+        normalized_incidents: governanceResult.normalized_incidents as Record<string, unknown>,
+      };
+      return new Response(JSON.stringify(response), {
+        status: 422, // Unprocessable Entity - governance violation
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const response: ControlPlaneResponse = {
       status: "success",
