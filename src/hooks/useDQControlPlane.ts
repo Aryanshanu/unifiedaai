@@ -26,12 +26,20 @@ export interface ColumnProfile {
   sample_values: (string | number | null)[];
 }
 
+export interface DimensionScore {
+  dimension: string;
+  score: number;
+  weight: number;
+  details: Record<string, number>;
+}
+
 export interface DQProfile {
   id: string;
   dataset_id: string;
   dataset_version: string | null;
   row_count: number;
   column_profiles: ColumnProfile[] | Record<string, ColumnProfile>;
+  dimension_scores?: DimensionScore[];
   profile_ts: string;
   execution_time_ms: number | null;
 }
