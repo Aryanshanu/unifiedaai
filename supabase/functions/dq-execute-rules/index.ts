@@ -323,7 +323,6 @@ serve(async (req) => {
         execution_mode,
         metrics,
         summary,
-        circuit_breaker_tripped: false, // Never trip - always complete
         execution_time_ms: executionTime,
       })
       .select()
