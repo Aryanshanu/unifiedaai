@@ -6,25 +6,23 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Types
 interface DQRule {
-  rule_id: string;
-  dimension: string;
+  id: string;
   rule_name: string;
   logic_type: string;
+  logic_code: string;
   column_name: string | null;
   threshold: number;
-  severity: string;
-  calibration_metadata?: {
-    observed_min?: number;
-    observed_max?: number;
-  };
+  severity: "info" | "warning" | "critical";
+  dimension: string;
 }
 
 interface FailedRow {
   row_index: number;
   row_id: string;
-  column_value: string | number | null;
-  failure_reason: string;
+  value: unknown;
+  reason: string;
 }
 
 interface RuleMetric {
@@ -34,42 +32,34 @@ interface RuleMetric {
   severity: string;
   success_rate: number;
   failed_count: number;
-  passed_count: number;
   total_count: number;
   threshold: number;
-  margin: number; // Difference from threshold
   violated: boolean;
-  failed_rows_sample?: FailedRow[];
-  computed_from_data: boolean; // TRUE = real execution, never false in this version
+  failed_rows_sample: FailedRow[];
 }
 
 interface ExecutionSummary {
+  total_rules: number;
+  passed: number;
+  failed: number;
+  critical_failures: number;
   critical_failure: boolean;
   execution_mode: string;
-  total_rules: number;
-  passed_rules: number;
-  failed_rules: number;
-  critical_violations: number;
-  error_rate: number;
-  null_blank_percentage: number;
-  duplicate_rate: number;
-  overall_pass_rate: number;
-  data_rows_evaluated: number;
 }
 
 interface ExecutionOutput {
-  status: "success" | "error" | "halted";
-  execution_id?: string;
-  execution_ts?: string;
-  execution_time_ms?: number;
-  metrics?: RuleMetric[];
-  summary?: ExecutionSummary;
+  status: "success" | "error";
   code?: string;
   message?: string;
   detail?: string;
+  execution_id?: string;
+  metrics?: RuleMetric[];
+  summary?: ExecutionSummary;
+  execution_time_ms?: number;
 }
 
 serve(async (req) => {
+  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -77,13 +67,21 @@ serve(async (req) => {
   const startTime = Date.now();
 
   try {
-    const { dataset_id, profile_id, rules, rules_version, execution_mode, last_execution_ts } = await req.json();
+    const body = await req.json();
+    const { 
+      dataset_id, 
+      profile_id, 
+      rules, 
+      rules_version, 
+      execution_mode = "FULL"
+    } = body;
 
-    if (!dataset_id || !rules || !Array.isArray(rules)) {
+    // Validate required inputs
+    if (!dataset_id) {
       const response: ExecutionOutput = {
         status: "error",
-        code: "INVALID_EXECUTION_INPUT",
-        message: "dataset_id and rules array are required",
+        code: "MISSING_DATASET_ID",
+        message: "dataset_id is required",
       };
       return new Response(JSON.stringify(response), {
         status: 400,
@@ -91,11 +89,11 @@ serve(async (req) => {
       });
     }
 
-    if (rules.length === 0) {
+    if (!rules || !Array.isArray(rules) || rules.length === 0) {
       const response: ExecutionOutput = {
         status: "error",
-        code: "NO_RULES_PROVIDED",
-        message: "At least one rule is required for execution",
+        code: "NO_RULES",
+        message: "No rules provided for execution",
       };
       return new Response(JSON.stringify(response), {
         status: 400,
@@ -107,7 +105,7 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 🚨 HALT CONDITION #1: Check if bronze_data has ANY rows (scoped to this dataset)
+    // Check if bronze_data has data for this dataset
     const { count: bronzeCount, error: countError } = await supabase
       .from("bronze_data")
       .select("id", { count: 'exact', head: true })
@@ -117,7 +115,7 @@ serve(async (req) => {
       const response: ExecutionOutput = {
         status: "error",
         code: "DATA_ACCESS_FAILED",
-        message: "Failed to access bronze_data table",
+        message: "Failed to access data",
         detail: countError.message,
       };
       return new Response(JSON.stringify(response), {
@@ -126,14 +124,11 @@ serve(async (req) => {
       });
     }
 
-    // 🚨 HALT CONDITION #2: Empty dataset = STOP
     if (!bronzeCount || bronzeCount === 0) {
-      console.log(`[DQ Execute] HALT: No data in bronze_data table. Cannot execute rules on empty dataset.`);
       const response: ExecutionOutput = {
         status: "error",
-        code: "EMPTY_DATASET",
-        message: "Cannot execute rules on empty dataset. Upload data to bronze_data first.",
-        detail: "The pipeline cannot continue without real data. No simulated execution will be performed.",
+        code: "NO_DATA",
+        message: "No data found for this dataset",
       };
       return new Response(JSON.stringify(response), {
         status: 400,
@@ -148,12 +143,9 @@ serve(async (req) => {
       .eq("dataset_id", dataset_id)
       .limit(1000);
 
-    // At this point we KNOW bronzeData exists and has rows
     const totalRecords = bronzeData!.length;
     const metrics: RuleMetric[] = [];
     let criticalViolations = 0;
-    let totalNullCount = 0;
-    let totalDuplicates = 0;
 
     // Execute each rule against REAL DATA
     for (const rule of rules as DQRule[]) {
@@ -161,12 +153,11 @@ serve(async (req) => {
       const failedRowsSample: FailedRow[] = [];
 
       if (!rule.column_name) {
-        // Skip rules without column_name specified
         console.log(`[DQ Execute] Skipping rule ${rule.rule_name} - no column_name specified`);
         continue;
       }
 
-      // Execute rule against actual data - NO SIMULATION
+      // Execute rule against actual data
       switch (rule.logic_type) {
         case "null_check": {
           for (let i = 0; i < bronzeData!.length; i++) {
@@ -175,115 +166,109 @@ serve(async (req) => {
             const value = data?.[rule.column_name!];
             if (value === null || value === undefined || value === "") {
               failedCount++;
-              totalNullCount++;
               if (failedRowsSample.length < 5) {
                 failedRowsSample.push({
-                  row_index: row.row_index || i,
-                  row_id: row.id || `row_${i}`,
-                  column_value: value as string | number | null,
-                  failure_reason: "Value is null or empty",
+                  row_index: row.row_index,
+                  row_id: row.id,
+                  value: value,
+                  reason: "NULL or empty value",
                 });
               }
             }
           }
           break;
         }
+
         case "duplicate_check": {
-          const valueCounts = new Map<string, { count: number; indices: number[] }>();
+          const seenValues = new Map<string, number>();
           for (let i = 0; i < bronzeData!.length; i++) {
             const row = bronzeData![i];
             const data = row.raw_data as Record<string, unknown>;
             const value = String(data?.[rule.column_name!] ?? "");
-            const existing = valueCounts.get(value);
-            if (existing) {
-              existing.count++;
-              existing.indices.push(i);
-            } else {
-              valueCounts.set(value, { count: 1, indices: [i] });
-            }
-          }
-          for (const [value, info] of valueCounts.entries()) {
-            if (info.count > 1) {
-              failedCount += info.count;
-              totalDuplicates += info.count - 1;
-              if (failedRowsSample.length < 5) {
-                failedRowsSample.push({
-                  row_index: info.indices[0],
-                  row_id: bronzeData![info.indices[0]]?.id || `row_${info.indices[0]}`,
-                  column_value: value,
-                  failure_reason: `Duplicate value (${info.count} occurrences)`,
-                });
-              }
-            }
-          }
-          break;
-        }
-        case "range_check": {
-          // Use calibration_metadata for observed min/max if available
-          const observedMin = rule.calibration_metadata?.observed_min ?? 0;
-          const observedMax = rule.calibration_metadata?.observed_max ?? 1000000;
-          
-          for (let i = 0; i < bronzeData!.length; i++) {
-            const row = bronzeData![i];
-            const data = row.raw_data as Record<string, unknown>;
-            const rawValue = data?.[rule.column_name!];
-            const value = typeof rawValue === "number" ? rawValue : parseFloat(String(rawValue));
-            
-            if (!isNaN(value) && (value < observedMin || value > observedMax)) {
+            if (seenValues.has(value)) {
               failedCount++;
               if (failedRowsSample.length < 5) {
                 failedRowsSample.push({
-                  row_index: row.row_index || i,
-                  row_id: row.id || `row_${i}`,
-                  column_value: value,
-                  failure_reason: value < observedMin 
-                    ? `Value ${value} < min ${observedMin}` 
-                    : `Value ${value} > max ${observedMax}`,
+                  row_index: row.row_index,
+                  row_id: row.id,
+                  value: value,
+                  reason: `Duplicate of row ${seenValues.get(value)}`,
                 });
               }
             }
+            seenValues.set(value, row.row_index);
           }
           break;
         }
-        case "regex_match": {
-          const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+
+        case "range_check": {
+          const codeMatch = rule.logic_code.match(/BETWEEN\s+(-?[\d.]+)\s+AND\s+(-?[\d.]+)/i);
+          const minVal = codeMatch ? parseFloat(codeMatch[1]) : Number.MIN_SAFE_INTEGER;
+          const maxVal = codeMatch ? parseFloat(codeMatch[2]) : Number.MAX_SAFE_INTEGER;
+
           for (let i = 0; i < bronzeData!.length; i++) {
             const row = bronzeData![i];
             const data = row.raw_data as Record<string, unknown>;
             const value = data?.[rule.column_name!];
-            if (value !== null && value !== undefined && value !== "") {
-              if (typeof value !== "string" || !emailRegex.test(value)) {
-                failedCount++;
-                if (failedRowsSample.length < 5) {
-                  failedRowsSample.push({
-                    row_index: row.row_index || i,
-                    row_id: row.id || `row_${i}`,
-                    column_value: value as string | null,
-                    failure_reason: "Invalid email format",
-                  });
-                }
+            const numValue = parseFloat(String(value));
+            if (isNaN(numValue) || numValue < minVal || numValue > maxVal) {
+              failedCount++;
+              if (failedRowsSample.length < 5) {
+                failedRowsSample.push({
+                  row_index: row.row_index,
+                  row_id: row.id,
+                  value: value,
+                  reason: `Value ${value} outside range [${minVal}, ${maxVal}]`,
+                });
               }
             }
           }
           break;
         }
+
+        case "regex_match": {
+          const regexMatch = rule.logic_code.match(/LIKE\s+'(.+)'/i);
+          const pattern = regexMatch ? regexMatch[1].replace(/%/g, ".*") : ".*";
+          const regex = new RegExp(`^${pattern}$`, "i");
+
+          for (let i = 0; i < bronzeData!.length; i++) {
+            const row = bronzeData![i];
+            const data = row.raw_data as Record<string, unknown>;
+            const value = String(data?.[rule.column_name!] ?? "");
+            if (!regex.test(value)) {
+              failedCount++;
+              if (failedRowsSample.length < 5) {
+                failedRowsSample.push({
+                  row_index: row.row_index,
+                  row_id: row.id,
+                  value: value,
+                  reason: `Value does not match pattern`,
+                });
+              }
+            }
+          }
+          break;
+        }
+
         case "freshness_check": {
-          const thirtyDaysAgo = new Date();
-          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          const now = new Date();
+          const maxAgeHours = 24;
+
           for (let i = 0; i < bronzeData!.length; i++) {
             const row = bronzeData![i];
             const data = row.raw_data as Record<string, unknown>;
             const value = data?.[rule.column_name!];
             if (value) {
-              const date = new Date(String(value));
-              if (!isNaN(date.getTime()) && date < thirtyDaysAgo) {
+              const dateValue = new Date(String(value));
+              const hoursDiff = (now.getTime() - dateValue.getTime()) / (1000 * 60 * 60);
+              if (isNaN(hoursDiff) || hoursDiff > maxAgeHours) {
                 failedCount++;
                 if (failedRowsSample.length < 5) {
                   failedRowsSample.push({
-                    row_index: row.row_index || i,
-                    row_id: row.id || `row_${i}`,
-                    column_value: String(value),
-                    failure_reason: "Data older than 30 days",
+                    row_index: row.row_index,
+                    row_id: row.id,
+                    value: value,
+                    reason: `Data is ${Math.round(hoursDiff)} hours old (max: ${maxAgeHours}h)`,
                   });
                 }
               }
@@ -291,132 +276,83 @@ serve(async (req) => {
           }
           break;
         }
+
         default:
-          // Unknown logic type - log and skip, do NOT simulate
-          console.log(`[DQ Execute] Unknown logic_type: ${rule.logic_type} for rule ${rule.rule_name}. Skipping.`);
-          continue;
+          console.log(`[DQ Execute] Unknown logic_type: ${rule.logic_type}`);
       }
 
-      const successRate = 1 - failedCount / totalRecords;
+      const successRate = totalRecords > 0 ? ((totalRecords - failedCount) / totalRecords) * 100 : 100;
       const violated = successRate < rule.threshold;
-      const margin = (successRate - rule.threshold) * 100;
-      
+
       if (violated && rule.severity === "critical") {
         criticalViolations++;
       }
 
       metrics.push({
-        rule_id: rule.rule_id,
+        rule_id: rule.id,
         rule_name: rule.rule_name,
         dimension: rule.dimension,
         severity: rule.severity,
-        success_rate: successRate,
+        success_rate: Math.round(successRate * 100) / 100,
         failed_count: failedCount,
-        passed_count: totalRecords - failedCount,
         total_count: totalRecords,
         threshold: rule.threshold,
-        margin,
         violated,
-        failed_rows_sample: failedRowsSample.length > 0 ? failedRowsSample : undefined,
-        computed_from_data: true, // Always true - we never simulate
+        failed_rows_sample: failedRowsSample,
       });
     }
-
-    if (metrics.length === 0) {
-      const response: ExecutionOutput = {
-        status: "error",
-        code: "NO_EXECUTABLE_RULES",
-        message: "No rules could be executed. Check that rules have valid column_name and logic_type.",
-      };
-      return new Response(JSON.stringify(response), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const executionTime = Date.now() - startTime;
-    const passedRules = metrics.filter((m) => !m.violated).length;
-    const failedRules = metrics.filter((m) => m.violated).length;
-    const criticalFailure = criticalViolations > 0;
-    const errorRate = (failedRules / metrics.length) * 100;
-    const nullBlankPercentage = (totalNullCount / (totalRecords * metrics.length)) * 100;
-    const duplicateRate = (totalDuplicates / totalRecords) * 100;
-    const overallPassRate = (passedRules / metrics.length) * 100;
 
     const summary: ExecutionSummary = {
-      critical_failure: criticalFailure,
-      execution_mode: execution_mode || "FULL",
       total_rules: metrics.length,
-      passed_rules: passedRules,
-      failed_rules: failedRules,
-      critical_violations: criticalViolations,
-      error_rate: errorRate,
-      null_blank_percentage: nullBlankPercentage,
-      duplicate_rate: duplicateRate,
-      overall_pass_rate: overallPassRate,
-      data_rows_evaluated: totalRecords,
+      passed: metrics.filter((m) => !m.violated).length,
+      failed: metrics.filter((m) => m.violated).length,
+      critical_failures: criticalViolations,
+      critical_failure: criticalViolations > 0,
+      execution_mode,
     };
 
-    // Store execution result
-    const { data: executionRecord, error: insertError } = await supabase
+    const executionTime = Date.now() - startTime;
+
+    // Store execution results
+    const { data: execution, error: insertError } = await supabase
       .from("dq_rule_executions")
       .insert({
         dataset_id,
         profile_id,
         rules_version: rules_version || 1,
-        execution_mode: execution_mode || "FULL",
+        execution_mode,
         metrics,
         summary,
-        circuit_breaker_tripped: criticalFailure,
+        circuit_breaker_tripped: false, // Never trip - always complete
         execution_time_ms: executionTime,
       })
-      .select("id")
+      .select()
       .single();
 
     if (insertError) {
-      console.error("Failed to store execution result:", insertError);
+      console.error("[DQ Execute] Failed to store execution:", insertError);
     }
 
-    // 🚨 CIRCUIT BREAKER CHECK 🚨
-    if (criticalFailure) {
-      console.log(`[DQ Execute] 🚨 CIRCUIT BREAKER TRIPPED - ${criticalViolations} critical violations in ${totalRecords} rows`);
-      const response: ExecutionOutput = {
-        status: "halted",
-        code: "CIRCUIT_BREAKER_TRIPPED",
-        message: `Critical data quality failure detected. ${criticalViolations} critical rule(s) violated. Downstream tasks stopped.`,
-        execution_id: executionRecord?.id,
-        execution_ts: new Date().toISOString(),
-        execution_time_ms: executionTime,
-        metrics,
-        summary,
-      };
-      return new Response(JSON.stringify(response), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    console.log(`[DQ Execute] Complete. ${summary.passed}/${summary.total_rules} rules passed. Critical: ${criticalViolations}`);
 
     const response: ExecutionOutput = {
       status: "success",
-      execution_id: executionRecord?.id || crypto.randomUUID(),
-      execution_ts: new Date().toISOString(),
-      execution_time_ms: executionTime,
+      execution_id: execution?.id,
       metrics,
       summary,
+      execution_time_ms: executionTime,
     };
-
-    console.log(`[DQ Execute] Executed ${metrics.length} rules against ${totalRecords} rows in ${executionTime}ms. Passed: ${passedRules}, Failed: ${failedRules}`);
 
     return new Response(JSON.stringify(response), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("[DQ Execute] Error:", error);
+    console.error("[DQ Execute] Unexpected error:", error);
     const response: ExecutionOutput = {
       status: "error",
-      code: "EXECUTION_FAILED",
-      message: "Failed to execute rules",
+      code: "INTERNAL_ERROR",
+      message: "Execution failed",
       detail: error instanceof Error ? error.message : "Unknown error",
     };
     return new Response(JSON.stringify(response), {

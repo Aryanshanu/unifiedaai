@@ -527,10 +527,7 @@ function ControlPlaneTab() {
     reset,
     isRealtimeConnected,
     acknowledgeIncident,
-    resolveIncident,
-    circuitBreakerState,
-    continuePipeline,
-    stopPipeline
+    resolveIncident
   } = useDQControlPlane(selectedDataset);
 
   const handleDatasetCreated = (datasetId: string) => {
@@ -631,8 +628,6 @@ function ControlPlaneTab() {
         pipelineStatus={pipelineStatus}
         elapsedTime={elapsedTime}
         isRealtimeConnected={isRealtimeConnected}
-        onContinue={continuePipeline}
-        onStop={stopPipeline}
       />
 
       {/* STEP 1: Data Profiling - Full Width Tabular */}
@@ -656,9 +651,6 @@ function ControlPlaneTab() {
       <DQExecutionReportTabular 
         execution={executionResult} 
         isLoading={currentStep === 3}
-        circuitBreakerState={circuitBreakerState}
-        onContinue={continuePipeline}
-        onStop={stopPipeline}
       />
 
       {/* STEP 4: Streaming Dashboard - Real-time Power BI Style */}
