@@ -76,8 +76,11 @@ export function DQRuleSummary({ rules, profile, isLoading, version = 1 }: DQRule
     return acc;
   }, {} as Record<string, DQRule[]>);
 
-  // Calculate average confidence
-  const avgConfidence = activeRules.reduce((sum, r) => sum + (r.confidence || 0.85), 0) / activeRules.length;
+  // Calculate average confidence - GOVERNANCE FIX: Remove default 0.85
+  const rulesWithConfidence = activeRules.filter(r => r.confidence != null);
+  const avgConfidence = rulesWithConfidence.length > 0
+    ? rulesWithConfidence.reduce((sum, r) => sum + r.confidence!, 0) / rulesWithConfidence.length
+    : null;
 
   // Get unique columns covered
   const uniqueColumns = new Set(activeRules.map(r => r.column_name).filter(Boolean));
@@ -201,9 +204,13 @@ export function DQRuleSummary({ rules, profile, isLoading, version = 1 }: DQRule
           <div className="flex items-center gap-4">
             <div className="text-right">
               <p className="text-xs text-muted-foreground">Avg Confidence</p>
-              <p className="text-sm font-mono font-bold">{(avgConfidence * 100).toFixed(1)}%</p>
+              {avgConfidence !== null ? (
+                <p className="text-sm font-mono font-bold">{(avgConfidence * 100).toFixed(1)}%</p>
+              ) : (
+                <p className="text-sm font-mono text-muted-foreground">Default</p>
+              )}
             </div>
-            <Progress value={avgConfidence * 100} className="w-24 h-2" />
+            <Progress value={avgConfidence !== null ? avgConfidence * 100 : 0} className="w-24 h-2" />
           </div>
         </div>
 

@@ -701,12 +701,7 @@ function ControlPlaneTab() {
         isActive={pipelineStatus === 'running' || !!executionResult}
       />
 
-      {/* Legacy Dashboard Visual (fallback) */}
-      <DQDashboardVisual 
-        assets={dashboardAssets} 
-        executionMetrics={executionResult?.metrics}
-        isLoading={currentStep === 4} 
-      />
+      {/* REMOVED: Legacy DQDashboardVisual - redundant with DQStreamingDashboard */}
 
       {/* STEP 5: Incidents - Full Width Tabular */}
       <DQIncidentsTabular

@@ -77,7 +77,8 @@ export function DQPipelineVisualizer({
               )}
             >
               <Circle className={cn("h-2 w-2 mr-1 fill-current", isRealtimeConnected && "animate-pulse")} />
-              Realtime {isRealtimeConnected ? 'ON' : 'OFF'}
+              {/* GOVERNANCE FIX: Renamed from "Realtime" - more accurate terminology */}
+              Sync {isRealtimeConnected ? 'Active' : 'Inactive'}
             </Badge>
             {pipelineStatus === 'running' && (
               <Badge variant="secondary" className="font-mono">
