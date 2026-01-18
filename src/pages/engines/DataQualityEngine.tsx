@@ -735,6 +735,7 @@ function ControlPlaneTab() {
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
         context={{
+          datasetId: selectedDataset,
           profile: profilingResult,
           rules: rulesResult,
           execution: executionResult,
