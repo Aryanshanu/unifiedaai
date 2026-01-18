@@ -120,7 +120,7 @@ export default function Index() {
   return (
     <MainLayout 
       title="Command Center" 
-      subtitle="Unified AI Governance Operating System"
+      subtitle="Autonomous Governance Platform"
       headerActions={
         <div className="flex items-center gap-3">
           {realtimeActive && (
@@ -217,7 +217,7 @@ export default function Index() {
       </div>
 
       {/* Core Engines Grid */}
-      <h2 className="text-lg font-semibold text-foreground mb-4">Evaluation Engines</h2>
+      <h2 className="text-lg font-semibold text-foreground mb-4">Core RAI Engines</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {engines.map((engine) => {
           const Icon = engine.icon;

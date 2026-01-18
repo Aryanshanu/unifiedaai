@@ -136,7 +136,7 @@ export function ConnectModelForm() {
         <Alert className="bg-yellow-500/10 border-yellow-500/30">
           <AlertTriangle className="w-4 h-4 text-yellow-500" />
           <AlertDescription className="text-yellow-500">
-            No fake data. All evaluations will use your real model endpoint.
+            All evaluations will use your configured model endpoint.
           </AlertDescription>
         </Alert>
 

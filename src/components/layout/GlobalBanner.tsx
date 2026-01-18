@@ -15,7 +15,7 @@ export function GlobalBanner() {
     )}>
       <Globe className="w-4 h-4 animate-pulse" />
       <span className="text-sm font-medium">
-        Fractal RAI-OS — The World's First Responsible AI Operating System — Now Live
+        Fractal Unified-OS — Autonomous Governance Platform
       </span>
       <Button
         variant="ghost"

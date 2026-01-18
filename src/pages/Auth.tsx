@@ -108,7 +108,7 @@ export default function Auth() {
     } else {
       toast({
         title: 'Account created!',
-        description: 'Welcome to Fractal RAI OS.',
+        description: 'Welcome to Fractal Unified-OS.',
       });
     }
   };
@@ -127,8 +127,8 @@ export default function Auth() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-primary mb-4 shadow-glow">
             <Shield className="w-8 h-8 text-primary-foreground" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">Fractal RAI OS</h1>
-          <p className="text-muted-foreground text-sm mt-1">Enterprise AI Governance Platform</p>
+          <h1 className="text-2xl font-bold text-foreground">Fractal Unified-OS</h1>
+          <p className="text-muted-foreground text-sm mt-1">Autonomous Governance Platform</p>
         </div>
 
         <Card className="border-border bg-card/80 backdrop-blur-sm">
@@ -285,7 +285,7 @@ export default function Auth() {
         <div className="mt-8 grid grid-cols-3 gap-4 text-center">
           <div className="p-3 rounded-lg bg-card/50 border border-border">
             <Activity className="w-5 h-5 text-primary mx-auto mb-1" />
-            <p className="text-xs text-muted-foreground">Real-time Monitoring</p>
+            <p className="text-xs text-muted-foreground">Continuous Monitoring</p>
           </div>
           <div className="p-3 rounded-lg bg-card/50 border border-border">
             <Shield className="w-5 h-5 text-success mx-auto mb-1" />

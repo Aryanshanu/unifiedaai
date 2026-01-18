@@ -39,13 +39,14 @@ const navItems = [
   { path: "/hitl", icon: Users, label: "HITL Console" },
   { path: "/incidents", icon: AlertCircle, label: "Incidents" },
   { path: "/lineage", icon: GitBranch, label: "Knowledge Graph" },
-  { divider: true, label: "Evaluate" },
-  { path: "/engine/fairness", icon: Scale, label: "Fairness" },
-  { path: "/engine/hallucination", icon: AlertCircle, label: "Hallucination" },
-  { path: "/engine/toxicity", icon: ShieldAlert, label: "Toxicity" },
-  { path: "/engine/privacy", icon: Lock, label: "Privacy" },
-  { path: "/engine/explainability", icon: Eye, label: "Explainability" },
-  { path: "/engine/data-quality", icon: Database, label: "Data Quality" },
+  { divider: true, label: "CORE RAI" },
+  { path: "/engine/fairness", icon: Scale, label: "Fairness Engine" },
+  { path: "/engine/hallucination", icon: AlertCircle, label: "Hallucination Engine" },
+  { path: "/engine/toxicity", icon: ShieldAlert, label: "Toxicity Engine" },
+  { path: "/engine/privacy", icon: Lock, label: "Privacy Engine" },
+  { path: "/engine/explainability", icon: Eye, label: "Explainability Engine" },
+  { divider: true, label: "DATA GOVERNANCE" },
+  { path: "/engine/data-quality", icon: Database, label: "Data Quality Engine" },
   { divider: true, label: "Respond" },
   { path: "/policy", icon: FileText, label: "Policy Studio" },
   { path: "/data-contracts", icon: FileText, label: "Data Contracts" },
@@ -82,7 +83,7 @@ export function Sidebar() {
           </div>
           {!collapsed && (
             <div className="flex flex-col">
-              <span className="font-bold text-foreground text-base tracking-tight">Fractal RAI</span>
+              <span className="font-bold text-foreground text-base tracking-tight">Fractal Unified-OS</span>
             </div>
           )}
         </div>

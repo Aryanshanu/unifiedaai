@@ -2,11 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface RealityMetrics {
-  realRequestsProcessed: number;
-  realBlocks: number;
-  realHITLReviews: number;
+  processedRequests: number;
+  governanceBlocks: number;
+  hitlReviews: number;
   lastDriftCheck: string | null;
-  fakeDataCount: number; // Always 0 after Dec 11, 2025
+  legacyDataCount: number; // Always 0 after Dec 11, 2025
 }
 
 export function useRealityMetrics() {
@@ -27,11 +27,11 @@ export function useRealityMetrics() {
       ]);
 
       return {
-        realRequestsProcessed: requestLogsResult.count || 0,
-        realBlocks: incidentsResult.count || 0,
-        realHITLReviews: reviewQueueResult.count || 0,
+        processedRequests: requestLogsResult.count || 0,
+        governanceBlocks: incidentsResult.count || 0,
+        hitlReviews: reviewQueueResult.count || 0,
         lastDriftCheck: driftAlertsResult.data?.[0]?.detected_at || null,
-        fakeDataCount: 0, // Permanently 0 after Dec 11, 2025 purge
+        legacyDataCount: 0, // Permanently 0 after Dec 11, 2025 purge
       };
     },
     refetchInterval: 30000, // Refresh every 30 seconds

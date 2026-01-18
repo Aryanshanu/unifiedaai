@@ -94,7 +94,7 @@ export function DQTrustReport({ trustReport, isLoading, governanceStatus, violat
             ) : (
               <Shield className="h-5 w-5 text-primary" />
             )}
-            TRUST REPORT
+            GOVERNANCE INTEGRITY REPORT
           </div>
           {governanceStatus && (
             <Badge 
@@ -109,7 +109,7 @@ export function DQTrustReport({ trustReport, isLoading, governanceStatus, violat
           )}
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Pipeline reconciliation and data integrity verification
+          Pipeline reconciliation and governance integrity verification
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -137,9 +137,9 @@ export function DQTrustReport({ trustReport, isLoading, governanceStatus, violat
           <div className="flex items-center gap-3">
             {getScoreIcon(scoreAsRatio)}
             <div>
-              <p className="font-medium">Trust Score</p>
+              <p className="font-medium">Governance Integrity Score</p>
               <p className="text-sm text-muted-foreground">
-                Pipeline integrity verification
+                Pipeline governance verification
               </p>
             </div>
           </div>
@@ -162,7 +162,7 @@ export function DQTrustReport({ trustReport, isLoading, governanceStatus, violat
                 <span className="text-warning">- {score_breakdown.dimension_penalty} (dimensions)</span>
               )}
               {score_breakdown.simulated_penalty > 0 && (
-                <span className="text-warning">- {score_breakdown.simulated_penalty} (simulated)</span>
+                <span className="text-warning">- {score_breakdown.simulated_penalty} (unavailable)</span>
               )}
               {score_breakdown.critical_penalty > 0 && (
                 <span className="text-destructive">- {score_breakdown.critical_penalty} (critical)</span>
@@ -285,7 +285,7 @@ export function DQTrustReport({ trustReport, isLoading, governanceStatus, violat
         <div className="pt-2 border-t text-xs text-muted-foreground flex items-center justify-between">
           <span className="flex items-center gap-1">
             <Info className="h-3 w-3" />
-            Trust Score = 100 only if all dimensions computed, no violations, no simulated metrics.
+            Governance Integrity Score = 100 only if all dimensions computed, no violations, no unavailable metrics.
           </span>
           {/* GOVERNANCE: trust_score is now INTEGER 0-100 */}
           <Badge 

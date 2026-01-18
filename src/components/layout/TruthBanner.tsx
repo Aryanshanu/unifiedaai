@@ -10,7 +10,7 @@ export function TruthBanner() {
       <Shield className="w-4 h-4" />
       <span className="text-sm font-medium">
         <CheckCircle2 className="w-4 h-4 inline mr-1" />
-        All fake data deleted on Dec 11, 2025. Only real traffic flows here.
+        All legacy data cleared on Dec 11, 2025. Only production traffic flows here.
       </span>
     </div>
   );
