@@ -83,3 +83,24 @@ verify_jwt = true
 
 [functions.dq-chat]
 verify_jwt = false
+
+[functions.dq-control-plane]
+verify_jwt = false
+
+[functions.dq-profile-dataset]
+verify_jwt = false
+
+[functions.dq-generate-rules]
+verify_jwt = false
+
+[functions.dq-execute-rules]
+verify_jwt = false
+
+[functions.dq-generate-dashboard-assets]
+verify_jwt = false
+
+[functions.dq-raise-incidents]
+verify_jwt = false
+
+[functions.dq-ingest-data]
+verify_jwt = false
