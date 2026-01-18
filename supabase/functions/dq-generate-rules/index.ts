@@ -38,6 +38,7 @@ interface RulesOutput {
   rules_version?: number;
   rules?: DQRule[];
   profiling_run_id?: string;
+  deduplicated_count?: number;
   code?: string;
   message?: string;
   detail?: string;
@@ -101,168 +102,208 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const columnProfiles: ColumnProfile[] = profiling_output.column_profiles;
-    const rules: DQRule[] = [];
+    const candidateRules: DQRule[] = [];
     
     // Get current max version for this dataset
     const { data: existingRules } = await supabase
       .from("dq_rules")
-      .select("version")
+      .select("version, column_name, dimension, logic_type")
       .eq("dataset_id", profiling_output.dataset_id)
-      .order("version", { ascending: false })
-      .limit(1);
+      .eq("is_active", true);
 
     const newVersion = (existingRules?.[0]?.version || 0) + 1;
+
+    // ============================================
+    // TRUTH CONTRACT: Deduplicate rules by (column, dimension, logic_type)
+    // ============================================
+    const existingRuleKeys = new Set(
+      (existingRules || []).map(r => `${r.column_name}_${r.dimension}_${r.logic_type}`)
+    );
+    let deduplicatedCount = 0;
 
     // Generate rules for each column
     for (const col of columnProfiles) {
       // Rule 1: Completeness check for every column
-      const completenessThreshold = calibrateThreshold(col.completeness, "completeness");
-      const completenessRule: DQRule = {
-        rule_id: crypto.randomUUID(),
-        version: newVersion,
-        dimension: "completeness",
-        rule_name: `${col.column_name}_completeness`,
-        logic_type: "null_check",
-        logic_code: `SELECT COUNT(*) as failed FROM data WHERE ${col.column_name} IS NULL OR ${col.column_name} = ''`,
-        column_name: col.column_name,
-        threshold: completenessThreshold,
-        severity: determineSeverity(col.column_name, "completeness", completenessThreshold),
-        confidence: 0.95,
-        business_impact: `Missing ${col.column_name} values may cause downstream processing failures`,
-        calibration_metadata: {
-          observed_completeness: col.completeness,
-          observed_null_count: col.null_count,
-          profiling_run_id: profiling_output.profiling_run_id,
-        },
-      };
-      rules.push(completenessRule);
-
-      // Rule 2: Uniqueness check for ID-like columns
-      if (col.uniqueness > 0.95 || col.column_name.toLowerCase().includes("id")) {
-        const uniquenessThreshold = calibrateThreshold(col.uniqueness, "uniqueness");
-        const uniquenessRule: DQRule = {
+      const completenessKey = `${col.column_name}_completeness_null_check`;
+      if (!existingRuleKeys.has(completenessKey)) {
+        const completenessThreshold = calibrateThreshold(col.completeness, "completeness");
+        const completenessRule: DQRule = {
           rule_id: crypto.randomUUID(),
           version: newVersion,
-          dimension: "uniqueness",
-          rule_name: `${col.column_name}_uniqueness`,
-          logic_type: "duplicate_check",
-          logic_code: `SELECT ${col.column_name}, COUNT(*) FROM data GROUP BY ${col.column_name} HAVING COUNT(*) > 1`,
+          dimension: "completeness",
+          rule_name: `${col.column_name}_completeness`,
+          logic_type: "null_check",
+          logic_code: `SELECT COUNT(*) as failed FROM data WHERE ${col.column_name} IS NULL OR ${col.column_name} = ''`,
           column_name: col.column_name,
-          threshold: uniquenessThreshold,
-          severity: determineSeverity(col.column_name, "uniqueness", uniquenessThreshold),
-          confidence: 0.9,
-          business_impact: `Duplicate ${col.column_name} values may indicate data integrity issues`,
+          threshold: completenessThreshold,
+          severity: determineSeverity(col.column_name, "completeness", completenessThreshold),
+          confidence: 0.95,
+          business_impact: `Missing ${col.column_name} values may cause downstream processing failures`,
           calibration_metadata: {
-            observed_uniqueness: col.uniqueness,
-            distinct_count: col.distinct_count,
+            observed_completeness: col.completeness,
+            observed_null_count: col.null_count,
             profiling_run_id: profiling_output.profiling_run_id,
           },
         };
-        rules.push(uniquenessRule);
+        candidateRules.push(completenessRule);
+        existingRuleKeys.add(completenessKey);
+      } else {
+        deduplicatedCount++;
+      }
+
+      // Rule 2: Uniqueness check for ID-like columns
+      if (col.uniqueness > 0.95 || col.column_name.toLowerCase().includes("id")) {
+        const uniquenessKey = `${col.column_name}_uniqueness_duplicate_check`;
+        if (!existingRuleKeys.has(uniquenessKey)) {
+          const uniquenessThreshold = calibrateThreshold(col.uniqueness, "uniqueness");
+          const uniquenessRule: DQRule = {
+            rule_id: crypto.randomUUID(),
+            version: newVersion,
+            dimension: "uniqueness",
+            rule_name: `${col.column_name}_uniqueness`,
+            logic_type: "duplicate_check",
+            logic_code: `SELECT ${col.column_name}, COUNT(*) FROM data GROUP BY ${col.column_name} HAVING COUNT(*) > 1`,
+            column_name: col.column_name,
+            threshold: uniquenessThreshold,
+            severity: determineSeverity(col.column_name, "uniqueness", uniquenessThreshold),
+            confidence: 0.9,
+            business_impact: `Duplicate ${col.column_name} values may indicate data integrity issues`,
+            calibration_metadata: {
+              observed_uniqueness: col.uniqueness,
+              distinct_count: col.distinct_count,
+              profiling_run_id: profiling_output.profiling_run_id,
+            },
+          };
+          candidateRules.push(uniquenessRule);
+          existingRuleKeys.add(uniquenessKey);
+        } else {
+          deduplicatedCount++;
+        }
       }
 
       // Rule 3: Validity check for specific data types
       if (col.dtype === "integer" || col.dtype === "float") {
-        const validityRule: DQRule = {
-          rule_id: crypto.randomUUID(),
-          version: newVersion,
-          dimension: "validity",
-          rule_name: `${col.column_name}_numeric_validity`,
-          logic_type: "range_check",
-          logic_code: `SELECT COUNT(*) as failed FROM data WHERE ${col.column_name} < ${col.min_value ?? 0} OR ${col.column_name} > ${col.max_value ?? 999999}`,
-          column_name: col.column_name,
-          threshold: 0.95,
-          severity: "warning",
-          confidence: 0.85,
-          business_impact: `Out-of-range ${col.column_name} values may indicate data entry errors`,
-          calibration_metadata: {
-            observed_min: col.min_value,
-            observed_max: col.max_value,
-            observed_mean: col.mean_value,
-            profiling_run_id: profiling_output.profiling_run_id,
-          },
-        };
-        rules.push(validityRule);
+        const validityKey = `${col.column_name}_validity_range_check`;
+        if (!existingRuleKeys.has(validityKey)) {
+          const validityRule: DQRule = {
+            rule_id: crypto.randomUUID(),
+            version: newVersion,
+            dimension: "validity",
+            rule_name: `${col.column_name}_numeric_validity`,
+            logic_type: "range_check",
+            logic_code: `SELECT COUNT(*) as failed FROM data WHERE ${col.column_name} < ${col.min_value ?? 0} OR ${col.column_name} > ${col.max_value ?? 999999}`,
+            column_name: col.column_name,
+            threshold: 0.95,
+            severity: "warning",
+            confidence: 0.85,
+            business_impact: `Out-of-range ${col.column_name} values may indicate data entry errors`,
+            calibration_metadata: {
+              observed_min: col.min_value,
+              observed_max: col.max_value,
+              observed_mean: col.mean_value,
+              profiling_run_id: profiling_output.profiling_run_id,
+            },
+          };
+          candidateRules.push(validityRule);
+          existingRuleKeys.add(validityKey);
+        } else {
+          deduplicatedCount++;
+        }
       }
 
       // Rule 4: Email validity check
       if (col.column_name.toLowerCase().includes("email")) {
-        const emailRule: DQRule = {
-          rule_id: crypto.randomUUID(),
-          version: newVersion,
-          dimension: "validity",
-          rule_name: `${col.column_name}_email_format`,
-          logic_type: "regex_match",
-          logic_code: `SELECT COUNT(*) as failed FROM data WHERE ${col.column_name} !~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$'`,
-          column_name: col.column_name,
-          threshold: 0.98,
-          severity: "critical",
-          confidence: 0.95,
-          business_impact: "Invalid email addresses will cause notification failures",
-          calibration_metadata: {
-            profiling_run_id: profiling_output.profiling_run_id,
-          },
-        };
-        rules.push(emailRule);
+        const emailKey = `${col.column_name}_validity_regex_match`;
+        if (!existingRuleKeys.has(emailKey)) {
+          const emailRule: DQRule = {
+            rule_id: crypto.randomUUID(),
+            version: newVersion,
+            dimension: "validity",
+            rule_name: `${col.column_name}_email_format`,
+            logic_type: "regex_match",
+            logic_code: `SELECT COUNT(*) as failed FROM data WHERE ${col.column_name} !~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$'`,
+            column_name: col.column_name,
+            threshold: 0.98,
+            severity: "critical",
+            confidence: 0.95,
+            business_impact: "Invalid email addresses will cause notification failures",
+            calibration_metadata: {
+              profiling_run_id: profiling_output.profiling_run_id,
+            },
+          };
+          candidateRules.push(emailRule);
+          existingRuleKeys.add(emailKey);
+        } else {
+          deduplicatedCount++;
+        }
       }
 
       // Rule 5: Date/timestamp timeliness check
       if (col.dtype === "datetime" || col.column_name.toLowerCase().includes("_at")) {
-        const timelinessRule: DQRule = {
-          rule_id: crypto.randomUUID(),
-          version: newVersion,
-          dimension: "timeliness",
-          rule_name: `${col.column_name}_freshness`,
-          logic_type: "freshness_check",
-          logic_code: `SELECT COUNT(*) as failed FROM data WHERE ${col.column_name} < NOW() - INTERVAL '30 days'`,
-          column_name: col.column_name,
-          threshold: 0.8,
-          severity: "info",
-          confidence: 0.7,
-          business_impact: `Stale ${col.column_name} records may need review`,
-          calibration_metadata: {
-            profiling_run_id: profiling_output.profiling_run_id,
-          },
-        };
-        rules.push(timelinessRule);
+        const timelinessKey = `${col.column_name}_timeliness_freshness_check`;
+        if (!existingRuleKeys.has(timelinessKey)) {
+          const timelinessRule: DQRule = {
+            rule_id: crypto.randomUUID(),
+            version: newVersion,
+            dimension: "timeliness",
+            rule_name: `${col.column_name}_freshness`,
+            logic_type: "freshness_check",
+            logic_code: `SELECT COUNT(*) as failed FROM data WHERE ${col.column_name} < NOW() - INTERVAL '30 days'`,
+            column_name: col.column_name,
+            threshold: 0.8,
+            severity: "info",
+            confidence: 0.7,
+            business_impact: `Stale ${col.column_name} records may need review`,
+            calibration_metadata: {
+              profiling_run_id: profiling_output.profiling_run_id,
+            },
+          };
+          candidateRules.push(timelinessRule);
+          existingRuleKeys.add(timelinessKey);
+        } else {
+          deduplicatedCount++;
+        }
       }
     }
 
-    // Store rules in database
-    const rulesToInsert = rules.map((rule) => ({
-      id: rule.rule_id,
-      dataset_id: profiling_output.dataset_id,
-      profile_id: profiling_output.profiling_run_id,
-      version: rule.version,
-      dimension: rule.dimension,
-      rule_name: rule.rule_name,
-      logic_type: rule.logic_type,
-      logic_code: rule.logic_code,
-      column_name: rule.column_name,
-      threshold: rule.threshold,
-      severity: rule.severity,
-      confidence: rule.confidence,
-      business_impact: rule.business_impact,
-      is_active: true,
-      calibration_metadata: rule.calibration_metadata,
-    }));
+    // Store rules in database (only new ones)
+    if (candidateRules.length > 0) {
+      const rulesToInsert = candidateRules.map((rule) => ({
+        id: rule.rule_id,
+        dataset_id: profiling_output.dataset_id,
+        profile_id: profiling_output.profiling_run_id,
+        version: rule.version,
+        dimension: rule.dimension,
+        rule_name: rule.rule_name,
+        logic_type: rule.logic_type,
+        logic_code: rule.logic_code,
+        column_name: rule.column_name,
+        threshold: rule.threshold,
+        severity: rule.severity,
+        confidence: rule.confidence,
+        business_impact: rule.business_impact,
+        is_active: true,
+        calibration_metadata: rule.calibration_metadata,
+      }));
 
-    const { error: insertError } = await supabase
-      .from("dq_rules")
-      .insert(rulesToInsert);
+      const { error: insertError } = await supabase
+        .from("dq_rules")
+        .insert(rulesToInsert);
 
-    if (insertError) {
-      console.error("Failed to store rules:", insertError);
+      if (insertError) {
+        console.error("Failed to store rules:", insertError);
+      }
     }
 
     const response: RulesOutput = {
       status: "success",
       rules_version: newVersion,
-      rules,
+      rules: candidateRules,
       profiling_run_id: profiling_output.profiling_run_id,
+      deduplicated_count: deduplicatedCount,
     };
 
-    console.log(`[DQ Rules] Generated ${rules.length} rules, version ${newVersion}`);
+    console.log(`[DQ Rules] Generated ${candidateRules.length} rules (${deduplicatedCount} deduplicated), version ${newVersion}`);
 
     return new Response(JSON.stringify(response), {
       status: 200,

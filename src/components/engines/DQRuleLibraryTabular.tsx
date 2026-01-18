@@ -55,6 +55,7 @@ interface DQRuleLibraryTabularProps {
   rules: DQRule[];
   isLoading?: boolean;
   version?: number;
+  deduplicatedCount?: number;
 }
 
 function getSeverityConfig(severity: string) {

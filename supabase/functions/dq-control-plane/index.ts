@@ -6,7 +6,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Response type definitions
+// TRUTH CONTRACT: Complete response including TRUST_REPORT
+interface TrustReport {
+  discarded_metrics: string[];
+  deduplicated_rules: number;
+  inconsistencies_found: string[];
+  truth_score: number;
+}
+
 interface ControlPlaneResponse {
   status: "success" | "error";
   code: string;
@@ -19,6 +26,8 @@ interface ControlPlaneResponse {
   // Track partial success
   completed_steps?: string[];
   failed_steps?: string[];
+  // TRUTH CONTRACT: Reconciliation report
+  TRUST_REPORT?: TrustReport;
 }
 
 // Input validation
@@ -64,6 +73,11 @@ serve(async (req) => {
   const startTime = Date.now();
   const completedSteps: string[] = [];
   const failedSteps: string[] = [];
+  
+  // TRUST_REPORT tracking
+  const discardedMetrics: string[] = [];
+  let deduplicatedRulesCount = 0;
+  const inconsistencies: string[] = [];
 
   try {
     // Parse input
@@ -170,6 +184,14 @@ serve(async (req) => {
       } else {
         completedSteps.push("profiling");
         console.log("[DQ Control Plane] Profiling complete. Run ID:", profilingResult.profiling_run_id);
+        
+        // TRUTH CONTRACT: Track discarded metrics from profiling
+        const dimensionScores = profilingResult.dimension_scores as Array<{ dimension: string; computed: boolean }> || [];
+        dimensionScores.forEach((d) => {
+          if (!d.computed) {
+            discardedMetrics.push(d.dimension);
+          }
+        });
       }
     } catch (err) {
       console.error("[DQ Control Plane] Profiling exception:", err);
@@ -218,6 +240,9 @@ serve(async (req) => {
       } else {
         completedSteps.push("rules");
         console.log("[DQ Control Plane] Rules generated. Version:", rulesResult.rules_version, "Count:", (rulesResult.rules as unknown[]).length);
+        
+        // TRUTH CONTRACT: Track deduplicated rules
+        deduplicatedRulesCount = (rulesResult.deduplicated_count as number) || 0;
       }
     } catch (err) {
       console.error("[DQ Control Plane] Rules exception:", err);
@@ -372,10 +397,20 @@ serve(async (req) => {
     }
 
     // ============================================
-    // FINAL RESPONSE
+    // FINAL RESPONSE WITH TRUST_REPORT
     // ============================================
     const totalTime = Date.now() - startTime;
     console.log(`[DQ Control Plane] Pipeline completed in ${totalTime}ms. Completed: ${completedSteps.join(", ")}. Failed: ${failedSteps.join(", ") || "none"}`);
+
+    // Calculate truth score: 1.0 if no inconsistencies, degrade for each issue
+    const truthScore = inconsistencies.length === 0 ? 1.0 : Math.max(0, 1 - (inconsistencies.length * 0.1));
+
+    const trustReport: TrustReport = {
+      discarded_metrics: discardedMetrics,
+      deduplicated_rules: deduplicatedRulesCount,
+      inconsistencies_found: inconsistencies,
+      truth_score: truthScore,
+    };
 
     const response: ControlPlaneResponse = {
       status: "success",
@@ -392,6 +427,7 @@ serve(async (req) => {
       incident_count: (incidentsResult.incident_count as number) || 0,
       completed_steps: completedSteps,
       failed_steps: failedSteps,
+      TRUST_REPORT: trustReport,
     };
 
     return new Response(JSON.stringify(response), {
