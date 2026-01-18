@@ -26,9 +26,12 @@ export interface ColumnProfile {
   sample_values: (string | number | null)[];
 }
 
+// TRUTH CONTRACT: DimensionScore with computed flag
 export interface DimensionScore {
   dimension: string;
-  score: number;
+  score: number | null;
+  computed: boolean;
+  reason?: string;
   weight: number;
   details: Record<string, number>;
 }

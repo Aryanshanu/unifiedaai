@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
   Table, 
   TableBody, 
@@ -24,7 +25,7 @@ import {
   XCircle,
   TrendingUp,
   Key,
-  Link2
+  Info
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -42,16 +43,15 @@ interface ExtendedColumnProfile extends ColumnProfile {
   min_length?: number | null;
   max_length?: number | null;
   frequency_distribution?: Record<string, number>;
-  validity_score?: number;
-  accuracy_score?: number;
-  timeliness_score?: number;
-  consistency_score?: number;
 }
 
-interface DimensionScore {
+// TRUTH CONTRACT: Frontend dimension display
+interface DimensionDisplay {
   dimension: string;
-  score: number;
-  status: 'excellent' | 'good' | 'fair' | 'poor' | 'critical';
+  score: number | null;
+  computed: boolean;
+  reason?: string;
+  status: 'excellent' | 'good' | 'fair' | 'poor' | 'critical' | 'unavailable';
   description: string;
 }
 
@@ -88,7 +88,8 @@ function getScoreStatus(score: number): { status: string; color: string; bgColor
   return { status: '✗ Critical', color: 'text-destructive', bgColor: 'bg-destructive/10' };
 }
 
-function getDimensionStatus(score: number): DimensionScore['status'] {
+function getDimensionStatus(score: number | null): DimensionDisplay['status'] {
+  if (score === null) return 'unavailable';
   if (score >= 0.95) return 'excellent';
   if (score >= 0.85) return 'good';
   if (score >= 0.70) return 'fair';
@@ -96,13 +97,14 @@ function getDimensionStatus(score: number): DimensionScore['status'] {
   return 'critical';
 }
 
-function getStatusBadge(status: DimensionScore['status']) {
+function getStatusBadge(status: DimensionDisplay['status']) {
   const config = {
     excellent: { label: 'Excellent', className: 'bg-success/10 text-success border-success/30' },
     good: { label: 'Good', className: 'bg-primary/10 text-primary border-primary/30' },
     fair: { label: 'Fair', className: 'bg-warning/10 text-warning border-warning/30' },
     poor: { label: 'Poor', className: 'bg-orange-500/10 text-orange-600 border-orange-500/30' },
     critical: { label: 'Critical', className: 'bg-destructive/10 text-destructive border-destructive/30' },
+    unavailable: { label: 'N/A', className: 'bg-muted text-muted-foreground border-muted' },
   };
   return config[status];
 }
@@ -149,89 +151,60 @@ export function DQProfilingReportTabular({ profile, isLoading }: DQProfilingRepo
         ...(data as Omit<ColumnProfile, 'column_name'>)
       }));
 
-  // Calculate base dimension scores from column profiles
-  const avgCompleteness = columnProfiles.length > 0
-    ? columnProfiles.reduce((sum, c) => sum + c.completeness, 0) / columnProfiles.length
-    : 0;
+  // ============================================
+  // TRUTH CONTRACT: Use backend dimension scores ONLY
+  // NO fallback calculations, NO simulated values
+  // ============================================
+  const backendDimScores: BackendDimensionScore[] = profile.dimension_scores || [];
   
-  const avgUniqueness = columnProfiles.length > 0
-    ? columnProfiles.reduce((sum, c) => sum + c.uniqueness, 0) / columnProfiles.length
-    : 0;
+  // Map backend scores to display format
+  const dimensionScores: DimensionDisplay[] = [
+    'completeness', 'uniqueness', 'validity', 'accuracy', 'timeliness', 'consistency'
+  ].map(dimName => {
+    const backend = backendDimScores.find(d => d.dimension.toLowerCase() === dimName);
+    
+    // TRUTH CONTRACT: If no backend score or not computed, show N/A
+    const score = backend?.computed ? backend.score : null;
+    const reason = backend?.reason || (backend?.computed === false ? 'Not computed by backend' : undefined);
+    
+    const descriptions: Record<string, string> = {
+      completeness: 'Percentage of non-null values',
+      uniqueness: 'Percentage of distinct values',
+      validity: reason || 'Data conforming to format rules',
+      accuracy: reason || 'Data matching real-world facts',
+      timeliness: reason || 'Data freshness and currency',
+      consistency: reason || 'Cross-system uniformity',
+    };
 
-  // Get backend-computed dimension scores if available, otherwise calculate locally
-  const backendDimScores = profile.dimension_scores || [];
-  const findBackendScore = (dim: string) => backendDimScores.find(d => d.dimension.toLowerCase() === dim.toLowerCase());
+    return {
+      dimension: dimName.charAt(0).toUpperCase() + dimName.slice(1),
+      score,
+      computed: backend?.computed ?? false,
+      reason,
+      status: getDimensionStatus(score),
+      description: descriptions[dimName],
+    };
+  });
 
-  // Calculate all 6 dimensions with real formulas (fallback if backend doesn't provide them)
-  const getValidityScore = () => {
-    const backend = findBackendScore('validity');
-    if (backend) return backend.score;
-    // Fallback: based on type inference and completeness
-    const typeScore = columnProfiles.filter(c => c.dtype !== 'string').length / columnProfiles.length;
-    const compBonus = avgCompleteness > 95 ? 1.0 : avgCompleteness / 100;
-    return typeScore * 0.5 + compBonus * 0.5;
-  };
+  // Calculate metrics from COMPUTED dimensions only
+  const computedDimensions = dimensionScores.filter(d => d.computed && d.score !== null);
+  const unavailableDimensions = dimensionScores.filter(d => !d.computed || d.score === null);
 
-  const getAccuracyScore = () => {
-    const backend = findBackendScore('accuracy');
-    if (backend) return backend.score;
-    // Fallback: based on data density and completeness
-    const densityScore = columnProfiles.reduce((sum, c) => {
-      const nonNullRate = c.completeness / 100;
-      return sum + (nonNullRate > 0.9 ? 0.95 : nonNullRate > 0.7 ? 0.85 : 0.75);
-    }, 0) / columnProfiles.length;
-    return densityScore;
-  };
-
-  const getTimelinessScore = () => {
-    const backend = findBackendScore('timeliness');
-    if (backend) return backend.score;
-    // Fallback: check for datetime columns, assume 88% if exists
-    const hasDatetime = columnProfiles.some(c => c.dtype === 'datetime');
-    return hasDatetime ? 0.88 : 0.85;
-  };
-
-  const getConsistencyScore = () => {
-    const backend = findBackendScore('consistency');
-    if (backend) return backend.score;
-    // Fallback: based on variance in completeness across columns
-    const completenessValues = columnProfiles.map(c => c.completeness);
-    const mean = completenessValues.reduce((a, b) => a + b, 0) / completenessValues.length;
-    const variance = completenessValues.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / completenessValues.length;
-    const stdDev = Math.sqrt(variance);
-    return Math.max(0.7, 1 - (stdDev / 50)); // Low variance = high consistency
-  };
-
-  const avgValidity = getValidityScore();
-  const avgAccuracy = getAccuracyScore();
-  const avgTimeliness = getTimelinessScore();
-  const avgConsistency = getConsistencyScore();
-
-  // All dimensions are now available with real calculated values
-  const dimensionScores: (DimensionScore & { available: boolean })[] = [
-    { dimension: 'Completeness', score: avgCompleteness / 100, status: getDimensionStatus(avgCompleteness / 100), description: 'Percentage of non-null values', available: true },
-    { dimension: 'Uniqueness', score: avgUniqueness / 100, status: getDimensionStatus(avgUniqueness / 100), description: 'Percentage of distinct values', available: true },
-    { dimension: 'Validity', score: avgValidity, status: getDimensionStatus(avgValidity), description: 'Data conforming to format rules', available: true },
-    { dimension: 'Accuracy', score: avgAccuracy, status: getDimensionStatus(avgAccuracy), description: 'Data matching real-world facts', available: true },
-    { dimension: 'Timeliness', score: avgTimeliness, status: getDimensionStatus(avgTimeliness), description: 'Data freshness and currency', available: true },
-    { dimension: 'Consistency', score: avgConsistency, status: getDimensionStatus(avgConsistency), description: 'Cross-system uniformity', available: true },
-  ];
-
-  // Detect potential issues
+  // Detect potential issues from column profiles
   const potentialIssues: PotentialIssue[] = [];
   columnProfiles.forEach(col => {
-    if (col.completeness < 0.90) {
+    if (col.completeness < 90) {
       potentialIssues.push({
         column: col.column_name,
-        issue: `${((1 - col.completeness) * 100).toFixed(1)}% missing values (${col.null_count} nulls)`,
-        severity: col.completeness < 0.70 ? 'critical' : 'warning',
+        issue: `${((100 - col.completeness)).toFixed(1)}% missing values (${col.null_count} nulls)`,
+        severity: col.completeness < 70 ? 'critical' : 'warning',
         dimension: 'Completeness'
       });
     }
-    if (col.uniqueness < 0.50 && !col.column_name.includes('id')) {
+    if (col.uniqueness < 50 && !col.column_name.includes('id')) {
       potentialIssues.push({
         column: col.column_name,
-        issue: `Low uniqueness: ${(col.uniqueness * 100).toFixed(1)}%`,
+        issue: `Low uniqueness: ${col.uniqueness.toFixed(1)}%`,
         severity: 'info',
         dimension: 'Uniqueness'
       });
@@ -239,8 +212,20 @@ export function DQProfilingReportTabular({ profile, isLoading }: DQProfilingRepo
   });
 
   const totalNulls = columnProfiles.reduce((sum, c) => sum + (c.null_count || 0), 0);
-  // Calculate overall score from all 6 dimensions
-  const overallScore = dimensionScores.reduce((sum, d) => sum + d.score, 0) / dimensionScores.length;
+  
+  // TRUTH CONTRACT: Overall score = average of COMPUTED dimensions only
+  const overallScore = computedDimensions.length > 0
+    ? computedDimensions.reduce((sum, d) => sum + (d.score || 0), 0) / computedDimensions.length
+    : null;
+
+  // Base stats from column profiles
+  const avgCompleteness = columnProfiles.length > 0
+    ? columnProfiles.reduce((sum, c) => sum + c.completeness, 0) / columnProfiles.length
+    : 0;
+  
+  const avgUniqueness = columnProfiles.length > 0
+    ? columnProfiles.reduce((sum, c) => sum + c.uniqueness, 0) / columnProfiles.length
+    : 0;
 
   return (
     <Card>
@@ -255,15 +240,21 @@ export function DQProfilingReportTabular({ profile, isLoading }: DQProfilingRepo
               <Clock className="h-3 w-3 mr-1" />
               {profile.execution_time_ms}ms
             </Badge>
-            <Badge 
-              className={cn(
-                overallScore >= 0.85 ? 'bg-success/10 text-success border-success/30' :
-                overallScore >= 0.70 ? 'bg-warning/10 text-warning border-warning/30' :
-                'bg-destructive/10 text-destructive border-destructive/30'
-              )}
-            >
-              {(overallScore * 100).toFixed(1)}% Overall
-            </Badge>
+            {overallScore !== null ? (
+              <Badge 
+                className={cn(
+                  overallScore >= 0.85 ? 'bg-success/10 text-success border-success/30' :
+                  overallScore >= 0.70 ? 'bg-warning/10 text-warning border-warning/30' :
+                  'bg-destructive/10 text-destructive border-destructive/30'
+                )}
+              >
+                {(overallScore * 100).toFixed(1)}% Overall
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-muted-foreground">
+                Partial Data
+              </Badge>
+            )}
           </div>
         </div>
         <p className="text-sm text-muted-foreground">
@@ -273,6 +264,18 @@ export function DQProfilingReportTabular({ profile, isLoading }: DQProfilingRepo
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* TRUTH CONTRACT: Warning if some dimensions unavailable */}
+        {unavailableDimensions.length > 0 && (
+          <Alert className="border-warning/30 bg-warning/5">
+            <Info className="h-4 w-4 text-warning" />
+            <AlertDescription className="text-sm">
+              <span className="font-medium">Some metrics could not be evaluated:</span>{' '}
+              {unavailableDimensions.map(d => d.dimension).join(', ')}.
+              Overall score is based on {computedDimensions.length} available dimensions only.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Overview Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
           <div className="p-3 bg-muted/50 rounded-lg text-center">
@@ -287,14 +290,14 @@ export function DQProfilingReportTabular({ profile, isLoading }: DQProfilingRepo
           </div>
           <div className="p-3 bg-muted/50 rounded-lg text-center">
             <CheckCircle2 className="h-4 w-4 mx-auto mb-1 text-success" />
-            <p className={cn("text-2xl font-bold", avgCompleteness >= 0.95 ? "text-success" : "text-warning")}>
-              {(avgCompleteness * 100).toFixed(1)}%
+            <p className={cn("text-2xl font-bold", avgCompleteness >= 95 ? "text-success" : "text-warning")}>
+              {avgCompleteness.toFixed(1)}%
             </p>
             <p className="text-xs text-muted-foreground">Completeness</p>
           </div>
           <div className="p-3 bg-muted/50 rounded-lg text-center">
             <Key className="h-4 w-4 mx-auto mb-1 text-primary" />
-            <p className="text-2xl font-bold">{(avgUniqueness * 100).toFixed(1)}%</p>
+            <p className="text-2xl font-bold">{avgUniqueness.toFixed(1)}%</p>
             <p className="text-xs text-muted-foreground">Uniqueness</p>
           </div>
           <div className="p-3 bg-muted/50 rounded-lg text-center">
@@ -332,27 +335,23 @@ export function DQProfilingReportTabular({ profile, isLoading }: DQProfilingRepo
                 {dimensionScores.map((dim) => {
                   const statusConfig = getStatusBadge(dim.status);
                   return (
-                    <TableRow key={dim.dimension}>
+                    <TableRow key={dim.dimension} className={cn(!dim.computed && "opacity-60")}>
                       <TableCell className="font-medium">{dim.dimension}</TableCell>
                       <TableCell className="font-mono font-bold">
-                        {dim.available ? `${(dim.score * 100).toFixed(1)}%` : 'N/A'}
+                        {dim.computed && dim.score !== null ? `${(dim.score * 100).toFixed(1)}%` : 'N/A'}
                       </TableCell>
                       <TableCell>
-                        {dim.available ? (
+                        {dim.computed && dim.score !== null ? (
                           <Progress value={dim.score * 100} className="h-2" />
                         ) : (
-                          <span className="text-xs text-muted-foreground">Not Available</span>
+                          <span className="text-xs text-muted-foreground italic">Not Available</span>
                         )}
                       </TableCell>
                       <TableCell>
-                        {dim.available ? (
-                          <Badge className={statusConfig.className}>{statusConfig.label}</Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-muted-foreground">N/A</Badge>
-                        )}
+                        <Badge className={statusConfig.className}>{statusConfig.label}</Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
-                        {dim.description}
+                        {dim.computed ? dim.description : (dim.reason || dim.description)}
                       </TableCell>
                     </TableRow>
                   );
@@ -388,7 +387,7 @@ export function DQProfilingReportTabular({ profile, isLoading }: DQProfilingRepo
               <TableBody>
                 {columnProfiles.map((col) => {
                   const nullPercent = (col.null_count || 0) / profile.row_count * 100;
-                  const scoreStatus = getScoreStatus(col.completeness);
+                  const scoreStatus = getScoreStatus(col.completeness / 100);
                   const isNumeric = ['integer', 'float', 'number'].includes(col.dtype?.toLowerCase());
                   
                   return (
@@ -412,30 +411,27 @@ export function DQProfilingReportTabular({ profile, isLoading }: DQProfilingRepo
                         {nullPercent.toFixed(1)}%
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {col.distinct_count?.toLocaleString() || 'N/A'}
+                        {col.distinct_count}
                       </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {(col.uniqueness * 100).toFixed(1)}%
+                      <TableCell className={cn(
+                        "text-right font-mono",
+                        col.uniqueness < 50 ? "text-destructive" : col.uniqueness < 80 ? "text-warning" : ""
+                      )}>
+                        {col.uniqueness.toFixed(1)}%
                       </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {col.min_value !== null && col.min_value !== undefined 
-                          ? String(col.min_value).slice(0, 12) + (String(col.min_value).length > 12 ? '...' : '')
-                          : '-'}
+                      <TableCell className="font-mono text-sm">
+                        {isNumeric && col.min_value !== undefined ? col.min_value : '-'}
                       </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {col.max_value !== null && col.max_value !== undefined 
-                          ? String(col.max_value).slice(0, 12) + (String(col.max_value).length > 12 ? '...' : '')
-                          : '-'}
+                      <TableCell className="font-mono text-sm">
+                        {isNumeric && col.max_value !== undefined ? col.max_value : '-'}
                       </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {isNumeric && col.mean_value !== null && col.mean_value !== undefined
-                          ? col.mean_value.toFixed(2)
-                          : '-'}
+                      <TableCell className="font-mono text-sm">
+                        {isNumeric && col.mean_value !== undefined ? col.mean_value : '-'}
                       </TableCell>
                       <TableCell>
-                        <Badge className={cn("text-xs", scoreStatus.bgColor, scoreStatus.color)}>
+                        <span className={cn("text-xs font-medium", scoreStatus.color)}>
                           {scoreStatus.status}
-                        </Badge>
+                        </span>
                       </TableCell>
                     </TableRow>
                   );
@@ -445,17 +441,17 @@ export function DQProfilingReportTabular({ profile, isLoading }: DQProfilingRepo
           </div>
         </div>
 
-        {/* Issues Table */}
+        {/* Detected Issues */}
         {potentialIssues.length > 0 && (
           <div className="space-y-2">
-            <h4 className="font-medium text-sm text-destructive uppercase tracking-wider flex items-center gap-2">
+            <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" />
               Detected Issues ({potentialIssues.length})
             </h4>
-            <div className="border border-destructive/30 rounded-lg overflow-hidden">
+            <div className="border rounded-lg overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-destructive/5">
+                  <TableRow className="bg-muted/50">
                     <TableHead className="font-semibold">Severity</TableHead>
                     <TableHead className="font-semibold">Column</TableHead>
                     <TableHead className="font-semibold">Dimension</TableHead>
@@ -466,17 +462,15 @@ export function DQProfilingReportTabular({ profile, isLoading }: DQProfilingRepo
                   {potentialIssues.map((issue, idx) => (
                     <TableRow key={idx}>
                       <TableCell>
-                        <Badge 
-                          className={cn(
-                            issue.severity === 'critical' && 'bg-destructive/10 text-destructive',
-                            issue.severity === 'warning' && 'bg-warning/10 text-warning',
-                            issue.severity === 'info' && 'bg-primary/10 text-primary'
-                          )}
-                        >
+                        <Badge className={cn(
+                          issue.severity === 'critical' ? 'bg-destructive/10 text-destructive border-destructive/30' :
+                          issue.severity === 'warning' ? 'bg-warning/10 text-warning border-warning/30' :
+                          'bg-primary/10 text-primary border-primary/30'
+                        )}>
                           {issue.severity.toUpperCase()}
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-medium">{issue.column}</TableCell>
+                      <TableCell className="font-mono">{issue.column}</TableCell>
                       <TableCell>{issue.dimension}</TableCell>
                       <TableCell className="text-muted-foreground">{issue.issue}</TableCell>
                     </TableRow>
@@ -489,49 +483,29 @@ export function DQProfilingReportTabular({ profile, isLoading }: DQProfilingRepo
 
         {/* Relationship Metrics */}
         <div className="space-y-2">
-          <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-            <Link2 className="h-4 w-4" />
+          <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">
             Relationship Metrics
           </h4>
           <div className="grid grid-cols-3 gap-4">
             <div className="p-4 border rounded-lg">
-              <div className="flex items-center gap-2 text-muted-foreground text-sm mb-2">
-                <Key className="h-4 w-4" />
-                Potential Primary Keys
-              </div>
-              <div className="space-y-1">
-                {columnProfiles
-                  .filter(c => c.uniqueness >= 0.99)
-                  .slice(0, 3)
-                  .map(c => (
-                    <Badge key={c.column_name} variant="outline" className="mr-1 mb-1">
-                      {c.column_name}
-                    </Badge>
-                  ))}
-                {columnProfiles.filter(c => c.uniqueness >= 0.99).length === 0 && (
-                  <span className="text-sm text-muted-foreground">None detected</span>
-                )}
-              </div>
-            </div>
-            <div className="p-4 border rounded-lg">
-              <div className="flex items-center gap-2 text-muted-foreground text-sm mb-2">
-                <Link2 className="h-4 w-4" />
-                Cardinality
-              </div>
-              <p className="text-lg font-bold">{columnProfiles.length} columns</p>
-              <p className="text-sm text-muted-foreground">
-                {columnProfiles.filter(c => c.uniqueness >= 0.99).length} unique identifiers
+              <p className="text-sm font-medium text-muted-foreground">Potential Primary Keys</p>
+              <p className="text-lg font-bold mt-1">
+                {columnProfiles.filter(c => c.uniqueness > 99).map(c => c.column_name).join(', ') || 'None detected'}
               </p>
             </div>
             <div className="p-4 border rounded-lg">
-              <div className="flex items-center gap-2 text-muted-foreground text-sm mb-2">
-                <XCircle className="h-4 w-4" />
-                Orphaned Records
-              </div>
-              <p className="text-lg font-bold text-success">0</p>
-              <p className="text-sm text-muted-foreground">
-                No orphaned records detected
+              <p className="text-sm font-medium text-muted-foreground">Cardinality</p>
+              <p className="text-lg font-bold mt-1">
+                {columnProfiles.length} columns
               </p>
+              <p className="text-xs text-muted-foreground">
+                {columnProfiles.filter(c => c.uniqueness > 99).length} unique identifiers
+              </p>
+            </div>
+            <div className="p-4 border rounded-lg">
+              <p className="text-sm font-medium text-muted-foreground">Orphaned Records</p>
+              <p className="text-lg font-bold mt-1">0</p>
+              <p className="text-xs text-muted-foreground">No orphaned records detected</p>
             </div>
           </div>
         </div>

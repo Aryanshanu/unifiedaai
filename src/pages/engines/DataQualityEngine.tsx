@@ -51,6 +51,7 @@ import { DQIncidentsTabular } from '@/components/engines/DQIncidentsTabular';
 import { DQStreamingDashboard } from '@/components/engines/DQStreamingDashboard';
 import { DQRuleSummary } from '@/components/engines/DQRuleSummary';
 import { DQChatPanel } from '@/components/engines/DQChatPanel';
+import { DQTrustReport } from '@/components/engines/DQTrustReport';
 import { useDQControlPlane } from '@/hooks/useDQControlPlane';
 import { useFileUploadStatus, useAllUploads, useQualityStats, UploadStatus } from '@/hooks/useFileUploadStatus';
 import { useQualityTrend } from '@/hooks/useQualityTrend';
@@ -714,6 +715,9 @@ function ControlPlaneTab() {
         onAcknowledge={acknowledgeIncident}
         onResolve={resolveIncident}
       />
+
+      {/* TRUST REPORT - Truth Contract Reconciliation */}
+      <DQTrustReport trustReport={finalResponse?.TRUST_REPORT} />
 
       {/* Raw JSON Response */}
       {finalResponse && (
