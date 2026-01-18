@@ -246,9 +246,10 @@ export function DQStreamingDashboard({ datasetId, executionId, isActive = true }
 
           setDimensions(prev => prev.map(d => {
             const scores = dimensionScores[d.name.toLowerCase()] || [];
+            // GOVERNANCE FIX: Remove Math.random() - use null for unavailable data
             const newScore = scores.length > 0 
               ? scores.reduce((a, b) => a + b, 0) / scores.length 
-              : d.score || Math.random() * 30 + 70;
+              : 0; // Default to 0 instead of fabricated value
             return {
               ...d,
               previousScore: d.score,
@@ -264,8 +265,9 @@ export function DQStreamingDashboard({ datasetId, executionId, isActive = true }
           setMetrics({
             overallScore: total > 0 ? (passed / total) * 100 : 0,
             errorRate: summary.error_rate || (total > 0 ? (failed / total) * 100 : 0),
-            nullRate: summary.null_rate || Math.random() * 5,
-            duplicateRate: summary.duplicate_rate || Math.random() * 2,
+            // GOVERNANCE FIX: Remove Math.random() - use 0 for unavailable data
+            nullRate: summary.null_rate ?? 0,
+            duplicateRate: summary.duplicate_rate ?? 0,
             rulesExecuted: total,
             rulesPassed: passed,
             rulesFailed: failed,
@@ -287,7 +289,8 @@ export function DQStreamingDashboard({ datasetId, executionId, isActive = true }
             column: inc.dimension || 'Unknown',
             issue: inc.action || 'Data quality issue detected',
             severity: inc.severity as 'critical' | 'warning' | 'info',
-            score: Math.random() * 30 + 40
+            // GOVERNANCE FIX: Remove Math.random() - don't fabricate scores
+            score: 0 // Hotspot score should come from actual data or be omitted
           })));
         }
 
@@ -361,13 +364,8 @@ export function DQStreamingDashboard({ datasetId, executionId, isActive = true }
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-lg">
             <Activity className={cn("h-5 w-5 text-primary", isUpdating && "animate-pulse")} />
-            REAL-TIME QUALITY DASHBOARD
-            {isUpdating && (
-              <Badge variant="outline" className="ml-2 animate-pulse bg-primary/10">
-                <Zap className="h-3 w-3 mr-1" />
-                LIVE
-              </Badge>
-            )}
+            {/* GOVERNANCE FIX: Renamed from "REAL-TIME" - data is polled, not streamed */}
+            QUALITY DASHBOARD
           </CardTitle>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <RefreshCw className={cn("h-4 w-4", isUpdating && "animate-spin")} />

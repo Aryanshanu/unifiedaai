@@ -246,7 +246,15 @@ export function useDQControlPlane(datasetId?: string): UseDQControlPlaneReturn {
         { event: 'INSERT', schema: 'public', table: 'dq_rules', filter: `dataset_id=eq.${datasetId}` },
         (payload) => {
           const rule = payload.new as DQRule;
-          setRulesResult(prev => [...prev, rule]);
+          // FIX: Reset rules when a new profile is detected (new pipeline run)
+          // by checking if the rule's profile_id differs from current profile
+          setRulesResult(prev => {
+            // If this is the first rule of a new profile, reset the array
+            if (prev.length > 0 && prev[0].profile_id !== rule.profile_id) {
+              return [rule];
+            }
+            return [...prev, rule];
+          });
         }
       )
       .on(
@@ -295,63 +303,61 @@ export function useDQControlPlane(datasetId?: string): UseDQControlPlaneReturn {
     if (!datasetId) return;
     
     const fetchExistingData = async () => {
-      // Fetch latest profile
-      const { data: profiles } = await supabase
-        .from('dq_profiles')
-        .select('*')
-        .eq('dataset_id', datasetId)
-        .order('profile_ts', { ascending: false })
-        .limit(1);
-      
-      if (profiles?.[0]) {
-        setProfilingResult(profiles[0] as unknown as DQProfile);
-      }
+      // CRITICAL FIX: Clear previous dataset's data immediately to prevent mixed-state
+      setProfilingResult(null);
+      setRulesResult([]);
+      setExecutionResult(null);
+      setDashboardAssets(null);
+      setIncidents([]);
+      setFinalResponse(null);
 
-      // Fetch rules
-      const { data: rules } = await supabase
-        .from('dq_rules')
-        .select('*')
-        .eq('dataset_id', datasetId)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
-      
-      if (rules) {
-        setRulesResult(rules as unknown as DQRule[]);
-      }
+      // PERFORMANCE FIX: Parallelize all data fetches
+      const [profileRes, rulesRes, execRes, assetsRes, incidentsRes] = await Promise.all([
+        supabase
+          .from('dq_profiles')
+          .select('*')
+          .eq('dataset_id', datasetId)
+          .order('profile_ts', { ascending: false })
+          .limit(1),
+        supabase
+          .from('dq_rules')
+          .select('*')
+          .eq('dataset_id', datasetId)
+          .eq('is_active', true)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('dq_rule_executions')
+          .select('*')
+          .eq('dataset_id', datasetId)
+          .order('execution_ts', { ascending: false })
+          .limit(1),
+        supabase
+          .from('dq_dashboard_assets')
+          .select('*')
+          .eq('dataset_id', datasetId)
+          .order('generated_at', { ascending: false })
+          .limit(1),
+        supabase
+          .from('dq_incidents')
+          .select('*')
+          .eq('dataset_id', datasetId)
+          .order('created_at', { ascending: false }),
+      ]);
 
-      // Fetch latest execution
-      const { data: executions } = await supabase
-        .from('dq_rule_executions')
-        .select('*')
-        .eq('dataset_id', datasetId)
-        .order('execution_ts', { ascending: false })
-        .limit(1);
-      
-      if (executions?.[0]) {
-        setExecutionResult(executions[0] as unknown as DQExecution);
+      if (profileRes.data?.[0]) {
+        setProfilingResult(profileRes.data[0] as unknown as DQProfile);
       }
-
-      // Fetch dashboard assets
-      const { data: assets } = await supabase
-        .from('dq_dashboard_assets')
-        .select('*')
-        .eq('dataset_id', datasetId)
-        .order('generated_at', { ascending: false })
-        .limit(1);
-      
-      if (assets?.[0]) {
-        setDashboardAssets(assets[0] as unknown as DQDashboardAsset);
+      if (rulesRes.data) {
+        setRulesResult(rulesRes.data as unknown as DQRule[]);
       }
-
-      // Fetch incidents
-      const { data: incidentData } = await supabase
-        .from('dq_incidents')
-        .select('*')
-        .eq('dataset_id', datasetId)
-        .order('created_at', { ascending: false });
-      
-      if (incidentData) {
-        setIncidents(incidentData as unknown as DQIncident[]);
+      if (execRes.data?.[0]) {
+        setExecutionResult(execRes.data[0] as unknown as DQExecution);
+      }
+      if (assetsRes.data?.[0]) {
+        setDashboardAssets(assetsRes.data[0] as unknown as DQDashboardAsset);
+      }
+      if (incidentsRes.data) {
+        setIncidents(incidentsRes.data as unknown as DQIncident[]);
       }
     };
 
@@ -510,6 +516,12 @@ export function useDQControlPlane(datasetId?: string): UseDQControlPlaneReturn {
       4: 'pending',
       5: 'pending'
     });
+    // CRITICAL FIX: Clear ALL data states, not just step statuses
+    setProfilingResult(null);
+    setRulesResult([]);
+    setExecutionResult(null);
+    setDashboardAssets(null);
+    setIncidents([]);
     setFinalResponse(null);
   }, []);
 

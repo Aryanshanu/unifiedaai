@@ -211,14 +211,16 @@ export function DQDashboardVisual({ assets, executionMetrics, isLoading }: DQDas
     : 0;
 
   const timelinessMetrics = metrics.filter(m => m.dimension.toLowerCase() === 'timeliness');
+  // GOVERNANCE FIX: Remove default 100% - show null if not evaluated
   const freshnessScore = timelinessMetrics.length > 0
     ? timelinessMetrics.reduce((sum, m) => sum + m.success_rate, 0) / timelinessMetrics.length * 100
-    : 100;
+    : null;
 
   const consistencyMetrics = metrics.filter(m => m.dimension.toLowerCase() === 'consistency');
+  // GOVERNANCE FIX: Remove default 100% - show null if not evaluated
   const consistencyScore = consistencyMetrics.length > 0
     ? consistencyMetrics.reduce((sum, m) => sum + m.success_rate, 0) / consistencyMetrics.length * 100
-    : 100;
+    : null;
 
   return (
     <Card>
@@ -431,20 +433,32 @@ export function DQDashboardVisual({ assets, executionMetrics, isLoading }: DQDas
                 </TableRow>
                 <TableRow>
                   <TableCell className="font-medium">Freshness Score</TableCell>
-                  <TableCell className="font-mono">{freshnessScore.toFixed(1)}%</TableCell>
+                  <TableCell className="font-mono">
+                    {freshnessScore !== null ? `${freshnessScore.toFixed(1)}%` : 'N/A'}
+                  </TableCell>
                   <TableCell>
-                    <Badge className={freshnessScore >= 80 ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}>
-                      {freshnessScore >= 80 ? '✓ Current' : '⚠ Stale'}
-                    </Badge>
+                    {freshnessScore !== null ? (
+                      <Badge className={freshnessScore >= 80 ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}>
+                        {freshnessScore >= 80 ? '✓ Current' : '⚠ Stale'}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline">Not Evaluated</Badge>
+                    )}
                   </TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell className="font-medium">Consistency Score</TableCell>
-                  <TableCell className="font-mono">{consistencyScore.toFixed(1)}%</TableCell>
+                  <TableCell className="font-mono">
+                    {consistencyScore !== null ? `${consistencyScore.toFixed(1)}%` : 'N/A'}
+                  </TableCell>
                   <TableCell>
-                    <Badge className={consistencyScore >= 90 ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}>
-                      {consistencyScore >= 90 ? '✓ Consistent' : '⚠ Inconsistent'}
-                    </Badge>
+                    {consistencyScore !== null ? (
+                      <Badge className={consistencyScore >= 90 ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}>
+                        {consistencyScore >= 90 ? '✓ Consistent' : '⚠ Inconsistent'}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline">Not Evaluated</Badge>
+                    )}
                   </TableCell>
                 </TableRow>
               </TableBody>
