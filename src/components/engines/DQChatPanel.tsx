@@ -56,7 +56,6 @@ interface DQChatContext {
     passed_count: number;
     failed_count: number;
     critical_failure: boolean;
-    circuit_breaker_tripped: boolean;
   } | null;
   incidents: Array<{
     dimension: string;
@@ -99,7 +98,6 @@ interface DQChatPanelProps {
         critical_failure: boolean;
         execution_mode?: string;
       };
-      circuit_breaker_tripped: boolean;
     } | null;
     incidents?: Array<{
       dimension: string;
@@ -186,8 +184,7 @@ function transformContext(props: DQChatPanelProps['context']): DQChatContext {
     execution = {
       passed_count: passedCount,
       failed_count: failedCount,
-      critical_failure: Boolean(props.execution.summary?.critical_failure ?? false),
-      circuit_breaker_tripped: Boolean(props.execution.circuit_breaker_tripped)
+      critical_failure: Boolean(props.execution.summary?.critical_failure ?? false)
     };
   }
 
@@ -236,9 +233,6 @@ function buildContextString(context: DQChatContext): string {
     parts.push(`- Failed: ${context.execution.failed_count}`);
     if (context.execution.critical_failure) {
       parts.push(`- ⚠️ CRITICAL FAILURE DETECTED`);
-    }
-    if (context.execution.circuit_breaker_tripped) {
-      parts.push(`- ⚠️ CIRCUIT BREAKER TRIPPED`);
     }
   }
 

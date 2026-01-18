@@ -64,28 +64,13 @@ interface DQExecution {
     failed_rules?: number;
     critical_violations?: number;
   };
-  circuit_breaker_tripped: boolean;
   execution_ts: string;
   execution_time_ms: number | null;
-}
-
-interface CircuitBreakerState {
-  isTripped: boolean;
-  pendingInput: unknown;
-  executionSummary: {
-    total_rules: number;
-    passed: number;
-    failed: number;
-    critical_failures: number;
-  } | null;
 }
 
 interface DQExecutionReportTabularProps {
   execution: DQExecution | null;
   isLoading?: boolean;
-  circuitBreakerState?: CircuitBreakerState;
-  onContinue?: () => void;
-  onStop?: () => void;
 }
 
 function getSeverityBadge(severity: string) {
@@ -101,10 +86,7 @@ function getSeverityBadge(severity: string) {
 
 export function DQExecutionReportTabular({ 
   execution, 
-  isLoading,
-  circuitBreakerState,
-  onContinue,
-  onStop
+  isLoading
 }: DQExecutionReportTabularProps) {
   const [expandedRules, setExpandedRules] = useState<Set<string>>(new Set());
 
@@ -176,7 +158,7 @@ export function DQExecutionReportTabular({
     Math.max(metrics.filter(m => m.dimension === 'uniqueness').length, 1) * 100;
 
   return (
-    <Card className={cn(execution.circuit_breaker_tripped && "border-destructive/50")}>
+    <Card className={cn(execution.summary?.critical_failure && "border-destructive/50")}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-lg">
@@ -196,27 +178,15 @@ export function DQExecutionReportTabular({
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Circuit Breaker Alert */}
-        {(execution.circuit_breaker_tripped || circuitBreakerState?.isTripped) && (
+        {/* Critical Failure Alert */}
+        {execution.summary?.critical_failure && (
           <Alert variant="destructive" className="border-2">
             <AlertOctagon className="h-5 w-5" />
             <AlertTitle className="text-lg font-bold">
-              🚨 CIRCUIT BREAKER TRIPPED
+              ⚠️ CRITICAL FAILURE DETECTED
             </AlertTitle>
-            <AlertDescription className="mt-2 space-y-4">
-              <p>Critical data quality failure detected. Downstream tasks stopped to prevent data corruption.</p>
-              {onContinue && onStop && (
-                <div className="flex gap-3 pt-2">
-                  <Button variant="destructive" onClick={onStop} className="gap-2">
-                    <StopCircle className="h-4 w-4" />
-                    Stop Pipeline
-                  </Button>
-                  <Button variant="outline" onClick={onContinue} className="gap-2">
-                    <PlayCircle className="h-4 w-4" />
-                    Continue Anyway
-                  </Button>
-                </div>
-              )}
+            <AlertDescription className="mt-2">
+              <p>Critical data quality issues found. Review the failed rules below.</p>
             </AlertDescription>
           </Alert>
         )}
