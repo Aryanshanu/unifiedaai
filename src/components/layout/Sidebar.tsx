@@ -83,7 +83,7 @@ export function Sidebar() {
           </div>
           {!collapsed && (
             <div className="flex flex-col">
-              <span className="font-bold text-foreground text-base tracking-tight">Fractal Unified-OS</span>
+              <span className="font-bold text-foreground text-base tracking-tight">Fractal Unified Governance</span>
             </div>
           )}
         </div>
