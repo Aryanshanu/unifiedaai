@@ -146,10 +146,11 @@ serve(async (req) => {
       });
     }
 
-    // 🚨 HALT CONDITION #1: Check if bronze_data has ANY rows
+    // 🚨 HALT CONDITION #1: Check if bronze_data has ANY rows (scoped to this dataset)
     const { count: bronzeCount, error: countError } = await supabase
       .from("bronze_data")
-      .select("id", { count: 'exact', head: true });
+      .select("id", { count: 'exact', head: true })
+      .eq("dataset_id", dataset_id);
 
     if (countError) {
       const response: ProfilingOutput = {
@@ -186,6 +187,7 @@ serve(async (req) => {
     const { data: bronzeData } = await supabase
       .from("bronze_data")
       .select("raw_data")
+      .eq("dataset_id", dataset_id)
       .limit(1000);
 
     // At this point we KNOW bronzeData exists and has rows

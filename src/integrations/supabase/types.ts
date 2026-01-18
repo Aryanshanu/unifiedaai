@@ -224,6 +224,7 @@ export type Database = {
       bronze_data: {
         Row: {
           created_at: string | null
+          dataset_id: string | null
           id: string
           raw_data: Json
           record_hash: string | null
@@ -232,6 +233,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          dataset_id?: string | null
           id?: string
           raw_data: Json
           record_hash?: string | null
@@ -240,6 +242,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          dataset_id?: string | null
           id?: string
           raw_data?: Json
           record_hash?: string | null

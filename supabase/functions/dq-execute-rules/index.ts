@@ -107,10 +107,11 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 🚨 HALT CONDITION #1: Check if bronze_data has ANY rows
+    // 🚨 HALT CONDITION #1: Check if bronze_data has ANY rows (scoped to this dataset)
     const { count: bronzeCount, error: countError } = await supabase
       .from("bronze_data")
-      .select("id", { count: 'exact', head: true });
+      .select("id", { count: 'exact', head: true })
+      .eq("dataset_id", dataset_id);
 
     if (countError) {
       const response: ExecutionOutput = {
@@ -144,6 +145,7 @@ serve(async (req) => {
     const { data: bronzeData } = await supabase
       .from("bronze_data")
       .select("raw_data, row_index, id")
+      .eq("dataset_id", dataset_id)
       .limit(1000);
 
     // At this point we KNOW bronzeData exists and has rows
