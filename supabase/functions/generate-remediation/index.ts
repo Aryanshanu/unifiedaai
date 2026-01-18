@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
           remediationPlans.push({
             action_type: 'DELETE_ROWS',
             description: `Remove ${affectedRows} rows with null values in columns: ${nullColumns}`,
-            sql_preview: `-- Delete rows with null values\nDELETE FROM bronze_data\nWHERE upload_id = '${upload_id}'\n  AND (${affectedColumns.map(c => `raw_data->>'${c}' IS NULL OR raw_data->>'${c}' = ''`).join(' OR ')});`,
+            sql_preview: `-- Delete rows with null values\nDELETE FROM dq_data\nWHERE upload_id = '${upload_id}'\n  AND (${affectedColumns.map(c => `raw_data->>'${c}' IS NULL OR raw_data->>'${c}' = ''`).join(' OR ')});`,
             affected_rows: affectedRows,
             affected_columns: affectedColumns,
             safety_score: 75,
@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
           remediationPlans.push({
             action_type: 'IMPUTE_MODE',
             description: `Fill null values with most frequent value in columns: ${nullColumns}`,
-            sql_preview: `-- Impute nulls with mode value\nUPDATE bronze_data\nSET raw_data = raw_data || jsonb_build_object('${affectedColumns[0]}', (\n  SELECT mode() WITHIN GROUP (ORDER BY raw_data->>'${affectedColumns[0]}')\n  FROM bronze_data WHERE upload_id = '${upload_id}'\n))\nWHERE upload_id = '${upload_id}'\n  AND (raw_data->>'${affectedColumns[0]}' IS NULL);`,
+            sql_preview: `-- Impute nulls with mode value\nUPDATE dq_data\nSET raw_data = raw_data || jsonb_build_object('${affectedColumns[0]}', (\n  SELECT mode() WITHIN GROUP (ORDER BY raw_data->>'${affectedColumns[0]}')\n  FROM dq_data WHERE upload_id = '${upload_id}'\n))\nWHERE upload_id = '${upload_id}'\n  AND (raw_data->>'${affectedColumns[0]}' IS NULL);`,
             affected_rows: affectedRows,
             affected_columns: affectedColumns,
             safety_score: 85,
@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
           remediationPlans.push({
             action_type: 'DEDUPLICATE',
             description: `Remove ${affectedRows} duplicate records`,
-            sql_preview: `-- Remove duplicates, keeping first occurrence\nDELETE FROM bronze_data a\nUSING bronze_data b\nWHERE a.upload_id = '${upload_id}'\n  AND b.upload_id = '${upload_id}'\n  AND a.record_hash = b.record_hash\n  AND a.row_index > b.row_index;`,
+            sql_preview: `-- Remove duplicates, keeping first occurrence\nDELETE FROM dq_data a\nUSING dq_data b\nWHERE a.upload_id = '${upload_id}'\n  AND b.upload_id = '${upload_id}'\n  AND a.record_hash = b.record_hash\n  AND a.row_index > b.row_index;`,
             affected_rows: affectedRows,
             affected_columns: affectedColumns,
             safety_score: 90,
@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
             remediationPlans.push({
               action_type: 'NORMALIZE_FORMAT',
               description: `Normalize email format in ${affectedRows} rows`,
-              sql_preview: `-- Normalize email format (lowercase, trim)\nUPDATE bronze_data\nSET raw_data = raw_data || jsonb_build_object('email', \n  LOWER(TRIM(raw_data->>'email'))\n)\nWHERE upload_id = '${upload_id}'\n  AND raw_data->>'email' IS NOT NULL;`,
+              sql_preview: `-- Normalize email format (lowercase, trim)\nUPDATE dq_data\nSET raw_data = raw_data || jsonb_build_object('email', \n  LOWER(TRIM(raw_data->>'email'))\n)\nWHERE upload_id = '${upload_id}'\n  AND raw_data->>'email' IS NOT NULL;`,
               python_script: `# Python script for email normalization\nimport re\n\ndef normalize_email(email):\n    if not email:\n        return None\n    email = email.strip().lower()\n    # Fix common typos\n    email = re.sub(r'\\.c$', '.com', email)\n    email = re.sub(r'@gmial\\.', '@gmail.', email)\n    return email`,
               affected_rows: affectedRows,
               affected_columns: affectedColumns,
@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
             action_type: 'TRIM_WHITESPACE',
             description: `Trim whitespace from ${affectedColumns.length} columns`,
             sql_preview: `-- Trim whitespace from all text columns\n${affectedColumns.map(c => 
-              `UPDATE bronze_data\nSET raw_data = raw_data || jsonb_build_object('${c}', TRIM(raw_data->>'${c}'))\nWHERE upload_id = '${upload_id}';`
+              `UPDATE dq_data\nSET raw_data = raw_data || jsonb_build_object('${c}', TRIM(raw_data->>'${c}'))\nWHERE upload_id = '${upload_id}';`
             ).join('\n\n')}`,
             affected_rows: affectedRows,
             affected_columns: affectedColumns,

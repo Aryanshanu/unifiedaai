@@ -158,30 +158,31 @@ export function DQProfilingReportTabular({ profile, isLoading }: DQProfilingRepo
     ? columnProfiles.reduce((sum, c) => sum + c.uniqueness, 0) / columnProfiles.length
     : 0;
 
-  // Calculate additional dimension scores (simulated based on available data)
+  // Calculate additional dimension scores - only from real data, no simulated values
   const avgValidity = columnProfiles.length > 0
-    ? columnProfiles.reduce((sum, c) => sum + (c.validity_score ?? c.completeness * 0.95), 0) / columnProfiles.length
-    : 0;
+    ? columnProfiles.reduce((sum, c) => sum + (c.validity_score ?? null), 0) / columnProfiles.filter(c => c.validity_score != null).length
+    : null;
 
   const avgAccuracy = columnProfiles.length > 0
-    ? columnProfiles.reduce((sum, c) => sum + (c.accuracy_score ?? 0.92), 0) / columnProfiles.length
-    : 0;
+    ? columnProfiles.reduce((sum, c) => sum + (c.accuracy_score ?? null), 0) / columnProfiles.filter(c => c.accuracy_score != null).length
+    : null;
 
   const avgTimeliness = columnProfiles.length > 0
-    ? columnProfiles.reduce((sum, c) => sum + (c.timeliness_score ?? 0.88), 0) / columnProfiles.length
-    : 0;
+    ? columnProfiles.reduce((sum, c) => sum + (c.timeliness_score ?? null), 0) / columnProfiles.filter(c => c.timeliness_score != null).length
+    : null;
 
   const avgConsistency = columnProfiles.length > 0
-    ? columnProfiles.reduce((sum, c) => sum + (c.consistency_score ?? 0.95), 0) / columnProfiles.length
-    : 0;
+    ? columnProfiles.reduce((sum, c) => sum + (c.consistency_score ?? null), 0) / columnProfiles.filter(c => c.consistency_score != null).length
+    : null;
 
-  const dimensionScores: DimensionScore[] = [
-    { dimension: 'Completeness', score: avgCompleteness, status: getDimensionStatus(avgCompleteness), description: 'Percentage of non-null values' },
-    { dimension: 'Uniqueness', score: avgUniqueness, status: getDimensionStatus(avgUniqueness), description: 'Percentage of distinct values' },
-    { dimension: 'Validity', score: avgValidity, status: getDimensionStatus(avgValidity), description: 'Data conforming to format rules' },
-    { dimension: 'Accuracy', score: avgAccuracy, status: getDimensionStatus(avgAccuracy), description: 'Data matching real-world facts' },
-    { dimension: 'Timeliness', score: avgTimeliness, status: getDimensionStatus(avgTimeliness), description: 'Data freshness and currency' },
-    { dimension: 'Consistency', score: avgConsistency, status: getDimensionStatus(avgConsistency), description: 'Cross-system uniformity' },
+  // Only include dimensions with real available data
+  const dimensionScores: (DimensionScore & { available: boolean })[] = [
+    { dimension: 'Completeness', score: avgCompleteness, status: getDimensionStatus(avgCompleteness), description: 'Percentage of non-null values', available: true },
+    { dimension: 'Uniqueness', score: avgUniqueness, status: getDimensionStatus(avgUniqueness), description: 'Percentage of distinct values', available: true },
+    { dimension: 'Validity', score: avgValidity ?? 0, status: avgValidity != null ? getDimensionStatus(avgValidity) : 'critical', description: 'Data conforming to format rules', available: avgValidity != null && !isNaN(avgValidity) },
+    { dimension: 'Accuracy', score: avgAccuracy ?? 0, status: avgAccuracy != null ? getDimensionStatus(avgAccuracy) : 'critical', description: 'Data matching real-world facts', available: avgAccuracy != null && !isNaN(avgAccuracy) },
+    { dimension: 'Timeliness', score: avgTimeliness ?? 0, status: avgTimeliness != null ? getDimensionStatus(avgTimeliness) : 'critical', description: 'Data freshness and currency', available: avgTimeliness != null && !isNaN(avgTimeliness) },
+    { dimension: 'Consistency', score: avgConsistency ?? 0, status: avgConsistency != null ? getDimensionStatus(avgConsistency) : 'critical', description: 'Cross-system uniformity', available: avgConsistency != null && !isNaN(avgConsistency) },
   ];
 
   // Detect potential issues
@@ -206,7 +207,11 @@ export function DQProfilingReportTabular({ profile, isLoading }: DQProfilingRepo
   });
 
   const totalNulls = columnProfiles.reduce((sum, c) => sum + (c.null_count || 0), 0);
-  const overallScore = (avgCompleteness + avgUniqueness + avgValidity + avgAccuracy + avgTimeliness + avgConsistency) / 6;
+  // Only include available dimensions in overall score calculation
+  const availableDimensions = dimensionScores.filter(d => d.available);
+  const overallScore = availableDimensions.length > 0
+    ? availableDimensions.reduce((sum, d) => sum + d.score, 0) / availableDimensions.length
+    : avgCompleteness; // fallback to completeness if no other dimensions available
 
   return (
     <Card>
@@ -301,13 +306,21 @@ export function DQProfilingReportTabular({ profile, isLoading }: DQProfilingRepo
                     <TableRow key={dim.dimension}>
                       <TableCell className="font-medium">{dim.dimension}</TableCell>
                       <TableCell className="font-mono font-bold">
-                        {(dim.score * 100).toFixed(1)}%
+                        {dim.available ? `${(dim.score * 100).toFixed(1)}%` : 'N/A'}
                       </TableCell>
                       <TableCell>
-                        <Progress value={dim.score * 100} className="h-2" />
+                        {dim.available ? (
+                          <Progress value={dim.score * 100} className="h-2" />
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Not Available</span>
+                        )}
                       </TableCell>
                       <TableCell>
-                        <Badge className={statusConfig.className}>{statusConfig.label}</Badge>
+                        {dim.available ? (
+                          <Badge className={statusConfig.className}>{statusConfig.label}</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-muted-foreground">N/A</Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {dim.description}

@@ -3,16 +3,12 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
 import { 
   Zap, 
   CheckCircle2, 
   XCircle, 
   AlertTriangle,
-  Clock,
-  AlertOctagon,
-  StopCircle,
-  PlayCircle
+  Clock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -45,28 +41,13 @@ interface DQExecution {
     failed_rules?: number;
     critical_violations?: number;
   };
-  circuit_breaker_tripped: boolean;
   execution_ts: string;
   execution_time_ms: number | null;
-}
-
-interface CircuitBreakerState {
-  isTripped: boolean;
-  pendingInput: unknown;
-  executionSummary: {
-    total_rules: number;
-    passed: number;
-    failed: number;
-    critical_failures: number;
-  } | null;
 }
 
 interface DQExecutionReportProps {
   execution: DQExecution | null;
   isLoading?: boolean;
-  circuitBreakerState?: CircuitBreakerState;
-  onContinue?: () => void;
-  onStop?: () => void;
 }
 
 function getSeverityBadge(severity: string) {
@@ -82,10 +63,7 @@ function getSeverityBadge(severity: string) {
 
 export function DQExecutionReport({ 
   execution, 
-  isLoading,
-  circuitBreakerState,
-  onContinue,
-  onStop
+  isLoading
 }: DQExecutionReportProps) {
   if (isLoading) {
     return (
@@ -130,7 +108,7 @@ export function DQExecutionReport({
 
   return (
     <Card className={cn(
-      execution.circuit_breaker_tripped && "border-destructive/50"
+      execution.summary?.critical_failure && "border-warning/50"
     )}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
@@ -151,42 +129,30 @@ export function DQExecutionReport({
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Circuit Breaker Alert */}
-        {(execution.circuit_breaker_tripped || circuitBreakerState?.isTripped) && (
-          <Alert variant="destructive" className="border-2">
-            <AlertOctagon className="h-5 w-5" />
-            <AlertTitle className="text-lg font-bold">
-              🚨 CIRCUIT BREAKER TRIPPED
+        {/* Critical Issues Warning */}
+        {execution.summary?.critical_failure && (
+          <Alert className="border-warning/50 bg-warning/5">
+            <AlertTriangle className="h-5 w-5 text-warning" />
+            <AlertTitle className="text-lg font-bold text-warning">
+              Critical Issues Detected
             </AlertTitle>
             <AlertDescription className="mt-2 space-y-4">
-              <p>
-                Critical data quality failure detected. Downstream tasks stopped to prevent data corruption.
+              <p className="text-muted-foreground">
+                {criticalFailures.length} critical rule(s) failed. Pipeline continued automatically. Review issues below.
               </p>
               {criticalFailures.length > 0 && (
-                <div className="bg-destructive/10 rounded-lg p-4 space-y-2">
-                  <p className="font-medium">Failed Critical Rules:</p>
+                <div className="bg-warning/10 rounded-lg p-4 space-y-2">
+                  <p className="font-medium text-warning">Failed Critical Rules:</p>
                   {criticalFailures.map((rule) => (
                     <div key={rule.rule_id} className="flex items-center justify-between text-sm">
                       <span>{rule.rule_name || rule.rule_id.slice(0, 8)}</span>
-                      <span className="font-mono">
+                      <span className="font-mono text-muted-foreground">
                         Expected: ≥{(rule.threshold * 100).toFixed(0)}% | 
                         Actual: {(rule.success_rate * 100).toFixed(1)}% | 
                         Gap: {((rule.threshold - rule.success_rate) * 100).toFixed(1)}%
                       </span>
                     </div>
                   ))}
-                </div>
-              )}
-              {onContinue && onStop && (
-                <div className="flex gap-3 pt-2">
-                  <Button variant="destructive" onClick={onStop} className="gap-2">
-                    <StopCircle className="h-4 w-4" />
-                    Stop Pipeline
-                  </Button>
-                  <Button variant="outline" onClick={onContinue} className="gap-2">
-                    <PlayCircle className="h-4 w-4" />
-                    Continue Anyway
-                  </Button>
                 </div>
               )}
             </AlertDescription>
