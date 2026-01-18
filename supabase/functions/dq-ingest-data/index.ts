@@ -175,6 +175,7 @@ serve(async (req) => {
 
     // Step 3: Insert bronze_data rows
     const bronzeRecords = rows.map((row, idx) => ({
+      dataset_id: dataset.id,
       upload_id: upload.id,
       row_index: idx,
       raw_data: row,
