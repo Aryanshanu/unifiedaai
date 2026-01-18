@@ -72,7 +72,7 @@ export function DQExecutionResults({ execution, isLoading }: DQExecutionResultsP
   const metrics = (execution?.metrics || []) as DQExecutionMetric[];
   const passedCount = metrics.filter(m => !m.violated).length;
   const failedCount = metrics.filter(m => m.violated).length;
-  const criticalFailure = execution?.circuit_breaker_tripped || execution?.summary?.critical_failure;
+  const criticalFailure = execution?.summary?.critical_failure;
 
   return (
     <Card className="border-border">
