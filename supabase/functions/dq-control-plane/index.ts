@@ -293,12 +293,64 @@ serve(async (req) => {
       if (executionResult.status === "error") {
         console.error("[DQ Control Plane] Execution failed:", executionResult.message);
         failedSteps.push("execution");
+        
+        // Check if it's a truth violation
+        if (executionResult.code === "EXECUTION_TRUTH_VIOLATION") {
+          inconsistencies.push(`EXECUTION_TRUTH_VIOLATION: ${executionResult.detail}`);
+        }
       } else {
         completedSteps.push("execution");
         console.log("[DQ Control Plane] Execution complete. ID:", executionResult.execution_id);
         
-        // Log if there were critical failures but DON'T STOP
+        // TRUTH CONTRACT: Validate execution results
         const summary = executionResult.summary as Record<string, unknown>;
+        const metrics = executionResult.metrics as Array<Record<string, unknown>>;
+        
+        if (summary && metrics) {
+          // Validate execution truth: passed + failed = total
+          const passed = summary.passed as number;
+          const failed = summary.failed as number;
+          const total = summary.total_rules as number;
+          
+          if (passed + failed !== total) {
+            inconsistencies.push(`EXECUTION_TRUTH_VIOLATION: passed(${passed}) + failed(${failed}) != total(${total})`);
+          }
+          
+          // Validate all success_rates are ratios (0-1)
+          for (const m of metrics) {
+            const successRate = m.success_rate as number;
+            if (successRate < 0 || successRate > 1) {
+              inconsistencies.push(`INVALID_SUCCESS_RATE: Rule ${m.rule_id} has success_rate ${successRate} outside [0,1]`);
+            }
+            
+            const threshold = m.threshold as number;
+            if (threshold < 0 || threshold > 1) {
+              inconsistencies.push(`INVALID_THRESHOLD: Rule ${m.rule_id} has threshold ${threshold} outside [0,1]`);
+            }
+            
+            const failedCount = m.failed_count as number;
+            if (failedCount < 0) {
+              inconsistencies.push(`NEGATIVE_COUNT: Rule ${m.rule_id} has negative failed_count ${failedCount}`);
+            }
+          }
+          
+          // RULE CONSISTENCY CHECK: Validate executed rules exist in library
+          const executedRuleIds = new Set(metrics.map(m => m.rule_id as string));
+          const libraryRules = rulesResult.rules as Array<{ id: string }>;
+          const libraryRuleIds = new Set(libraryRules.map(r => r.id));
+          
+          const phantomRules = [...executedRuleIds].filter(id => !libraryRuleIds.has(id));
+          if (phantomRules.length > 0) {
+            inconsistencies.push(`PHANTOM_RULES: ${phantomRules.length} rules executed but not in library`);
+          }
+          
+          const skippedRules = [...libraryRuleIds].filter(id => !executedRuleIds.has(id));
+          if (skippedRules.length > 0) {
+            console.log(`[DQ Control Plane] Warning: ${skippedRules.length} rules in library but not executed`);
+          }
+        }
+        
+        // Log if there were critical failures but DON'T STOP
         if (summary?.critical_failure) {
           console.log("[DQ Control Plane] ⚠️ Critical failures detected - continuing to dashboard and incidents");
         }
@@ -310,7 +362,8 @@ serve(async (req) => {
 
     // If execution failed, we still try to generate dashboard with what we have
     if (failedSteps.includes("execution")) {
-      // Return partial success
+      // Return partial success with inconsistencies
+      const truthScore = inconsistencies.length === 0 ? 1.0 : Math.max(0, 1 - (inconsistencies.length * 0.1));
       const response: ControlPlaneResponse = {
         status: "error",
         code: "EXECUTION_FAILED",
@@ -319,6 +372,12 @@ serve(async (req) => {
         rules_version: rulesResult.rules_version as number,
         completed_steps: completedSteps,
         failed_steps: failedSteps,
+        TRUST_REPORT: {
+          discarded_metrics: discardedMetrics,
+          deduplicated_rules: deduplicatedRulesCount,
+          inconsistencies_found: inconsistencies,
+          truth_score: truthScore,
+        },
       };
       return new Response(JSON.stringify(response), {
         status: 400,
@@ -390,6 +449,15 @@ serve(async (req) => {
       } else {
         completedSteps.push("incidents");
         console.log("[DQ Control Plane] Incidents raised. Count:", incidentsResult.incident_count);
+        
+        // INCIDENT CONSISTENCY CHECK: Validate incidents only from failed rules
+        const incidentCount = (incidentsResult.incident_count as number) || 0;
+        const metrics = executionResult.metrics as Array<{ violated: boolean; rule_id: string }>;
+        const failedRuleIds = metrics?.filter(m => m.violated).map(m => m.rule_id) || [];
+        
+        if (failedRuleIds.length === 0 && incidentCount > 0) {
+          inconsistencies.push(`ORPHAN_INCIDENTS: ${incidentCount} incidents created but no rules failed`);
+        }
       }
     } catch (err) {
       console.error("[DQ Control Plane] Incidents exception:", err);

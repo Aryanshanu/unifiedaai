@@ -35,6 +35,37 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import {
+  detectUnit,
+  normalizeToRatio,
+  validateExecutionTruth,
+  validateRatio,
+} from '@/lib/dq-truth-enforcement';
+
+// ============================================
+// TRUTH ENFORCEMENT: Unit normalization helpers
+// ============================================
+
+/**
+ * TRUTH CONTRACT: Normalize any rate to ratio (0-1)
+ * Backend may send ratio (0-1) or percentage (0-100)
+ */
+function toRatio(value: number): number {
+  const unit = detectUnit(value);
+  return normalizeToRatio(value, unit);
+}
+
+/**
+ * TRUTH CONTRACT: Convert ratio to percentage for DISPLAY ONLY
+ */
+function toDisplayPercent(ratio: number): string {
+  const validation = validateRatio(ratio);
+  if (!validation.valid) {
+    console.error(`[TRUTH VIOLATION] Invalid ratio: ${ratio}`);
+    return 'INVALID';
+  }
+  return `${(ratio * 100).toFixed(1)}%`;
+}
 
 interface DQExecutionMetric {
   rule_id: string;
@@ -89,6 +120,7 @@ export function DQExecutionReportTabular({
   isLoading
 }: DQExecutionReportTabularProps) {
   const [expandedRules, setExpandedRules] = useState<Set<string>>(new Set());
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   const toggleRule = (ruleId: string) => {
     setExpandedRules(prev => {
@@ -136,26 +168,55 @@ export function DQExecutionReportTabular({
   }
 
   const metrics = execution.metrics || [];
+  
+  // TRUTH CONTRACT: Calculate from counts, not from metrics
   const passedRules = metrics.filter(m => !m.violated);
   const failedRules = metrics.filter(m => m.violated);
   const criticalFailures = failedRules.filter(m => m.severity === 'critical');
-  const passRate = metrics.length > 0 ? (passedRules.length / metrics.length) * 100 : 0;
+  
+  // EXECUTION TRUTH VALIDATION
+  const executionTruthResult = validateExecutionTruth(
+    passedRules.length,
+    failedRules.length,
+    metrics.length
+  );
+  
+  if (!executionTruthResult.valid && executionTruthResult.error) {
+    console.error(`[TRUTH VIOLATION] ${executionTruthResult.error}`);
+  }
+  
+  // Pass rate from counts
+  const passRate = metrics.length > 0 ? passedRules.length / metrics.length : 0;
 
-  // Calculate aggregate metrics
-  const avgSuccessRate = metrics.length > 0 
-    ? metrics.reduce((sum, m) => sum + m.success_rate, 0) / metrics.length 
+  // TRUTH CONTRACT: Normalize all metrics to ratio space, then display as percentage
+  const normalizedMetrics = metrics.map(m => ({
+    ...m,
+    // Normalize success_rate to ratio (0-1)
+    successRateRatio: toRatio(m.success_rate),
+    // Normalize threshold to ratio (0-1)
+    thresholdRatio: toRatio(m.threshold),
+  }));
+
+  // Calculate aggregate metrics in RATIO SPACE
+  const avgSuccessRatio = normalizedMetrics.length > 0 
+    ? normalizedMetrics.reduce((sum, m) => sum + m.successRateRatio, 0) / normalizedMetrics.length 
     : 0;
+  
   const totalFailed = metrics.reduce((sum, m) => sum + m.failed_count, 0);
   const totalRecords = metrics[0]?.total_count || 0;
-  const errorRate = totalRecords > 0 ? (totalFailed / totalRecords) * 100 : 0;
-  const nullBlankPercent = metrics
-    .filter(m => m.dimension === 'completeness')
-    .reduce((sum, m) => sum + (1 - m.success_rate), 0) / 
-    Math.max(metrics.filter(m => m.dimension === 'completeness').length, 1) * 100;
-  const duplicateRate = metrics
-    .filter(m => m.dimension === 'uniqueness')
-    .reduce((sum, m) => sum + (1 - m.success_rate), 0) / 
-    Math.max(metrics.filter(m => m.dimension === 'uniqueness').length, 1) * 100;
+  const errorRatio = totalRecords > 0 ? totalFailed / totalRecords : 0;
+  
+  // Calculate null/blank from completeness dimension
+  const completenessMetrics = normalizedMetrics.filter(m => m.dimension === 'completeness');
+  const nullBlankRatio = completenessMetrics.length > 0
+    ? completenessMetrics.reduce((sum, m) => sum + (1 - m.successRateRatio), 0) / completenessMetrics.length
+    : 0;
+  
+  // Calculate duplicate rate from uniqueness dimension
+  const uniquenessMetrics = normalizedMetrics.filter(m => m.dimension === 'uniqueness');
+  const duplicateRatio = uniquenessMetrics.length > 0
+    ? uniquenessMetrics.reduce((sum, m) => sum + (1 - m.successRateRatio), 0) / uniquenessMetrics.length
+    : 0;
 
   return (
     <Card className={cn(execution.summary?.critical_failure && "border-destructive/50")}>
@@ -210,25 +271,28 @@ export function DQExecutionReportTabular({
           </div>
           <div className={cn(
             "p-3 rounded-lg text-center",
-            passRate >= 80 ? "bg-success/10" : passRate >= 60 ? "bg-warning/10" : "bg-destructive/10"
+            passRate >= 0.8 ? "bg-success/10" : passRate >= 0.6 ? "bg-warning/10" : "bg-destructive/10"
           )}>
             <Percent className="h-4 w-4 mx-auto mb-1" />
             <p className={cn(
               "text-2xl font-bold",
-              passRate >= 80 ? "text-success" : passRate >= 60 ? "text-warning" : "text-destructive"
+              passRate >= 0.8 ? "text-success" : passRate >= 0.6 ? "text-warning" : "text-destructive"
             )}>
-              {passRate.toFixed(1)}%
+              {/* DISPLAY: Convert ratio to percentage */}
+              {(passRate * 100).toFixed(1)}%
             </p>
             <p className="text-xs text-muted-foreground">Pass Rate</p>
           </div>
           <div className="p-3 bg-warning/10 rounded-lg text-center">
             <AlertTriangle className="h-4 w-4 mx-auto mb-1 text-warning" />
-            <p className="text-2xl font-bold text-warning">{errorRate.toFixed(1)}%</p>
+            {/* DISPLAY: Convert ratio to percentage */}
+            <p className="text-2xl font-bold text-warning">{(errorRatio * 100).toFixed(1)}%</p>
             <p className="text-xs text-muted-foreground">Error Rate</p>
           </div>
           <div className="p-3 bg-muted/50 rounded-lg text-center">
             <Copy className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-            <p className="text-2xl font-bold">{duplicateRate.toFixed(1)}%</p>
+            {/* DISPLAY: Convert ratio to percentage */}
+            <p className="text-2xl font-bold">{(duplicateRatio * 100).toFixed(1)}%</p>
             <p className="text-xs text-muted-foreground">Duplicate Rate</p>
           </div>
         </div>
@@ -255,9 +319,10 @@ export function DQExecutionReportTabular({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {metrics.map((metric) => {
+                {normalizedMetrics.map((metric) => {
                   const isExpanded = expandedRules.has(metric.rule_id);
-                  const margin = (metric.success_rate - metric.threshold) * 100;
+                  // TRUTH CONTRACT: Calculate margin in ratio space, display as percentage
+                  const marginRatio = metric.successRateRatio - metric.thresholdRatio;
                   const hasSamples = metric.failed_samples && metric.failed_samples.length > 0;
                   
                   return (
@@ -306,16 +371,19 @@ export function DQExecutionReportTabular({
                               "text-right font-mono font-bold",
                               metric.violated ? "text-destructive" : "text-success"
                             )}>
-                              {(metric.success_rate * 100).toFixed(1)}%
+                              {/* DISPLAY: Convert ratio to percentage */}
+                              {(metric.successRateRatio * 100).toFixed(1)}%
                             </TableCell>
                             <TableCell className="text-right font-mono">
-                              {(metric.threshold * 100).toFixed(0)}%
+                              {/* DISPLAY: Convert ratio to percentage */}
+                              {(metric.thresholdRatio * 100).toFixed(0)}%
                             </TableCell>
                             <TableCell className={cn(
                               "text-right font-mono font-bold",
-                              margin >= 0 ? "text-success" : "text-destructive"
+                              marginRatio >= 0 ? "text-success" : "text-destructive"
                             )}>
-                              {margin >= 0 ? '+' : ''}{margin.toFixed(1)}%
+                              {/* DISPLAY: Convert ratio to percentage */}
+                              {marginRatio >= 0 ? '+' : ''}{(marginRatio * 100).toFixed(1)}%
                             </TableCell>
                             <TableCell>
                               {metric.violated ? (
@@ -382,13 +450,14 @@ export function DQExecutionReportTabular({
             <span className="text-muted-foreground">Overall Quality Score</span>
             <span className={cn(
               "font-bold",
-              avgSuccessRate >= 0.80 ? "text-success" : 
-              avgSuccessRate >= 0.60 ? "text-warning" : "text-destructive"
+              avgSuccessRatio >= 0.80 ? "text-success" : 
+              avgSuccessRatio >= 0.60 ? "text-warning" : "text-destructive"
             )}>
-              {(avgSuccessRate * 100).toFixed(1)}%
+              {/* DISPLAY: Convert ratio to percentage */}
+              {(avgSuccessRatio * 100).toFixed(1)}%
             </span>
           </div>
-          <Progress value={avgSuccessRate * 100} className="h-3" />
+          <Progress value={avgSuccessRatio * 100} className="h-3" />
         </div>
       </CardContent>
     </Card>

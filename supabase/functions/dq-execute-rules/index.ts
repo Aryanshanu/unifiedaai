@@ -281,8 +281,18 @@ serve(async (req) => {
           console.log(`[DQ Execute] Unknown logic_type: ${rule.logic_type}`);
       }
 
-      const successRate = totalRecords > 0 ? ((totalRecords - failedCount) / totalRecords) * 100 : 100;
-      const violated = successRate < rule.threshold;
+      // TRUTH CONTRACT: success_rate is ALWAYS a ratio (0-1), NOT percentage
+      // All calculations in ratio space. Threshold is also expected as ratio (0-1).
+      const successRate = totalRecords > 0 ? (totalRecords - failedCount) / totalRecords : 1;
+      
+      // Validate success_rate is in valid range
+      if (successRate < 0 || successRate > 1) {
+        console.error(`[DQ Execute] TRUTH VIOLATION: success_rate ${successRate} outside [0,1]`);
+      }
+      
+      // Normalize threshold: if > 1, assume it's percentage and convert to ratio
+      const normalizedThreshold = rule.threshold > 1 ? rule.threshold / 100 : rule.threshold;
+      const violated = successRate < normalizedThreshold;
 
       if (violated && rule.severity === "critical") {
         criticalViolations++;
@@ -293,19 +303,40 @@ serve(async (req) => {
         rule_name: rule.rule_name,
         dimension: rule.dimension,
         severity: rule.severity,
-        success_rate: Math.round(successRate * 100) / 100,
+        // OUTPUT: ratio (0-1), NOT percentage - rounded to 4 decimal places
+        success_rate: Math.round(successRate * 10000) / 10000,
         failed_count: failedCount,
         total_count: totalRecords,
-        threshold: rule.threshold,
+        // OUTPUT: threshold as ratio (0-1)
+        threshold: normalizedThreshold,
         violated,
         failed_rows_sample: failedRowsSample,
       });
     }
 
+    const passed = metrics.filter((m) => !m.violated).length;
+    const failed = metrics.filter((m) => m.violated).length;
+    const totalRules = metrics.length;
+
+    // EXECUTION TRUTH VALIDATION: passed + failed MUST equal total_rules
+    if (passed + failed !== totalRules) {
+      console.error(`[DQ Execute] EXECUTION_TRUTH_VIOLATION: passed(${passed}) + failed(${failed}) != total(${totalRules})`);
+      const response: ExecutionOutput = {
+        status: "error",
+        code: "EXECUTION_TRUTH_VIOLATION",
+        message: `Execution truth check failed: passed + failed != total`,
+        detail: `passed(${passed}) + failed(${failed}) = ${passed + failed} != total(${totalRules})`,
+      };
+      return new Response(JSON.stringify(response), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const summary: ExecutionSummary = {
-      total_rules: metrics.length,
-      passed: metrics.filter((m) => !m.violated).length,
-      failed: metrics.filter((m) => m.violated).length,
+      total_rules: totalRules,
+      passed,
+      failed,
       critical_failures: criticalViolations,
       critical_failure: criticalViolations > 0,
       execution_mode,
