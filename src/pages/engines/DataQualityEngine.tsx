@@ -50,6 +50,7 @@ import { DQDashboardVisual } from '@/components/engines/DQDashboardVisual';
 import { DQIncidentsTabular } from '@/components/engines/DQIncidentsTabular';
 import { DQStreamingDashboard } from '@/components/engines/DQStreamingDashboard';
 import { DQRuleSummary } from '@/components/engines/DQRuleSummary';
+import { DQRulesUnified } from '@/components/engines/DQRulesUnified';
 import { DQChatPanel } from '@/components/engines/DQChatPanel';
 import { DQTrustReport } from '@/components/engines/DQTrustReport';
 import { useDQControlPlane } from '@/hooks/useDQControlPlane';
@@ -595,16 +596,12 @@ function ControlPlaneTab() {
                     <SelectValue placeholder="Choose a dataset..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {datasets?.map((ds) => {
-                      const ingestedRows = ds.ingested_row_count ?? 0;
-                      const hasData = ingestedRows > 0;
-                      return (
-                        <SelectItem key={ds.id} value={ds.id} disabled={!hasData}>
-                          {ds.name} ({ingestedRows.toLocaleString()} ingested rows)
-                          {!hasData && ' — No data'}
-                        </SelectItem>
-                      );
-                    })}
+                    {/* FIX #1: Only show datasets with >0 ingested rows */}
+                    {datasets?.filter(ds => (ds.ingested_row_count ?? 0) > 0).map((ds) => (
+                      <SelectItem key={ds.id} value={ds.id}>
+                        {ds.name} ({(ds.ingested_row_count ?? 0).toLocaleString()} rows)
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -628,13 +625,14 @@ function ControlPlaneTab() {
                   Reset
                 </Button>
               )}
+              {/* FIX #2: Changed from "AI" to "Assistant" */}
               <Button 
                 variant="ghost" 
                 onClick={() => setIsChatOpen(true)}
                 className="gap-2"
               >
                 <MessageCircle className="h-4 w-4" />
-                AI
+                Assistant
               </Button>
             </div>
           </CardContent>
@@ -677,15 +675,11 @@ function ControlPlaneTab() {
         isLoading={currentStep === 1} 
       />
 
-      {/* STEP 2: Rule Library - Summary + Tabular */}
-      <DQRuleSummary 
+      {/* FIX #5: STEP 2 - Merged Rule Summary + Library into single view */}
+      <DQRulesUnified 
         rules={rulesResult || []}
         profile={profilingResult}
         isLoading={currentStep === 2}
-      />
-      <DQRuleLibraryTabular 
-        rules={rulesResult} 
-        isLoading={currentStep === 2} 
       />
 
       {/* STEP 3: Rule Execution - Full Width Tabular */}
