@@ -44,16 +44,28 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Maximum rows to process for browser performance
+  const MAX_ROWS = 50000;
+
   const parseData = useCallback((content: string, fileName?: string): ParsedData | null => {
     try {
       // Try JSON first
       const parsed = JSON.parse(content);
       if (Array.isArray(parsed) && parsed.length > 0) {
         const columns = Object.keys(parsed[0]);
+        const actualRowCount = parsed.length;
+        
+        // Process all rows up to MAX_ROWS limit
+        const rowsToProcess = actualRowCount > MAX_ROWS ? parsed.slice(0, MAX_ROWS) : parsed;
+        
+        if (actualRowCount > MAX_ROWS) {
+          toast.warning(`Large dataset: Processing first ${MAX_ROWS.toLocaleString()} of ${actualRowCount.toLocaleString()} rows for performance.`);
+        }
+        
         return {
-          rowCount: parsed.length,
+          rowCount: actualRowCount,
           columns,
-          sampleRows: parsed.slice(0, 100) // Take up to 100 rows for processing
+          sampleRows: rowsToProcess
         };
       }
     } catch {
@@ -62,7 +74,14 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
       if (lines.length > 1) {
         const headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, ''));
         const rows: Record<string, unknown>[] = [];
-        for (let i = 1; i < Math.min(lines.length, 101); i++) { // Take up to 100 rows
+        const actualRowCount = lines.length - 1;
+        const linesToProcess = Math.min(lines.length, MAX_ROWS + 1);
+        
+        if (actualRowCount > MAX_ROWS) {
+          toast.warning(`Large dataset: Processing first ${MAX_ROWS.toLocaleString()} of ${actualRowCount.toLocaleString()} rows for performance.`);
+        }
+        
+        for (let i = 1; i < linesToProcess; i++) {
           const values = lines[i].split(',').map(v => v.trim().replace(/^["']|["']$/g, ''));
           const row: Record<string, unknown> = {};
           headers.forEach((h, idx) => {
@@ -79,7 +98,7 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
           rows.push(row);
         }
         return {
-          rowCount: lines.length - 1,
+          rowCount: actualRowCount,
           columns: headers,
           sampleRows: rows
         };

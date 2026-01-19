@@ -223,36 +223,48 @@ serve(async (req) => {
 
     console.log(`[DQ Ingest] Upload record created: ${upload.id}`);
 
-    // Step 3: Insert dq_data rows (the single pipeline table)
-    const dqRecords = rows.map((row, idx) => ({
-      dataset_id: datasetId,
-      upload_id: upload.id,
-      row_index: idx,
-      raw_data: row,
-    }));
+    // Step 3: Insert dq_data rows in batches (prevents timeout for large datasets)
+    const BATCH_SIZE = 1000;
+    let totalInserted = 0;
 
-    const { error: dqDataError } = await supabase
-      .from("dq_data")
-      .insert(dqRecords);
+    console.log(`[DQ Ingest] Inserting ${rows.length} rows in batches of ${BATCH_SIZE}...`);
 
-    if (dqDataError) {
-      console.error("[DQ Ingest] Failed to insert dq_data:", dqDataError);
-      // Rollback upload and dataset creation
-      await supabase.from("data_uploads").delete().eq("id", upload.id);
-      if (!existingDatasetId) {
-        await supabase.from("datasets").delete().eq("id", datasetId);
+    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+      const batch = rows.slice(i, i + BATCH_SIZE);
+      const dqRecords = batch.map((row, idx) => ({
+        dataset_id: datasetId,
+        upload_id: upload.id,
+        row_index: i + idx,
+        raw_data: row,
+      }));
+
+      const { error: batchError } = await supabase
+        .from("dq_data")
+        .insert(dqRecords);
+
+      if (batchError) {
+        console.error(`[DQ Ingest] Batch ${Math.floor(i/BATCH_SIZE) + 1} failed:`, batchError);
+        // Rollback upload and dataset creation
+        await supabase.from("data_uploads").delete().eq("id", upload.id);
+        await supabase.from("dq_data").delete().eq("dataset_id", datasetId);
+        if (!existingDatasetId) {
+          await supabase.from("datasets").delete().eq("id", datasetId);
+        }
+        
+        const response: IngestOutput = {
+          status: "error",
+          code: "DQ_DATA_INSERT_FAILED",
+          message: "Failed to insert data records",
+          detail: batchError.message,
+        };
+        return new Response(JSON.stringify(response), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
-      
-      const response: IngestOutput = {
-        status: "error",
-        code: "DQ_DATA_INSERT_FAILED",
-        message: "Failed to insert data records",
-        detail: dqDataError.message,
-      };
-      return new Response(JSON.stringify(response), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+
+      totalInserted += batch.length;
+      console.log(`[DQ Ingest] Inserted batch ${Math.floor(i/BATCH_SIZE) + 1}: ${totalInserted}/${rows.length} rows`);
     }
 
     console.log(`[DQ Ingest] ✅ Successfully ingested ${rows.length} rows into dq_data`);
