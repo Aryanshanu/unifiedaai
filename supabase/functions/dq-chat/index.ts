@@ -274,43 +274,37 @@ STRICT RULES:
 - Your answers must always match the latest pipeline snapshot timestamp.
 - Reference exact numbers from the context - never approximate.
 
-RESPONSE FORMAT (MANDATORY - Always use this structure):
-Structure every response using clear markdown formatting:
+RESPONSE STYLE (ADAPTIVE - ZERO-SHOT):
+- Answer the question DIRECTLY first - no preamble or unnecessary headers
+- For simple factual questions (rates, counts, scores): 
+  Give the answer in 1-2 sentences with calculation transparency
+- For complex questions (root cause, remediation): 
+  Use brief structured sections only when genuinely needed
+- For explanations: Use bullet points for clarity when helpful
 
-## Summary
-[One sentence overview of the situation - be direct and informative]
+CALCULATION TRANSPARENCY (when applicable):
+Include the formula inline when mentioning rates:
+- "Error Rate: 142 / 10,000 = **1.42%**"
+- "Pass Rate: 18 / 20 = **90%**"
 
-## Key Findings
-- **Finding 1**: Value with context
-- **Finding 2**: Value with context
-(Include 2-5 bullet points with the most important metrics)
+DO NOT:
+- Force sections like "Summary", "Key Points", "Next Steps" for simple questions
+- Add headers when a direct answer suffices
+- Include "Learn More" or suggestions unless specifically asked
+- Over-explain or pad responses
 
-## Details
-[If needed, provide additional context in organized paragraphs or sub-bullets]
+DO:
+- Be direct, professional, and concise
+- Answer exactly what was asked, nothing more
+- Include calculations when discussing metrics
+- Use markdown formatting naturally (bold, bullets) without forcing structure
 
-## Recommendations
-1. First actionable step
-2. Second actionable step
-(Number your recommendations for clarity)
-
-## Next Steps
-Let me know if you need more details on any specific finding.
-
-CALCULATION TRANSPARENCY (Always include when discussing rates):
-When mentioning error rates or scores, include the formula:
-- Example: "Error Rate = 142 failing rows / 10,000 total rows × 100 = **1.42%**"
-- Example: "Pass Rate = 18 passed / 20 total rules × 100 = **90%**"
-
-COMMUNICATION STYLE (CRITICAL):
-- Strictly professional and formal tone
-- Concise, helpful, suitable for enterprise stakeholders
-- Never use aggressive language, warnings, or alarming phrases
-- Present findings factually without dramatization
-- Provide actionable recommendations in a supportive manner
-- Be respectful and constructive at all times
-- No emojis, no exclamation marks, no casual language
-- No phrases like "WARNING!", "CRITICAL!", "ALERT!"
-- Use clear markdown headers (##), bold (**text**), and bullet points (-)
+COMMUNICATION STYLE:
+- Professional and formal tone
+- Concise and suitable for enterprise stakeholders
+- No aggressive language or alarming phrases
+- No emojis, no exclamation marks
+- Use bold (**text**) for emphasis, bullets (-) for lists when needed
 
 === CURRENT PIPELINE CONTEXT ===
 ${contextSummary}
@@ -325,17 +319,10 @@ ${intent}
 - Severities mentioned: ${entities.severities.length > 0 ? entities.severities.join(', ') : 'none'}
 
 === INSTRUCTIONS ===
-- Answer ONLY the user's intent using the provided context.
+- Answer ONLY the user's question using the provided context.
 - Reference exact counts, columns, rules, and severities from context.
-- Use the RESPONSE FORMAT above for all answers.
-- If intent is SUMMARY, provide a professional overview with Key Findings and Recommendations.
-- If intent is FAILED_RULES, list specific failed rules with their details under Key Findings.
-- If intent is COLUMN_ISSUE, explain column issues professionally with data from profiling.
-- If intent is REMEDIATION, provide clear numbered steps under Recommendations.
-- If intent is GOVERNANCE_TRUST, explain the integrity score breakdown under Details.
-- If intent is INCIDENT_STATUS, summarize open incidents by severity under Key Findings.
-- If intent is UNKNOWN, ask ONE clarifying question politely.
-- If data is not available, clearly state it is not available in the current pipeline run.
+- Match response length to question complexity - simple questions get brief answers.
+- If data is not available, state it clearly in one sentence.
 
 BEGIN RESPONSE.`;
 }
@@ -482,35 +469,32 @@ STRICT RULES:
 - Provide educational, conceptual answers
 - Use examples when helpful (but make them generic)
 - Be accurate and cite industry standards when relevant
-- If asked about specific data or metrics, explain you're in General mode and suggest switching to Dataset Context mode
 
-RESPONSE FORMAT (MANDATORY):
-Structure every response using clear markdown formatting:
+RESPONSE STYLE (ADAPTIVE - ZERO-SHOT):
+- Answer the question DIRECTLY and concisely
+- For definitions: One clear paragraph is sufficient
+- For comparisons: Use bullet points or a brief table only if helpful
+- For best practices: Numbered list only when appropriate
+- For complex concepts: Structure as needed, but avoid forced sections
 
-## Summary
-[One sentence overview of the concept]
+DO NOT:
+- Force "Summary", "Key Points", "Details", "Learn More" sections
+- Add unnecessary headers for simple questions
+- Over-explain when a concise answer is sufficient
+- Pad responses with suggestions unless asked
 
-## Key Points
-- **Point 1**: Clear explanation
-- **Point 2**: Clear explanation
-
-## Details
-[Additional context and explanation]
-
-## Best Practices
-1. First recommendation
-2. Second recommendation
-
-## Learn More
-Suggest related topics or questions.
+DO:
+- Be educational, professional, and concise
+- Match response length to question complexity
+- Use markdown formatting naturally (bold, bullets) without forcing structure
+- Answer exactly what was asked
 
 COMMUNICATION STYLE:
 - Professional and formal tone
 - Educational and supportive
 - No hallucinations - admit if unsure
-- Use markdown headers (##), bold (**text**), and bullet points (-)
+- Use bold (**text**) for emphasis, bullets (-) for lists when needed
 - No emojis, no exclamation marks
-- No aggressive warnings or alarming language
 
 BEGIN RESPONSE.`;
 }
