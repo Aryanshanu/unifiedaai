@@ -390,7 +390,7 @@ serve(async (req) => {
     const executionTime = Date.now() - startTime;
     const profileTs = new Date().toISOString();
 
-    // Store profile
+    // Store profile with dimension scores
     const { data: profile, error: insertError } = await supabase
       .from("dq_profiles")
       .insert({
@@ -398,6 +398,7 @@ serve(async (req) => {
         dataset_version: dataset_version || "1.0",
         row_count: rowCount,
         column_profiles: columnProfiles,
+        dimension_scores: dimensionScores,
         profile_ts: profileTs,
         execution_time_ms: executionTime,
       })

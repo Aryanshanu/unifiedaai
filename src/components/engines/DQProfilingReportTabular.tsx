@@ -471,30 +471,60 @@ export function DQProfilingReportTabular({ profile, isLoading }: DQProfilingRepo
           </div>
         )}
 
-        {/* Relationship Metrics */}
-        <div className="space-y-2">
-          <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">
+        {/* Relationship Metrics - Enhanced Primary Key Detection with Clear Reasoning */}
+        <div className="space-y-4">
+          <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+            <Key className="h-4 w-4" />
             Relationship Metrics
           </h4>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="p-4 border rounded-lg">
-              <p className="text-sm font-medium text-muted-foreground">Potential Primary Keys</p>
-              <p className="text-lg font-bold mt-1">
-                {columnProfiles.filter(c => c.uniqueness > 99).map(c => c.column_name).join(', ') || 'None detected'}
+          
+          {/* Potential Primary Keys with DETAILED REASONING */}
+          <div className="border rounded-lg p-4 space-y-3">
+            <p className="font-semibold text-sm flex items-center gap-2">
+              <Key className="h-4 w-4 text-primary" />
+              Potential Primary Keys
+            </p>
+            {columnProfiles.filter(c => c.uniqueness >= 99 && c.null_count === 0).length > 0 ? (
+              <div className="space-y-2">
+                {columnProfiles
+                  .filter(c => c.uniqueness >= 99 && c.null_count === 0)
+                  .map(col => (
+                    <div key={col.column_name} className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg border">
+                      <Key className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                      <div className="space-y-1">
+                        <p className="font-mono font-semibold text-sm">{col.column_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Suggested as primary key: <span className="font-medium text-foreground">{col.uniqueness.toFixed(1)}% unique values</span>, 
+                          no nulls, <span className="font-medium text-foreground">{col.distinct_count?.toLocaleString() || 'N/A'} distinct values</span> across {profile.row_count.toLocaleString()} rows, 
+                          <span className="font-medium text-foreground"> {col.dtype}</span> type.
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-sm italic p-2">
+                No columns meet primary key criteria (requires ≥99% uniqueness and 0 null values)
               </p>
+            )}
+          </div>
+          
+          {/* Cardinality Summary Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 border rounded-lg">
+              <p className="text-sm font-medium text-muted-foreground">Total Columns</p>
+              <p className="text-2xl font-bold mt-1">{columnProfiles.length}</p>
             </div>
             <div className="p-4 border rounded-lg">
-              <p className="text-sm font-medium text-muted-foreground">Cardinality</p>
-              <p className="text-lg font-bold mt-1">
-                {columnProfiles.length} columns
+              <p className="text-sm font-medium text-muted-foreground">Unique Identifiers</p>
+              <p className="text-2xl font-bold mt-1">
+                {columnProfiles.filter(c => c.uniqueness >= 99 && c.null_count === 0).length}
               </p>
-              <p className="text-xs text-muted-foreground">
-                {columnProfiles.filter(c => c.uniqueness > 99).length} unique identifiers
-              </p>
+              <p className="text-xs text-muted-foreground">Columns with ≥99% uniqueness, no nulls</p>
             </div>
             <div className="p-4 border rounded-lg">
               <p className="text-sm font-medium text-muted-foreground">Orphaned Records</p>
-              <p className="text-lg font-bold mt-1">0</p>
+              <p className="text-2xl font-bold mt-1">0</p>
               <p className="text-xs text-muted-foreground">No orphaned records detected</p>
             </div>
           </div>

@@ -467,18 +467,41 @@ export function useDQControlPlane(datasetId?: string): UseDQControlPlaneReturn {
       setFinalResponse(response);
 
       if (response.status === 'success') {
-        // FIX #7: Force refetch incidents immediately to show correct count in toast
-        const { data: freshIncidents } = await supabase
-          .from('dq_incidents')
-          .select('*')
-          .eq('dataset_id', input.dataset_id)
-          .order('created_at', { ascending: false });
+        // Force refetch ALL results immediately to ensure UI is in sync
+        const [profileRes, rulesRes, execRes, assetsRes, incidentsRes] = await Promise.all([
+          supabase.from('dq_profiles')
+            .select('*')
+            .eq('dataset_id', input.dataset_id)
+            .order('profile_ts', { ascending: false })
+            .limit(1),
+          supabase.from('dq_rules')
+            .select('*')
+            .eq('dataset_id', input.dataset_id)
+            .eq('is_active', true),
+          supabase.from('dq_rule_executions')
+            .select('*')
+            .eq('dataset_id', input.dataset_id)
+            .order('execution_ts', { ascending: false })
+            .limit(1),
+          supabase.from('dq_dashboard_assets')
+            .select('*')
+            .eq('dataset_id', input.dataset_id)
+            .order('generated_at', { ascending: false })
+            .limit(1),
+          supabase.from('dq_incidents')
+            .select('*')
+            .eq('dataset_id', input.dataset_id)
+            .order('created_at', { ascending: false }),
+        ]);
+
+        // Update all state with fresh data
+        if (profileRes.data?.[0]) setProfilingResult(profileRes.data[0] as unknown as DQProfile);
+        if (rulesRes.data) setRulesResult(rulesRes.data as unknown as DQRule[]);
+        if (execRes.data?.[0]) setExecutionResult(execRes.data[0] as unknown as DQExecution);
+        if (assetsRes.data?.[0]) setDashboardAssets(assetsRes.data[0] as unknown as DQDashboardAsset);
+        if (incidentsRes.data) setIncidents(incidentsRes.data as unknown as DQIncident[]);
         
-        if (freshIncidents) {
-          setIncidents(freshIncidents as unknown as DQIncident[]);
-        }
-        
-        const actualIncidentCount = freshIncidents?.length || 0;
+        const actualIncidentCount = incidentsRes.data?.length || 0;
         
         setPipelineStatus('success');
         setStepStatuses({
