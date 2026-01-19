@@ -162,21 +162,35 @@ serve(async (req) => {
       });
     }
 
-    // Get ALL data for profiling - optimized pagination for up to 1M rows
-    const CHUNK_SIZE = 10000;
-    const PROFILE_TIMEOUT_MS = 120000; // 2 minute timeout for profiling
+    // Get ALL data for profiling - FIXED pagination with backend max page size
+    // CRITICAL: Backend API returns max ~1000 rows per request regardless of range size
+    const CHUNK_SIZE = 1000; // Match backend max page size
+    const PROFILE_TIMEOUT_MS = 300000; // 5 minute timeout for profiling large datasets
     let allData: Array<{ raw_data: unknown }> = [];
     let offset = 0;
-    let hasMore = true;
     const fetchStart = Date.now();
+    const totalExpected = dqDataCount || 0;
     
-    console.log(`[DQ Profile] Fetching all data for dataset ${dataset_id} (total: ${dqDataCount?.toLocaleString()} rows)`);
+    console.log(`[DQ Profile] Fetching all data for dataset ${dataset_id} (total: ${totalExpected.toLocaleString()} rows)`);
     
-    while (hasMore) {
+    // FIXED: Use count-based termination, not chunk-size comparison
+    while (offset < totalExpected) {
       // Check timeout
       if (Date.now() - fetchStart > PROFILE_TIMEOUT_MS) {
-        console.warn(`[DQ Profile] Timeout approaching at ${allData.length.toLocaleString()} rows, proceeding with available data`);
-        break;
+        console.error(`[DQ Profile] TIMEOUT at ${allData.length.toLocaleString()}/${totalExpected.toLocaleString()} rows after ${Math.round((Date.now() - fetchStart) / 1000)}s`);
+        // FAIL-CLOSED: Return error on timeout, do not silently proceed with partial data
+        const response: ProfilingOutput = {
+          status: "error",
+          code: "PROFILE_TIMEOUT",
+          message: `Profiling timeout: processed ${allData.length.toLocaleString()} of ${totalExpected.toLocaleString()} rows`,
+          detail: `Timeout after ${Math.round((Date.now() - fetchStart) / 1000)} seconds. Consider using sampling for very large datasets.`,
+          dataset_id,
+          row_count: allData.length,
+        };
+        return new Response(JSON.stringify(response), {
+          status: 408,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
       
       const { data: chunk, error: chunkError } = await supabase
@@ -187,22 +201,37 @@ serve(async (req) => {
       
       if (chunkError) {
         console.error(`[DQ Profile] Error fetching chunk at offset ${offset}:`, chunkError);
+        const response: ProfilingOutput = {
+          status: "error",
+          code: "DATA_FETCH_ERROR",
+          message: `Failed to fetch data at offset ${offset}`,
+          detail: chunkError.message,
+        };
+        return new Response(JSON.stringify(response), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      
+      if (!chunk || chunk.length === 0) {
+        console.log(`[DQ Profile] No more data at offset ${offset}, fetched ${allData.length} total`);
         break;
       }
       
-      if (chunk && chunk.length > 0) {
-        allData = allData.concat(chunk);
-        offset += chunk.length;
-        
-        // Log progress every 10% or 100k rows
-        const progressStep = Math.max(100000, Math.floor((dqDataCount || 0) / 10));
-        if (allData.length % progressStep < CHUNK_SIZE) {
-          const pct = dqDataCount ? Math.round((allData.length / dqDataCount) * 100) : 0;
-          console.log(`[DQ Profile] Progress: ${pct}% (${allData.length.toLocaleString()}/${dqDataCount?.toLocaleString()} rows)`);
-        }
-      }
+      allData = allData.concat(chunk);
+      offset += chunk.length;
       
-      hasMore = chunk && chunk.length === CHUNK_SIZE;
+      // Log progress every 10% or at least every 50k rows
+      const progressInterval = Math.max(50000, Math.floor(totalExpected / 10));
+      if (allData.length % progressInterval < CHUNK_SIZE || allData.length === totalExpected) {
+        const pct = Math.round((allData.length / totalExpected) * 100);
+        console.log(`[DQ Profile] Progress: ${pct}% (${allData.length.toLocaleString()}/${totalExpected.toLocaleString()} rows)`);
+      }
+    }
+    
+    // TRUTH VALIDATION: Verify we got all rows
+    if (allData.length < totalExpected) {
+      console.warn(`[DQ Profile] WARNING: Fetched ${allData.length} rows but expected ${totalExpected}`);
     }
     
     const dqData = allData;
