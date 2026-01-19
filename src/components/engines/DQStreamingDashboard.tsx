@@ -29,6 +29,7 @@ import {
   ResponsiveContainer,
   Legend
 } from 'recharts';
+import { ErrorRateExplanation, PassRateExplanation } from './ErrorRateExplanation';
 
 interface DimensionData {
   name: string;
@@ -455,6 +456,15 @@ export function DQStreamingDashboard({ datasetId, executionId, isActive = true }
             </div>
           </div>
         </div>
+
+        {/* Error Rate Calculation Transparency */}
+        {metrics.rulesExecuted > 0 && (
+          <ErrorRateExplanation
+            failedRows={metrics.rulesFailed}
+            totalRows={metrics.rulesExecuted}
+            errorRate={metrics.errorRate}
+          />
+        )}
 
         {/* FIX #6: Real Charts - Bar Chart for Dimension Scores */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

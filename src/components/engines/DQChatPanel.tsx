@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -663,7 +664,14 @@ export function DQChatPanel({ isOpen, onClose, context: rawContext }: DQChatPane
 
   return (
     <>
-      <div className="fixed right-0 top-0 h-full w-[420px] bg-background border-l shadow-xl z-50 flex flex-col">
+      {/* Mobile backdrop overlay */}
+      <div 
+        className="fixed inset-0 bg-black/50 z-[55] sm:hidden" 
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      
+      <div className="fixed right-0 top-0 h-full w-full sm:w-[420px] max-w-full bg-background border-l shadow-xl z-[60] flex flex-col isolate">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b bg-muted/30">
           <div className="flex items-center gap-2">
@@ -721,7 +729,7 @@ export function DQChatPanel({ isOpen, onClose, context: rawContext }: DQChatPane
               >
                 <div
                   className={cn(
-                    "max-w-[85%] rounded-lg px-3 py-2 text-sm",
+                    "max-w-[85%] rounded-lg px-3 py-2 text-sm overflow-hidden",
                     message.role === 'user'
                       ? "bg-primary text-primary-foreground"
                       : message.isError
@@ -735,7 +743,28 @@ export function DQChatPanel({ isOpen, onClose, context: rawContext }: DQChatPane
                       <span className="text-xs font-medium">Error</span>
                     </div>
                   )}
-                  <div className="whitespace-pre-wrap">{message.content}</div>
+                  {/* Render markdown for assistant messages, plain text for user */}
+                  {message.role === 'assistant' && !message.isError ? (
+                    <div className="prose prose-sm dark:prose-invert max-w-none break-words">
+                      <ReactMarkdown
+                        components={{
+                          h2: ({children}) => <h2 className="text-sm font-bold mt-3 mb-1 text-foreground first:mt-0">{children}</h2>,
+                          h3: ({children}) => <h3 className="text-sm font-semibold mt-2 mb-1 text-foreground">{children}</h3>,
+                          ul: ({children}) => <ul className="list-disc list-inside my-1 space-y-0.5 pl-0">{children}</ul>,
+                          ol: ({children}) => <ol className="list-decimal list-inside my-1 space-y-0.5 pl-0">{children}</ol>,
+                          li: ({children}) => <li className="text-sm leading-relaxed">{children}</li>,
+                          p: ({children}) => <p className="my-1 leading-relaxed">{children}</p>,
+                          strong: ({children}) => <strong className="font-semibold text-foreground">{children}</strong>,
+                          code: ({children}) => <code className="bg-background/50 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
+                          hr: () => <hr className="my-2 border-border" />,
+                        }}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    <div className="whitespace-pre-wrap break-words">{message.content}</div>
+                  )}
                   {message.isError && renderErrorAction(message.errorCode)}
                 </div>
               </div>

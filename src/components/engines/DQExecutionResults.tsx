@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import type { DQExecution, DQExecutionMetric } from '@/hooks/useDQControlPlane';
 import { format } from 'date-fns';
+import { PassRateExplanation } from './ErrorRateExplanation';
 
 interface DQExecutionResultsProps {
   execution: DQExecution | null;
@@ -140,6 +141,16 @@ export function DQExecutionResults({ execution, isLoading }: DQExecutionResultsP
             <div className="text-xs text-destructive/80">Failed</div>
           </div>
         </div>
+
+        {/* Pass Rate Calculation Transparency */}
+        {metrics.length > 0 && (
+          <PassRateExplanation
+            passedRules={passedCount}
+            totalRules={metrics.length}
+            passRate={metrics.length > 0 ? (passedCount / metrics.length) * 100 : 0}
+            className="mb-4"
+          />
+        )}
 
         {/* Metrics Table */}
         <ScrollArea className="h-[180px]">
