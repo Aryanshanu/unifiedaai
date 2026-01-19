@@ -44,8 +44,8 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Maximum rows to process for browser performance
-  const MAX_ROWS = 50000;
+  // Maximum rows to process - supports up to 1 million
+  const MAX_ROWS = 1000000;
 
   const parseData = useCallback((content: string, fileName?: string): ParsedData | null => {
     try {
@@ -110,8 +110,8 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
   const handleFileSelect = useCallback(async (file: File) => {
     setUploadError(null);
     
-    if (file.size > 50 * 1024 * 1024) {
-      toast.error('File too large. Maximum size is 50MB.');
+    if (file.size > 500 * 1024 * 1024) {
+      toast.error('File too large. Maximum size is 500MB.');
       return;
     }
 
@@ -385,7 +385,7 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
                 Drop file here or click to browse
               </p>
               <p className="text-sm text-muted-foreground mt-1">
-                Supports: CSV, JSON (up to 50MB)
+                Supports: CSV, JSON (up to 500MB, 1M rows max)
               </p>
             </>
           )}
