@@ -1341,6 +1341,7 @@ export type Database = {
           created_by: string | null
           dataset_id: string
           dataset_version: string | null
+          dimension_scores: Json | null
           execution_time_ms: number | null
           id: string
           profile_ts: string
@@ -1353,6 +1354,7 @@ export type Database = {
           created_by?: string | null
           dataset_id: string
           dataset_version?: string | null
+          dimension_scores?: Json | null
           execution_time_ms?: number | null
           id?: string
           profile_ts?: string
@@ -1365,6 +1367,7 @@ export type Database = {
           created_by?: string | null
           dataset_id?: string
           dataset_version?: string | null
+          dimension_scores?: Json | null
           execution_time_ms?: number | null
           id?: string
           profile_ts?: string
