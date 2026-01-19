@@ -693,83 +693,68 @@ export function DQChatPanel({ isOpen, onClose, context: rawContext }: DQChatPane
         aria-hidden="true"
       />
       
-      <div className="fixed right-0 top-0 h-full w-full sm:w-[420px] max-w-full bg-background border-l shadow-xl z-[60] flex flex-col isolate">
-        {/* Header */}
-        <div className="flex items-center justify-between p-3 border-b bg-muted/30">
+      {/* Chat panel - positioned below header on desktop */}
+      <div className="fixed right-0 top-0 h-full sm:top-14 sm:bottom-0 sm:h-auto w-full sm:w-[380px] max-w-full bg-background border-l shadow-xl z-[60] flex flex-col isolate">
+        {/* Compact Header with inline mode indicator */}
+        <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30">
           <div className="flex items-center gap-2 min-w-0">
-            <Bot className="h-5 w-5 text-primary shrink-0" />
-            <span className="font-semibold truncate hidden sm:inline">DQ Assistant</span>
+            <Bot className="h-4 w-4 text-primary shrink-0" />
+            <span className="font-semibold text-sm">DQ Assistant</span>
+            {/* Inline mode badge */}
+            <span className={cn(
+              "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
+              isDatasetMode 
+                ? "bg-blue-500/15 text-blue-600 dark:text-blue-400" 
+                : "bg-purple-500/15 text-purple-600 dark:text-purple-400"
+            )}>
+              {isDatasetMode ? "Dataset" : "General"}
+            </span>
           </div>
           
-          {/* Mode Toggle - Center */}
-          <div className="flex items-center gap-2 px-2 shrink-0">
-            <BookOpen className={cn("h-4 w-4 transition-colors", !isDatasetMode ? "text-primary" : "text-muted-foreground")} />
+          {/* Mode Toggle - compact */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <BookOpen className={cn("h-3.5 w-3.5 transition-colors", !isDatasetMode && "text-purple-500")} />
             <Switch
               checked={isDatasetMode}
               onCheckedChange={setIsDatasetMode}
               aria-label="Toggle context mode"
+              className="scale-90"
             />
-            <Database className={cn("h-4 w-4 transition-colors", isDatasetMode ? "text-primary" : "text-muted-foreground")} />
+            <Database className={cn("h-3.5 w-3.5 transition-colors", isDatasetMode && "text-blue-500")} />
           </div>
           
-          {/* Actions - Right */}
-          <div className="flex items-center gap-1 shrink-0">
-            <Button
-              variant="ghost"
-              size="icon"
+          {/* Actions */}
+          <div className="flex items-center shrink-0">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-7 w-7"
               onClick={() => setShowClearConfirm(true)}
               disabled={messages.length === 0}
               title="Clear chat"
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-3.5 w-3.5" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-4 w-4" />
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose} title="Close">
+              <X className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
 
-        {/* Mode Indicator Banner */}
-        <div className={cn(
-          "px-4 py-1.5 text-xs border-b flex items-center justify-center gap-2",
-          isDatasetMode 
-            ? "bg-blue-500/10 text-blue-600 dark:text-blue-400" 
-            : "bg-purple-500/10 text-purple-600 dark:text-purple-400"
-        )}>
-          {isDatasetMode ? (
-            <>
-              <Database className="h-3 w-3" />
-              <span className="font-medium">Mode: Dataset Context</span>
-            </>
-          ) : (
-            <>
-              <BookOpen className="h-3 w-3" />
-              <span className="font-medium">Mode: General Data Governance</span>
-            </>
-          )}
-        </div>
-
-        {/* Context Status Banner - Only show in Dataset Mode */}
-        {isDatasetMode && (
+        {/* Compact Context Status - only show in dataset mode when data available */}
+        {isDatasetMode && contextStatus.hasData && (
           <div className={cn(
-            "px-4 py-2 text-sm border-b flex items-center gap-2",
-            !contextStatus.hasData ? "bg-warning/10 text-warning" :
-            contextStatus.isStale ? "bg-orange-500/10 text-orange-600 dark:text-orange-400" :
-            "bg-success/10 text-success"
+            "px-3 py-1 text-[11px] border-b flex items-center gap-1.5",
+            contextStatus.isStale 
+              ? "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400"
+              : "bg-green-500/10 text-green-700 dark:text-green-400"
           )}>
-            {!contextStatus.hasData ? (
-              <AlertCircle className="h-4 w-4 shrink-0" />
-            ) : contextStatus.isStale ? (
-              <Clock className="h-4 w-4 shrink-0" />
+            {contextStatus.isStale ? (
+              <AlertTriangle className="h-3 w-3 shrink-0" />
             ) : (
-              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              <CheckCircle2 className="h-3 w-3 shrink-0" />
             )}
-            <span className="truncate flex-1">{contextStatus.summary}</span>
-            {contextStatus.contextAge && (
-              <Badge variant="outline" className="text-xs shrink-0">
-                {contextStatus.contextAge}
-              </Badge>
-            )}
+            <span className="truncate">{contextStatus.summary}</span>
           </div>
         )}
 
