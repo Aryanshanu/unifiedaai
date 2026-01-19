@@ -162,15 +162,39 @@ serve(async (req) => {
       });
     }
 
-    // Get data for profiling (increased sample for better accuracy on large datasets)
-    const { data: dqData } = await supabase
-      .from("dq_data")
-      .select("raw_data")
-      .eq("dataset_id", dataset_id)
-      .limit(10000);
-
+    // Get ALL data for profiling - paginate through entire dataset
+    const CHUNK_SIZE = 2000;
+    let allData: Array<{ raw_data: unknown }> = [];
+    let offset = 0;
+    let hasMore = true;
+    
+    console.log(`[DQ Profile] Fetching all data for dataset ${dataset_id} (total: ${dqDataCount} rows)`);
+    
+    while (hasMore) {
+      const { data: chunk, error: chunkError } = await supabase
+        .from("dq_data")
+        .select("raw_data")
+        .eq("dataset_id", dataset_id)
+        .range(offset, offset + CHUNK_SIZE - 1);
+      
+      if (chunkError) {
+        console.error(`[DQ Profile] Error fetching chunk at offset ${offset}:`, chunkError);
+        break;
+      }
+      
+      if (chunk && chunk.length > 0) {
+        allData = allData.concat(chunk);
+        offset += chunk.length;
+        console.log(`[DQ Profile] Fetched ${allData.length}/${dqDataCount} rows...`);
+      }
+      
+      hasMore = chunk && chunk.length === CHUNK_SIZE;
+    }
+    
+    const dqData = allData;
     const columnProfiles: ColumnProfile[] = [];
-    const rowCount = dqData!.length;
+    const rowCount = dqData.length;
+    console.log(`[DQ Profile] ✅ Loaded ${rowCount} rows for profiling`);
 
     // Get all column names from first row
     const firstRow = dqData![0]?.raw_data as Record<string, unknown>;
