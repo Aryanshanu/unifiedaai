@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,7 +24,9 @@ import {
   CheckCircle2,
   AlertCircle,
   Bot,
-  Clock
+  Clock,
+  Database,
+  BookOpen
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
@@ -490,12 +493,23 @@ export function DQChatPanel({ isOpen, onClose, context: rawContext }: DQChatPane
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [lastUserMessage, setLastUserMessage] = useState<string>('');
   
+  // Mode toggle - persisted in sessionStorage
+  const [isDatasetMode, setIsDatasetMode] = useState<boolean>(() => {
+    const stored = sessionStorage.getItem('dq-chat-mode');
+    return stored !== null ? stored === 'dataset' : true; // Default: Dataset Context
+  });
+  
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Build structured context
   const context = useMemo(() => buildLiveDQContext(rawContext), [rawContext]);
   const contextStatus = useMemo(() => getContextStatus(context), [context]);
+  
+  // Persist mode changes
+  useEffect(() => {
+    sessionStorage.setItem('dq-chat-mode', isDatasetMode ? 'dataset' : 'general');
+  }, [isDatasetMode]);
 
   // Auto-scroll on new messages
   useEffect(() => {
@@ -511,18 +525,22 @@ export function DQChatPanel({ isOpen, onClose, context: rawContext }: DQChatPane
     }
   }, [isOpen]);
 
-  // Add welcome message on first open
+  // Add welcome message on first open or when mode changes
   useEffect(() => {
     if (isOpen && messages.length === 0) {
+      const welcomeContent = isDatasetMode
+        ? `Hello! I'm your **Data Quality Governance Assistant** in **Dataset Context** mode.\n\nI can help you understand your data quality results, explain issues, and suggest remediations based on the current pipeline data.\n\n**Important:** I only answer based on the currently loaded dataset. I will never guess or fabricate metrics.\n\nChat history is not saved between sessions.`
+        : `Hello! I'm your **Data Quality Governance Assistant** in **General Data Governance** mode.\n\nI can answer questions about data quality concepts, best practices, frameworks, and industry standards.\n\n**Note:** I won't reference any specific dataset in this mode. Switch to Dataset Context mode to analyze your pipeline results.`;
+      
       setMessages([{
         id: generateId(),
         role: 'assistant',
-        content: `Hello! I'm your **Data Quality Governance Assistant** for the Fractal Unified Governance Platform.\n\nI can help you understand your data quality results, explain issues, and suggest remediations.\n\n**Important:** I only answer based on the current pipeline data. I will never guess or fabricate metrics.\n\nChat history is not saved between sessions.`,
+        content: welcomeContent,
         timestamp: new Date(),
         isError: false
       }]);
     }
-  }, [isOpen, messages.length]);
+  }, [isOpen, messages.length, isDatasetMode]);
 
   const sendMessage = async (messageText?: string) => {
     const text = (messageText || input).trim();
@@ -542,34 +560,37 @@ export function DQChatPanel({ isOpen, onClose, context: rawContext }: DQChatPane
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
 
-    // Check for context
-    if (!contextStatus.hasData) {
-      setMessages(prev => [...prev, {
-        id: generateId(),
-        role: 'assistant',
-        content: ERROR_CONFIG.NO_CONTEXT.message,
-        timestamp: new Date(),
-        isError: true,
-        errorCode: 'NO_CONTEXT'
-      }]);
-      setIsLoading(false);
-      return;
-    }
+    // MODE-SPECIFIC BEHAVIOR
+    if (isDatasetMode) {
+      // DATASET CONTEXT MODE - requires data
+      if (!contextStatus.hasData) {
+        setMessages(prev => [...prev, {
+          id: generateId(),
+          role: 'assistant',
+          content: "Please select a dataset and run the pipeline first to get context-specific answers.",
+          timestamp: new Date(),
+          isError: true,
+          errorCode: 'NO_CONTEXT'
+        }]);
+        setIsLoading(false);
+        return;
+      }
 
-    // Check for stale context (warn but allow)
-    if (contextStatus.isStale) {
-      setMessages(prev => [...prev, {
-        id: generateId(),
-        role: 'assistant',
-        content: `⚠️ **Warning:** Pipeline data is ${contextStatus.contextAge} old. Results may not reflect the current state.\n\nProceeding with available data...`,
-        timestamp: new Date(),
-        isError: false
-      }]);
+      // Check for stale context (warn but allow)
+      if (contextStatus.isStale) {
+        setMessages(prev => [...prev, {
+          id: generateId(),
+          role: 'assistant',
+          content: `⚠️ **Warning:** Pipeline data is ${contextStatus.contextAge} old. Results may not reflect the current state.\n\nProceeding with available data...`,
+          timestamp: new Date(),
+          isError: false
+        }]);
+      }
     }
 
     try {
-      // Extract entities from user message
-      const extractedEntities = extractEntities(text, context);
+      // Extract entities from user message (only relevant for dataset mode)
+      const extractedEntities = isDatasetMode ? extractEntities(text, context) : { columns: [], rules: [], dimensions: [], severities: [], steps: [] };
       
       // Build history (last 10 messages)
       const history = messages
@@ -577,13 +598,14 @@ export function DQChatPanel({ isOpen, onClose, context: rawContext }: DQChatPane
         .slice(-10)
         .map(m => ({ role: m.role, content: m.content }));
 
-      // Call governance-grade edge function
+      // Call governance-grade edge function with mode
       const { data, error } = await supabase.functions.invoke('dq-chat', {
         body: {
           message: text,
           history,
-          context,
-          extracted_entities: extractedEntities
+          context: isDatasetMode ? context : null,
+          extracted_entities: isDatasetMode ? extractedEntities : null,
+          mode: isDatasetMode ? 'dataset' : 'general'
         }
       });
 
@@ -673,12 +695,25 @@ export function DQChatPanel({ isOpen, onClose, context: rawContext }: DQChatPane
       
       <div className="fixed right-0 top-0 h-full w-full sm:w-[420px] max-w-full bg-background border-l shadow-xl z-[60] flex flex-col isolate">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b bg-muted/30">
-          <div className="flex items-center gap-2">
-            <Bot className="h-5 w-5 text-primary" />
-            <span className="font-semibold">DQ Governance Assistant</span>
+        <div className="flex items-center justify-between p-3 border-b bg-muted/30">
+          <div className="flex items-center gap-2 min-w-0">
+            <Bot className="h-5 w-5 text-primary shrink-0" />
+            <span className="font-semibold truncate hidden sm:inline">DQ Assistant</span>
           </div>
-          <div className="flex items-center gap-1">
+          
+          {/* Mode Toggle - Center */}
+          <div className="flex items-center gap-2 px-2 shrink-0">
+            <BookOpen className={cn("h-4 w-4 transition-colors", !isDatasetMode ? "text-primary" : "text-muted-foreground")} />
+            <Switch
+              checked={isDatasetMode}
+              onCheckedChange={setIsDatasetMode}
+              aria-label="Toggle context mode"
+            />
+            <Database className={cn("h-4 w-4 transition-colors", isDatasetMode ? "text-primary" : "text-muted-foreground")} />
+          </div>
+          
+          {/* Actions - Right */}
+          <div className="flex items-center gap-1 shrink-0">
             <Button
               variant="ghost"
               size="icon"
@@ -694,27 +729,49 @@ export function DQChatPanel({ isOpen, onClose, context: rawContext }: DQChatPane
           </div>
         </div>
 
-        {/* Context Status Banner */}
+        {/* Mode Indicator Banner */}
         <div className={cn(
-          "px-4 py-2 text-sm border-b flex items-center gap-2",
-          !contextStatus.hasData ? "bg-warning/10 text-warning" :
-          contextStatus.isStale ? "bg-orange-500/10 text-orange-600 dark:text-orange-400" :
-          "bg-success/10 text-success"
+          "px-4 py-1.5 text-xs border-b flex items-center justify-center gap-2",
+          isDatasetMode 
+            ? "bg-blue-500/10 text-blue-600 dark:text-blue-400" 
+            : "bg-purple-500/10 text-purple-600 dark:text-purple-400"
         )}>
-          {!contextStatus.hasData ? (
-            <AlertCircle className="h-4 w-4 shrink-0" />
-          ) : contextStatus.isStale ? (
-            <Clock className="h-4 w-4 shrink-0" />
+          {isDatasetMode ? (
+            <>
+              <Database className="h-3 w-3" />
+              <span className="font-medium">Mode: Dataset Context</span>
+            </>
           ) : (
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-          )}
-          <span className="truncate flex-1">{contextStatus.summary}</span>
-          {contextStatus.contextAge && (
-            <Badge variant="outline" className="text-xs shrink-0">
-              {contextStatus.contextAge}
-            </Badge>
+            <>
+              <BookOpen className="h-3 w-3" />
+              <span className="font-medium">Mode: General Data Governance</span>
+            </>
           )}
         </div>
+
+        {/* Context Status Banner - Only show in Dataset Mode */}
+        {isDatasetMode && (
+          <div className={cn(
+            "px-4 py-2 text-sm border-b flex items-center gap-2",
+            !contextStatus.hasData ? "bg-warning/10 text-warning" :
+            contextStatus.isStale ? "bg-orange-500/10 text-orange-600 dark:text-orange-400" :
+            "bg-success/10 text-success"
+          )}>
+            {!contextStatus.hasData ? (
+              <AlertCircle className="h-4 w-4 shrink-0" />
+            ) : contextStatus.isStale ? (
+              <Clock className="h-4 w-4 shrink-0" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+            )}
+            <span className="truncate flex-1">{contextStatus.summary}</span>
+            {contextStatus.contextAge && (
+              <Badge variant="outline" className="text-xs shrink-0">
+                {contextStatus.contextAge}
+              </Badge>
+            )}
+          </div>
+        )}
 
         {/* Messages */}
         <ScrollArea className="flex-1 p-4" ref={scrollRef}>

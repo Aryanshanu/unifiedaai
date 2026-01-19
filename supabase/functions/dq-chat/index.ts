@@ -117,8 +117,9 @@ interface LiveDQContext {
 interface ChatRequest {
   message: string;
   history: Array<{ role: 'user' | 'assistant'; content: string }>;
-  context: LiveDQContext;
-  extracted_entities: ExtractedEntities;
+  context: LiveDQContext | null;
+  extracted_entities: ExtractedEntities | null;
+  mode: 'dataset' | 'general';
 }
 
 interface ChatResponse {
@@ -127,9 +128,10 @@ interface ChatResponse {
   error_code?: 'NO_CONTEXT' | 'MODEL_UNAVAILABLE' | 'INVALID_REQUEST' | 'RATE_LIMITED' | 'MISSING_DATA';
   error_message?: string;
   metadata?: {
-    intent: DQIntent;
-    entities: ExtractedEntities;
-    context_timestamp: string;
+    intent?: DQIntent;
+    entities?: ExtractedEntities;
+    context_timestamp?: string;
+    mode: 'dataset' | 'general';
   };
 }
 
@@ -459,6 +461,61 @@ function buildContextSummary(context: LiveDQContext): string {
 }
 
 // ============================================
+// GENERAL DATA GOVERNANCE PROMPT
+// ============================================
+
+function buildGeneralGovernancePrompt(): string {
+  return `You are the Data Quality Governance Assistant for the Fractal Unified Governance Platform.
+
+You are in **General Data Governance Mode**. You should answer questions about:
+- Data quality concepts and dimensions (completeness, uniqueness, validity, accuracy, timeliness, consistency)
+- Data governance best practices and frameworks
+- Industry standards (DAMA DMBOK, ISO 8000, etc.)
+- Data quality tools and methodologies
+- Data stewardship and ownership
+- Metadata management
+- Data lineage concepts
+- Regulatory compliance (GDPR, CCPA, etc.)
+
+STRICT RULES:
+- Do NOT reference any specific dataset, pipeline, or results
+- Provide educational, conceptual answers
+- Use examples when helpful (but make them generic)
+- Be accurate and cite industry standards when relevant
+- If asked about specific data or metrics, explain you're in General mode and suggest switching to Dataset Context mode
+
+RESPONSE FORMAT (MANDATORY):
+Structure every response using clear markdown formatting:
+
+## Summary
+[One sentence overview of the concept]
+
+## Key Points
+- **Point 1**: Clear explanation
+- **Point 2**: Clear explanation
+
+## Details
+[Additional context and explanation]
+
+## Best Practices
+1. First recommendation
+2. Second recommendation
+
+## Learn More
+Suggest related topics or questions.
+
+COMMUNICATION STYLE:
+- Professional and formal tone
+- Educational and supportive
+- No hallucinations - admit if unsure
+- Use markdown headers (##), bold (**text**), and bullet points (-)
+- No emojis, no exclamation marks
+- No aggressive warnings or alarming language
+
+BEGIN RESPONSE.`;
+}
+
+// ============================================
 // MAIN HANDLER
 // ============================================
 
@@ -471,12 +528,15 @@ serve(async (req) => {
   try {
     const body = await req.json();
     
+    // Extract mode (default to 'dataset' for backward compatibility)
+    const mode = body.mode || 'dataset';
+    
     // Handle both old string-based context and new structured context
     const isLegacyRequest = typeof body.context === 'string';
     
     let message: string;
     let history: Array<{ role: 'user' | 'assistant'; content: string }>;
-    let context: LiveDQContext;
+    let context: LiveDQContext | null;
     let extractedEntities: ExtractedEntities;
     
     if (isLegacyRequest) {
@@ -499,7 +559,8 @@ serve(async (req) => {
         const response: ChatResponse = {
           status: 'error',
           error_code: 'NO_CONTEXT',
-          error_message: 'No data quality data is available. Please run the DQ pipeline first.'
+          error_message: 'No data quality data is available. Please run the DQ pipeline first.',
+          metadata: { mode }
         };
         return new Response(JSON.stringify(response), {
           status: 200,
@@ -521,21 +582,8 @@ serve(async (req) => {
       const response: ChatResponse = {
         status: 'error',
         error_code: 'INVALID_REQUEST',
-        error_message: 'Please enter a valid question.'
-      };
-      return new Response(JSON.stringify(response), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
-
-    // Validation: context required
-    if (!context || !context.dataset_id) {
-      console.log("[dq-chat] No context provided");
-      const response: ChatResponse = {
-        status: 'error',
-        error_code: 'NO_CONTEXT',
-        error_message: 'No data quality data is available. Please run the DQ pipeline first.'
+        error_message: 'Please enter a valid question.',
+        metadata: { mode }
       };
       return new Response(JSON.stringify(response), {
         status: 200,
@@ -550,7 +598,135 @@ serve(async (req) => {
       const response: ChatResponse = {
         status: 'error',
         error_code: 'MODEL_UNAVAILABLE',
-        error_message: 'AI service is not configured. Please contact support.'
+        error_message: 'AI service is not configured. Please contact support.',
+        metadata: { mode }
+      };
+      return new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    // ============================================
+    // GENERAL MODE - No context required
+    // ============================================
+    if (mode === 'general') {
+      console.log(`[dq-chat] General mode query: "${message.substring(0, 50)}..."`);
+      
+      const systemPrompt = buildGeneralGovernancePrompt();
+      
+      const messages = [
+        { role: 'system', content: systemPrompt },
+        ...history.slice(-8).map(m => ({ role: m.role, content: m.content })),
+        { role: 'user', content: message }
+      ];
+      
+      console.log(`[dq-chat] Calling Lovable AI Gateway for general mode`);
+      
+      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages,
+          temperature: 0.3,
+          max_tokens: 2000,
+        }),
+      });
+      
+      // Handle rate limiting
+      if (aiResponse.status === 429) {
+        console.log("[dq-chat] Rate limited by Lovable AI");
+        const response: ChatResponse = {
+          status: 'error',
+          error_code: 'RATE_LIMITED',
+          error_message: 'Too many requests. Please wait a moment and try again.',
+          metadata: { mode }
+        };
+        return new Response(JSON.stringify(response), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+
+      // Handle payment required
+      if (aiResponse.status === 402) {
+        console.log("[dq-chat] Payment required for Lovable AI");
+        const response: ChatResponse = {
+          status: 'error',
+          error_code: 'MODEL_UNAVAILABLE',
+          error_message: 'AI credits exhausted. Please add credits to continue.',
+          metadata: { mode }
+        };
+        return new Response(JSON.stringify(response), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+
+      // Handle other errors
+      if (!aiResponse.ok) {
+        const errorText = await aiResponse.text();
+        console.error("[dq-chat] AI gateway error:", aiResponse.status, errorText);
+        const response: ChatResponse = {
+          status: 'error',
+          error_code: 'MODEL_UNAVAILABLE',
+          error_message: 'The AI model is temporarily unavailable. Please try again in a moment.',
+          metadata: { mode }
+        };
+        return new Response(JSON.stringify(response), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+
+      // Parse successful response
+      const data = await aiResponse.json();
+      const answer = data.choices?.[0]?.message?.content;
+
+      if (!answer) {
+        console.error("[dq-chat] Empty response from AI");
+        const response: ChatResponse = {
+          status: 'error',
+          error_code: 'MODEL_UNAVAILABLE',
+          error_message: 'The AI returned an empty response. Please try again.',
+          metadata: { mode }
+        };
+        return new Response(JSON.stringify(response), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+
+      console.log(`[dq-chat] General mode response generated successfully`);
+      
+      const response: ChatResponse = {
+        status: 'success',
+        answer,
+        metadata: { mode }
+      };
+      
+      return new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    // ============================================
+    // DATASET MODE - Context required
+    // ============================================
+    
+    // Validation: context required for dataset mode
+    if (!context || !context.dataset_id) {
+      console.log("[dq-chat] No context provided for dataset mode");
+      const response: ChatResponse = {
+        status: 'error',
+        error_code: 'NO_CONTEXT',
+        error_message: 'No data quality data is available. Please run the DQ pipeline first.',
+        metadata: { mode }
       };
       return new Response(JSON.stringify(response), {
         status: 200,
@@ -574,7 +750,8 @@ serve(async (req) => {
         metadata: {
           intent,
           entities: extractedEntities,
-          context_timestamp: context.timestamp
+          context_timestamp: context.timestamp,
+          mode
         }
       };
       return new Response(JSON.stringify(response), {
@@ -594,6 +771,8 @@ serve(async (req) => {
     ];
 
     console.log(`[dq-chat] Calling Lovable AI Gateway with ${messages.length} messages, intent=${intent}`);
+
+    // Step 5: Call Lovable AI Gateway
 
     // Step 5: Call Lovable AI Gateway
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -616,7 +795,8 @@ serve(async (req) => {
       const response: ChatResponse = {
         status: 'error',
         error_code: 'RATE_LIMITED',
-        error_message: 'Too many requests. Please wait a moment and try again.'
+        error_message: 'Too many requests. Please wait a moment and try again.',
+        metadata: { mode: 'dataset' }
       };
       return new Response(JSON.stringify(response), {
         status: 200,
@@ -630,7 +810,8 @@ serve(async (req) => {
       const response: ChatResponse = {
         status: 'error',
         error_code: 'MODEL_UNAVAILABLE',
-        error_message: 'AI credits exhausted. Please add credits to continue.'
+        error_message: 'AI credits exhausted. Please add credits to continue.',
+        metadata: { mode: 'dataset' }
       };
       return new Response(JSON.stringify(response), {
         status: 200,
@@ -645,7 +826,8 @@ serve(async (req) => {
       const response: ChatResponse = {
         status: 'error',
         error_code: 'MODEL_UNAVAILABLE',
-        error_message: 'The AI model is temporarily unavailable. Please try again in a moment.'
+        error_message: 'The AI model is temporarily unavailable. Please try again in a moment.',
+        metadata: { mode: 'dataset' }
       };
       return new Response(JSON.stringify(response), {
         status: 200,
@@ -662,7 +844,8 @@ serve(async (req) => {
       const response: ChatResponse = {
         status: 'error',
         error_code: 'MODEL_UNAVAILABLE',
-        error_message: 'The AI returned an empty response. Please try again.'
+        error_message: 'The AI returned an empty response. Please try again.',
+        metadata: { mode: 'dataset' }
       };
       return new Response(JSON.stringify(response), {
         status: 200,
@@ -678,7 +861,8 @@ serve(async (req) => {
       metadata: {
         intent,
         entities: extractedEntities,
-        context_timestamp: context.timestamp
+        context_timestamp: context.timestamp,
+        mode: 'dataset'
       }
     };
     
@@ -692,7 +876,8 @@ serve(async (req) => {
     const response: ChatResponse = {
       status: 'error',
       error_code: 'MODEL_UNAVAILABLE',
-      error_message: error instanceof Error ? error.message : 'An unexpected error occurred.'
+      error_message: error instanceof Error ? error.message : 'An unexpected error occurred.',
+      metadata: { mode: 'dataset' }
     };
     return new Response(JSON.stringify(response), {
       status: 200,
