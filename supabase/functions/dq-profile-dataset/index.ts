@@ -162,15 +162,23 @@ serve(async (req) => {
       });
     }
 
-    // Get ALL data for profiling - paginate through entire dataset
-    const CHUNK_SIZE = 2000;
+    // Get ALL data for profiling - optimized pagination for up to 1M rows
+    const CHUNK_SIZE = 10000;
+    const PROFILE_TIMEOUT_MS = 120000; // 2 minute timeout for profiling
     let allData: Array<{ raw_data: unknown }> = [];
     let offset = 0;
     let hasMore = true;
+    const fetchStart = Date.now();
     
-    console.log(`[DQ Profile] Fetching all data for dataset ${dataset_id} (total: ${dqDataCount} rows)`);
+    console.log(`[DQ Profile] Fetching all data for dataset ${dataset_id} (total: ${dqDataCount?.toLocaleString()} rows)`);
     
     while (hasMore) {
+      // Check timeout
+      if (Date.now() - fetchStart > PROFILE_TIMEOUT_MS) {
+        console.warn(`[DQ Profile] Timeout approaching at ${allData.length.toLocaleString()} rows, proceeding with available data`);
+        break;
+      }
+      
       const { data: chunk, error: chunkError } = await supabase
         .from("dq_data")
         .select("raw_data")
@@ -185,7 +193,13 @@ serve(async (req) => {
       if (chunk && chunk.length > 0) {
         allData = allData.concat(chunk);
         offset += chunk.length;
-        console.log(`[DQ Profile] Fetched ${allData.length}/${dqDataCount} rows...`);
+        
+        // Log progress every 10% or 100k rows
+        const progressStep = Math.max(100000, Math.floor((dqDataCount || 0) / 10));
+        if (allData.length % progressStep < CHUNK_SIZE) {
+          const pct = dqDataCount ? Math.round((allData.length / dqDataCount) * 100) : 0;
+          console.log(`[DQ Profile] Progress: ${pct}% (${allData.length.toLocaleString()}/${dqDataCount?.toLocaleString()} rows)`);
+        }
       }
       
       hasMore = chunk && chunk.length === CHUNK_SIZE;

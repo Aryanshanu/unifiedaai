@@ -223,11 +223,12 @@ serve(async (req) => {
 
     console.log(`[DQ Ingest] Upload record created: ${upload.id}`);
 
-    // Step 3: Insert dq_data rows in batches (prevents timeout for large datasets)
-    const BATCH_SIZE = 1000;
+    // Step 3: Insert dq_data rows in batches (optimized for 1M+ rows)
+    const BATCH_SIZE = 5000;
     let totalInserted = 0;
+    const progressInterval = Math.max(1, Math.floor(rows.length / 10)); // Log every 10%
 
-    console.log(`[DQ Ingest] Inserting ${rows.length} rows in batches of ${BATCH_SIZE}...`);
+    console.log(`[DQ Ingest] Inserting ${rows.length.toLocaleString()} rows in batches of ${BATCH_SIZE}...`);
 
     for (let i = 0; i < rows.length; i += BATCH_SIZE) {
       const batch = rows.slice(i, i + BATCH_SIZE);
@@ -264,7 +265,12 @@ serve(async (req) => {
       }
 
       totalInserted += batch.length;
-      console.log(`[DQ Ingest] Inserted batch ${Math.floor(i/BATCH_SIZE) + 1}: ${totalInserted}/${rows.length} rows`);
+      
+      // Progress logging at ~10% intervals
+      if (totalInserted % progressInterval < BATCH_SIZE || totalInserted === rows.length) {
+        const pct = Math.round((totalInserted / rows.length) * 100);
+        console.log(`[DQ Ingest] Progress: ${pct}% (${totalInserted.toLocaleString()}/${rows.length.toLocaleString()} rows)`);
+      }
     }
 
     console.log(`[DQ Ingest] ✅ Successfully ingested ${rows.length} rows into dq_data`);
