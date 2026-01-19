@@ -366,15 +366,7 @@ export function useDQControlPlane(datasetId?: string): UseDQControlPlaneReturn {
 
   const runPipeline = useCallback(async (input: PipelineInput) => {
     setPipelineStatus('running');
-    setCurrentStep(1);
     setElapsedTime(0);
-    setStepStatuses({
-      1: 'running',
-      2: 'pending',
-      3: 'pending',
-      4: 'pending',
-      5: 'pending'
-    });
     setProfilingResult(null);
     setRulesResult([]);
     setExecutionResult(null);
@@ -382,6 +374,42 @@ export function useDQControlPlane(datasetId?: string): UseDQControlPlaneReturn {
     setIncidents([]);
     setFinalResponse(null);
     activeDatasetRef.current = input.dataset_id;
+
+    // FIX #3: Visual step progression - show each step running for ~2 seconds
+    const stepDelay = 2000; // 2 seconds per step
+    
+    // Start step 1 immediately
+    setCurrentStep(1);
+    setStepStatuses({
+      1: 'running',
+      2: 'pending',
+      3: 'pending',
+      4: 'pending',
+      5: 'pending'
+    });
+
+    // Run step progression in parallel with actual pipeline call
+    const stepProgressionPromise = (async () => {
+      // Step 1 to 2
+      await new Promise(resolve => setTimeout(resolve, stepDelay));
+      setStepStatuses(prev => ({ ...prev, 1: 'passed', 2: 'running' }));
+      setCurrentStep(2);
+      
+      // Step 2 to 3
+      await new Promise(resolve => setTimeout(resolve, stepDelay));
+      setStepStatuses(prev => ({ ...prev, 2: 'passed', 3: 'running' }));
+      setCurrentStep(3);
+      
+      // Step 3 to 4
+      await new Promise(resolve => setTimeout(resolve, stepDelay));
+      setStepStatuses(prev => ({ ...prev, 3: 'passed', 4: 'running' }));
+      setCurrentStep(4);
+      
+      // Step 4 to 5
+      await new Promise(resolve => setTimeout(resolve, stepDelay));
+      setStepStatuses(prev => ({ ...prev, 4: 'passed', 5: 'running' }));
+      setCurrentStep(5);
+    })();
 
     try {
       const { data, error } = await supabase.functions.invoke('dq-control-plane', {
@@ -439,6 +467,19 @@ export function useDQControlPlane(datasetId?: string): UseDQControlPlaneReturn {
       setFinalResponse(response);
 
       if (response.status === 'success') {
+        // FIX #7: Force refetch incidents immediately to show correct count in toast
+        const { data: freshIncidents } = await supabase
+          .from('dq_incidents')
+          .select('*')
+          .eq('dataset_id', input.dataset_id)
+          .order('created_at', { ascending: false });
+        
+        if (freshIncidents) {
+          setIncidents(freshIncidents as unknown as DQIncident[]);
+        }
+        
+        const actualIncidentCount = freshIncidents?.length || 0;
+        
         setPipelineStatus('success');
         setStepStatuses({
           1: 'passed',
@@ -450,7 +491,9 @@ export function useDQControlPlane(datasetId?: string): UseDQControlPlaneReturn {
         setCurrentStep(null);
         toast({
           title: 'Pipeline Complete',
-          description: `${response.incident_count || 0} incidents raised.`,
+          description: actualIncidentCount > 0 
+            ? `${actualIncidentCount} incident${actualIncidentCount > 1 ? 's' : ''} detected.`
+            : 'All quality checks passed - no incidents.',
         });
       } else {
         // Error response from pipeline

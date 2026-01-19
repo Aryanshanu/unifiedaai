@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Activity, 
@@ -9,15 +8,27 @@ import {
   AlertTriangle, 
   CheckCircle2, 
   XCircle,
-  Zap,
   RefreshCw,
   Database,
   BarChart3,
   Flame,
-  Timer
+  Timer,
+  PieChart as PieChartIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { 
+  BarChart, 
+  Bar, 
+  PieChart, 
+  Pie, 
+  Cell, 
+  XAxis, 
+  YAxis, 
+  Tooltip, 
+  ResponsiveContainer,
+  Legend
+} from 'recharts';
 
 interface DimensionData {
   name: string;
@@ -445,11 +456,98 @@ export function DQStreamingDashboard({ datasetId, executionId, isActive = true }
           </div>
         </div>
 
-        {/* Dimension Bars */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {dimensions.map(dim => (
-            <DimensionBar key={dim.name} dimension={dim} isUpdating={isUpdating} />
-          ))}
+        {/* FIX #6: Real Charts - Bar Chart for Dimension Scores */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Dimension Scores Bar Chart */}
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-primary" />
+              Dimension Scores
+            </h4>
+            <div className="h-48 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart 
+                  data={dimensions.map(d => ({ 
+                    name: d.name.slice(0, 4), 
+                    fullName: d.name,
+                    score: Math.round(d.score)
+                  }))}
+                  layout="vertical"
+                >
+                  <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={40} />
+                  <Tooltip 
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-background border rounded-lg p-2 shadow-lg text-xs">
+                            <p className="font-medium">{data.fullName}</p>
+                            <p className="text-primary">{data.score}%</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar 
+                    dataKey="score" 
+                    fill="hsl(var(--primary))"
+                    radius={[0, 4, 4, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Pass/Fail Pie Chart */}
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium flex items-center gap-2">
+              <PieChartIcon className="h-4 w-4 text-primary" />
+              Rules Pass/Fail
+            </h4>
+            <div className="h-48 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: 'Passed', value: metrics.rulesPassed, color: 'hsl(var(--success))' },
+                      { name: 'Failed', value: metrics.rulesFailed, color: 'hsl(var(--destructive))' }
+                    ].filter(d => d.value > 0)}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={35}
+                    outerRadius={60}
+                    paddingAngle={2}
+                    dataKey="value"
+                    label={({ name, value }) => `${name}: ${value}`}
+                    labelLine={false}
+                  >
+                    <Cell fill="hsl(142.1 76.2% 36.3%)" />
+                    <Cell fill="hsl(0 84.2% 60.2%)" />
+                  </Pie>
+                  <Tooltip 
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="bg-background border rounded-lg p-2 shadow-lg text-xs">
+                            <p className="font-medium">{payload[0].name}</p>
+                            <p>{payload[0].value} rules</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Legend 
+                    verticalAlign="bottom" 
+                    height={24}
+                    formatter={(value) => <span className="text-xs">{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         </div>
 
         {/* Hotspots */}
@@ -494,27 +592,29 @@ export function DQStreamingDashboard({ datasetId, executionId, isActive = true }
           </div>
         )}
 
-        {/* Live Activity Indicator */}
-        <div className="flex items-center justify-center gap-2 pt-2 border-t">
-          <div className="flex gap-1">
-            {[0, 1, 2, 3, 4].map(i => (
-              <div 
-                key={i}
-                className={cn(
-                  "w-1 bg-primary rounded-full transition-all",
-                  isUpdating ? "animate-bounce" : ""
-                )}
-                style={{ 
-                  height: `${8 + Math.random() * 16}px`,
-                  animationDelay: `${i * 100}ms`
-                }}
-              />
-            ))}
+        {/* FIX #6: Only show activity indicator when actively listening AND have an execution */}
+        {executionId && (
+          <div className="flex items-center justify-center gap-2 pt-2 border-t">
+            <div className="flex gap-1">
+              {[0, 1, 2, 3, 4].map(i => (
+                <div 
+                  key={i}
+                  className={cn(
+                    "w-1 bg-primary rounded-full transition-all",
+                    isUpdating ? "animate-bounce" : ""
+                  )}
+                  style={{ 
+                    height: `${8 + (i * 3)}px`,
+                    animationDelay: `${i * 100}ms`
+                  }}
+                />
+              ))}
+            </div>
+            <span className="text-xs text-muted-foreground">
+              {isUpdating ? 'Receiving updates...' : 'Ready'}
+            </span>
           </div>
-          <span className="text-xs text-muted-foreground">
-            {isUpdating ? 'Receiving updates...' : 'Listening for changes...'}
-          </span>
-        </div>
+        )}
       </CardContent>
     </Card>
   );

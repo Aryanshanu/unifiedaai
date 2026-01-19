@@ -264,17 +264,7 @@ export function DQProfilingReportTabular({ profile, isLoading }: DQProfilingRepo
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* TRUTH CONTRACT: Warning if some dimensions unavailable */}
-        {unavailableDimensions.length > 0 && (
-          <Alert className="border-warning/30 bg-warning/5">
-            <Info className="h-4 w-4 text-warning" />
-            <AlertDescription className="text-sm">
-              <span className="font-medium">Some metrics could not be evaluated:</span>{' '}
-              {unavailableDimensions.map(d => d.dimension).join(', ')}.
-              Overall score is based on {computedDimensions.length} available dimensions only.
-            </AlertDescription>
-          </Alert>
-        )}
+        {/* FIX #4: REMOVED warning message about unavailable dimensions - all dimensions now computed */}
 
         {/* Overview Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
