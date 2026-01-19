@@ -136,14 +136,40 @@ serve(async (req) => {
       });
     }
 
-    // Get sample data for rule execution from dq_data
-    const { data: dqData } = await supabase
-      .from("dq_data")
-      .select("raw_data, row_index, id")
-      .eq("dataset_id", dataset_id)
-      .limit(1000);
-
-    const totalRecords = dqData!.length;
+    // Get ALL data for rule execution - paginate through entire dataset
+    const CHUNK_SIZE = 2000;
+    let allData: Array<{ raw_data: unknown; row_index: number; id: string }> = [];
+    let offset = 0;
+    let hasMore = true;
+    
+    console.log(`[DQ Execute] Fetching all data for dataset ${dataset_id} (total: ${dqDataCount} rows)`);
+    
+    while (hasMore) {
+      const { data: chunk, error: chunkError } = await supabase
+        .from("dq_data")
+        .select("raw_data, row_index, id")
+        .eq("dataset_id", dataset_id)
+        .range(offset, offset + CHUNK_SIZE - 1)
+        .order("row_index", { ascending: true });
+      
+      if (chunkError) {
+        console.error(`[DQ Execute] Error fetching chunk at offset ${offset}:`, chunkError);
+        break;
+      }
+      
+      if (chunk && chunk.length > 0) {
+        allData = allData.concat(chunk);
+        offset += chunk.length;
+        console.log(`[DQ Execute] Fetched ${allData.length}/${dqDataCount} rows...`);
+      }
+      
+      hasMore = chunk && chunk.length === CHUNK_SIZE;
+    }
+    
+    const dqData = allData;
+    const totalRecords = dqData.length;
+    console.log(`[DQ Execute] ✅ Loaded ${totalRecords} rows for rule execution`);
+    
     const metrics: RuleMetric[] = [];
     let criticalViolations = 0;
 

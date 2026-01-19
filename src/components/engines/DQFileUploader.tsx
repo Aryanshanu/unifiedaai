@@ -115,12 +115,19 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
       return;
     }
 
-    const allowedTypes = ['application/json', 'text/csv', 'text/plain', 'application/vnd.ms-excel'];
-    const allowedExtensions = ['.json', '.csv', '.txt', '.xlsx'];
+    // Only allow JSON and CSV - XLSX parsing not yet implemented
+    const allowedTypes = ['application/json', 'text/csv', 'text/plain'];
+    const allowedExtensions = ['.json', '.csv', '.txt'];
     const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
     
+    // Explicitly reject XLSX with helpful message
+    if (ext === '.xlsx' || ext === '.xls') {
+      toast.error('XLSX/XLS files are not yet supported. Please export to CSV or JSON format.');
+      return;
+    }
+    
     if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(ext)) {
-      toast.error('Invalid file type. Please upload CSV, JSON, or XLSX files.');
+      toast.error('Invalid file type. Please upload CSV or JSON files.');
       return;
     }
 
@@ -340,7 +347,7 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
           <input
             ref={fileInputRef}
             type="file"
-            accept=".csv,.json,.xlsx,.txt"
+            accept=".csv,.json,.txt"
             className="hidden"
             onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
             disabled={isUploading || !!createdDatasetId}
@@ -378,7 +385,7 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
                 Drop file here or click to browse
               </p>
               <p className="text-sm text-muted-foreground mt-1">
-                Supports: CSV, JSON, XLSX (up to 50MB)
+                Supports: CSV, JSON (up to 50MB)
               </p>
             </>
           )}
