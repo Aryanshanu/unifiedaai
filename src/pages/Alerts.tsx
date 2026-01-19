@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,8 +59,9 @@ const channelIcons = {
 };
 
 export default function Alerts() {
-  const { data: driftAlerts, isLoading: driftLoading, refetch: refetchDrift } = useDriftAlerts();
-  const { data: incidents, isLoading: incidentsLoading, refetch: refetchIncidents } = useIncidents();
+  const queryClient = useQueryClient();
+  const { data: driftAlerts, isLoading: driftLoading } = useDriftAlerts();
+  const { data: incidents, isLoading: incidentsLoading } = useIncidents();
   const { data: channels, isLoading: channelsLoading } = useNotificationChannels();
   const createChannel = useCreateNotificationChannel();
   const updateChannel = useUpdateNotificationChannel();
@@ -71,15 +73,21 @@ export default function Alerts() {
   const [newChannelName, setNewChannelName] = useState('');
   const [newChannelConfig, setNewChannelConfig] = useState('');
 
-  // Supabase Realtime subscriptions
+  // Supabase Realtime subscriptions - use stable queryClient reference
+  const subscriptionRef = useRef(false);
+  
   useEffect(() => {
+    // Prevent duplicate subscriptions
+    if (subscriptionRef.current) return;
+    subscriptionRef.current = true;
+    
     const channel = supabase
       .channel('alerts-realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'drift_alerts' },
         (payload) => {
-          refetchDrift();
+          queryClient.invalidateQueries({ queryKey: ['drift-alerts'] });
           if (payload.eventType === 'INSERT') {
             toast.warning("New Drift Alert", {
               description: `${(payload.new as any)?.drift_type || 'Drift'} detected on ${(payload.new as any)?.feature || 'feature'}`
@@ -91,7 +99,7 @@ export default function Alerts() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'incidents' },
         (payload) => {
-          refetchIncidents();
+          queryClient.invalidateQueries({ queryKey: ['incidents'] });
           if (payload.eventType === 'INSERT') {
             toast.error("New Incident", {
               description: (payload.new as any)?.title || "Incident created"
@@ -102,9 +110,10 @@ export default function Alerts() {
       .subscribe();
 
     return () => {
+      subscriptionRef.current = false;
       supabase.removeChannel(channel);
     };
-  }, [refetchDrift, refetchIncidents]);
+  }, [queryClient]);
 
   const allAlerts = [
     ...(driftAlerts || []).map(a => ({
