@@ -162,12 +162,12 @@ serve(async (req) => {
       });
     }
 
-    // Get data for profiling (sample for large datasets)
+    // Get data for profiling (increased sample for better accuracy on large datasets)
     const { data: dqData } = await supabase
       .from("dq_data")
       .select("raw_data")
       .eq("dataset_id", dataset_id)
-      .limit(1000);
+      .limit(10000);
 
     const columnProfiles: ColumnProfile[] = [];
     const rowCount = dqData!.length;
