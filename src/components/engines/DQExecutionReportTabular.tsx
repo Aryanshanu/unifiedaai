@@ -202,9 +202,9 @@ export function DQExecutionReportTabular({
     ? normalizedMetrics.reduce((sum, m) => sum + m.successRateRatio, 0) / normalizedMetrics.length 
     : 0;
   
-  const totalFailed = metrics.reduce((sum, m) => sum + m.failed_count, 0);
-  const totalRecords = metrics[0]?.total_count || 0;
-  const errorRatio = totalRecords > 0 ? totalFailed / totalRecords : 0;
+  // TRUTH CONTRACT: Error Rate = Failed Rules / Total Rules (aligns with Pass Rate)
+  // Pass Rate + Error Rate = 100%
+  const errorRatio = metrics.length > 0 ? failedRules.length / metrics.length : 0;
   
   // Calculate null/blank from completeness dimension
   const completenessMetrics = normalizedMetrics.filter(m => m.dimension === 'completeness');

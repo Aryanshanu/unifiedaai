@@ -197,8 +197,9 @@ export function DQDashboardVisual({ assets, executionMetrics, isLoading }: DQDas
 
   // Calculate quality metrics
   const totalRecords = metrics[0]?.total_count || 0;
-  const totalFailed = metrics.reduce((sum, m) => sum + m.failed_count, 0);
-  const errorRate = totalRecords > 0 ? (totalFailed / totalRecords / metrics.length) * 100 : 0;
+  // TRUTH CONTRACT: Error Rate = Failed Rules / Total Rules (aligns with Pass Rate)
+  // Pass Rate + Error Rate = 100%
+  const errorRate = totalRules > 0 ? (failedRules / totalRules) * 100 : 0;
   
   const completenessMetrics = metrics.filter(m => m.dimension.toLowerCase() === 'completeness');
   const nullBlankPercent = completenessMetrics.length > 0
