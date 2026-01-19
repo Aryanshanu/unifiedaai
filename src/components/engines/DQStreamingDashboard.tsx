@@ -460,8 +460,8 @@ export function DQStreamingDashboard({ datasetId, executionId, isActive = true }
         {/* Error Rate Calculation Transparency */}
         {metrics.rulesExecuted > 0 && (
           <ErrorRateExplanation
-            failedRows={metrics.rulesFailed}
-            totalRows={metrics.rulesExecuted}
+            failedRules={metrics.rulesFailed}
+            totalRules={metrics.rulesExecuted}
             errorRate={metrics.errorRate}
           />
         )}
