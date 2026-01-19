@@ -375,10 +375,7 @@ export function useDQControlPlane(datasetId?: string): UseDQControlPlaneReturn {
     setFinalResponse(null);
     activeDatasetRef.current = input.dataset_id;
 
-    // FIX #3: Visual step progression - show each step running for ~2 seconds
-    const stepDelay = 2000; // 2 seconds per step
-    
-    // Start step 1 immediately
+    // Start step 1 immediately - real progression driven by realtime subscriptions
     setCurrentStep(1);
     setStepStatuses({
       1: 'running',
@@ -387,29 +384,6 @@ export function useDQControlPlane(datasetId?: string): UseDQControlPlaneReturn {
       4: 'pending',
       5: 'pending'
     });
-
-    // Run step progression in parallel with actual pipeline call
-    const stepProgressionPromise = (async () => {
-      // Step 1 to 2
-      await new Promise(resolve => setTimeout(resolve, stepDelay));
-      setStepStatuses(prev => ({ ...prev, 1: 'passed', 2: 'running' }));
-      setCurrentStep(2);
-      
-      // Step 2 to 3
-      await new Promise(resolve => setTimeout(resolve, stepDelay));
-      setStepStatuses(prev => ({ ...prev, 2: 'passed', 3: 'running' }));
-      setCurrentStep(3);
-      
-      // Step 3 to 4
-      await new Promise(resolve => setTimeout(resolve, stepDelay));
-      setStepStatuses(prev => ({ ...prev, 3: 'passed', 4: 'running' }));
-      setCurrentStep(4);
-      
-      // Step 4 to 5
-      await new Promise(resolve => setTimeout(resolve, stepDelay));
-      setStepStatuses(prev => ({ ...prev, 4: 'passed', 5: 'running' }));
-      setCurrentStep(5);
-    })();
 
     try {
       const { data, error } = await supabase.functions.invoke('dq-control-plane', {
