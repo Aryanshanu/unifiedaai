@@ -3,13 +3,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePendingApprovals, useProcessApproval, useSystemApprovals } from "@/hooks/useSystemApprovals";
 import { useUnsafeDeployments } from "@/hooks/usePlatformMetrics";
 import { RiskBadge } from "@/components/risk/RiskBadge";
 import { DeploymentStatusBadge } from "@/components/governance/DeploymentStatusBadge";
+import { ReadyDatasetsList } from "@/components/data/ReadyDatasetsList";
 import { 
   Shield, CheckCircle, XCircle, Clock, AlertTriangle, 
-  ArrowRight, AlertOctagon, History, Radio
+  ArrowRight, AlertOctagon, History, Radio, Database
 } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
@@ -21,6 +23,7 @@ import { toast } from "sonner";
 
 export default function Approvals() {
   const [realtimeCount, setRealtimeCount] = useState(0);
+  const [activeTab, setActiveTab] = useState("systems");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: pendingApprovals, isLoading: pendingLoading } = usePendingApprovals();
@@ -158,32 +161,45 @@ export default function Approvals() {
       }
     >
       <div className="space-y-6">
-        {/* Unsafe Deployment Warning */}
-        {!unsafeLoading && (unsafeDeployments?.length || 0) > 0 && (
-          <div className="p-4 rounded-xl border-2 border-destructive bg-destructive/5 flex items-start gap-4">
-            <AlertOctagon className="h-6 w-6 text-destructive shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <h3 className="font-semibold text-destructive">Unsafe Deployment Detected</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                {unsafeDeployments?.length} system(s) have live traffic without proper approval. 
-                Immediate action required.
-              </p>
-              <div className="flex flex-wrap gap-2 mt-3">
-                {unsafeDeployments?.map((system) => (
-                  <Badge 
-                    key={system.id}
-                    variant="outline" 
-                    className="bg-destructive/10 text-destructive border-destructive/30 cursor-pointer"
-                    onClick={() => navigate(`/systems/${system.id}`)}
-                  >
-                    {system.name} ({system.recentRequests} requests)
-                    <ArrowRight className="h-3 w-3 ml-1" />
-                  </Badge>
-                ))}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="systems" className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Systems
+            </TabsTrigger>
+            <TabsTrigger value="datasets" className="flex items-center gap-2">
+              <Database className="h-4 w-4" />
+              Datasets
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="systems" className="mt-6 space-y-6">
+            {/* Unsafe Deployment Warning */}
+            {!unsafeLoading && (unsafeDeployments?.length || 0) > 0 && (
+              <div className="p-4 rounded-xl border-2 border-destructive bg-destructive/5 flex items-start gap-4">
+                <AlertOctagon className="h-6 w-6 text-destructive shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-destructive">Unsafe Deployment Detected</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {unsafeDeployments?.length} system(s) have live traffic without proper approval. 
+                    Immediate action required.
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {unsafeDeployments?.map((system) => (
+                      <Badge 
+                        key={system.id}
+                        variant="outline" 
+                        className="bg-destructive/10 text-destructive border-destructive/30 cursor-pointer"
+                        onClick={() => navigate(`/systems/${system.id}`)}
+                      >
+                        {system.name} ({system.recentRequests} requests)
+                        <ArrowRight className="h-3 w-3 ml-1" />
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        )}
+            )}
 
         {/* Pending Approvals */}
         <Card>
@@ -375,6 +391,12 @@ export default function Approvals() {
             </CardContent>
           </Card>
         </div>
+          </TabsContent>
+
+          <TabsContent value="datasets" className="mt-6">
+            <ReadyDatasetsList />
+          </TabsContent>
+        </Tabs>
       </div>
     </MainLayout>
   );

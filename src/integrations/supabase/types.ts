@@ -540,6 +540,48 @@ export type Database = {
           },
         ]
       }
+      data_sources: {
+        Row: {
+          auth_type: string | null
+          connection_config: Json | null
+          created_at: string | null
+          id: string
+          last_sync_at: string | null
+          name: string
+          owner_id: string | null
+          row_count: number | null
+          source_type: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          auth_type?: string | null
+          connection_config?: Json | null
+          created_at?: string | null
+          id?: string
+          last_sync_at?: string | null
+          name: string
+          owner_id?: string | null
+          row_count?: number | null
+          source_type: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          auth_type?: string | null
+          connection_config?: Json | null
+          created_at?: string | null
+          id?: string
+          last_sync_at?: string | null
+          name?: string
+          owner_id?: string | null
+          row_count?: number | null
+          source_type?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       data_uploads: {
         Row: {
           analysis_details: Json | null
@@ -743,6 +785,9 @@ export type Database = {
       }
       datasets: {
         Row: {
+          ai_approval_status: string | null
+          ai_approved_at: string | null
+          ai_approved_by: string | null
           business_impact: string | null
           consent_status: string
           created_at: string
@@ -758,10 +803,15 @@ export type Database = {
           row_count: number | null
           sensitivity_level: string | null
           source: string
+          source_id: string | null
           source_url: string | null
           updated_at: string
+          version: string | null
         }
         Insert: {
+          ai_approval_status?: string | null
+          ai_approved_at?: string | null
+          ai_approved_by?: string | null
           business_impact?: string | null
           consent_status?: string
           created_at?: string
@@ -777,10 +827,15 @@ export type Database = {
           row_count?: number | null
           sensitivity_level?: string | null
           source: string
+          source_id?: string | null
           source_url?: string | null
           updated_at?: string
+          version?: string | null
         }
         Update: {
+          ai_approval_status?: string | null
+          ai_approved_at?: string | null
+          ai_approved_by?: string | null
           business_impact?: string | null
           consent_status?: string
           created_at?: string
@@ -796,10 +851,20 @@ export type Database = {
           row_count?: number | null
           sensitivity_level?: string | null
           source?: string
+          source_id?: string | null
           source_url?: string | null
           updated_at?: string
+          version?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "datasets_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "data_sources"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       decision_appeals: {
         Row: {
@@ -2281,7 +2346,9 @@ export type Database = {
           huggingface_endpoint: string | null
           huggingface_model_id: string | null
           id: string
+          intended_use: string | null
           license: string | null
+          limitations: string | null
           metadata: Json | null
           model_card_url: string | null
           model_type: string
@@ -2291,10 +2358,13 @@ export type Database = {
           privacy_score: number | null
           project_id: string
           provider: string | null
+          risk_classification: string | null
+          risk_classification_reason: string | null
           robustness_score: number | null
           status: Database["public"]["Enums"]["model_status"]
           system_id: string
           toxicity_score: number | null
+          training_dataset_id: string | null
           updated_at: string
           use_case: string | null
           version: string
@@ -2310,7 +2380,9 @@ export type Database = {
           huggingface_endpoint?: string | null
           huggingface_model_id?: string | null
           id?: string
+          intended_use?: string | null
           license?: string | null
+          limitations?: string | null
           metadata?: Json | null
           model_card_url?: string | null
           model_type: string
@@ -2320,10 +2392,13 @@ export type Database = {
           privacy_score?: number | null
           project_id: string
           provider?: string | null
+          risk_classification?: string | null
+          risk_classification_reason?: string | null
           robustness_score?: number | null
           status?: Database["public"]["Enums"]["model_status"]
           system_id: string
           toxicity_score?: number | null
+          training_dataset_id?: string | null
           updated_at?: string
           use_case?: string | null
           version?: string
@@ -2339,7 +2414,9 @@ export type Database = {
           huggingface_endpoint?: string | null
           huggingface_model_id?: string | null
           id?: string
+          intended_use?: string | null
           license?: string | null
+          limitations?: string | null
           metadata?: Json | null
           model_card_url?: string | null
           model_type?: string
@@ -2349,10 +2426,13 @@ export type Database = {
           privacy_score?: number | null
           project_id?: string
           provider?: string | null
+          risk_classification?: string | null
+          risk_classification_reason?: string | null
           robustness_score?: number | null
           status?: Database["public"]["Enums"]["model_status"]
           system_id?: string
           toxicity_score?: number | null
+          training_dataset_id?: string | null
           updated_at?: string
           use_case?: string | null
           version?: string
@@ -2370,6 +2450,13 @@ export type Database = {
             columns: ["system_id"]
             isOneToOne: false
             referencedRelation: "systems"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "models_training_dataset_id_fkey"
+            columns: ["training_dataset_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
             referencedColumns: ["id"]
           },
         ]
