@@ -55,6 +55,9 @@ import { DQChatPanel } from '@/components/engines/DQChatPanel';
 import { DQTrustReport } from '@/components/engines/DQTrustReport';
 import { useDQControlPlane } from '@/hooks/useDQControlPlane';
 import { useFileUploadStatus, useAllUploads, useQualityStats, UploadStatus } from '@/hooks/useFileUploadStatus';
+import { DataSourceConnectors } from '@/components/data/DataSourceConnectors';
+import { ReadyDatasetsList } from '@/components/data/ReadyDatasetsList';
+import { DatasetBiasScan } from '@/components/engines/DatasetBiasScan';
 import { useQualityTrend } from '@/hooks/useQualityTrend';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -775,10 +778,14 @@ function DataQualityEngineContent() {
         <QualityStatsCards />
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4 max-w-lg">
+          <TabsList className="grid w-full grid-cols-7 max-w-4xl">
             <TabsTrigger value="control-plane" className="flex items-center gap-2">
               <Zap className="h-4 w-4" />
               Control Plane
+            </TabsTrigger>
+            <TabsTrigger value="sources" className="flex items-center gap-2">
+              <Database className="h-4 w-4" />
+              Data Sources
             </TabsTrigger>
             <TabsTrigger value="import" className="flex items-center gap-2">
               <Upload className="h-4 w-4" />
@@ -787,6 +794,14 @@ function DataQualityEngineContent() {
             <TabsTrigger value="evaluate" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Evaluate
+            </TabsTrigger>
+            <TabsTrigger value="readiness" className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              AI Readiness
+            </TabsTrigger>
+            <TabsTrigger value="bias" className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              Bias Scan
             </TabsTrigger>
             <TabsTrigger value="history" className="flex items-center gap-2">
               <History className="h-4 w-4" />
@@ -798,12 +813,24 @@ function DataQualityEngineContent() {
             <ControlPlaneTab />
           </TabsContent>
 
+          <TabsContent value="sources" className="mt-6">
+            <DataSourceConnectors />
+          </TabsContent>
+
           <TabsContent value="import" className="mt-6">
             <ImportTab />
           </TabsContent>
 
           <TabsContent value="evaluate" className="mt-6">
             <EvaluateTab />
+          </TabsContent>
+
+          <TabsContent value="readiness" className="mt-6">
+            <ReadyDatasetsList />
+          </TabsContent>
+
+          <TabsContent value="bias" className="mt-6">
+            <DatasetBiasScan />
           </TabsContent>
 
           <TabsContent value="history" className="mt-6">

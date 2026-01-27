@@ -3,16 +3,19 @@ import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Badge } from "@/components/ui/badge";
 import { useCreateModel } from "@/hooks/useModels";
 import { useProjects } from "@/hooks/useProjects";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, ChevronRight, ChevronLeft, Check, Brain, Server, Settings, FileCheck, FolderOpen, Shield, Scale, ExternalLink, Eye, EyeOff, AlertTriangle } from "lucide-react";
+import { Loader2, ChevronRight, ChevronLeft, Check, Brain, Server, Settings, FileCheck, FolderOpen, Shield, Scale, ExternalLink, Eye, EyeOff, AlertTriangle, Database } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { validateEndpoint, validateApiKey, getEndpointHint, getApiKeyHint } from "@/lib/endpoint-validation";
 
@@ -33,6 +36,11 @@ const modelSchema = z.object({
   model_card_url: z.string().url("Must be a valid URL").optional().or(z.literal("")),
   access_tier: z.enum(["internal-only", "partner", "customer", "public"]).default("internal-only"),
   sla_tier: z.enum(["best-effort", "standard", "premium", "mission-critical"]).default("best-effort"),
+  // New traceability fields
+  training_dataset_id: z.string().optional(),
+  limitations: z.string().optional(),
+  intended_use: z.string().optional(),
+  risk_classification: z.enum(["minimal", "limited", "high", "unacceptable", ""]).optional(),
 });
 
 type ModelFormData = z.infer<typeof modelSchema>;
@@ -95,6 +103,20 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
   const createModel = useCreateModel();
   const { data: projects, isLoading: projectsLoading } = useProjects();
 
+  // Fetch AI-approved datasets for training data linking
+  const { data: approvedDatasets } = useQuery({
+    queryKey: ["approved-datasets-for-models"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("datasets")
+        .select("id, name, row_count")
+        .eq("ai_approval_status", "approved")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const form = useForm<ModelFormData>({
     resolver: zodResolver(modelSchema),
     defaultValues: {
@@ -114,6 +136,11 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
       model_card_url: "",
       access_tier: "internal-only",
       sla_tier: "best-effort",
+      // Traceability defaults
+      training_dataset_id: "",
+      limitations: "",
+      intended_use: "",
+      risk_classification: "",
     },
   });
 
@@ -136,6 +163,11 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
         model_card_url: data.model_card_url || undefined,
         access_tier: data.access_tier,
         sla_tier: data.sla_tier,
+        // Traceability fields
+        training_dataset_id: data.training_dataset_id || undefined,
+        limitations: data.limitations || undefined,
+        intended_use: data.intended_use || undefined,
+        risk_classification: data.risk_classification || undefined,
       });
       
       toast.success("Model registered and system created!", {
@@ -707,6 +739,138 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                     )}
                   />
                 </div>
+
+                {/* Training Dataset Traceability */}
+                <FormField
+                  control={form.control}
+                  name="training_dataset_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-1">
+                        <Database className="w-4 h-4" />
+                        Training Dataset
+                      </FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select AI-approved dataset" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {approvedDatasets?.length === 0 ? (
+                            <div className="p-2 text-sm text-muted-foreground text-center">
+                              No AI-approved datasets available
+                            </div>
+                          ) : (
+                            approvedDatasets?.map((ds) => (
+                              <SelectItem key={ds.id} value={ds.id}>
+                                <div className="flex items-center gap-2">
+                                  <span>{ds.name}</span>
+                                  <Badge variant="outline" className="text-xs">
+                                    {(ds.row_count || 0).toLocaleString()} rows
+                                  </Badge>
+                                </div>
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Link to an AI-approved dataset for traceability.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Risk Classification */}
+                <FormField
+                  control={form.control}
+                  name="risk_classification"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-1">
+                        <AlertTriangle className="w-4 h-4" />
+                        EU AI Act Risk Classification
+                      </FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select risk level" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="minimal">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="bg-success/10 text-success border-success/20">Minimal</Badge>
+                              <span className="text-muted-foreground text-xs">Low risk, minimal obligations</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="limited">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">Limited</Badge>
+                              <span className="text-muted-foreground text-xs">Transparency obligations</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="high">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">High</Badge>
+                              <span className="text-muted-foreground text-xs">Strict compliance required</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="unacceptable">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">Unacceptable</Badge>
+                              <span className="text-muted-foreground text-xs">Prohibited use case</span>
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Based on EU AI Act Article 6 risk categorization.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Limitations */}
+                <FormField
+                  control={form.control}
+                  name="limitations"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Known Limitations</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Document known limitations, failure modes, or edge cases..."
+                          className="min-h-[80px]"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Intended Use */}
+                <FormField
+                  control={form.control}
+                  name="intended_use"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Intended Use Statement</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Describe the intended use cases and target population..."
+                          className="min-h-[80px]"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
             )}
 

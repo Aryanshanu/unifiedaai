@@ -91,6 +91,11 @@ export interface CreateModelInput {
   model_card_url?: string;
   access_tier?: string;
   sla_tier?: string;
+  // Traceability fields
+  training_dataset_id?: string;
+  limitations?: string;
+  intended_use?: string;
+  risk_classification?: string;
 }
 
 export function useModels() {
@@ -223,6 +228,11 @@ export function useCreateModel() {
           license: input.license || null,
           base_model: input.base_model || null,
           model_card_url: input.model_card_url || null,
+          // Traceability fields
+          training_dataset_id: input.training_dataset_id || null,
+          limitations: input.limitations || null,
+          intended_use: input.intended_use || null,
+          risk_classification: input.risk_classification || null,
         })
         .select()
         .single();
