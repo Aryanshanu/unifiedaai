@@ -3,6 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
+import { Switch } from '@/components/ui/switch';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
 import { 
   Table, 
   TableBody, 
@@ -17,6 +25,12 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   BookOpen,
   CheckCircle2,
   AlertTriangle,
@@ -29,7 +43,9 @@ import {
   Clock,
   Code,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Star,
+  TrendingUp
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -47,8 +63,9 @@ interface DQRule {
   threshold: number;
   severity: 'info' | 'warning' | 'critical';
   confidence: number | null;
-  business_impact: string | null;
+  business_impact: 'high' | 'medium' | 'low' | string | null;
   is_active: boolean;
+  is_critical_element?: boolean;
   calibration_metadata?: {
     source: string;
     observedValue: number;
@@ -66,6 +83,7 @@ interface DQRulesUnifiedProps {
   rules: DQRule[];
   profile?: DQProfile | null;
   isLoading?: boolean;
+  onRuleUpdate?: (ruleId: string, updates: Partial<DQRule>) => void;
 }
 
 function getSeverityConfig(severity: string) {
@@ -115,7 +133,21 @@ function getDimensionDescription(dim: string): string {
   return descriptions[dim.toLowerCase()] || 'quality checks';
 }
 
-export function DQRulesUnified({ rules, profile, isLoading }: DQRulesUnifiedProps) {
+// Business impact badge styling
+function getBusinessImpactBadge(impact: string | null) {
+  switch (impact) {
+    case 'high':
+      return { className: 'bg-destructive/10 text-destructive border-destructive/30', label: 'High', icon: TrendingUp };
+    case 'medium':
+      return { className: 'bg-warning/10 text-warning border-warning/30', label: 'Medium', icon: TrendingUp };
+    case 'low':
+      return { className: 'bg-muted text-muted-foreground border-muted', label: 'Low', icon: TrendingUp };
+    default:
+      return null;
+  }
+}
+
+export function DQRulesUnified({ rules, profile, isLoading, onRuleUpdate }: DQRulesUnifiedProps) {
   const [expandedRules, setExpandedRules] = useState<Set<string>>(new Set());
 
   const toggleRule = (ruleId: string) => {
@@ -128,6 +160,15 @@ export function DQRulesUnified({ rules, profile, isLoading }: DQRulesUnifiedProp
       }
       return next;
     });
+  };
+
+  const handleCriticalToggle = (ruleId: string, checked: boolean) => {
+    onRuleUpdate?.(ruleId, { is_critical_element: checked });
+  };
+
+  const handleBusinessImpactChange = (ruleId: string, value: string) => {
+    const impact = value === 'none' ? null : value as 'high' | 'medium' | 'low';
+    onRuleUpdate?.(ruleId, { business_impact: impact });
   };
 
   if (isLoading) {
@@ -163,6 +204,10 @@ export function DQRulesUnified({ rules, profile, isLoading }: DQRulesUnifiedProp
   const warningCount = activeRules.filter(r => r.severity === 'warning').length;
   const infoCount = activeRules.length - criticalCount - warningCount;
   const latestVersion = Math.max(...rules.map(r => r.version));
+  
+  // CDE and business impact stats
+  const cdeCount = activeRules.filter(r => r.is_critical_element).length;
+  const highImpactCount = activeRules.filter(r => r.business_impact === 'high').length;
 
   // Group by dimension
   const dimensionGroups = activeRules.reduce((acc, rule) => {
@@ -210,8 +255,8 @@ export function DQRulesUnified({ rules, profile, isLoading }: DQRulesUnifiedProp
       </CardHeader>
 
       <CardContent className="space-y-6">
-        {/* Overview Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        {/* Overview Stats - Now with 7 columns including CDE and High Impact */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
           <div className="p-3 bg-background/60 rounded-lg border text-center">
             <BookOpen className="h-5 w-5 mx-auto mb-1 text-primary" />
             <p className="text-2xl font-bold">{activeRules.length}</p>
@@ -247,6 +292,46 @@ export function DQRulesUnified({ rules, profile, isLoading }: DQRulesUnifiedProp
             <p className="text-2xl font-bold">{uniqueColumns.size}</p>
             <p className="text-xs text-muted-foreground">Columns Covered</p>
           </div>
+
+          {/* New: CDE Count */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className={cn(
+                  "p-3 rounded-lg border text-center cursor-help",
+                  cdeCount > 0 ? "bg-primary/10 border-primary/30" : "bg-background/60"
+                )}>
+                  <Star className={cn("h-5 w-5 mx-auto mb-1", cdeCount > 0 ? "text-primary" : "text-muted-foreground")} />
+                  <p className={cn("text-2xl font-bold", cdeCount > 0 && "text-primary")}>{cdeCount}</p>
+                  <p className="text-xs text-muted-foreground">CDE Tagged</p>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="font-medium">Critical Data Elements</p>
+                <p className="text-xs text-muted-foreground">Rules marked as critical for business operations</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          {/* New: High Impact Count */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className={cn(
+                  "p-3 rounded-lg border text-center cursor-help",
+                  highImpactCount > 0 ? "bg-destructive/10 border-destructive/30" : "bg-background/60"
+                )}>
+                  <TrendingUp className={cn("h-5 w-5 mx-auto mb-1", highImpactCount > 0 ? "text-destructive" : "text-muted-foreground")} />
+                  <p className={cn("text-2xl font-bold", highImpactCount > 0 && "text-destructive")}>{highImpactCount}</p>
+                  <p className="text-xs text-muted-foreground">High Impact</p>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="font-medium">High Business Impact</p>
+                <p className="text-xs text-muted-foreground">Rules affecting revenue, compliance, or operations</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
 
         {/* Dimension Coverage */}
@@ -281,16 +366,27 @@ export function DQRulesUnified({ rules, profile, isLoading }: DQRulesUnifiedProp
                 <TableHead className="w-8"></TableHead>
                 <TableHead className="font-semibold">Rule Name</TableHead>
                 <TableHead className="font-semibold">Dimension</TableHead>
-                <TableHead className="font-semibold">Logic Type</TableHead>
                 <TableHead className="font-semibold">Column</TableHead>
                 <TableHead className="font-semibold text-right">Threshold</TableHead>
                 <TableHead className="font-semibold">Severity</TableHead>
-                <TableHead className="font-semibold text-right">Confidence</TableHead>
+                <TableHead className="font-semibold text-center">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger className="flex items-center gap-1 mx-auto">
+                        <Star className="h-3.5 w-3.5" />
+                        CDE
+                      </TooltipTrigger>
+                      <TooltipContent>Critical Data Element</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </TableHead>
+                <TableHead className="font-semibold">Impact</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {activeRules.map((rule) => {
                 const severityConfig = getSeverityConfig(rule.severity);
+                const businessImpactConfig = getBusinessImpactBadge(rule.business_impact);
                 const isExpanded = expandedRules.has(rule.id);
                 
                 return (
@@ -305,15 +401,17 @@ export function DQRulesUnified({ rules, profile, isLoading }: DQRulesUnifiedProp
                               <ChevronRight className="h-4 w-4 text-muted-foreground" />
                             )}
                           </TableCell>
-                          <TableCell className="font-medium">{rule.rule_name}</TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              {rule.rule_name}
+                              {rule.is_critical_element && (
+                                <Star className="h-3.5 w-3.5 text-primary fill-primary" />
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <Badge className={cn("uppercase text-xs", getDimensionBadge(rule.dimension))}>
                               {rule.dimension}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="font-mono text-xs">
-                              {rule.logic_type}
                             </Badge>
                           </TableCell>
                           <TableCell className="font-mono text-sm">
@@ -327,10 +425,36 @@ export function DQRulesUnified({ rules, profile, isLoading }: DQRulesUnifiedProp
                               {severityConfig.label}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {rule.confidence !== null 
-                              ? `${(rule.confidence * 100).toFixed(0)}%` 
-                              : 'N/A'}
+                          <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                            <Switch
+                              checked={rule.is_critical_element ?? false}
+                              onCheckedChange={(checked) => handleCriticalToggle(rule.id, checked)}
+                              disabled={!onRuleUpdate}
+                            />
+                          </TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            {onRuleUpdate ? (
+                              <Select
+                                value={rule.business_impact || 'none'}
+                                onValueChange={(value) => handleBusinessImpactChange(rule.id, value)}
+                              >
+                                <SelectTrigger className="h-7 w-24 text-xs">
+                                  <SelectValue placeholder="Set" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">None</SelectItem>
+                                  <SelectItem value="low">Low</SelectItem>
+                                  <SelectItem value="medium">Medium</SelectItem>
+                                  <SelectItem value="high">High</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : businessImpactConfig ? (
+                              <Badge className={businessImpactConfig.className}>
+                                {businessImpactConfig.label}
+                              </Badge>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                         </TableRow>
                       </CollapsibleTrigger>
@@ -338,7 +462,7 @@ export function DQRulesUnified({ rules, profile, isLoading }: DQRulesUnifiedProp
                         <TableRow className="bg-muted/20">
                           <TableCell colSpan={8} className="p-4">
                             <div className="space-y-4">
-                              <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div className="grid grid-cols-3 gap-4 text-sm">
                                 <div>
                                   <span className="text-muted-foreground">Rule ID:</span>
                                   <p className="font-mono text-xs">{rule.id}</p>
@@ -346,6 +470,14 @@ export function DQRulesUnified({ rules, profile, isLoading }: DQRulesUnifiedProp
                                 <div>
                                   <span className="text-muted-foreground">Profile ID:</span>
                                   <p className="font-mono text-xs">{rule.profile_id || 'N/A'}</p>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Confidence:</span>
+                                  <p className="font-mono text-xs">
+                                    {rule.confidence !== null 
+                                      ? `${(rule.confidence * 100).toFixed(1)}%` 
+                                      : 'N/A'}
+                                  </p>
                                 </div>
                               </div>
 
