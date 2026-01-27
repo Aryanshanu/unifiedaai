@@ -532,7 +532,8 @@ function ControlPlaneTab() {
     reset,
     isRealtimeConnected,
     acknowledgeIncident,
-    resolveIncident
+    resolveIncident,
+    updateRule
   } = useDQControlPlane(selectedDataset);
 
   const handleDatasetCreated = (datasetId: string) => {
@@ -680,6 +681,7 @@ function ControlPlaneTab() {
         rules={rulesResult || []}
         profile={profilingResult}
         isLoading={currentStep === 2}
+        onRuleUpdate={updateRule}
       />
 
       {/* STEP 3: Rule Execution - Full Width Tabular */}

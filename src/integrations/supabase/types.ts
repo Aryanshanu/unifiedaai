@@ -743,6 +743,7 @@ export type Database = {
       }
       datasets: {
         Row: {
+          business_impact: string | null
           consent_status: string
           created_at: string
           data_types: string[] | null
@@ -761,6 +762,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          business_impact?: string | null
           consent_status?: string
           created_at?: string
           data_types?: string[] | null
@@ -779,6 +781,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          business_impact?: string | null
           consent_status?: string
           created_at?: string
           data_types?: string[] | null
@@ -1339,6 +1342,7 @@ export type Database = {
           column_profiles: Json
           created_at: string | null
           created_by: string | null
+          critical_columns: string[] | null
           dataset_id: string
           dataset_version: string | null
           dimension_scores: Json | null
@@ -1352,6 +1356,7 @@ export type Database = {
           column_profiles?: Json
           created_at?: string | null
           created_by?: string | null
+          critical_columns?: string[] | null
           dataset_id: string
           dataset_version?: string | null
           dimension_scores?: Json | null
@@ -1365,6 +1370,7 @@ export type Database = {
           column_profiles?: Json
           created_at?: string | null
           created_by?: string | null
+          critical_columns?: string[] | null
           dataset_id?: string
           dataset_version?: string | null
           dimension_scores?: Json | null
@@ -1458,6 +1464,7 @@ export type Database = {
           dimension: string
           id: string
           is_active: boolean | null
+          is_critical_element: boolean | null
           logic_code: string
           logic_type: string
           profile_id: string | null
@@ -1477,6 +1484,7 @@ export type Database = {
           dimension: string
           id?: string
           is_active?: boolean | null
+          is_critical_element?: boolean | null
           logic_code: string
           logic_type: string
           profile_id?: string | null
@@ -1496,6 +1504,7 @@ export type Database = {
           dimension?: string
           id?: string
           is_active?: boolean | null
+          is_critical_element?: boolean | null
           logic_code?: string
           logic_type?: string
           profile_id?: string | null

@@ -62,6 +62,7 @@ export interface DQRule {
   confidence: number | null;
   business_impact: string | null;
   is_active: boolean;
+  is_critical_element?: boolean;
 }
 
 export interface DQExecutionMetric {
@@ -177,6 +178,7 @@ export interface UseDQControlPlaneReturn {
   isRealtimeConnected: boolean;
   acknowledgeIncident: (incidentId: string) => Promise<void>;
   resolveIncident: (incidentId: string) => Promise<void>;
+  updateRule: (ruleId: string, updates: Partial<DQRule>) => Promise<boolean>;
 }
 
 const STEP_NAMES: Record<PipelineStep, string> = {
@@ -595,6 +597,42 @@ export function useDQControlPlane(datasetId?: string): UseDQControlPlaneReturn {
     }
   }, [toast]);
 
+  // Update rule CDE/business impact
+  const updateRule = useCallback(async (ruleId: string, updates: Partial<DQRule>) => {
+    const updateData: Record<string, unknown> = {};
+    if (updates.is_critical_element !== undefined) {
+      updateData.is_critical_element = updates.is_critical_element;
+    }
+    if (updates.business_impact !== undefined) {
+      updateData.business_impact = updates.business_impact;
+    }
+    
+    const { error } = await supabase
+      .from('dq_rules')
+      .update(updateData)
+      .eq('id', ruleId);
+    
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update rule',
+        variant: 'destructive',
+      });
+      return false;
+    }
+    
+    // Update local state
+    setRulesResult(prev => 
+      prev.map(r => r.id === ruleId ? { ...r, ...updates } : r)
+    );
+    
+    toast({
+      title: 'Rule Updated',
+      description: 'Rule tagging updated successfully',
+    });
+    return true;
+  }, [toast]);
+
   return {
     pipelineStatus,
     currentStep,
@@ -611,5 +649,6 @@ export function useDQControlPlane(datasetId?: string): UseDQControlPlaneReturn {
     isRealtimeConnected,
     acknowledgeIncident,
     resolveIncident,
+    updateRule,
   };
 }
