@@ -66,12 +66,12 @@ export function GovernanceFlowDiagram({ stages: propStages }: GovernanceFlowDiag
   const { stages: dynamicStages, isLoading } = useGovernanceFlowMetrics();
 
   // Use dynamic stages from hook, enriched with icons
-  const stages = propStages || dynamicStages.map(s => ({
+  const stages = propStages || (dynamicStages || []).map(s => ({
     ...s,
     icon: stageIcons[s.id] || Activity,
   }));
 
-  if (isLoading) {
+  if (isLoading || stages.length === 0) {
     return (
       <Card>
         <CardHeader>
