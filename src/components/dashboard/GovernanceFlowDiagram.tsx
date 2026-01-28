@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Upload, Database, ShieldCheck, Brain, 
   Shield, Activity, ArrowRight, CheckCircle2, 
@@ -8,6 +9,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useGovernanceFlowMetrics } from "@/hooks/useGovernanceFlowMetrics";
 
 interface StageStatus {
   id: number;
@@ -23,62 +25,14 @@ interface GovernanceFlowDiagramProps {
   stages?: StageStatus[];
 }
 
-const defaultStages: StageStatus[] = [
-  {
-    id: 1,
-    name: "Data Ingestion",
-    description: "Capture & validate source data",
-    icon: Upload,
-    status: "complete",
-    path: "/engine/data-quality",
-    metrics: [{ label: "Sources", value: "3" }]
-  },
-  {
-    id: 2,
-    name: "Data Quality",
-    description: "Profile, validate & certify",
-    icon: Database,
-    status: "in_progress",
-    path: "/engine/data-quality",
-    metrics: [{ label: "Quality Score", value: "87%" }]
-  },
-  {
-    id: 3,
-    name: "AI Readiness",
-    description: "Lineage, bias checks & approval",
-    icon: ShieldCheck,
-    status: "pending",
-    path: "/engine/data-quality",
-    metrics: [{ label: "Approved", value: "2" }]
-  },
-  {
-    id: 4,
-    name: "AI Development",
-    description: "Model registration & traceability",
-    icon: Brain,
-    status: "pending",
-    path: "/models",
-    metrics: [{ label: "Models", value: "3" }]
-  },
-  {
-    id: 5,
-    name: "RAI Controls",
-    description: "Fairness, safety & compliance",
-    icon: Shield,
-    status: "pending",
-    path: "/engine/fairness",
-    metrics: [{ label: "Evaluations", value: "0" }]
-  },
-  {
-    id: 6,
-    name: "Monitoring",
-    description: "Drift, violations & feedback",
-    icon: Activity,
-    status: "pending",
-    path: "/observability",
-    metrics: [{ label: "Incidents", value: "164" }]
-  }
-];
+const stageIcons: Record<number, React.ComponentType<{ className?: string }>> = {
+  1: Upload,
+  2: Database,
+  3: ShieldCheck,
+  4: Brain,
+  5: Shield,
+  6: Activity,
+};
 
 const statusConfig = {
   complete: { 
@@ -107,8 +61,33 @@ const statusConfig = {
   }
 };
 
-export function GovernanceFlowDiagram({ stages = defaultStages }: GovernanceFlowDiagramProps) {
+export function GovernanceFlowDiagram({ stages: propStages }: GovernanceFlowDiagramProps) {
   const navigate = useNavigate();
+  const { stages: dynamicStages, isLoading } = useGovernanceFlowMetrics();
+
+  // Use dynamic stages from hook, enriched with icons
+  const stages = propStages || dynamicStages.map(s => ({
+    ...s,
+    icon: stageIcons[s.id] || Activity,
+  }));
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-64" />
+          <Skeleton className="h-4 w-48 mt-2" />
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Skeleton key={i} className="h-40 rounded-xl" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>

@@ -6,6 +6,8 @@ import { PlatformHealthCards } from "@/components/dashboard/PlatformHealthCards"
 import { RealityCheckDashboard } from "@/components/dashboard/RealityCheckDashboard";
 import GovernanceHealthCards, { GovernanceCoverageBadge } from "@/components/dashboard/GovernanceHealthCards";
 import { GovernanceFlowDiagram } from "@/components/dashboard/GovernanceFlowDiagram";
+import { IncidentSummaryCard } from "@/components/dashboard/IncidentSummaryCard";
+import { FeedbackLoopDiagram } from "@/components/monitoring/FeedbackLoopDiagram";
 import { useUnsafeDeployments, usePlatformMetrics } from "@/hooks/usePlatformMetrics";
 import { useGovernanceMetrics } from "@/hooks/useGovernanceMetrics";
 import { Database, Scale, AlertCircle, ShieldAlert, Lock, Eye, AlertOctagon, ArrowRight, Shield, AlertTriangle } from "lucide-react";
@@ -161,6 +163,12 @@ export default function Index() {
       {/* 6-Stage Governance Pipeline Flow */}
       <div className="mb-6">
         <GovernanceFlowDiagram />
+      </div>
+
+      {/* Incident Summary and Feedback Loop - Side by Side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <IncidentSummaryCard />
+        <FeedbackLoopDiagram />
       </div>
 
       {/* Reality Check Dashboard */}
