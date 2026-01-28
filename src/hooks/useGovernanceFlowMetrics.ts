@@ -99,14 +99,14 @@ export function useGovernanceFlowMetrics(): GovernanceFlowData {
     }
   };
 
-  const stages: StageMetrics[] = [
+  const stages: StageMetrics[] = data ? [
     {
       id: 1,
       name: "Data Ingestion",
       description: "Capture & validate source data",
       path: "/engine/data-quality",
       status: getStageStatus(1),
-      metrics: [{ label: "Sources", value: data?.sourcesCount || 0 }]
+      metrics: [{ label: "Sources", value: data.sourcesCount ?? 0 }]
     },
     {
       id: 2,
@@ -114,7 +114,7 @@ export function useGovernanceFlowMetrics(): GovernanceFlowData {
       description: "Profile, validate & certify",
       path: "/engine/data-quality",
       status: getStageStatus(2),
-      metrics: [{ label: "Quality Score", value: data?.qualityScore !== null ? `${data.qualityScore}%` : 'N/A' }]
+      metrics: [{ label: "Quality Score", value: data.qualityScore != null ? `${data.qualityScore}%` : 'N/A' }]
     },
     {
       id: 3,
@@ -122,7 +122,7 @@ export function useGovernanceFlowMetrics(): GovernanceFlowData {
       description: "Lineage, bias checks & approval",
       path: "/engine/data-quality",
       status: getStageStatus(3),
-      metrics: [{ label: "Approved", value: data?.approvedCount || 0 }]
+      metrics: [{ label: "Approved", value: data.approvedCount ?? 0 }]
     },
     {
       id: 4,
@@ -130,7 +130,7 @@ export function useGovernanceFlowMetrics(): GovernanceFlowData {
       description: "Model registration & traceability",
       path: "/models",
       status: getStageStatus(4),
-      metrics: [{ label: "Models", value: data?.modelsCount || 0 }]
+      metrics: [{ label: "Models", value: data.modelsCount ?? 0 }]
     },
     {
       id: 5,
@@ -138,7 +138,7 @@ export function useGovernanceFlowMetrics(): GovernanceFlowData {
       description: "Fairness, safety & compliance",
       path: "/engine/fairness",
       status: getStageStatus(5),
-      metrics: [{ label: "Evaluations", value: data?.evaluationsCount || 0 }]
+      metrics: [{ label: "Evaluations", value: data.evaluationsCount ?? 0 }]
     },
     {
       id: 6,
@@ -146,9 +146,9 @@ export function useGovernanceFlowMetrics(): GovernanceFlowData {
       description: "Drift, violations & feedback",
       path: "/observability",
       status: getStageStatus(6),
-      metrics: [{ label: "Open Incidents", value: data?.openIncidentsCount || 0 }]
+      metrics: [{ label: "Open Incidents", value: data.openIncidentsCount ?? 0 }]
     }
-  ];
+  ] : [];
 
   return {
     stages,
