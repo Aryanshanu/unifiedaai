@@ -62,15 +62,16 @@ export default function AttackLibrary() {
     
     await createAttack.mutateAsync(newAttack);
     setIsAddDialogOpen(false);
-    setNewAttack({
-      name: '',
-      description: '',
-      category: 'jailbreak',
-      difficulty: 'medium',
-      attack_payload: '',
-      tags: [],
-      is_active: true,
-    });
+      setNewAttack({
+        name: '',
+        description: '',
+        category: 'jailbreak',
+        owasp_category: '',
+        difficulty: 'medium',
+        attack_payload: '',
+        tags: [],
+        is_active: true,
+      });
   };
 
   // Stats

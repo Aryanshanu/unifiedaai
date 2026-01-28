@@ -107,3 +107,15 @@ verify_jwt = false
 
 [functions.dq-truth-enforcer]
 verify_jwt = false
+
+[functions.agent-pentester]
+verify_jwt = false
+
+[functions.agent-jailbreaker]
+verify_jwt = false
+
+[functions.agent-threat-modeler]
+verify_jwt = false
+
+[functions.security-evidence-service]
+verify_jwt = false
