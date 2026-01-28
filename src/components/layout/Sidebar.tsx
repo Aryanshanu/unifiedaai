@@ -26,6 +26,10 @@ import {
   Play,
   BarChart3,
   FileCheck,
+  Bug,
+  Skull,
+  Target,
+  Library,
 } from "lucide-react";
 
 const navItems = [
@@ -42,6 +46,12 @@ const navItems = [
   { divider: true, label: "DATA GOVERNANCE" },
   { path: "/engine/data-quality", icon: Database, label: "Data Quality Engine" },
   { path: "/data-contracts", icon: FileText, label: "Data Contracts" },
+  { divider: true, label: "CORE SECURITY" },
+  { path: "/security", icon: Shield, label: "Security Dashboard" },
+  { path: "/security/pentesting", icon: Bug, label: "AI Pentesting" },
+  { path: "/security/jailbreak-lab", icon: Skull, label: "Jailbreak Lab" },
+  { path: "/security/threat-modeling", icon: Target, label: "Threat Modeling" },
+  { path: "/security/attack-library", icon: Library, label: "Attack Library" },
   { divider: true, label: "CORE RAI" },
   { path: "/engine/fairness", icon: Scale, label: "Fairness Engine" },
   { path: "/engine/hallucination", icon: AlertCircle, label: "Hallucination Engine" },
