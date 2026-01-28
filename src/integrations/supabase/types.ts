@@ -104,6 +104,54 @@ export type Database = {
         }
         Relationships: []
       }
+      attack_library: {
+        Row: {
+          attack_payload: string
+          category: string
+          created_at: string | null
+          description: string | null
+          difficulty: string | null
+          first_seen: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          owasp_category: string | null
+          success_rate: number | null
+          tags: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          attack_payload: string
+          category: string
+          created_at?: string | null
+          description?: string | null
+          difficulty?: string | null
+          first_seen?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          owasp_category?: string | null
+          success_rate?: number | null
+          tags?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          attack_payload?: string
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          difficulty?: string | null
+          first_seen?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          owasp_category?: string | null
+          success_rate?: number | null
+          tags?: string[] | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       attestations: {
         Row: {
           created_at: string
@@ -218,6 +266,54 @@ export type Database = {
           storage_path?: string
           verification_status?: string | null
           verified_at?: string | null
+        }
+        Relationships: []
+      }
+      automated_test_cases: {
+        Row: {
+          attack_objective: string[] | null
+          code: string
+          conversation_script: Json | null
+          created_at: string | null
+          detection_config: Json | null
+          expected_secure_behavior: string
+          id: string
+          is_active: boolean | null
+          module: string
+          objective: string
+          owasp_category: string | null
+          prompt_template: string
+          updated_at: string | null
+        }
+        Insert: {
+          attack_objective?: string[] | null
+          code: string
+          conversation_script?: Json | null
+          created_at?: string | null
+          detection_config?: Json | null
+          expected_secure_behavior: string
+          id?: string
+          is_active?: boolean | null
+          module: string
+          objective: string
+          owasp_category?: string | null
+          prompt_template: string
+          updated_at?: string | null
+        }
+        Update: {
+          attack_objective?: string[] | null
+          code?: string
+          conversation_script?: Json | null
+          created_at?: string | null
+          detection_config?: Json | null
+          expected_secure_behavior?: string
+          id?: string
+          is_active?: boolean | null
+          module?: string
+          objective?: string
+          owasp_category?: string | null
+          prompt_template?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -3486,6 +3582,137 @@ export type Database = {
         }
         Relationships: []
       }
+      security_findings: {
+        Row: {
+          business_impact_score: number | null
+          created_at: string | null
+          description: string | null
+          evidence: Json | null
+          exploitability_score: number | null
+          fractal_risk_index: number | null
+          framework_mappings: Json | null
+          id: string
+          mitigation: string | null
+          owasp_category: string | null
+          severity: string
+          status: string | null
+          system_id: string
+          test_run_id: string | null
+          title: string
+          updated_at: string | null
+          vulnerability_id: string
+        }
+        Insert: {
+          business_impact_score?: number | null
+          created_at?: string | null
+          description?: string | null
+          evidence?: Json | null
+          exploitability_score?: number | null
+          fractal_risk_index?: number | null
+          framework_mappings?: Json | null
+          id?: string
+          mitigation?: string | null
+          owasp_category?: string | null
+          severity: string
+          status?: string | null
+          system_id: string
+          test_run_id?: string | null
+          title: string
+          updated_at?: string | null
+          vulnerability_id: string
+        }
+        Update: {
+          business_impact_score?: number | null
+          created_at?: string | null
+          description?: string | null
+          evidence?: Json | null
+          exploitability_score?: number | null
+          fractal_risk_index?: number | null
+          framework_mappings?: Json | null
+          id?: string
+          mitigation?: string | null
+          owasp_category?: string | null
+          severity?: string
+          status?: string | null
+          system_id?: string
+          test_run_id?: string | null
+          title?: string
+          updated_at?: string | null
+          vulnerability_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_findings_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_findings_test_run_id_fkey"
+            columns: ["test_run_id"]
+            isOneToOne: false
+            referencedRelation: "security_test_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      security_test_runs: {
+        Row: {
+          completed_at: string | null
+          coverage_percentage: number | null
+          created_at: string | null
+          id: string
+          started_at: string | null
+          status: string | null
+          summary: Json | null
+          system_id: string
+          test_type: string
+          tests_failed: number | null
+          tests_passed: number | null
+          tests_total: number | null
+          triggered_by: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          coverage_percentage?: number | null
+          created_at?: string | null
+          id?: string
+          started_at?: string | null
+          status?: string | null
+          summary?: Json | null
+          system_id: string
+          test_type: string
+          tests_failed?: number | null
+          tests_passed?: number | null
+          tests_total?: number | null
+          triggered_by?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          coverage_percentage?: number | null
+          created_at?: string | null
+          id?: string
+          started_at?: string | null
+          status?: string | null
+          summary?: Json | null
+          system_id?: string
+          test_type?: string
+          tests_failed?: number | null
+          tests_passed?: number | null
+          tests_total?: number | null
+          triggered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_test_runs_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       silver_data: {
         Row: {
           bronze_id: string
@@ -3868,6 +4095,148 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      threat_models: {
+        Row: {
+          architecture_graph: Json | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          framework: string | null
+          id: string
+          name: string
+          risk_score: number | null
+          system_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          architecture_graph?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          framework?: string | null
+          id?: string
+          name: string
+          risk_score?: number | null
+          system_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          architecture_graph?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          framework?: string | null
+          id?: string
+          name?: string
+          risk_score?: number | null
+          system_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "threat_models_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      threat_scenarios_library: {
+        Row: {
+          code: string
+          created_at: string | null
+          default_framework: string | null
+          description: string
+          id: string
+          is_active: boolean | null
+          risk_category: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          default_framework?: string | null
+          description: string
+          id?: string
+          is_active?: boolean | null
+          risk_category?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          default_framework?: string | null
+          description?: string
+          id?: string
+          is_active?: boolean | null
+          risk_category?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      threat_vectors: {
+        Row: {
+          atlas_tactic: string | null
+          confidence_level: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          impact: number | null
+          is_accepted: boolean | null
+          likelihood: number | null
+          maestro_layer: string | null
+          mitigation_checklist: Json | null
+          owasp_category: string | null
+          threat_model_id: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          atlas_tactic?: string | null
+          confidence_level?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          impact?: number | null
+          is_accepted?: boolean | null
+          likelihood?: number | null
+          maestro_layer?: string | null
+          mitigation_checklist?: Json | null
+          owasp_category?: string | null
+          threat_model_id: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          atlas_tactic?: string | null
+          confidence_level?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          impact?: number | null
+          is_accepted?: boolean | null
+          likelihood?: number | null
+          maestro_layer?: string | null
+          mitigation_checklist?: Json | null
+          owasp_category?: string | null
+          threat_model_id?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "threat_vectors_threat_model_id_fkey"
+            columns: ["threat_model_id"]
+            isOneToOne: false
+            referencedRelation: "threat_models"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_provider_keys: {
         Row: {
