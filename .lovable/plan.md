@@ -1,122 +1,154 @@
 
 
-# Complete Core Security Integration - Error-Free Implementation
+# Fix Core Security Backend and Sidebar Layout Issues
 
 ## Summary
-Complete the Core Security module by fixing the TypeScript error and adding all remaining navigation and routing configurations.
+
+Two critical issues identified and must be fixed:
+
+1. **Backend Not Working**: The `agent-pentester` edge function runs but returns 0 findings because the `automated_test_cases` and `attack_library` tables are empty - no seed data exists
+2. **Sidebar Jumping**: The `MainLayout.tsx` has a hardcoded `pl-64` padding that doesn't respond to sidebar collapse state, causing layout instability
 
 ---
 
-## Changes Required
+## Phase 1: Seed Security Test Data
 
-### 1. Fix TypeScript Error in AttackLibrary.tsx (Line 65-73)
+Create a database migration to populate the required tables with curated security test cases.
 
-**Problem**: The reset state object is missing `owasp_category` property.
+### 1.1 OWASP LLM Top 10 Automated Test Cases (40 tests)
 
-**Fix**: Add `owasp_category: null as string | null` to the reset state object.
+Insert into `automated_test_cases` table:
+
+| Category | Test Code | Description |
+|----------|-----------|-------------|
+| LLM01 | PENTEST_LLM01_001-005 | Prompt Injection tests (5) |
+| LLM02 | PENTEST_LLM02_001-004 | Insecure Output Handling (4) |
+| LLM03 | PENTEST_LLM03_001-003 | Training Data Poisoning (3) |
+| LLM04 | PENTEST_LLM04_001-004 | Model Denial of Service (4) |
+| LLM05 | PENTEST_LLM05_001-003 | Supply Chain Vulnerabilities (3) |
+| LLM06 | PENTEST_LLM06_001-005 | Sensitive Info Disclosure (5) |
+| LLM07 | PENTEST_LLM07_001-003 | Insecure Plugin Design (3) |
+| LLM08 | PENTEST_LLM08_001-004 | Excessive Agency (4) |
+| LLM09 | PENTEST_LLM09_001-003 | Overreliance (3) |
+| LLM10 | PENTEST_LLM10_001-003 | Model Theft (3) |
+
+### 1.2 Attack Library Seed Data (50+ attacks)
+
+Insert into `attack_library` table:
+
+| Category | Count | Examples |
+|----------|-------|----------|
+| Jailbreak | 10 | DAN prompt, Role-play escape, Hypothetical scenarios |
+| Prompt Injection | 10 | Ignore previous, System prompt extraction |
+| Toxicity | 8 | Hate speech probes, Discrimination tests |
+| PII Extraction | 8 | SSN extraction, Email harvesting |
+| Harmful Content | 7 | Violence instructions, Illegal activity |
+| Policy Bypass | 7 | Content filter bypass, Safety override |
+
+---
+
+## Phase 2: Fix Sidebar Layout Synchronization
+
+### 2.1 Create Shared Sidebar Context
+
+Create a new context to share the collapsed state between `Sidebar` and `MainLayout`:
 
 ```typescript
-// Line 65-73: Update setNewAttack reset to include owasp_category
-setNewAttack({
-  name: '',
-  description: '',
-  category: 'jailbreak',
-  owasp_category: null as string | null,  // ADD THIS LINE
-  difficulty: 'medium',
-  attack_payload: '',
-  tags: [],
-  is_active: true,
+// src/contexts/SidebarContext.tsx
+import { createContext, useContext, useState, ReactNode } from 'react';
+
+interface SidebarContextType {
+  collapsed: boolean;
+  setCollapsed: (value: boolean) => void;
+  toggle: () => void;
+}
+
+const SidebarContext = createContext<SidebarContextType | null>(null);
+
+export function SidebarProvider({ children }: { children: ReactNode }) {
+  const [collapsed, setCollapsed] = useState(false);
+  return (
+    <SidebarContext.Provider value={{ 
+      collapsed, 
+      setCollapsed,
+      toggle: () => setCollapsed(prev => !prev) 
+    }}>
+      {children}
+    </SidebarContext.Provider>
+  );
+}
+
+export function useSidebarContext() {
+  const context = useContext(SidebarContext);
+  if (!context) throw new Error('useSidebarContext must be used within SidebarProvider');
+  return context;
+}
+```
+
+### 2.2 Update Sidebar.tsx
+
+- Remove local `collapsed` state
+- Use `useSidebarContext()` hook instead
+- Call `toggle()` from context on collapse button click
+
+### 2.3 Update MainLayout.tsx
+
+- Import and use `useSidebarContext()`
+- Change padding from hardcoded `pl-64` to dynamic:
+
+```typescript
+const { collapsed } = useSidebarContext();
+// ...
+<div className={cn(
+  "transition-all duration-300 flex flex-col flex-1",
+  collapsed ? "pl-16" : "pl-64"
+)}>
+```
+
+### 2.4 Wrap App with SidebarProvider
+
+Update `App.tsx` to wrap the router with `SidebarProvider`.
+
+---
+
+## Phase 3: Add Loading State Stabilization
+
+### 3.1 Prevent Sidebar Re-renders
+
+In `Sidebar.tsx`, memoize the metrics query or use `staleTime` to prevent frequent re-fetches:
+
+```typescript
+const { data: metrics } = usePlatformMetrics({ 
+  staleTime: 30000 // 30 seconds 
 });
 ```
 
 ---
 
-### 2. Update Sidebar.tsx - Add CORE SECURITY Navigation
+## Files to Create
 
-**Location**: Between "DATA GOVERNANCE" and "CORE RAI" sections
+| File | Purpose |
+|------|---------|
+| `src/contexts/SidebarContext.tsx` | Shared sidebar state context |
+| `supabase/migrations/xxx_seed_security_data.sql` | Seed test cases and attack library |
 
-**New imports required**:
-- `Bug` - for AI Pentesting
-- `Skull` - for Jailbreak Lab  
-- `Target` - for Threat Modeling
-- `Library` - for Attack Library
-
-**New nav items** (insert after line 44, before CORE RAI):
-```typescript
-{ divider: true, label: "CORE SECURITY" },
-{ path: "/security", icon: Shield, label: "Security Dashboard" },
-{ path: "/security/pentesting", icon: Bug, label: "AI Pentesting" },
-{ path: "/security/jailbreak-lab", icon: Skull, label: "Jailbreak Lab" },
-{ path: "/security/threat-modeling", icon: Target, label: "Threat Modeling" },
-{ path: "/security/attack-library", icon: Library, label: "Attack Library" },
-```
-
----
-
-### 3. Update App.tsx - Add Security Routes
-
-**New imports required**:
-```typescript
-import SecurityDashboard from "./pages/security/SecurityDashboard";
-import Pentesting from "./pages/security/Pentesting";
-import JailbreakLab from "./pages/security/JailbreakLab";
-import ThreatModeling from "./pages/security/ThreatModeling";
-import AttackLibrary from "./pages/security/AttackLibrary";
-```
-
-**New routes** (add after line 88, before Data Governance comment):
-```typescript
-{/* Core Security */}
-<Route path="/security" element={<ProtectedRoute><SecurityDashboard /></ProtectedRoute>} />
-<Route path="/security/pentesting" element={<ProtectedRoute><Pentesting /></ProtectedRoute>} />
-<Route path="/security/jailbreak-lab" element={<ProtectedRoute><JailbreakLab /></ProtectedRoute>} />
-<Route path="/security/threat-modeling" element={<ProtectedRoute><ThreatModeling /></ProtectedRoute>} />
-<Route path="/security/attack-library" element={<ProtectedRoute><AttackLibrary /></ProtectedRoute>} />
-```
-
----
-
-### 4. Update supabase/config.toml - Add Edge Function Configs
-
-**Add at end of file** (4 new edge functions with JWT verification):
-```toml
-[functions.agent-pentester]
-verify_jwt = false
-
-[functions.agent-jailbreaker]
-verify_jwt = false
-
-[functions.agent-threat-modeler]
-verify_jwt = false
-
-[functions.security-evidence-service]
-verify_jwt = false
-```
-
-Note: Using `verify_jwt = false` following project pattern for edge functions that handle auth internally via auth-helper.
-
----
-
-## Files Modified
+## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/pages/security/AttackLibrary.tsx` | Add `owasp_category` to reset state |
-| `src/components/layout/Sidebar.tsx` | Add CORE SECURITY nav section with 5 items |
-| `src/App.tsx` | Add 5 security route imports and routes |
-| `supabase/config.toml` | Add 4 new edge function configurations |
+| `src/components/layout/Sidebar.tsx` | Use shared context instead of local state |
+| `src/components/layout/MainLayout.tsx` | Dynamic padding based on collapsed state |
+| `src/App.tsx` | Wrap with SidebarProvider |
+| `src/hooks/usePlatformMetrics.ts` | Add staleTime option |
 
 ---
 
-## Final Navigation Order
+## Expected Outcome
 
-1. Command Center
-2. **Monitor**: Observability, Alerts
-3. **Govern**: Approvals, Decision Ledger, HITL, Incidents, Knowledge Graph
-4. **DATA GOVERNANCE**: Data Quality Engine, Data Contracts
-5. **CORE SECURITY** (NEW): Security Dashboard, AI Pentesting, Jailbreak Lab, Threat Modeling, Attack Library
-6. **CORE RAI**: Fairness, Hallucination, Toxicity, Privacy, Explainability
-7. **Respond**: Policy Studio, Golden Demo
-8. **Impact**: Impact Dashboard, Regulatory Reports
-9. **Configure**: Projects, Models, Settings, Documentation
+After implementation:
+
+1. **AI Pentesting** will execute 40 real test cases and generate findings
+2. **Jailbreak Lab** will have 50+ curated attacks to test
+3. **Sidebar** will smoothly collapse/expand with synchronized content padding
+4. **No visual jumping** from async data loading
 
