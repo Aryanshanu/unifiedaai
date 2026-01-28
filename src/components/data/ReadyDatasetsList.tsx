@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { 
   CheckCircle, Clock, XCircle, Database, 
-  ArrowRight, ShieldCheck, AlertTriangle, FileCheck
+  ArrowRight, ShieldCheck, AlertTriangle, FileCheck,
+  GitBranch, History
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -38,6 +40,7 @@ const statusConfig: Record<string, { color: string; icon: React.ComponentType<{ 
 export function ReadyDatasetsList() {
   const [showApprovedOnly, setShowApprovedOnly] = useState(false);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: datasets, isLoading } = useQuery({
     queryKey: ["datasets-for-ai", showApprovedOnly],
@@ -75,20 +78,51 @@ export function ReadyDatasetsList() {
   const approveDataset = useMutation({
     mutationFn: async (datasetId: string) => {
       const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase
+      
+      // Get the current dataset for version increment
+      const { data: dataset } = await supabase
+        .from("datasets")
+        .select("version")
+        .eq("id", datasetId)
+        .single();
+      
+      const currentVersion = dataset?.version || "1.0";
+      const [major] = currentVersion.split(".");
+      const newVersion = `${parseInt(major) + 1}.0`;
+      
+      // Update dataset status and version
+      const { error: updateError } = await supabase
         .from("datasets")
         .update({ 
           ai_approval_status: "approved",
           ai_approved_at: new Date().toISOString(),
-          ai_approved_by: user?.id
+          ai_approved_by: user?.id,
+          version: newVersion
         })
         .eq("id", datasetId);
       
-      if (error) throw error;
+      if (updateError) throw updateError;
+      
+      // Create snapshot for versioning
+      const { data: fullDataset } = await supabase
+        .from("datasets")
+        .select("*")
+        .eq("id", datasetId)
+        .single();
+      
+      if (fullDataset) {
+        await supabase.from("dataset_snapshots").insert({
+          dataset_id: datasetId,
+          version: newVersion,
+          snapshot_data: fullDataset,
+          approved_at: new Date().toISOString(),
+          approved_by: user?.id
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["datasets-for-ai"] });
-      toast.success("Dataset approved for AI use");
+      toast.success("Dataset approved for AI use and snapshot created");
     },
   });
 
@@ -272,10 +306,20 @@ export function ReadyDatasetsList() {
                               </>
                             )}
                             {dataset.ai_approval_status === "approved" && (
-                              <Badge variant="outline" className="bg-success/10 text-success border-success/20">
-                                <ShieldCheck className="h-3 w-3 mr-1" />
-                                Ready for AI
-                              </Badge>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="bg-success/10 text-success border-success/20">
+                                  <ShieldCheck className="h-3 w-3 mr-1" />
+                                  Ready for AI
+                                </Badge>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => navigate(`/lineage?dataset=${dataset.id}`)}
+                                  title="View Lineage"
+                                >
+                                  <GitBranch className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
                             )}
                             {dataset.ai_approval_status === "rejected" && (
                               <Button
