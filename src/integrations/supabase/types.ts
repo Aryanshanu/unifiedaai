@@ -636,6 +636,51 @@ export type Database = {
           },
         ]
       }
+      data_lineage: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          source_dataset_id: string | null
+          target_dataset_id: string | null
+          transformation_details: Json | null
+          transformation_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          source_dataset_id?: string | null
+          target_dataset_id?: string | null
+          transformation_details?: Json | null
+          transformation_type: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          source_dataset_id?: string | null
+          target_dataset_id?: string | null
+          transformation_details?: Json | null
+          transformation_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_lineage_source_dataset_id_fkey"
+            columns: ["source_dataset_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_lineage_target_dataset_id_fkey"
+            columns: ["target_dataset_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       data_sources: {
         Row: {
           auth_type: string | null
@@ -693,11 +738,13 @@ export type Database = {
           file_type: string | null
           file_url: string | null
           id: string
+          malware_scanned: boolean | null
           metadata: Json | null
           parsed_column_count: number | null
           parsed_row_count: number | null
           processing_time_ms: number | null
           quality_score: number | null
+          schema_hash: string | null
           status: string | null
           user_id: string | null
         }
@@ -715,11 +762,13 @@ export type Database = {
           file_type?: string | null
           file_url?: string | null
           id?: string
+          malware_scanned?: boolean | null
           metadata?: Json | null
           parsed_column_count?: number | null
           parsed_row_count?: number | null
           processing_time_ms?: number | null
           quality_score?: number | null
+          schema_hash?: string | null
           status?: string | null
           user_id?: string | null
         }
@@ -737,11 +786,13 @@ export type Database = {
           file_type?: string | null
           file_url?: string | null
           id?: string
+          malware_scanned?: boolean | null
           metadata?: Json | null
           parsed_column_count?: number | null
           parsed_row_count?: number | null
           processing_time_ms?: number | null
           quality_score?: number | null
+          schema_hash?: string | null
           status?: string | null
           user_id?: string | null
         }
@@ -751,6 +802,50 @@ export type Database = {
             columns: ["contract_id"]
             isOneToOne: false
             referencedRelation: "data_contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dataset_bias_reports: {
+        Row: {
+          class_imbalance: Json | null
+          created_at: string | null
+          dataset_id: string
+          demographic_skew: Json | null
+          id: string
+          missing_patterns: Json | null
+          overall_bias_score: number | null
+          recommendations: string[] | null
+          scan_timestamp: string | null
+        }
+        Insert: {
+          class_imbalance?: Json | null
+          created_at?: string | null
+          dataset_id: string
+          demographic_skew?: Json | null
+          id?: string
+          missing_patterns?: Json | null
+          overall_bias_score?: number | null
+          recommendations?: string[] | null
+          scan_timestamp?: string | null
+        }
+        Update: {
+          class_imbalance?: Json | null
+          created_at?: string | null
+          dataset_id?: string
+          demographic_skew?: Json | null
+          id?: string
+          missing_patterns?: Json | null
+          overall_bias_score?: number | null
+          recommendations?: string[] | null
+          scan_timestamp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dataset_bias_reports_dataset_id_fkey"
+            columns: ["dataset_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
             referencedColumns: ["id"]
           },
         ]
@@ -879,6 +974,47 @@ export type Database = {
           },
         ]
       }
+      dataset_snapshots: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string | null
+          dataset_id: string
+          id: string
+          quality_score: number | null
+          snapshot_data: Json
+          version: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          dataset_id: string
+          id?: string
+          quality_score?: number | null
+          snapshot_data: Json
+          version: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          dataset_id?: string
+          id?: string
+          quality_score?: number | null
+          snapshot_data?: Json
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dataset_snapshots_dataset_id_fkey"
+            columns: ["dataset_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       datasets: {
         Row: {
           ai_approval_status: string | null
@@ -890,6 +1026,7 @@ export type Database = {
           data_types: string[] | null
           description: string | null
           environment: string | null
+          freshness_threshold_days: number | null
           id: string
           ingested_row_count: number
           jurisdiction: string[] | null
@@ -914,6 +1051,7 @@ export type Database = {
           data_types?: string[] | null
           description?: string | null
           environment?: string | null
+          freshness_threshold_days?: number | null
           id?: string
           ingested_row_count?: number
           jurisdiction?: string[] | null
@@ -938,6 +1076,7 @@ export type Database = {
           data_types?: string[] | null
           description?: string | null
           environment?: string | null
+          freshness_threshold_days?: number | null
           id?: string
           ingested_row_count?: number
           jurisdiction?: string[] | null

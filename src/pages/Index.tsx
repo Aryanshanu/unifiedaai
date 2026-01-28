@@ -5,15 +5,16 @@ import { Button } from "@/components/ui/button";
 import { PlatformHealthCards } from "@/components/dashboard/PlatformHealthCards";
 import { RealityCheckDashboard } from "@/components/dashboard/RealityCheckDashboard";
 import GovernanceHealthCards, { GovernanceCoverageBadge } from "@/components/dashboard/GovernanceHealthCards";
+import { GovernanceFlowDiagram } from "@/components/dashboard/GovernanceFlowDiagram";
 import { useUnsafeDeployments, usePlatformMetrics } from "@/hooks/usePlatformMetrics";
 import { useGovernanceMetrics } from "@/hooks/useGovernanceMetrics";
-import { Database, Scale, AlertCircle, ShieldAlert, Lock, Eye, AlertOctagon, ArrowRight, Shield } from "lucide-react";
+import { Database, Scale, AlertCircle, ShieldAlert, Lock, Eye, AlertOctagon, ArrowRight, Shield, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { HealthIndicator } from "@/components/shared/HealthIndicator";
 import { useDataHealth } from "@/components/shared/DataHealthWrapper";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 export default function Index() {
@@ -156,6 +157,11 @@ export default function Index() {
           </div>
         </div>
       )}
+
+      {/* 6-Stage Governance Pipeline Flow */}
+      <div className="mb-6">
+        <GovernanceFlowDiagram />
+      </div>
 
       {/* Reality Check Dashboard */}
       <div className="mb-6">
