@@ -1,9 +1,9 @@
-import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { FractalBadge } from "@/components/fractal";
 import { usePlatformMetrics } from "@/hooks/usePlatformMetrics";
+import { useSidebarContext } from "@/contexts/SidebarContext";
 import {
   LayoutDashboard,
   FolderOpen,
@@ -72,7 +72,7 @@ const navItems = [
 ];
 
 export function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false);
+  const { collapsed, toggle } = useSidebarContext();
   const location = useLocation();
   const { data: metrics } = usePlatformMetrics();
 
@@ -152,7 +152,7 @@ export function Sidebar() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => setCollapsed(!collapsed)}
+          onClick={toggle}
           className={cn("w-full h-8", collapsed && "justify-center px-0")}
         >
           {collapsed ? (

@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ErrorBoundary } from "@/components/error/ErrorBoundary";
 import { GlobalBanner } from "@/components/layout/GlobalBanner";
+import { SidebarProvider } from "@/contexts/SidebarContext";
 import Auth from "./pages/Auth";
 import Index from "./pages/Index";
 import Error from "./pages/Error";
@@ -50,13 +51,14 @@ const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <GlobalBanner />
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
+        <SidebarProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <GlobalBanner />
+              <Routes>
+                <Route path="/auth" element={<Auth />} />
               <Route path="/error" element={<Error />} />
               <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
               {/* Project & System Registry */}
@@ -114,9 +116,10 @@ const App = () => (
             </Routes>
           </BrowserRouter>
         </TooltipProvider>
-      </AuthProvider>
-    </QueryClientProvider>
-  </ErrorBoundary>
+      </SidebarProvider>
+    </AuthProvider>
+  </QueryClientProvider>
+</ErrorBoundary>
 );
 
 export default App;
