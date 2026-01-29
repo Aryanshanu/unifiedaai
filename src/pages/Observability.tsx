@@ -5,7 +5,9 @@ import { LiveMetrics } from "@/components/dashboard/LiveMetrics";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Activity, AlertTriangle, TrendingUp, Clock, RefreshCw, Bell, Zap, MessageSquare, Bot } from "lucide-react";
+import { Activity, AlertTriangle, TrendingUp, Clock, RefreshCw, Bell, Zap, MessageSquare, Bot, Cpu } from "lucide-react";
+import { SimulationController } from "@/components/oversight/SimulationController";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useDriftAlerts, useDriftAlertStats, DriftAlert } from "@/hooks/useDriftAlerts";
 import { useModels, Model } from "@/hooks/useModels";
@@ -43,6 +45,20 @@ export default function Observability() {
   
   const [realtimeCount, setRealtimeCount] = useState(0);
   const [newAlertBadge, setNewAlertBadge] = useState(false);
+  const [processingEvents, setProcessingEvents] = useState(false);
+
+  // Events count query
+  const { data: eventsCount, refetch: refetchEvents } = useQuery({
+    queryKey: ['events-raw-count'],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('events_raw')
+        .select('*', { count: 'exact', head: true })
+        .eq('processed', false);
+      if (error) return 0;
+      return count || 0;
+    },
+  });
 
   // Supabase Realtime subscriptions
   useEffect(() => {
@@ -146,11 +162,29 @@ export default function Observability() {
     refetchMetrics();
     refetchHealth();
     refetchModels();
+    refetchEvents();
     setNewAlertBadge(false);
     toast.success("Dashboard refreshed");
   };
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'realtime' | 'drift' | 'assistant'>('dashboard');
+  const handleProcessEvents = async () => {
+    setProcessingEvents(true);
+    try {
+      const { error } = await supabase.functions.invoke('process-events', {
+        body: { batch_size: 500 }
+      });
+      if (error) throw error;
+      toast.success("Events processed successfully");
+      refetchEvents();
+      refetchMetrics();
+    } catch (error) {
+      toast.error("Failed to process events");
+    } finally {
+      setProcessingEvents(false);
+    }
+  };
+
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'oversight' | 'realtime' | 'drift' | 'assistant'>('dashboard');
 
   return (
     <MainLayout 
@@ -180,6 +214,7 @@ export default function Observability() {
       <div className="flex items-center gap-2 mb-6 border-b border-border pb-4">
         {[
           { id: 'dashboard', label: 'Dashboard', icon: Activity },
+          { id: 'oversight', label: 'Oversight Agent', icon: Cpu },
           { id: 'assistant', label: 'AI Assistant', icon: Bot },
           { id: 'realtime', label: 'Real-Time Chat', icon: MessageSquare },
           { id: 'drift', label: 'Drift Detection', icon: TrendingUp },
@@ -196,6 +231,43 @@ export default function Observability() {
           </Button>
         ))}
       </div>
+
+      {activeTab === 'oversight' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <MetricCard
+              title="Pending Events"
+              value={(eventsCount || 0).toString()}
+              subtitle="Awaiting processing"
+              icon={<Cpu className="w-4 h-4 text-primary" />}
+            />
+            <MetricCard
+              title="Processing Status"
+              value={processingEvents ? "Running" : "Idle"}
+              subtitle="Event processor"
+              icon={<Activity className="w-4 h-4 text-muted-foreground" />}
+            />
+            <div className="bg-card border border-border rounded-xl p-4 flex flex-col justify-center items-center gap-2">
+              <Button 
+                onClick={handleProcessEvents}
+                disabled={processingEvents || (eventsCount || 0) === 0}
+                className="w-full"
+              >
+                {processingEvents ? (
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Zap className="w-4 h-4 mr-2" />
+                )}
+                Process Pending Events
+              </Button>
+              <p className="text-xs text-muted-foreground text-center">
+                Trigger alert generation from raw events
+              </p>
+            </div>
+          </div>
+          <SimulationController />
+        </div>
+      )}
 
       {activeTab === 'assistant' && <RAIAssistant currentPage="Observability" />}
       {activeTab === 'realtime' && <RealtimeChatDemo />}

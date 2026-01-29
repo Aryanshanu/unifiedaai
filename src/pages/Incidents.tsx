@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   AlertTriangle, 
   Search, 
@@ -18,8 +19,12 @@ import {
   Radio,
   Archive,
   Trash2,
-  Eye
+  Eye,
+  PlayCircle,
+  RefreshCw,
+  FileCheck
 } from "lucide-react";
+import { BulkResolutionPanel } from "@/components/incidents/BulkResolutionPanel";
 import { cn } from "@/lib/utils";
 import { useIncidents, useIncidentStats, useUpdateIncident, useBulkArchiveIncidents, useBulkResolveIncidents, Incident } from "@/hooks/useIncidents";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -59,6 +64,7 @@ export default function Incidents() {
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [showArchiveDialog, setShowArchiveDialog] = useState(false);
   const [archiveOptions, setArchiveOptions] = useState({ olderThanDays: 30, status: 'open' as const });
+  const [runningLifecycle, setRunningLifecycle] = useState(false);
   const queryClient = useQueryClient();
   
   const { data: incidents, isLoading } = useIncidents();
@@ -136,12 +142,43 @@ export default function Incidents() {
     }
   };
 
+  const handleRunLifecycleCheck = async () => {
+    setRunningLifecycle(true);
+    try {
+      const { error } = await supabase.functions.invoke('incident-lifecycle', {
+        body: { action: 'check_sla' }
+      });
+      if (error) throw error;
+      toast.success("Lifecycle check complete");
+      queryClient.invalidateQueries({ queryKey: ['incidents'] });
+      queryClient.invalidateQueries({ queryKey: ['incident-stats'] });
+    } catch (error) {
+      toast.error("Lifecycle check failed");
+    } finally {
+      setRunningLifecycle(false);
+    }
+  };
+
   return (
     <MainLayout 
       title="Incidents" 
       subtitle="Track and manage security and safety incidents"
       headerActions={
         <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRunLifecycleCheck}
+            disabled={runningLifecycle}
+            className="gap-1.5"
+          >
+            {runningLifecycle ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : (
+              <PlayCircle className="w-4 h-4" />
+            )}
+            Run Lifecycle Check
+          </Button>
           <Badge variant="outline" className="bg-success/10 text-success border-success/30 gap-1.5">
             <Radio className="w-3 h-3 animate-pulse" />
             Realtime Active
@@ -154,6 +191,13 @@ export default function Incidents() {
         </div>
       }
     >
+      <Tabs defaultValue="list" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="list">Incident List</TabsTrigger>
+          <TabsTrigger value="bulk">Bulk Resolution</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="list">
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <MetricCard
@@ -456,6 +500,18 @@ export default function Incidents() {
           )}
         </DialogContent>
       </Dialog>
+
+        </TabsContent>
+
+        <TabsContent value="bulk">
+          <BulkResolutionPanel 
+            onComplete={() => {
+              queryClient.invalidateQueries({ queryKey: ['incidents'] });
+              queryClient.invalidateQueries({ queryKey: ['incident-stats'] });
+            }} 
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Bulk Archive Dialog */}
       <Dialog open={showArchiveDialog} onOpenChange={setShowArchiveDialog}>

@@ -14,11 +14,13 @@ import {
   ArrowLeft, Play, Square, RotateCcw, Download, Printer, 
   CheckCircle2, AlertTriangle, XCircle, Info, Loader2,
   Zap, Eye, Route, Settings2, Clock, FileJson, FileText,
-  Shield, Activity, Users, AlertCircle, BarChart3
+  Shield, Activity, Users, AlertCircle, BarChart3, Cpu
 } from "lucide-react";
 import { useProjects } from "@/hooks/useProjects";
 import { useProjectModels } from "@/hooks/useModels";
 import { useGoldenDemoOrchestrator, DemoMode, DemoLog } from "@/hooks/useGoldenDemoOrchestrator";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
 const MODE_OPTIONS = [
@@ -85,10 +87,25 @@ export default function GoldenDemoV2() {
   const [selectedModelId, setSelectedModelId] = useState<string>("");
   const [selectedMode, setSelectedMode] = useState<DemoMode>('single-page');
   const [generateScorecard, setGenerateScorecard] = useState(true);
+  const [selectedScenario, setSelectedScenario] = useState<string>("");
   
   // Data
   const { data: projects, isLoading: projectsLoading } = useProjects();
   const { data: models, isLoading: modelsLoading } = useProjectModels(selectedProjectId);
+
+  // Demo scenarios query
+  const { data: demoScenarios } = useQuery({
+    queryKey: ['demo-scenarios'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('demo_scenarios')
+        .select('*')
+        .eq('enabled', true)
+        .order('category');
+      if (error) return [];
+      return data || [];
+    },
+  });
   
   // Orchestrator
   const orchestrator = useGoldenDemoOrchestrator();
@@ -232,6 +249,34 @@ export default function GoldenDemoV2() {
 
           <Separator />
 
+          {/* Demo Scenario Selection */}
+          {demoScenarios && demoScenarios.length > 0 && (
+            <div className="space-y-2">
+              <Label>Demo Scenario (Optional)</Label>
+              <Select value={selectedScenario} onValueChange={setSelectedScenario}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Use default demo flow" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Default Flow</SelectItem>
+                  {demoScenarios.map((s: any) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      <div className="flex items-center gap-2">
+                        <span>{s.scenario_name}</span>
+                        <Badge variant="outline" className="text-xs">{s.category}</Badge>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Pre-configured scenarios for specific demonstration use cases
+              </p>
+            </div>
+          )}
+
+          <Separator />
+
           {/* Options */}
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
@@ -272,6 +317,18 @@ export default function GoldenDemoV2() {
             <li>Detect drift in model behavior</li>
             <li>Create incidents and escalate to HITL review</li>
             <li>Run Red Team adversarial campaign</li>
+            <li className="flex items-center gap-2">
+              <Cpu className="w-4 h-4 text-primary" />
+              Run Oversight Agent simulation (new)
+            </li>
+            <li className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-primary" />
+              Execute Predictive Governance analysis (new)
+            </li>
+            <li className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-primary" />
+              Check for Governance Bypass attempts (new)
+            </li>
             <li>Generate regulatory-grade compliance scorecard</li>
           </ol>
         </CardContent>
