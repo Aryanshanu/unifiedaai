@@ -269,6 +269,42 @@ export type Database = {
         }
         Relationships: []
       }
+      auto_approval_policies: {
+        Row: {
+          auto_action: string | null
+          created_at: string | null
+          enabled: boolean | null
+          id: string
+          max_risk_score: number | null
+          policy_name: string
+          requires_audit_log: boolean | null
+          review_type_filter: string[] | null
+          severity_filter: string[] | null
+        }
+        Insert: {
+          auto_action?: string | null
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          max_risk_score?: number | null
+          policy_name: string
+          requires_audit_log?: boolean | null
+          review_type_filter?: string[] | null
+          severity_filter?: string[] | null
+        }
+        Update: {
+          auto_action?: string | null
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          max_risk_score?: number | null
+          policy_name?: string
+          requires_audit_log?: boolean | null
+          review_type_filter?: string[] | null
+          severity_filter?: string[] | null
+        }
+        Relationships: []
+      }
       automated_test_cases: {
         Row: {
           attack_objective: string[] | null
@@ -1402,6 +1438,42 @@ export type Database = {
           },
         ]
       }
+      demo_scenarios: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          description: string | null
+          duration_seconds: number | null
+          enabled: boolean | null
+          expected_outcomes: Json | null
+          id: string
+          scenario_name: string
+          steps: Json
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          duration_seconds?: number | null
+          enabled?: boolean | null
+          expected_outcomes?: Json | null
+          id?: string
+          scenario_name: string
+          steps: Json
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          duration_seconds?: number | null
+          enabled?: boolean | null
+          expected_outcomes?: Json | null
+          id?: string
+          scenario_name?: string
+          steps?: Json
+        }
+        Relationships: []
+      }
       deployment_attestations: {
         Row: {
           approved_artifact_hash: string | null
@@ -2161,6 +2233,39 @@ export type Database = {
           },
         ]
       }
+      function_metrics: {
+        Row: {
+          cold_start_count: number | null
+          error_count: number | null
+          function_name: string
+          id: string
+          invocation_count: number | null
+          measurement_window: string | null
+          recorded_at: string | null
+          total_latency_ms: number | null
+        }
+        Insert: {
+          cold_start_count?: number | null
+          error_count?: number | null
+          function_name: string
+          id?: string
+          invocation_count?: number | null
+          measurement_window?: string | null
+          recorded_at?: string | null
+          total_latency_ms?: number | null
+        }
+        Update: {
+          cold_start_count?: number | null
+          error_count?: number | null
+          function_name?: string
+          id?: string
+          invocation_count?: number | null
+          measurement_window?: string | null
+          recorded_at?: string | null
+          total_latency_ms?: number | null
+        }
+        Relationships: []
+      }
       gateway_config: {
         Row: {
           config_key: string
@@ -2388,9 +2493,12 @@ export type Database = {
           description: string | null
           detected_at: string | null
           evidence_url: string | null
+          follow_up_date: string | null
           id: string
           incident_type: string
           model_id: string | null
+          rca_completed_at: string | null
+          rca_template_id: string | null
           resolved_at: string | null
           resolved_by: string | null
           severity: Database["public"]["Enums"]["severity_level"]
@@ -2405,9 +2513,12 @@ export type Database = {
           description?: string | null
           detected_at?: string | null
           evidence_url?: string | null
+          follow_up_date?: string | null
           id?: string
           incident_type: string
           model_id?: string | null
+          rca_completed_at?: string | null
+          rca_template_id?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
           severity?: Database["public"]["Enums"]["severity_level"]
@@ -2422,9 +2533,12 @@ export type Database = {
           description?: string | null
           detected_at?: string | null
           evidence_url?: string | null
+          follow_up_date?: string | null
           id?: string
           incident_type?: string
           model_id?: string | null
+          rca_completed_at?: string | null
+          rca_template_id?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
           severity?: Database["public"]["Enums"]["severity_level"]
@@ -2437,6 +2551,13 @@ export type Database = {
             columns: ["model_id"]
             isOneToOne: false
             referencedRelation: "models"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incidents_rca_template_id_fkey"
+            columns: ["rca_template_id"]
+            isOneToOne: false
+            referencedRelation: "rca_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -2968,6 +3089,74 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_config: {
+        Row: {
+          category: string
+          config_key: string
+          config_value: Json
+          description: string | null
+          id: string
+          updated_at: string | null
+          updated_by: string | null
+          version: number | null
+        }
+        Insert: {
+          category: string
+          config_key: string
+          config_value: Json
+          description?: string | null
+          id?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          version?: number | null
+        }
+        Update: {
+          category?: string
+          config_key?: string
+          config_value?: Json
+          description?: string | null
+          id?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          version?: number | null
+        }
+        Relationships: []
+      }
+      platform_config_history: {
+        Row: {
+          changed_at: string | null
+          changed_by: string | null
+          config_id: string | null
+          id: string
+          new_value: Json | null
+          previous_value: Json | null
+        }
+        Insert: {
+          changed_at?: string | null
+          changed_by?: string | null
+          config_id?: string | null
+          id?: string
+          new_value?: Json | null
+          previous_value?: Json | null
+        }
+        Update: {
+          changed_at?: string | null
+          changed_by?: string | null
+          config_id?: string | null
+          id?: string
+          new_value?: Json | null
+          previous_value?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_config_history_config_id_fkey"
+            columns: ["config_id"]
+            isOneToOne: false
+            referencedRelation: "platform_config"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       policy_packs: {
         Row: {
           created_at: string
@@ -3001,6 +3190,39 @@ export type Database = {
           status?: Database["public"]["Enums"]["policy_status"]
           updated_at?: string
           version?: string
+        }
+        Relationships: []
+      }
+      policy_versions: {
+        Row: {
+          content: Json
+          created_at: string | null
+          created_by: string | null
+          id: string
+          policy_id: string
+          validated: boolean | null
+          validation_errors: Json | null
+          version: number
+        }
+        Insert: {
+          content: Json
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          policy_id: string
+          validated?: boolean | null
+          validation_errors?: Json | null
+          version: number
+        }
+        Update: {
+          content?: Json
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          policy_id?: string
+          validated?: boolean | null
+          validation_errors?: Json | null
+          version?: number
         }
         Relationships: []
       }
@@ -3104,6 +3326,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      predictive_governance: {
+        Row: {
+          confidence: number
+          created_at: string | null
+          entity_id: string
+          entity_type: string | null
+          factors: Json | null
+          id: string
+          predicted_timeframe_hours: number | null
+          prediction_type: string | null
+          risk_score: number
+        }
+        Insert: {
+          confidence: number
+          created_at?: string | null
+          entity_id: string
+          entity_type?: string | null
+          factors?: Json | null
+          id?: string
+          predicted_timeframe_hours?: number | null
+          prediction_type?: string | null
+          risk_score: number
+        }
+        Update: {
+          confidence?: number
+          created_at?: string | null
+          entity_id?: string
+          entity_type?: string | null
+          factors?: Json | null
+          id?: string
+          predicted_timeframe_hours?: number | null
+          prediction_type?: string | null
+          risk_score?: number
+        }
+        Relationships: []
       }
       processing_queue: {
         Row: {
@@ -3373,6 +3631,30 @@ export type Database = {
           identifier?: string
           window_ms?: number
           window_start?: string
+        }
+        Relationships: []
+      }
+      rca_templates: {
+        Row: {
+          created_at: string | null
+          id: string
+          incident_type: string
+          required_fields: string[] | null
+          template_content: Json
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          incident_type: string
+          required_fields?: string[] | null
+          template_content: Json
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          incident_type?: string
+          required_fields?: string[] | null
+          template_content?: Json
         }
         Relationships: []
       }

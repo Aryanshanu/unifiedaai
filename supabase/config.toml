@@ -125,3 +125,21 @@ verify_jwt = false
 
 [functions.process-events]
 verify_jwt = false
+
+[functions.generate-synthetic-events]
+verify_jwt = false
+
+[functions.hitl-auto-assist]
+verify_jwt = false
+
+[functions.incident-lifecycle]
+verify_jwt = false
+
+[functions.predictive-governance]
+verify_jwt = false
+
+[functions.policy-lint]
+verify_jwt = false
+
+[functions.detect-governance-bypass]
+verify_jwt = false
