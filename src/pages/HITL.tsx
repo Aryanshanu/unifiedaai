@@ -2,13 +2,15 @@ import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { Button } from "@/components/ui/button";
-import { Users, Clock, AlertTriangle, CheckCircle, ChevronRight, RefreshCw } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Users, Clock, AlertTriangle, CheckCircle, ChevronRight, RefreshCw, Bot, ListChecks } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useReviewQueue, useReviewQueueStats, ReviewItem } from "@/hooks/useReviewQueue";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
 import { ReviewDecisionDialog } from "@/components/hitl/ReviewDecisionDialog";
 import { SLACountdown } from "@/components/hitl/SLACountdown";
+import { BulkTriagePanel } from "@/components/hitl/BulkTriagePanel";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { EnforcementBadge } from "@/components/shared/EnforcementBadge";
@@ -128,104 +130,123 @@ export default function HITL() {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Review Queue */}
-        <div className="lg:col-span-2">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-risk-high" />
-              Review Queue
-            </h2>
-            <Button variant="ghost" size="sm" onClick={handleRefresh}>
-              <RefreshCw className="w-4 h-4" />
-            </Button>
-          </div>
+      <Tabs defaultValue="queue" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="queue" className="gap-2">
+            <AlertTriangle className="w-4 h-4" />
+            Review Queue
+          </TabsTrigger>
+          <TabsTrigger value="bulk" className="gap-2">
+            <ListChecks className="w-4 h-4" />
+            Bulk Triage
+          </TabsTrigger>
+        </TabsList>
 
-          {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="bg-card border border-border rounded-xl p-4">
-                  <div className="flex items-start gap-4">
-                    <Skeleton className="w-10 h-10 rounded-lg" />
-                    <div className="flex-1">
-                      <Skeleton className="h-4 w-24 mb-2" />
-                      <Skeleton className="h-5 w-48 mb-2" />
-                      <Skeleton className="h-3 w-32" />
+        <TabsContent value="queue">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Review Queue */}
+            <div className="lg:col-span-2">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-risk-high" />
+                  Review Queue
+                </h2>
+                <Button variant="ghost" size="sm" onClick={handleRefresh}>
+                  <RefreshCw className="w-4 h-4" />
+                </Button>
+              </div>
+
+              {isLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="bg-card border border-border rounded-xl p-4">
+                      <div className="flex items-start gap-4">
+                        <Skeleton className="w-10 h-10 rounded-lg" />
+                        <div className="flex-1">
+                          <Skeleton className="h-4 w-24 mb-2" />
+                          <Skeleton className="h-5 w-48 mb-2" />
+                          <Skeleton className="h-3 w-32" />
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
+              ) : pendingReviews.length === 0 ? (
+                <div className="text-center py-12 bg-card border border-border rounded-xl">
+                  <CheckCircle className="w-12 h-12 text-success mx-auto mb-4" />
+                  <p className="text-foreground font-medium">Queue Clear</p>
+                  <p className="text-sm text-muted-foreground mt-1">No pending reviews</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {pendingReviews.map((review) => (
+                    <ReviewCard key={review.id} review={review} onClick={() => handleReviewClick(review)} />
+                  ))}
+                </div>
+              )}
             </div>
-          ) : pendingReviews.length === 0 ? (
-            <div className="text-center py-12 bg-card border border-border rounded-xl">
-              <CheckCircle className="w-12 h-12 text-success mx-auto mb-4" />
-              <p className="text-foreground font-medium">Queue Clear</p>
-              <p className="text-sm text-muted-foreground mt-1">No pending reviews</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {pendingReviews.map((review) => (
-                <ReviewCard key={review.id} review={review} onClick={() => handleReviewClick(review)} />
-              ))}
-            </div>
-          )}
-        </div>
 
-        {/* Right Column */}
-        <div>
-          {/* Recent Decisions */}
-          <h2 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-            <CheckCircle className="w-4 h-4 text-success" />
-            Recent Decisions
-          </h2>
+            {/* Right Column */}
+            <div>
+              {/* Recent Decisions */}
+              <h2 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-success" />
+                Recent Decisions
+              </h2>
 
-          <div className="bg-card border border-border rounded-xl p-4 mb-6">
-            {recentDecisions.length > 0 ? (
-              <div className="space-y-4">
-                {recentDecisions.map((decision) => (
-                  <div key={decision.id} className="pb-4 border-b border-border last:border-0 last:pb-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-mono text-muted-foreground">{decision.id.slice(0, 8)}</span>
-                      <span className={cn(
-                        "text-xs font-medium",
-                        decision.status === "approved" ? "text-success" : "text-risk-critical"
-                      )}>
-                        {decision.status === "approved" ? "Authorized" : "Denied"}
-                      </span>
-                    </div>
-                    <p className="text-sm font-medium text-foreground">{decision.title}</p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                      <span>{decision.review_type}</span>
-                      <span>•</span>
-                      <span>{formatDistanceToNow(new Date(decision.updated_at), { addSuffix: true })}</span>
-                    </div>
+              <div className="bg-card border border-border rounded-xl p-4 mb-6">
+                {recentDecisions.length > 0 ? (
+                  <div className="space-y-4">
+                    {recentDecisions.map((decision) => (
+                      <div key={decision.id} className="pb-4 border-b border-border last:border-0 last:pb-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-mono text-muted-foreground">{decision.id.slice(0, 8)}</span>
+                          <span className={cn(
+                            "text-xs font-medium",
+                            decision.status === "approved" ? "text-success" : "text-risk-critical"
+                          )}>
+                            {decision.status === "approved" ? "Authorized" : "Denied"}
+                          </span>
+                        </div>
+                        <p className="text-sm font-medium text-foreground">{decision.title}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                          <span>{decision.review_type}</span>
+                          <span>•</span>
+                          <span>{formatDistanceToNow(new Date(decision.updated_at), { addSuffix: true })}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">No recent decisions</p>
+                )}
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">No recent decisions</p>
-            )}
-          </div>
 
-          {/* Queue Distribution */}
-          <div className="bg-card border border-border rounded-xl p-4">
-            <h3 className="text-sm font-semibold text-foreground mb-4">Queue Distribution</h3>
-            {distributionItems.length > 0 ? (
-              <div className="space-y-3">
-                {distributionItems.map((item) => (
-                  <div key={item.label} className="flex items-center gap-3">
-                    <div className={cn("w-2 h-2 rounded-full", item.color)} />
-                    <span className="text-sm text-muted-foreground flex-1 capitalize">{item.label}</span>
-                    <span className="text-sm font-mono text-foreground">{item.count}</span>
+              {/* Queue Distribution */}
+              <div className="bg-card border border-border rounded-xl p-4">
+                <h3 className="text-sm font-semibold text-foreground mb-4">Queue Distribution</h3>
+                {distributionItems.length > 0 ? (
+                  <div className="space-y-3">
+                    {distributionItems.map((item) => (
+                      <div key={item.label} className="flex items-center gap-3">
+                        <div className={cn("w-2 h-2 rounded-full", item.color)} />
+                        <span className="text-sm text-muted-foreground flex-1 capitalize">{item.label}</span>
+                        <span className="text-sm font-mono text-foreground">{item.count}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">No items in queue</p>
+                )}
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">No items in queue</p>
-            )}
+            </div>
           </div>
-        </div>
-      </div>
+        </TabsContent>
+
+        <TabsContent value="bulk">
+          <BulkTriagePanel onComplete={() => { refetch(); refetchStats(); }} />
+        </TabsContent>
+      </Tabs>
       
       {/* Decision Dialog */}
       <ReviewDecisionDialog 

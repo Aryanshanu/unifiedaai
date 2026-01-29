@@ -10,9 +10,12 @@ import { IncidentSummaryCard } from "@/components/dashboard/IncidentSummaryCard"
 import { FeedbackLoopDiagram } from "@/components/monitoring/FeedbackLoopDiagram";
 import { SLODashboard } from "@/components/dashboard/SLODashboard";
 import { OversightAgentStatus } from "@/components/dashboard/OversightAgentStatus";
+import { SimulationController } from "@/components/oversight/SimulationController";
+import { PredictiveRiskPanel } from "@/components/dashboard/PredictiveRiskPanel";
 import { useUnsafeDeployments, usePlatformMetrics } from "@/hooks/usePlatformMetrics";
 import { useGovernanceMetrics } from "@/hooks/useGovernanceMetrics";
-import { Database, Scale, AlertCircle, ShieldAlert, Lock, Eye, AlertOctagon, ArrowRight, Shield, AlertTriangle } from "lucide-react";
+import { useHighRiskPredictions } from "@/hooks/usePredictiveGovernance";
+import { Database, Scale, AlertCircle, ShieldAlert, Lock, Eye, AlertOctagon, ArrowRight, Shield, AlertTriangle, Brain, Zap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { HealthIndicator } from "@/components/shared/HealthIndicator";
 import { useDataHealth } from "@/components/shared/DataHealthWrapper";
@@ -20,6 +23,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 
 export default function Index() {
   const [realtimeActive, setRealtimeActive] = useState(false);
@@ -28,11 +32,26 @@ export default function Index() {
   const { data: unsafeDeployments, isLoading: deploymentsLoading } = useUnsafeDeployments();
   const { data: metrics, isLoading: metricsLoading, isError: metricsError, refetch: refetchMetrics } = usePlatformMetrics();
   const { data: governanceMetrics } = useGovernanceMetrics();
+  const { data: highRiskPredictions } = useHighRiskPredictions(3);
   const navigate = useNavigate();
   
   const isLoading = modelsLoading || deploymentsLoading || metricsLoading;
   const isError = modelsError || metricsError;
   const { status, lastUpdated } = useDataHealth(isLoading, isError);
+  
+  // Events count for oversight agent
+  const { data: eventsCount } = useQuery({
+    queryKey: ['events-raw-count'],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('events_raw')
+        .select('*', { count: 'exact', head: true })
+        .eq('processed', false);
+      if (error) return 0;
+      return count || 0;
+    },
+    refetchInterval: 30000,
+  });
   
   // Realtime subscription for dashboard data
   useEffect(() => {
@@ -75,6 +94,20 @@ export default function Index() {
         () => {
           setRealtimeActive(true);
           queryClient.invalidateQueries({ queryKey: ['models'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'events_raw' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['events-raw-count'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'predictive_governance' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['predictive-high-risk'] });
         }
       )
       .subscribe();
@@ -140,6 +173,28 @@ export default function Index() {
         </div>
       }
     >
+      {/* High-Risk Predictions Alert */}
+      {highRiskPredictions && highRiskPredictions.length > 0 && (
+        <div className="p-4 mb-6 rounded-xl border-2 border-warning bg-warning/5 flex items-start gap-4">
+          <Brain className="h-6 w-6 text-warning shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="font-semibold text-warning">Predictive Risk Alert</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              {highRiskPredictions.length} high-risk prediction(s) detected. Review predictive governance insights.
+            </p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="mt-3 border-warning/50 text-warning hover:bg-warning/10"
+              onClick={() => navigate("/configuration")}
+            >
+              View Predictions
+              <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Unsafe Deployment Alert */}
       {(unsafeDeployments?.length || 0) > 0 && (
         <div className="p-4 mb-6 rounded-xl border-2 border-destructive bg-destructive/5 flex items-start gap-4">
@@ -173,6 +228,23 @@ export default function Index() {
           <SLODashboard />
         </div>
         <OversightAgentStatus />
+      </div>
+
+      {/* Oversight Agent & Predictive Governance */}
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+          <Zap className="w-5 h-5 text-primary" />
+          Oversight Agent
+          {eventsCount !== undefined && eventsCount > 0 && (
+            <Badge variant="outline" className="text-warning border-warning/30">
+              {eventsCount} pending events
+            </Badge>
+          )}
+        </h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <SimulationController />
+          <PredictiveRiskPanel />
+        </div>
       </div>
 
       {/* Incident Summary and Feedback Loop - Side by Side */}
