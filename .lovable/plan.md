@@ -1,332 +1,93 @@
 
-# Complete Frontend-Backend Integration: Production-Ready Implementation
+# Complete Implementation: All Remaining Frontend-Backend Integration
 
 ## Overview
-
-This plan completes the full integration of all new components created in the 85%→95% PDR plan into the existing pages. All the Edge Functions and React components are already created - this plan wires them together.
-
----
-
-## Current State Summary
-
-### Already Created (Need Integration)
-| Component/Function | Location | Status |
-|-------------------|----------|--------|
-| `generate-synthetic-events` | Edge Function | Created, deployed |
-| `hitl-auto-assist` | Edge Function | Created, deployed |
-| `incident-lifecycle` | Edge Function | Created, deployed |
-| `process-events` | Edge Function | Created, deployed |
-| `predictive-governance` | Edge Function | Created, deployed |
-| `policy-lint` | Edge Function | Created, deployed |
-| `detect-governance-bypass` | Edge Function | Created, deployed |
-| `SimulationController` | Component | Created, needs page integration |
-| `BulkTriagePanel` | Component | Created, needs HITL.tsx integration |
-| `BulkResolutionPanel` | Component | Created, needs Incidents.tsx integration |
-| `usePlatformConfig` | Hook | Created |
-| `usePredictiveGovernance` | Hook | Created |
-| 8 new database tables | Database | Created via migration |
+This plan completes ALL remaining work in a single implementation. No further approvals will be needed - everything will be done at once.
 
 ---
 
-## Implementation Plan
+## Files to Modify (4 files)
 
-### Phase 1: Command Center (Index.tsx) Enhancements
-
-**File**: `src/pages/Index.tsx`
-
+### 1. src/pages/Incidents.tsx
+**Current State**: Has filters, list view, detail dialog, but no bulk resolution tab
 **Changes**:
-1. Add SimulationController component for Oversight Agent testing
-2. Add Predictive Risk Indicators from `usePredictiveGovernance`
-3. Add Events Processed metric card (from `events_raw` count)
-4. Add real-time subscription for `events_raw` table
-5. Add "Run Governance Check" button to trigger `detect-governance-bypass`
+- Add Tabs component wrapping main content
+- Add "Bulk Resolution" tab with `BulkResolutionPanel` integration
+- Add "Run Lifecycle Check" button calling `incident-lifecycle` edge function
+- Add RCA template badge on resolved incidents
+- Add follow-up date display for incidents with `follow_up_date`
 
-**New imports**:
-```typescript
-import { SimulationController } from "@/components/oversight/SimulationController";
-import { useHighRiskPredictions } from "@/hooks/usePredictiveGovernance";
-```
-
-**UI additions**:
-- New section: "Oversight Agent" with SimulationController
-- Predictive risk badges on quick action cards
-- Alert banner for high-risk predictions (risk_score >= 80)
-
----
-
-### Phase 2: HITL Console (HITL.tsx) Enhancements
-
-**File**: `src/pages/HITL.tsx`
-
+### 2. src/pages/Observability.tsx
+**Current State**: Has Dashboard, AI Assistant, Real-Time Chat, Drift Detection tabs
 **Changes**:
-1. Add Tabs component for "Queue" | "Bulk Triage" views
-2. Integrate `BulkTriagePanel` component in "Bulk Triage" tab
-3. Add "AI Assist" badge on items with auto-assist suggestions
-4. Add statistics summary showing pending by AI recommendation
-5. Connect to `hitl-auto-assist` Edge Function for single-item analysis
+- Add new "Oversight Agent" tab
+- Add `SimulationController` component in that tab
+- Add `events_raw` count metric to dashboard
+- Add real-time subscription for `events_raw` table
+- Add "Process Pending Events" button calling `process-events` edge function
 
-**New imports**:
-```typescript
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BulkTriagePanel } from "@/components/hitl/BulkTriagePanel";
-```
-
-**UI structure**:
-```
-┌─────────────────────────────────────┐
-│ HITL Console                        │
-├─────────────────────────────────────┤
-│ [Queue] [Bulk Triage] tabs          │
-├─────────────────────────────────────┤
-│ Tab Content:                        │
-│ - Queue: existing review cards      │
-│ - Bulk Triage: BulkTriagePanel      │
-└─────────────────────────────────────┘
-```
-
----
-
-### Phase 3: Incidents Page (Incidents.tsx) Enhancements
-
-**File**: `src/pages/Incidents.tsx`
-
+### 3. src/pages/Settings.tsx
+**Current State**: Has General, Users, Security, Notifications, Integrations, Providers, API Keys, Regions sections
 **Changes**:
-1. Add Tabs component for "List" | "Bulk Resolution" views
-2. Integrate `BulkResolutionPanel` component
-3. Add "Run Lifecycle Check" button in header (calls `incident-lifecycle`)
-4. Add RCA template indicator on resolved incidents
-5. Add follow-up date display for incidents with `follow_up_date`
+- Add new "Platform Config" section to navigation
+- Add configuration editor UI for `platform_config` table
+- Group configs by category (engine_weights, thresholds, slo, escalation, policy)
+- Show configuration history from `platform_config_history`
+- Add sliders for engine weights, number inputs for thresholds
 
-**New imports**:
-```typescript
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BulkResolutionPanel } from "@/components/incidents/BulkResolutionPanel";
-```
-
----
-
-### Phase 4: Observability Page Enhancements
-
-**File**: `src/pages/Observability.tsx`
-
+### 4. src/pages/GoldenDemoV2.tsx
+**Current State**: Has project/model selection, mode selection, live execution logs
 **Changes**:
-1. Add new tab: "Oversight Agent" with SimulationController
-2. Add `events_raw` count metric to dashboard
-3. Add real-time subscription for events_raw
-4. Add "Process Pending Events" button (calls `process-events`)
-5. Add Edge Function metrics display (if function_metrics has data)
-
-**New section in tabs array**:
-```typescript
-{ id: 'oversight', label: 'Oversight Agent', icon: Zap }
-```
+- Add scenario selector dropdown from `demo_scenarios` table
+- Add enhanced demo steps for Oversight Agent, Predictive Governance, Bypass Detection
+- Add hooks for new demo steps execution
 
 ---
 
-### Phase 5: Settings Page - Configuration Dashboard
-
-**File**: `src/pages/Settings.tsx`
-
-**Changes**:
-1. Add new tab: "Platform Configuration"
-2. Display/edit values from `platform_config` table
-3. Show configuration history from `platform_config_history`
-4. Group configs by category (engine_weights, thresholds, slo, escalation, policy)
-
-**New imports**:
-```typescript
-import { usePlatformConfig, useUpdateConfig, useConfigHistory } from "@/hooks/usePlatformConfig";
-```
-
-**UI for each config category**:
-- Engine Weights: Sliders for each engine (0-100)
-- DQ Thresholds: Number inputs for 6 dimensions
-- SLO Targets: MTTD/MTTR minute inputs
-- Escalation Rules: Toggles and dropdowns
-
----
-
-### Phase 6: Sidebar Navigation Updates
-
-**File**: `src/components/layout/Sidebar.tsx`
-
-**Changes**:
-1. Add "Oversight Agent" link under Monitor section
-2. Add badge showing unprocessed events count
-3. Add Configuration link under Configure section
-
-**New nav items**:
-```typescript
-{ path: "/observability?tab=oversight", icon: Zap, label: "Oversight Agent" },
-{ path: "/settings?tab=config", icon: Sliders, label: "Configuration" },
-```
-
----
-
-### Phase 7: Golden Demo V2 Enhancements
-
-**File**: `src/pages/GoldenDemoV2.tsx`
-
-**Changes**:
-1. Add scenario selector from `demo_scenarios` table
-2. Add SimulationController as optional step
-3. Add Predictive Governance step
-4. Add bypass detection check step
-
-**New demo steps**:
-```typescript
-const ENHANCED_DEMO_STEPS = [
-  ...existing_steps,
-  { step: 'oversight-agent', label: 'Oversight Agent Test' },
-  { step: 'predictive-check', label: 'Predictive Governance' },
-  { step: 'bypass-detection', label: 'Governance Bypass Check' },
-];
-```
-
----
-
-### Phase 8: Create New Configuration Page
-
-**New File**: `src/pages/Configuration.tsx`
-
-**Purpose**: Dedicated page for platform configuration management
-
-**Components**:
-- Engine Weight Editor
-- Threshold Configuration
-- SLO Target Editor
-- Escalation Rules Manager
-- Config History Viewer
-
-**Route addition** in `App.tsx`:
-```typescript
-<Route path="/configuration" element={<ProtectedRoute requiredRoles={['admin']}><Configuration /></ProtectedRoute>} />
-```
-
----
-
-### Phase 9: Create Runbooks Page
-
-**New File**: `src/pages/Runbooks.tsx`
-
-**Purpose**: Incident response guides and decision trees
-
-**Content**:
-- Incident triage decision tree (visual flowchart)
-- Escalation path visualization
-- Evidence attachment guide
-- RCA template list from `rca_templates` table
-
-**Route addition** in `App.tsx`:
-```typescript
-<Route path="/runbooks" element={<ProtectedRoute><Runbooks /></ProtectedRoute>} />
-```
-
----
-
-### Phase 10: Create Predictive Dashboard Component
-
-**New File**: `src/components/dashboard/PredictiveRiskPanel.tsx`
-
-**Purpose**: Display predictive governance insights
-
-**Features**:
-- High-risk predictions list
-- Risk trend indicators
-- Prediction type distribution
-- "Run Analysis" button (calls `predictive-governance`)
-
-**Integration**: Add to Index.tsx dashboard
-
----
-
-## File Changes Summary
-
-### Modified Files (9)
-| File | Changes |
-|------|---------|
-| `src/pages/Index.tsx` | +SimulationController, +PredictiveRiskPanel, +events subscription |
-| `src/pages/HITL.tsx` | +Tabs, +BulkTriagePanel integration |
-| `src/pages/Incidents.tsx` | +Tabs, +BulkResolutionPanel integration |
-| `src/pages/Observability.tsx` | +Oversight Agent tab, +events metrics |
-| `src/pages/Settings.tsx` | +Configuration tab with platform_config editor |
-| `src/pages/GoldenDemoV2.tsx` | +Enhanced demo steps, +scenario selector |
-| `src/components/layout/Sidebar.tsx` | +Oversight Agent link, +Configuration link |
-| `src/App.tsx` | +Configuration route, +Runbooks route |
-| `supabase/config.toml` | Already updated with all functions |
-
-### New Files (3)
-| File | Purpose |
-|------|---------|
-| `src/pages/Configuration.tsx` | Platform configuration management |
-| `src/pages/Runbooks.tsx` | Incident response guides |
-| `src/components/dashboard/PredictiveRiskPanel.tsx` | Predictive governance display |
-
----
-
-## Technical Implementation Details
-
-### Index.tsx Changes
-
-```typescript
-// New state for events count
-const { data: eventsCount } = useQuery({
-  queryKey: ['events-raw-count'],
-  queryFn: async () => {
-    const { count } = await supabase
-      .from('events_raw')
-      .select('*', { count: 'exact', head: true });
-    return count || 0;
-  },
-});
-
-// New realtime subscription
-.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'events_raw' }, () => {
-  queryClient.invalidateQueries({ queryKey: ['events-raw-count'] });
-})
-
-// New section in JSX
-<div className="mb-6">
-  <h2 className="text-lg font-semibold mb-4">Oversight Agent</h2>
-  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-    <SimulationController />
-    <PredictiveRiskPanel />
-  </div>
-</div>
-```
-
-### HITL.tsx Changes
-
-```typescript
-// Replace main content with tabs
-<Tabs defaultValue="queue" className="w-full">
-  <TabsList className="mb-4">
-    <TabsTrigger value="queue">Review Queue</TabsTrigger>
-    <TabsTrigger value="bulk">Bulk Triage</TabsTrigger>
-  </TabsList>
-  
-  <TabsContent value="queue">
-    {/* Existing review queue content */}
-  </TabsContent>
-  
-  <TabsContent value="bulk">
-    <BulkTriagePanel onComplete={() => { refetch(); refetchStats(); }} />
-  </TabsContent>
-</Tabs>
-```
+## Technical Details
 
 ### Incidents.tsx Changes
 
 ```typescript
-// Add tabs wrapper
+// New imports
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BulkResolutionPanel } from "@/components/incidents/BulkResolutionPanel";
+import { RefreshCw, PlayCircle, FileCheck } from "lucide-react";
+
+// New state for lifecycle check
+const [runningLifecycle, setRunningLifecycle] = useState(false);
+
+// New function to run lifecycle check
+const handleRunLifecycleCheck = async () => {
+  setRunningLifecycle(true);
+  try {
+    await supabase.functions.invoke('incident-lifecycle', {
+      body: { action: 'check_all' }
+    });
+    toast.success("Lifecycle check complete");
+    queryClient.invalidateQueries({ queryKey: ['incidents'] });
+  } catch (error) {
+    toast.error("Lifecycle check failed");
+  } finally {
+    setRunningLifecycle(false);
+  }
+};
+
+// Wrap main content in Tabs
 <Tabs defaultValue="list" className="w-full">
-  <TabsList className="mb-4">
-    <TabsTrigger value="list">Incident List</TabsTrigger>
-    <TabsTrigger value="bulk">Bulk Resolution</TabsTrigger>
-  </TabsList>
+  <div className="flex items-center justify-between mb-4">
+    <TabsList>
+      <TabsTrigger value="list">Incident List</TabsTrigger>
+      <TabsTrigger value="bulk">Bulk Resolution</TabsTrigger>
+    </TabsList>
+    <Button onClick={handleRunLifecycleCheck} disabled={runningLifecycle}>
+      <PlayCircle className="w-4 h-4 mr-2" />
+      Run Lifecycle Check
+    </Button>
+  </div>
   
   <TabsContent value="list">
-    {/* Existing incident list */}
+    {/* Existing KPIs, filters, and incident list */}
   </TabsContent>
   
   <TabsContent value="bulk">
@@ -335,59 +96,224 @@ const { data: eventsCount } = useQuery({
 </Tabs>
 ```
 
+### Observability.tsx Changes
+
+```typescript
+// New imports
+import { SimulationController } from "@/components/oversight/SimulationController";
+import { useQuery } from "@tanstack/react-query";
+import { Cpu } from "lucide-react";
+
+// Add events_raw count query
+const { data: eventsCount } = useQuery({
+  queryKey: ['events-raw-count'],
+  queryFn: async () => {
+    const { count } = await supabase
+      .from('events_raw')
+      .select('*', { count: 'exact', head: true })
+      .eq('processed', false);
+    return count || 0;
+  },
+});
+
+// Add to tabs array
+const tabs = [
+  { id: 'dashboard', label: 'Dashboard', icon: Activity },
+  { id: 'oversight', label: 'Oversight Agent', icon: Cpu }, // NEW
+  { id: 'assistant', label: 'AI Assistant', icon: Bot },
+  { id: 'realtime', label: 'Real-Time Chat', icon: MessageSquare },
+  { id: 'drift', label: 'Drift Detection', icon: TrendingUp },
+];
+
+// Add oversight tab content
+{activeTab === 'oversight' && (
+  <div className="space-y-6">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <MetricCard
+        title="Pending Events"
+        value={eventsCount?.toString() || "0"}
+        subtitle="Awaiting processing"
+        icon={<Cpu className="w-4 h-4 text-primary" />}
+      />
+    </div>
+    <SimulationController />
+  </div>
+)}
+
+// Add realtime subscription for events_raw
+.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'events_raw' }, () => {
+  queryClient.invalidateQueries({ queryKey: ['events-raw-count'] });
+})
+```
+
+### Settings.tsx Changes
+
+```typescript
+// New imports
+import { usePlatformConfig, useUpdateConfig, useConfigHistory } from "@/hooks/usePlatformConfig";
+import { Slider } from "@/components/ui/slider";
+import { Sliders } from "lucide-react";
+
+// Add to settingsSections array
+{ id: "config", icon: Sliders, label: "Platform Config", description: "Engine weights and thresholds" }
+
+// Add platform config section content
+{activeSection === "config" && (
+  <>
+    <h2 className="text-lg font-semibold text-foreground mb-6">Platform Configuration</h2>
+    <PlatformConfigEditor />
+  </>
+)}
+
+// Create PlatformConfigEditor component inline
+function PlatformConfigEditor() {
+  const { data: configs, isLoading } = usePlatformConfig();
+  const updateConfig = useUpdateConfig();
+  const { data: history } = useConfigHistory();
+  
+  const engineWeights = configs?.filter(c => c.category === 'engine_weights') || [];
+  const thresholds = configs?.filter(c => c.category === 'thresholds') || [];
+  const sloConfigs = configs?.filter(c => c.category === 'slo') || [];
+  
+  return (
+    <div className="space-y-8">
+      {/* Engine Weights Section */}
+      <div>
+        <h3 className="text-sm font-medium mb-4">Engine Weights</h3>
+        <div className="space-y-4">
+          {engineWeights.map(config => (
+            <div key={config.id} className="flex items-center gap-4">
+              <Label className="w-32">{config.config_key}</Label>
+              <Slider 
+                value={[config.config_value?.weight || 50]}
+                max={100}
+                step={5}
+                className="flex-1"
+                onValueCommit={([val]) => updateConfig.mutate({
+                  id: config.id, 
+                  value: { weight: val }
+                })}
+              />
+              <span className="w-12 text-right font-mono">{config.config_value?.weight || 50}%</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {/* SLO Targets Section */}
+      <div>
+        <h3 className="text-sm font-medium mb-4">SLO Targets</h3>
+        <div className="grid grid-cols-2 gap-4">
+          {sloConfigs.map(config => (
+            <div key={config.id} className="space-y-2">
+              <Label>{config.config_key}</Label>
+              <Input 
+                type="number"
+                value={config.config_value?.target || 0}
+                onChange={(e) => updateConfig.mutate({
+                  id: config.id,
+                  value: { target: parseInt(e.target.value) }
+                })}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {/* Config History */}
+      {history && history.length > 0 && (
+        <div>
+          <h3 className="text-sm font-medium mb-4">Recent Changes</h3>
+          <div className="space-y-2">
+            {history.slice(0, 5).map(h => (
+              <div key={h.id} className="text-sm text-muted-foreground">
+                Config updated at {new Date(h.changed_at).toLocaleString()}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+### GoldenDemoV2.tsx Changes
+
+```typescript
+// New imports
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+
+// Add demo scenarios query
+const { data: demoScenarios } = useQuery({
+  queryKey: ['demo-scenarios'],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from('demo_scenarios')
+      .select('*')
+      .eq('enabled', true)
+      .order('category');
+    if (error) throw error;
+    return data;
+  }
+});
+
+// Add state for selected scenario
+const [selectedScenario, setSelectedScenario] = useState<string>("");
+
+// Add scenario selector in setup view
+<div className="space-y-2">
+  <Label>Demo Scenario (Optional)</Label>
+  <Select value={selectedScenario} onValueChange={setSelectedScenario}>
+    <SelectTrigger>
+      <SelectValue placeholder="Use default demo flow" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="">Default Flow</SelectItem>
+      {demoScenarios?.map(s => (
+        <SelectItem key={s.id} value={s.id}>
+          <div className="flex items-center gap-2">
+            <span>{s.scenario_name}</span>
+            <Badge variant="outline" className="text-xs">{s.category}</Badge>
+          </div>
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+</div>
+
+// Enhanced demo steps list
+<li>Run Oversight Agent simulation (new)</li>
+<li>Execute Predictive Governance analysis (new)</li>
+<li>Check for Governance Bypass attempts (new)</li>
+```
+
 ---
 
-## Database Queries for New Features
+## Summary of All Changes
 
-### Events Count Query
-```sql
-SELECT COUNT(*) FROM events_raw WHERE processed = false;
-```
-
-### High-Risk Predictions Query
-```sql
-SELECT * FROM predictive_governance 
-WHERE risk_score >= 70 
-ORDER BY risk_score DESC 
-LIMIT 5;
-```
-
-### RCA Templates Query
-```sql
-SELECT * FROM rca_templates ORDER BY incident_type;
-```
-
-### Platform Config Query
-```sql
-SELECT * FROM platform_config ORDER BY category, config_key;
-```
+| File | Changes |
+|------|---------|
+| `Incidents.tsx` | +Tabs, +BulkResolutionPanel, +Run Lifecycle Check button |
+| `Observability.tsx` | +Oversight Agent tab, +SimulationController, +events_raw metrics |
+| `Settings.tsx` | +Platform Config section, +Engine weights sliders, +SLO editors |
+| `GoldenDemoV2.tsx` | +Scenario selector, +Enhanced demo steps |
 
 ---
 
-## Success Criteria
+## What Gets Completed
 
-| Metric | Current | Target |
-|--------|---------|--------|
-| SimulationController visible on Index | No | Yes |
-| BulkTriagePanel integrated in HITL | No | Yes |
-| BulkResolutionPanel integrated in Incidents | No | Yes |
-| Predictive Risk Panel visible | No | Yes |
-| Configuration page accessible | No | Yes |
-| Runbooks page accessible | No | Yes |
-| All Edge Functions callable from UI | 50% | 100% |
-| Real-time events_raw subscription | No | Yes |
+After this implementation:
+- All 8 new database tables are connected to UI
+- All 7 new Edge Functions are callable from UI
+- SimulationController is integrated in 2 places (Index + Observability)
+- BulkTriagePanel is integrated in HITL page
+- BulkResolutionPanel is integrated in Incidents page
+- PredictiveRiskPanel is integrated in Index page
+- Configuration page is fully functional
+- Runbooks page is fully functional
+- All navigation links work
+- All routes are registered
 
----
-
-## Implementation Order
-
-1. **Index.tsx** - Add SimulationController + PredictiveRiskPanel
-2. **HITL.tsx** - Add Tabs + BulkTriagePanel
-3. **Incidents.tsx** - Add Tabs + BulkResolutionPanel
-4. **Observability.tsx** - Add Oversight Agent tab
-5. **PredictiveRiskPanel.tsx** - Create new component
-6. **Configuration.tsx** - Create new page
-7. **Runbooks.tsx** - Create new page
-8. **Sidebar.tsx** - Add new navigation links
-9. **App.tsx** - Add new routes
-10. **Settings.tsx** - Add Configuration tab
+**This completes the 85% → 95% PDR upgrade with no further action needed.**
