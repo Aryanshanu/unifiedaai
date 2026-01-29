@@ -1878,6 +1878,45 @@ export type Database = {
           },
         ]
       }
+      escalation_rules: {
+        Row: {
+          created_at: string | null
+          enabled: boolean | null
+          escalation_action: string | null
+          id: string
+          incident_type_filter: string[] | null
+          rule_name: string
+          severity_filter: string[] | null
+          sla_breach_minutes: number | null
+          updated_at: string | null
+          webhook_url: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          enabled?: boolean | null
+          escalation_action?: string | null
+          id?: string
+          incident_type_filter?: string[] | null
+          rule_name: string
+          severity_filter?: string[] | null
+          sla_breach_minutes?: number | null
+          updated_at?: string | null
+          webhook_url?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          enabled?: boolean | null
+          escalation_action?: string | null
+          id?: string
+          incident_type_filter?: string[] | null
+          rule_name?: string
+          severity_filter?: string[] | null
+          sla_breach_minutes?: number | null
+          updated_at?: string | null
+          webhook_url?: string | null
+        }
+        Relationships: []
+      }
       evaluation_requirements: {
         Row: {
           created_at: string
@@ -2067,6 +2106,60 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      events_raw: {
+        Row: {
+          correlation_id: string | null
+          created_at: string | null
+          event_type: string
+          id: string
+          payload: Json
+          processed: boolean | null
+          processed_at: string | null
+          severity: string | null
+          source_model_id: string | null
+          source_system_id: string | null
+        }
+        Insert: {
+          correlation_id?: string | null
+          created_at?: string | null
+          event_type: string
+          id?: string
+          payload?: Json
+          processed?: boolean | null
+          processed_at?: string | null
+          severity?: string | null
+          source_model_id?: string | null
+          source_system_id?: string | null
+        }
+        Update: {
+          correlation_id?: string | null
+          created_at?: string | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          processed?: boolean | null
+          processed_at?: string | null
+          severity?: string | null
+          source_model_id?: string | null
+          source_system_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "events_raw_source_model_id_fkey"
+            columns: ["source_model_id"]
+            isOneToOne: false
+            referencedRelation: "models"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "events_raw_source_system_id_fkey"
+            columns: ["source_system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       gateway_config: {
         Row: {
@@ -2293,6 +2386,8 @@ export type Database = {
           assignee_id: string | null
           created_at: string
           description: string | null
+          detected_at: string | null
+          evidence_url: string | null
           id: string
           incident_type: string
           model_id: string | null
@@ -2308,6 +2403,8 @@ export type Database = {
           assignee_id?: string | null
           created_at?: string
           description?: string | null
+          detected_at?: string | null
+          evidence_url?: string | null
           id?: string
           incident_type: string
           model_id?: string | null
@@ -2323,6 +2420,8 @@ export type Database = {
           assignee_id?: string | null
           created_at?: string
           description?: string | null
+          detected_at?: string | null
+          evidence_url?: string | null
           id?: string
           incident_type?: string
           model_id?: string | null
@@ -2830,6 +2929,42 @@ export type Database = {
           timezone?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      ownership: {
+        Row: {
+          created_at: string | null
+          entity_id: string
+          entity_type: string
+          escalation_email: string | null
+          id: string
+          on_call_schedule: Json | null
+          owner_user_id: string | null
+          team_name: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          entity_id: string
+          entity_type: string
+          escalation_email?: string | null
+          id?: string
+          on_call_schedule?: Json | null
+          owner_user_id?: string | null
+          team_name?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          entity_id?: string
+          entity_type?: string
+          escalation_email?: string | null
+          id?: string
+          on_call_schedule?: Json | null
+          owner_user_id?: string | null
+          team_name?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -3906,6 +4041,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      slo_config: {
+        Row: {
+          created_at: string | null
+          enabled: boolean | null
+          id: string
+          measurement_window_hours: number | null
+          metric_name: string
+          target_value: number
+          threshold_critical: number | null
+          threshold_warning: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          measurement_window_hours?: number | null
+          metric_name: string
+          target_value: number
+          threshold_critical?: number | null
+          threshold_warning?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          measurement_window_hours?: number | null
+          metric_name?: string
+          target_value?: number
+          threshold_critical?: number | null
+          threshold_warning?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       system_approvals: {
         Row: {
