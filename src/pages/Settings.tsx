@@ -3,7 +3,9 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, User, Shield, Bell, Database, Key, Globe, Loader2, Check, Bot } from "lucide-react";
+import { Settings as SettingsIcon, User, Shield, Bell, Database, Key, Globe, Loader2, Check, Bot, Sliders } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { usePlatformConfig, useUpdateConfig, useEngineWeights, useSLOTargets, useDQThresholds } from "@/hooks/usePlatformConfig";
 import { cn } from "@/lib/utils";
 import { useSettings, useUpdateSettings } from "@/hooks/useSettings";
 import { useToast } from "@/hooks/use-toast";
@@ -21,6 +23,7 @@ import { PlannedFeatureCard } from "@/components/fractal";
 
 const settingsSections = [
   { id: "general", icon: SettingsIcon, label: "General", description: "Basic configuration and preferences" },
+  { id: "config", icon: Sliders, label: "Platform Config", description: "Engine weights and thresholds" },
   { id: "users", icon: User, label: "Users & Teams", description: "Manage access and permissions" },
   { id: "security", icon: Shield, label: "Security", description: "Authentication and encryption settings" },
   { id: "notifications", icon: Bell, label: "Notifications", description: "Alert channels and preferences" },
@@ -263,6 +266,9 @@ export default function Settings() {
                 )}
               </>
             )}
+
+            {/* Platform Config Section */}
+            {activeSection === "config" && <PlatformConfigEditor />}
 
             {/* Users & Teams Section */}
             {activeSection === "users" && <UsersTeamsSection />}
@@ -617,5 +623,162 @@ export default function Settings() {
         </div>
       </div>
     </MainLayout>
+  );
+}
+
+// Platform Config Editor Component
+function PlatformConfigEditor() {
+  const { data: configs, isLoading } = usePlatformConfig();
+  const { data: engineWeights } = useEngineWeights();
+  const { data: sloTargets } = useSLOTargets();
+  const { data: dqThresholds } = useDQThresholds();
+  const updateConfig = useUpdateConfig();
+
+  const [localWeights, setLocalWeights] = useState<Record<string, number>>({});
+  const [localSLO, setLocalSLO] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (engineWeights) {
+      setLocalWeights(engineWeights as Record<string, number>);
+    }
+  }, [engineWeights]);
+
+  useEffect(() => {
+    if (sloTargets) {
+      setLocalSLO(sloTargets as Record<string, number>);
+    }
+  }, [sloTargets]);
+
+  const handleWeightChange = (key: string, value: number) => {
+    setLocalWeights(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleSaveWeights = async () => {
+    try {
+      await updateConfig.mutateAsync({ configKey: 'engine_weights', value: localWeights });
+      toast.success("Engine weights updated");
+    } catch {
+      toast.error("Failed to save weights");
+    }
+  };
+
+  const handleSaveSLO = async () => {
+    try {
+      await updateConfig.mutateAsync({ configKey: 'slo_targets', value: localSLO });
+      toast.success("SLO targets updated");
+    } catch {
+      toast.error("Failed to save SLO targets");
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <div className="space-y-4">
+          {[1, 2, 3, 4, 5].map(i => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <h2 className="text-lg font-semibold text-foreground mb-6">Platform Configuration</h2>
+      <div className="space-y-8">
+        {/* Engine Weights Section */}
+        <div>
+          <h3 className="text-sm font-medium mb-4 text-muted-foreground uppercase tracking-wide">Engine Weights</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Adjust the relative importance of each RAI engine in the overall score calculation.
+          </p>
+          <div className="space-y-4 max-w-xl">
+            {Object.entries(localWeights).map(([key, value]) => (
+              <div key={key} className="flex items-center gap-4">
+                <Label className="w-32 capitalize">{key}</Label>
+                <Slider 
+                  value={[value]}
+                  max={100}
+                  step={5}
+                  className="flex-1"
+                  onValueChange={([val]) => handleWeightChange(key, val)}
+                />
+                <span className="w-12 text-right font-mono text-sm">{value}%</span>
+              </div>
+            ))}
+          </div>
+          <Button 
+            onClick={handleSaveWeights} 
+            className="mt-4"
+            disabled={updateConfig.isPending}
+          >
+            {updateConfig.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
+            Save Weights
+          </Button>
+        </div>
+
+        <Separator />
+
+        {/* SLO Targets Section */}
+        <div>
+          <h3 className="text-sm font-medium mb-4 text-muted-foreground uppercase tracking-wide">SLO Targets</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Define Service Level Objectives for incident response times.
+          </p>
+          <div className="grid grid-cols-2 gap-4 max-w-xl">
+            {Object.entries(localSLO).map(([key, value]) => (
+              <div key={key} className="space-y-2">
+                <Label className="capitalize">{key.replace(/_/g, ' ')}</Label>
+                <Input 
+                  type="number"
+                  value={value}
+                  onChange={(e) => setLocalSLO(prev => ({ ...prev, [key]: parseInt(e.target.value) || 0 }))}
+                  className="bg-secondary border-border"
+                />
+              </div>
+            ))}
+          </div>
+          <Button 
+            onClick={handleSaveSLO} 
+            className="mt-4"
+            disabled={updateConfig.isPending}
+          >
+            {updateConfig.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
+            Save SLO Targets
+          </Button>
+        </div>
+
+        <Separator />
+
+        {/* DQ Thresholds Display */}
+        <div>
+          <h3 className="text-sm font-medium mb-4 text-muted-foreground uppercase tracking-wide">Data Quality Thresholds</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Current threshold values for data quality dimensions.
+          </p>
+          {dqThresholds ? (
+            <div className="grid grid-cols-3 gap-3 max-w-xl">
+              {Object.entries(dqThresholds).map(([key, value]) => (
+                <div key={key} className="bg-secondary/50 rounded-lg p-3 text-center">
+                  <div className="text-lg font-bold text-foreground">{value as number}%</div>
+                  <div className="text-xs text-muted-foreground capitalize">{key}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No thresholds configured</p>
+          )}
+        </div>
+
+        {/* Config Info */}
+        <div className="p-4 rounded-lg bg-muted/50 border border-border text-sm">
+          <p className="text-muted-foreground">
+            Configuration changes are tracked in the audit history. All updates are versioned for compliance.
+          </p>
+        </div>
+      </div>
+    </>
   );
 }
