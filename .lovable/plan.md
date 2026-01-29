@@ -1,358 +1,500 @@
 
-
-# Oversight Agent POC Implementation Plan
+# Production-Ready Implementation Plan: 85% → 95% PDR
 
 ## Executive Summary
 
-The user requests implementing a comprehensive **Oversight Agent POC** that provides continuous monitoring of ML/AI systems for data quality, drift, bias, compliance, and security. After thorough analysis, I found that **~75% of the required infrastructure already exists** in the Fractal RAI-OS platform. This plan focuses on enhancing existing components and adding the missing capabilities.
+Based on thorough analysis of the current codebase and database state, this plan addresses all identified gaps to push the platform from **Pilot-Ready (85%)** to **Production-Ready (95%+)**.
+
+### Current State Metrics (Live Database)
+| Metric | Value | Status |
+|--------|-------|--------|
+| `events_raw` (Oversight Agent telemetry) | **0** | Critical Gap |
+| HITL Backlog (`review_queue` pending) | **546** | Critical Gap |
+| Open Incidents | **218** | Needs triage |
+| Governance Capabilities Enforced | **11/11** | Complete |
+| Rate Limit Entries | **29** | DB-backed exists |
+| Control Assessments | **100** | Healthy |
+| Evaluation Runs | **14** | Active |
+| Open Drift Alerts | **18** | Active |
 
 ---
 
-## Current State Analysis (What Already Exists)
+## Phase 1: Oversight Agent Full Validation (Priority: CRITICAL)
 
-### Database Infrastructure (88 tables - 100% Coverage)
-| Category | Tables | Status |
-|----------|--------|--------|
-| Event Telemetry | `request_logs`, `telemetry_logs` | Exists |
-| Incidents & Alerts | `incidents`, `drift_alerts`, `dq_incidents` | Exists |
-| Decisions & Audit | `decisions`, `decision_ledger`, `admin_audit_log` | Exists |
-| Policy & Controls | `controls`, `control_assessments`, `policy_violations` | Exists |
-| Review Queue (HITL) | `review_queue`, `decisions` | Exists |
-| Governance | `governance_activation_state`, `attestations` | All 11 enforced |
+### 1.1 Create Synthetic Event Generator Edge Function
+**New file**: `supabase/functions/generate-synthetic-events/index.ts`
 
-### Edge Functions (53 functions - 90% Coverage)
-| Function | Purpose | Status |
-|----------|---------|--------|
-| `detect-drift` | PSI/KL divergence drift detection | Fully implemented |
-| `dq-raise-incidents` | Auto-create DQ incidents | Fully implemented |
-| `eval-*` | 5 RAI engine evaluations | Fully implemented |
-| `ai-gateway` | Request proxy & scoring | Fully implemented |
-| `send-notification` | Alert routing | Exists (needs enhancement) |
+Generates diverse telemetry events for testing the Oversight Agent pipeline:
 
-### UI Components (Complete)
-- **Command Center** (`Index.tsx`): 6-stage pipeline, incident summary, governance health
-- **Observability** (`Observability.tsx`): Real-time metrics, drift alerts, system health tables
-- **HITL Console** (`HITL.tsx`): Review queue, SLA timers, decision dialogs
-- **Governance** (`Governance.tsx`): Control frameworks, compliance gauge, attestations
+```text
+Event Distribution (10,000 events):
+├── data_quality (45%) - 4,500 events
+├── model_perf (20%) - 2,000 events  
+├── fairness (15%) - 1,500 events
+├── security (12%) - 1,200 events
+└── compliance (8%) - 800 events
 
-### Real-time Subscriptions (Active)
-- Supabase Realtime already wired to: `incidents`, `request_logs`, `drift_alerts`, `review_queue`
-- Toast notifications on new incidents
-- Live dashboard refresh
+Severity Distribution:
+├── critical (5%) - Test MTTD ≤5min
+├── high (15%) - Test MTTD ≤15min
+├── medium (30%) - Standard processing
+├── low (30%) - Noise filtering
+└── info (20%) - Log-only
+```
 
-### Current Metrics (Live Database)
-- **Open Incidents**: 218 (151 critical, 46 investigating)
-- **Request Logs (24h)**: 0 (no live traffic yet)
-- **Governance Activation**: 100% (all 11 capabilities enforced)
+### 1.2 Create Simulation Controller Component
+**New file**: `src/components/oversight/SimulationController.tsx`
 
----
+UI for running and monitoring synthetic workloads:
+- Start/stop simulation with configurable batch sizes
+- Real-time counters for events, alerts, incidents
+- MTTD/MTTR live measurement
+- Precision/recall calculation against labeled scenarios
 
-## Gap Analysis (What's Missing for POC)
+### 1.3 Enhance `process-events` with Threshold Configuration
+**Modified file**: `supabase/functions/process-events/index.ts`
 
-### 1. Unified Event Ingestion Table
-**Current**: Events scattered across `request_logs`, `telemetry_logs`, `dq_profiles`
-**Need**: Normalized `events_raw` table for unified telemetry
-
-### 2. Policy-Based Scoring Engine
-**Current**: Fixed thresholds in `detect-drift`
-**Need**: Configurable rules/controls table with dynamic thresholds
-
-### 3. Evidence Storage Integration
-**Current**: `attestations.document_url` exists but limited
-**Need**: Proper storage bucket for evidence artifacts with hash verification
-
-### 4. Alert Deduplication & Correlation
-**Current**: Basic dedup in `dq-raise-incidents` via `failure_signature`
-**Need**: Cross-signal correlation (e.g., drift + bias = compound alert)
-
-### 5. External Notification Webhooks
-**Current**: Toast notifications only
-**Need**: Teams/Slack/Email integration via Edge Functions
-
-### 6. EU AI Act Assessment (Real Data)
-**Current**: `EUAIActAssessment.tsx` uses `Math.random()` for demo
-**Need**: Connect to actual `control_assessments` table
-
-### 7. Ownership/Escalation Routing
-**Current**: `assignee_id` exists on incidents but not populated
-**Need**: `ownership` table mapping systems → owners for auto-routing
-
-### 8. KPIs/SLOs Dashboard
-**Current**: Basic metrics in Observability
-**Need**: Explicit MTTD/MTTR tracking with SLO thresholds
+Add configurable thresholds by reading from `slo_config` table instead of hardcoded values:
+- Fetch thresholds dynamically
+- Add correlation window configuration (default: 5 minutes)
+- Add compound alert logic for multi-signal scenarios
 
 ---
 
-## Implementation Plan
+## Phase 2: HITL Backlog Elimination (Priority: CRITICAL)
 
-### Phase 1: Data Model Enhancements (Day 1)
+### 2.1 Create HITL Auto-Assist Engine
+**New file**: `supabase/functions/hitl-auto-assist/index.ts`
 
-#### 1.1 Create Unified Event Table
+AI-powered pre-triage for review queue items:
+- Generate summary of issue
+- Suggest decision (approve/reject/escalate)
+- Extract evidence references
+- Calculate risk score
+- Provide SLA recommendation
+
+```typescript
+interface AutoAssistResult {
+  summary: string;
+  suggested_decision: 'approve' | 'reject' | 'escalate';
+  confidence: number;
+  risk_score: number;
+  evidence_refs: string[];
+  reasoning: string;
+}
+```
+
+### 2.2 Create Bulk Triage Interface
+**New file**: `src/components/hitl/BulkTriagePanel.tsx`
+
+Batch processing UI for HITL backlog:
+- Multi-select with shift-click
+- Bulk approve/reject with common rationale
+- Auto-apply AI suggestions for low/medium severity
+- SLA-based priority sorting
+- "Clear Low Risk" quick action
+
+### 2.3 Add Auto-Approval Policies Table
+**Database migration**:
 ```sql
-CREATE TABLE events_raw (
+CREATE TABLE auto_approval_policies (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  event_type TEXT NOT NULL CHECK (event_type IN ('data_quality', 'model_perf', 'fairness', 'security', 'compliance')),
-  source_system_id UUID REFERENCES systems(id),
-  source_model_id UUID REFERENCES models(id),
-  severity TEXT CHECK (severity IN ('info', 'low', 'medium', 'high', 'critical')),
-  payload JSONB NOT NULL,
-  processed BOOLEAN DEFAULT false,
+  policy_name TEXT NOT NULL,
+  severity_filter TEXT[] CHECK (severity_filter <@ ARRAY['low', 'medium', 'high', 'critical']),
+  review_type_filter TEXT[],
+  max_risk_score NUMERIC DEFAULT 30,
+  auto_action TEXT CHECK (auto_action IN ('approve', 'reject', 'escalate')) DEFAULT 'approve',
+  enabled BOOLEAN DEFAULT false,
+  requires_audit_log BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+### 2.4 Enhance HITL Page with Triage Features
+**Modified file**: `src/pages/HITL.tsx`
+
+Add:
+- Bulk selection toolbar
+- AI suggestion indicators
+- Auto-approval toggle (admin only)
+- Backlog health indicator
+- "Process with AI Assist" button
+
+---
+
+## Phase 3: Incident Lifecycle Engine (Priority: HIGH)
+
+### 3.1 Create Incident Lifecycle Edge Function
+**New file**: `supabase/functions/incident-lifecycle/index.ts`
+
+Automated incident state management:
+- SLA timer enforcement (auto-escalate on breach)
+- Auto-close stale incidents (>7 days, low severity)
+- RCA template assignment
+- Knowledge Graph linking
+- Follow-up scheduling
+
+### 3.2 Add RCA Templates Table
+**Database migration**:
+```sql
+CREATE TABLE rca_templates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  incident_type TEXT NOT NULL,
+  template_content JSONB NOT NULL,
+  required_fields TEXT[],
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX idx_events_raw_type ON events_raw(event_type);
-CREATE INDEX idx_events_raw_unprocessed ON events_raw(processed) WHERE NOT processed;
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS rca_template_id UUID REFERENCES rca_templates(id);
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS rca_completed_at TIMESTAMPTZ;
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS follow_up_date DATE;
 ```
 
-#### 1.2 Create Ownership Mapping Table
+### 3.3 Create Incident Bulk Resolution Component
+**New file**: `src/components/incidents/BulkResolutionPanel.tsx`
+
+- Multi-select with filters (severity, age, status)
+- Common resolution reason dropdown
+- Auto-link to RCA template
+- Batch close with audit trail
+
+---
+
+## Phase 4: Unified Platform Configuration (Priority: HIGH)
+
+### 4.1 Create Configuration Registry Table
+**Database migration**:
 ```sql
-CREATE TABLE ownership (
+CREATE TABLE platform_config (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  entity_type TEXT NOT NULL CHECK (entity_type IN ('system', 'model', 'dataset')),
-  entity_id UUID NOT NULL,
-  owner_user_id UUID REFERENCES auth.users(id),
-  team_name TEXT,
-  escalation_email TEXT,
-  on_call_schedule JSONB,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(entity_type, entity_id)
+  config_key TEXT NOT NULL UNIQUE,
+  config_value JSONB NOT NULL,
+  category TEXT NOT NULL CHECK (category IN ('engine_weights', 'thresholds', 'slo', 'escalation', 'policy')),
+  version INTEGER DEFAULT 1,
+  updated_by UUID REFERENCES auth.users(id),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  description TEXT
+);
+
+CREATE TABLE platform_config_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  config_id UUID REFERENCES platform_config(id),
+  previous_value JSONB,
+  new_value JSONB,
+  changed_by UUID REFERENCES auth.users(id),
+  changed_at TIMESTAMPTZ DEFAULT now()
 );
 ```
 
-#### 1.3 Create SLO Configuration Table
+### 4.2 Create Config Management Hook
+**New file**: `src/hooks/usePlatformConfig.ts`
+
+Centralized configuration access with:
+- Type-safe config retrieval
+- Version tracking
+- Change history
+- Real-time updates via Supabase subscription
+
+### 4.3 Create Configuration Dashboard
+**New file**: `src/pages/Configuration.tsx`
+
+Admin UI for managing:
+- Engine weight profiles
+- DQ thresholds by dimension
+- Fairness thresholds (demographic parity, etc.)
+- SLO values (MTTD, MTTR)
+- Escalation rules
+- Policy settings
+
+---
+
+## Phase 5: Golden Demo Automation Enhancement (Priority: MEDIUM)
+
+### 5.1 Add Demo Scenarios Table
+**Database migration**:
 ```sql
-CREATE TABLE slo_config (
+CREATE TABLE demo_scenarios (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  metric_name TEXT NOT NULL UNIQUE,
-  target_value NUMERIC NOT NULL,
-  threshold_warning NUMERIC,
-  threshold_critical NUMERIC,
-  measurement_window_hours INTEGER DEFAULT 24,
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
--- Seed with POC defaults
-INSERT INTO slo_config (metric_name, target_value, threshold_warning, threshold_critical) VALUES
-  ('mttd_critical_minutes', 5, 10, 15),
-  ('mttd_high_minutes', 15, 30, 60),
-  ('mttr_critical_minutes', 60, 90, 120),
-  ('mttr_high_minutes', 240, 360, 480),
-  ('alert_precision', 0.80, 0.70, 0.60),
-  ('alert_recall', 0.80, 0.70, 0.60),
-  ('audit_completeness', 0.95, 0.90, 0.85);
-```
-
----
-
-### Phase 2: Event Ingestion & Scoring Edge Functions (Day 2)
-
-#### 2.1 Create `ingest-events` Edge Function
-**Purpose**: Normalize incoming telemetry from any source
-
-```typescript
-// supabase/functions/ingest-events/index.ts
-// - Accepts batch of events
-// - Validates against event schema
-// - Stores in events_raw
-// - Triggers processing if batch size > threshold
-```
-
-#### 2.2 Create `process-events` Edge Function
-**Purpose**: Apply rules/ML checks and generate alerts
-
-```typescript
-// supabase/functions/process-events/index.ts
-// - Reads unprocessed events from events_raw
-// - Applies configurable thresholds from controls table
-// - Correlates related events (e.g., multiple drift signals)
-// - Creates deduped alerts with severity scoring
-// - Marks events as processed
-```
-
-#### 2.3 Enhance `send-notification` Edge Function
-**Purpose**: Route alerts to external channels
-
-```typescript
-// Add support for:
-// - Microsoft Teams webhook
-// - Slack webhook
-// - Email via SMTP
-// - PagerDuty escalation (placeholder)
-```
-
----
-
-### Phase 3: Dashboard Enhancements (Day 3-4)
-
-#### 3.1 Create SLO/KPI Dashboard Component
-**New file**: `src/components/dashboard/SLODashboard.tsx`
-
-```typescript
-// Display:
-// - MTTD (Mean Time to Detect) by severity
-// - MTTR (Mean Time to Respond) by severity
-// - Alert precision/recall (if labeled test scenarios exist)
-// - Audit completeness %
-// - Traffic sparkline
-// - Trend indicators
-```
-
-#### 3.2 Create Oversight Agent Status Panel
-**New file**: `src/components/dashboard/OversightAgentStatus.tsx`
-
-```typescript
-// Display:
-// - Agent health (running/stopped)
-// - Last scan timestamp
-// - Events processed (24h)
-// - Alerts generated (24h)
-// - Quick action buttons
-```
-
-#### 3.3 Enhance Command Center (`Index.tsx`)
-- Add SLO dashboard widget
-- Add oversight agent status panel
-- Add event throughput metric
-
-#### 3.4 Fix EU AI Act Assessment
-**File**: `src/components/governance/EUAIActAssessment.tsx`
-- Replace `Math.random()` with actual queries to `control_assessments`
-- Store results to `control_assessments` table on completion
-- Add real evidence references
-
----
-
-### Phase 4: Evidence Storage & Audit Trail (Day 4)
-
-#### 4.1 Create Storage Bucket for Evidence
-```sql
-INSERT INTO storage.buckets (id, name, public) 
-VALUES ('oversight-evidence', 'oversight-evidence', false);
-
--- RLS policy for authenticated users
-CREATE POLICY "Authenticated users can read evidence"
-ON storage.objects FOR SELECT
-USING (bucket_id = 'oversight-evidence' AND auth.role() = 'authenticated');
-```
-
-#### 4.2 Enhance Audit Log with Hash Chain
-- Already exists via `compute_audit_hash()` trigger on `admin_audit_log`
-- Verify chain integrity via `verify_audit_chain()` function (already exists)
-
-#### 4.3 Add Evidence Attachment to Incidents
-**Modify**: `incidents` table (add `evidence_url` column if needed)
-
----
-
-### Phase 5: Alerting & Workflow Integration (Day 5)
-
-#### 5.1 Auto-Assign Incidents to Owners
-**Modify**: Incident creation flow to lookup `ownership` table and set `assignee_id`
-
-#### 5.2 SLA Timer Integration
-- Already exists in HITL Console via `SLACountdown` component
-- Add SLA breach auto-escalation trigger
-
-#### 5.3 Create Escalation Rules Table
-```sql
-CREATE TABLE escalation_rules (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  rule_name TEXT NOT NULL,
-  severity_filter TEXT[], -- ['critical', 'high']
-  incident_type_filter TEXT[],
-  sla_breach_minutes INTEGER,
-  escalation_action TEXT CHECK (escalation_action IN ('notify_owner', 'notify_team', 'page', 'auto_create_ticket')),
-  webhook_url TEXT,
+  scenario_name TEXT NOT NULL,
+  description TEXT,
+  steps JSONB NOT NULL,
+  expected_outcomes JSONB,
+  duration_seconds INTEGER DEFAULT 90,
+  category TEXT CHECK (category IN ('sales', 'audit', 'investor', 'training')),
   enabled BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 ```
 
----
+### 5.2 Enhance Golden Demo Orchestrator
+**Modified file**: `src/hooks/useGoldenDemoOrchestrator.ts`
 
-### Phase 6: Testing & Runbooks (Day 6)
+Add:
+- Scenario-based execution from `demo_scenarios` table
+- Stepper-based visual walkthrough
+- Investor mode (condensed 60s version)
+- Audit mode (comprehensive 5min version)
+- Export demo log as evidence package
 
-#### 6.1 Create Test Scenarios
-- Data quality violation (completeness < 80%)
-- Model drift (PSI > 0.25)
-- Fairness disparity (demographic parity > 0.1)
-- Security anomaly (unusual error rate)
-- Compliance breach (control assessment failed)
+### 5.3 Add Demo Narration Component
+**New file**: `src/components/golden/DemoNarrator.tsx`
 
-#### 6.2 Create Runbook Pages
-**New file**: `src/pages/Runbooks.tsx`
-- Incident triage decision tree
-- Escalation path visualization
-- Evidence attachment guide
-
-#### 6.3 End-to-End Validation
-- Simulate event → alert → triage → decision → audit flow
-- Verify MTTD/MTTR calculations
-- Verify hash chain integrity
+Visual overlay showing:
+- Current step description
+- What's happening technically
+- Why it matters for governance
+- Next step preview
 
 ---
 
-## Summary of Changes
+## Phase 6: Edge Function Observability (Priority: MEDIUM)
 
-### New Database Tables (4)
+### 6.1 Create Function Metrics Table
+**Database migration**:
+```sql
+CREATE TABLE function_metrics (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  function_name TEXT NOT NULL,
+  invocation_count INTEGER DEFAULT 0,
+  error_count INTEGER DEFAULT 0,
+  total_latency_ms BIGINT DEFAULT 0,
+  cold_start_count INTEGER DEFAULT 0,
+  measurement_window TIMESTAMPTZ DEFAULT now(),
+  recorded_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_function_metrics_name_time ON function_metrics(function_name, recorded_at DESC);
+```
+
+### 6.2 Create Metrics Recording Utility
+**New file**: `supabase/functions/_shared/function-metrics.ts`
+
+Wrapper for edge functions that records:
+- Invocation count
+- Latency distribution
+- Error rates by type
+- Cold start detection
+
+### 6.3 Create Edge Function Dashboard
+**New file**: `src/components/observability/EdgeFunctionDashboard.tsx`
+
+Visualizations:
+- Latency heatmap by function
+- Error rate chart
+- Invocation volume sparklines
+- Cold start percentage
+
+---
+
+## Phase 7: Governance Bypass Detection (Priority: MEDIUM)
+
+### 7.1 Create Bypass Detection Edge Function
+**New file**: `supabase/functions/detect-governance-bypass/index.ts`
+
+Monitors for:
+- API calls without signed JWT
+- Direct database access patterns
+- Unusual request patterns
+- Policy circumvention attempts
+- Suspicious rate limit behaviors
+
+### 7.2 Add Bypass Detection Alerts
+Automatically creates incidents when bypass detected:
+- Links to admin audit log
+- Captures request details
+- Assigns to security team
+
+---
+
+## Phase 8: Rate Limiting Hardening (Priority: HIGH)
+
+### 8.1 Verify DB-Backed Rate Limiting
+The `rate_limits` table already exists with 29 entries. Verify all critical functions use it:
+
+**Functions to verify/update**:
+- `ai-gateway` - Uses DB-backed ✓
+- `llm-generate` - Uses DB-backed ✓
+- `cicd-gate` - Uses in-memory ✗ (needs fix)
+- `eval-*` functions - Need rate limiting
+
+### 8.2 Add Rate Limit Cleanup CRON
+**Database migration** (for scheduled cleanup):
+```sql
+SELECT cron.schedule(
+  'cleanup-rate-limits',
+  '*/15 * * * *',
+  $$DELETE FROM rate_limits WHERE window_start < now() - interval '1 hour'$$
+);
+```
+
+### 8.3 Fix `cicd-gate` Rate Limiting
+**Modified file**: `supabase/functions/cicd-gate/index.ts`
+
+Replace in-memory Map with database-backed implementation:
+```typescript
+// Replace rateLimitMap with database queries
+async function checkRateLimit(identifier: string): Promise<boolean> {
+  const { count } = await supabase
+    .from('rate_limits')
+    .select('*', { count: 'exact', head: true })
+    .eq('identifier', identifier)
+    .gte('window_start', new Date(Date.now() - 60000).toISOString());
+  
+  return (count || 0) < RATE_LIMIT;
+}
+```
+
+---
+
+## Phase 9: Predictive Governance (Governance Capability 12)
+
+### 9.1 Create Predictive Model Table
+**Database migration**:
+```sql
+CREATE TABLE predictive_governance (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  entity_type TEXT CHECK (entity_type IN ('model', 'system', 'dataset')),
+  entity_id UUID NOT NULL,
+  prediction_type TEXT CHECK (prediction_type IN ('drift_risk', 'compliance_risk', 'incident_probability')),
+  risk_score NUMERIC NOT NULL,
+  confidence NUMERIC NOT NULL,
+  predicted_timeframe_hours INTEGER,
+  factors JSONB,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+### 9.2 Create Predictive Analysis Edge Function
+**New file**: `supabase/functions/predictive-governance/index.ts`
+
+Analyzes historical patterns to predict:
+- Likelihood of drift based on traffic patterns
+- Compliance risk based on evaluation trends
+- Incident probability based on error rates
+
+### 9.3 Add Predictive Indicators to Dashboard
+**Modified file**: `src/pages/Index.tsx`
+
+Add predictive risk badges:
+- "Drift likely in 24h" warning
+- "Compliance risk increasing" indicator
+- "Model degradation trend" alert
+
+---
+
+## Phase 10: Policy-as-Code Validation
+
+### 10.1 Create Policy Linter Edge Function
+**New file**: `supabase/functions/policy-lint/index.ts`
+
+Static validation for policy configurations:
+- Syntax validation
+- Threshold range checks
+- Conflict detection
+- Regulatory alignment verification
+
+### 10.2 Add Policy Version History
+**Database migration**:
+```sql
+CREATE TABLE policy_versions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  policy_id UUID NOT NULL,
+  version INTEGER NOT NULL,
+  content JSONB NOT NULL,
+  validated BOOLEAN DEFAULT false,
+  validation_errors JSONB,
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(policy_id, version)
+);
+```
+
+### 10.3 Integrate with CI/CD Gate
+**Modified file**: `supabase/functions/cicd-gate/index.ts`
+
+Add policy validation check before deployment approval.
+
+---
+
+## Implementation Summary
+
+### New Database Tables (8)
 | Table | Purpose |
 |-------|---------|
-| `events_raw` | Unified event ingestion |
-| `ownership` | System/model → owner mapping |
-| `slo_config` | KPI thresholds |
-| `escalation_rules` | Auto-escalation logic |
+| `auto_approval_policies` | HITL automation rules |
+| `rca_templates` | Root cause analysis templates |
+| `platform_config` | Unified configuration |
+| `platform_config_history` | Config change tracking |
+| `demo_scenarios` | Golden Demo scripts |
+| `function_metrics` | Edge function observability |
+| `predictive_governance` | Governance predictions |
+| `policy_versions` | Policy versioning |
 
-### New Edge Functions (2)
+### New Edge Functions (7)
 | Function | Purpose |
 |----------|---------|
-| `ingest-events` | Normalize incoming telemetry |
-| `process-events` | Apply rules and create alerts |
+| `generate-synthetic-events` | Oversight Agent testing |
+| `hitl-auto-assist` | AI-powered HITL triage |
+| `incident-lifecycle` | Automated incident management |
+| `detect-governance-bypass` | Security monitoring |
+| `predictive-governance` | Risk prediction |
+| `policy-lint` | Policy validation |
+| `edge-function-metrics` | Observability wrapper |
 
-### Enhanced Edge Functions (1)
-| Function | Enhancement |
-|----------|-------------|
-| `send-notification` | Add Teams/Slack/Email support |
+### Modified Edge Functions (2)
+| Function | Changes |
+|----------|---------|
+| `process-events` | Dynamic thresholds from config |
+| `cicd-gate` | DB-backed rate limiting |
 
-### New UI Components (3)
+### New UI Components (8)
 | Component | Purpose |
 |-----------|---------|
-| `SLODashboard.tsx` | MTTD/MTTR/precision/recall KPIs |
-| `OversightAgentStatus.tsx` | Agent health panel |
-| `Runbooks.tsx` | Incident response guides |
+| `SimulationController` | Synthetic event generation UI |
+| `BulkTriagePanel` | HITL batch processing |
+| `BulkResolutionPanel` | Incident batch closing |
+| `Configuration.tsx` | Platform config management |
+| `DemoNarrator` | Golden Demo walkthrough |
+| `EdgeFunctionDashboard` | Function observability |
+| `PredictiveIndicators` | Risk prediction badges |
+| `PolicyLintResults` | Policy validation UI |
 
-### Modified UI Components (2)
-| Component | Change |
-|-----------|--------|
-| `Index.tsx` | Add SLO widget, agent status |
-| `EUAIActAssessment.tsx` | Connect to real control_assessments |
-
-### Storage (1)
-| Bucket | Purpose |
-|--------|---------|
-| `oversight-evidence` | Evidence artifacts with hash verification |
+### Modified UI Files (4)
+| File | Changes |
+|------|---------|
+| `HITL.tsx` | Add bulk triage, AI assist |
+| `Index.tsx` | Add predictive indicators |
+| `Observability.tsx` | Add function metrics |
+| `useGoldenDemoOrchestrator.ts` | Add scenario-based execution |
 
 ---
 
-## Success Criteria (POC)
+## Success Criteria (Target Metrics)
 
-| KPI | Target |
-|-----|--------|
-| MTTD (Critical) | ≤5 minutes |
-| MTTD (High) | ≤15 minutes |
-| MTTR (Critical) | ≤60 minutes |
-| Alert Precision | ≥0.80 |
-| Audit Completeness | ≥95% |
-| RLS Coverage | 100% tables |
-| Evidence Bucket Policies | 100% |
+| KPI | Current | Target |
+|-----|---------|--------|
+| Events in `events_raw` | 0 | 10,000+ |
+| HITL Backlog | 546 | <50 |
+| Open Incidents | 218 | <30 |
+| MTTD (Critical) | N/A | ≤5 min |
+| MTTR (Critical) | N/A | ≤60 min |
+| Rate Limiting | Partial | 100% DB-backed |
+| Golden Demo Automation | Partial | Complete |
+| Config Centralization | None | 100% |
+| Edge Function Observability | None | 100% |
+| Governance Capabilities | 11/11 | 12/12 (with predictive) |
 
 ---
 
 ## Implementation Order
 
-1. **Database migrations** - Create new tables (events_raw, ownership, slo_config, escalation_rules)
-2. **Edge functions** - Create ingest-events, process-events; enhance send-notification
-3. **UI components** - Create SLODashboard, OversightAgentStatus
-4. **Fix EUAIActAssessment** - Remove Math.random(), connect to real data
-5. **Storage bucket** - Create oversight-evidence with policies
-6. **Testing** - Run test scenarios end-to-end
-
+1. **Phase 1**: Synthetic Event Generator + Oversight Agent validation (unblocks all SLO measurement)
+2. **Phase 2**: HITL Auto-Assist + Bulk Triage (clears 546 backlog)
+3. **Phase 3**: Incident Lifecycle Engine (clears 218 incidents)
+4. **Phase 8**: Rate Limiting Hardening (security requirement)
+5. **Phase 4**: Unified Platform Configuration
+6. **Phase 5**: Golden Demo Enhancement
+7. **Phase 6**: Edge Function Observability
+8. **Phase 7**: Governance Bypass Detection
+9. **Phase 9**: Predictive Governance
+10. **Phase 10**: Policy-as-Code Validation
