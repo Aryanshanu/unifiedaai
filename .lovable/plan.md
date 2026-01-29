@@ -1,500 +1,393 @@
 
-# Production-Ready Implementation Plan: 85% → 95% PDR
+# Complete Frontend-Backend Integration: Production-Ready Implementation
 
-## Executive Summary
+## Overview
 
-Based on thorough analysis of the current codebase and database state, this plan addresses all identified gaps to push the platform from **Pilot-Ready (85%)** to **Production-Ready (95%+)**.
-
-### Current State Metrics (Live Database)
-| Metric | Value | Status |
-|--------|-------|--------|
-| `events_raw` (Oversight Agent telemetry) | **0** | Critical Gap |
-| HITL Backlog (`review_queue` pending) | **546** | Critical Gap |
-| Open Incidents | **218** | Needs triage |
-| Governance Capabilities Enforced | **11/11** | Complete |
-| Rate Limit Entries | **29** | DB-backed exists |
-| Control Assessments | **100** | Healthy |
-| Evaluation Runs | **14** | Active |
-| Open Drift Alerts | **18** | Active |
+This plan completes the full integration of all new components created in the 85%→95% PDR plan into the existing pages. All the Edge Functions and React components are already created - this plan wires them together.
 
 ---
 
-## Phase 1: Oversight Agent Full Validation (Priority: CRITICAL)
+## Current State Summary
 
-### 1.1 Create Synthetic Event Generator Edge Function
-**New file**: `supabase/functions/generate-synthetic-events/index.ts`
-
-Generates diverse telemetry events for testing the Oversight Agent pipeline:
-
-```text
-Event Distribution (10,000 events):
-├── data_quality (45%) - 4,500 events
-├── model_perf (20%) - 2,000 events  
-├── fairness (15%) - 1,500 events
-├── security (12%) - 1,200 events
-└── compliance (8%) - 800 events
-
-Severity Distribution:
-├── critical (5%) - Test MTTD ≤5min
-├── high (15%) - Test MTTD ≤15min
-├── medium (30%) - Standard processing
-├── low (30%) - Noise filtering
-└── info (20%) - Log-only
-```
-
-### 1.2 Create Simulation Controller Component
-**New file**: `src/components/oversight/SimulationController.tsx`
-
-UI for running and monitoring synthetic workloads:
-- Start/stop simulation with configurable batch sizes
-- Real-time counters for events, alerts, incidents
-- MTTD/MTTR live measurement
-- Precision/recall calculation against labeled scenarios
-
-### 1.3 Enhance `process-events` with Threshold Configuration
-**Modified file**: `supabase/functions/process-events/index.ts`
-
-Add configurable thresholds by reading from `slo_config` table instead of hardcoded values:
-- Fetch thresholds dynamically
-- Add correlation window configuration (default: 5 minutes)
-- Add compound alert logic for multi-signal scenarios
+### Already Created (Need Integration)
+| Component/Function | Location | Status |
+|-------------------|----------|--------|
+| `generate-synthetic-events` | Edge Function | Created, deployed |
+| `hitl-auto-assist` | Edge Function | Created, deployed |
+| `incident-lifecycle` | Edge Function | Created, deployed |
+| `process-events` | Edge Function | Created, deployed |
+| `predictive-governance` | Edge Function | Created, deployed |
+| `policy-lint` | Edge Function | Created, deployed |
+| `detect-governance-bypass` | Edge Function | Created, deployed |
+| `SimulationController` | Component | Created, needs page integration |
+| `BulkTriagePanel` | Component | Created, needs HITL.tsx integration |
+| `BulkResolutionPanel` | Component | Created, needs Incidents.tsx integration |
+| `usePlatformConfig` | Hook | Created |
+| `usePredictiveGovernance` | Hook | Created |
+| 8 new database tables | Database | Created via migration |
 
 ---
 
-## Phase 2: HITL Backlog Elimination (Priority: CRITICAL)
+## Implementation Plan
 
-### 2.1 Create HITL Auto-Assist Engine
-**New file**: `supabase/functions/hitl-auto-assist/index.ts`
+### Phase 1: Command Center (Index.tsx) Enhancements
 
-AI-powered pre-triage for review queue items:
-- Generate summary of issue
-- Suggest decision (approve/reject/escalate)
-- Extract evidence references
-- Calculate risk score
-- Provide SLA recommendation
+**File**: `src/pages/Index.tsx`
 
+**Changes**:
+1. Add SimulationController component for Oversight Agent testing
+2. Add Predictive Risk Indicators from `usePredictiveGovernance`
+3. Add Events Processed metric card (from `events_raw` count)
+4. Add real-time subscription for `events_raw` table
+5. Add "Run Governance Check" button to trigger `detect-governance-bypass`
+
+**New imports**:
 ```typescript
-interface AutoAssistResult {
-  summary: string;
-  suggested_decision: 'approve' | 'reject' | 'escalate';
-  confidence: number;
-  risk_score: number;
-  evidence_refs: string[];
-  reasoning: string;
-}
+import { SimulationController } from "@/components/oversight/SimulationController";
+import { useHighRiskPredictions } from "@/hooks/usePredictiveGovernance";
 ```
 
-### 2.2 Create Bulk Triage Interface
-**New file**: `src/components/hitl/BulkTriagePanel.tsx`
-
-Batch processing UI for HITL backlog:
-- Multi-select with shift-click
-- Bulk approve/reject with common rationale
-- Auto-apply AI suggestions for low/medium severity
-- SLA-based priority sorting
-- "Clear Low Risk" quick action
-
-### 2.3 Add Auto-Approval Policies Table
-**Database migration**:
-```sql
-CREATE TABLE auto_approval_policies (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  policy_name TEXT NOT NULL,
-  severity_filter TEXT[] CHECK (severity_filter <@ ARRAY['low', 'medium', 'high', 'critical']),
-  review_type_filter TEXT[],
-  max_risk_score NUMERIC DEFAULT 30,
-  auto_action TEXT CHECK (auto_action IN ('approve', 'reject', 'escalate')) DEFAULT 'approve',
-  enabled BOOLEAN DEFAULT false,
-  requires_audit_log BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-```
-
-### 2.4 Enhance HITL Page with Triage Features
-**Modified file**: `src/pages/HITL.tsx`
-
-Add:
-- Bulk selection toolbar
-- AI suggestion indicators
-- Auto-approval toggle (admin only)
-- Backlog health indicator
-- "Process with AI Assist" button
+**UI additions**:
+- New section: "Oversight Agent" with SimulationController
+- Predictive risk badges on quick action cards
+- Alert banner for high-risk predictions (risk_score >= 80)
 
 ---
 
-## Phase 3: Incident Lifecycle Engine (Priority: HIGH)
+### Phase 2: HITL Console (HITL.tsx) Enhancements
 
-### 3.1 Create Incident Lifecycle Edge Function
-**New file**: `supabase/functions/incident-lifecycle/index.ts`
+**File**: `src/pages/HITL.tsx`
 
-Automated incident state management:
-- SLA timer enforcement (auto-escalate on breach)
-- Auto-close stale incidents (>7 days, low severity)
-- RCA template assignment
-- Knowledge Graph linking
-- Follow-up scheduling
+**Changes**:
+1. Add Tabs component for "Queue" | "Bulk Triage" views
+2. Integrate `BulkTriagePanel` component in "Bulk Triage" tab
+3. Add "AI Assist" badge on items with auto-assist suggestions
+4. Add statistics summary showing pending by AI recommendation
+5. Connect to `hitl-auto-assist` Edge Function for single-item analysis
 
-### 3.2 Add RCA Templates Table
-**Database migration**:
-```sql
-CREATE TABLE rca_templates (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  incident_type TEXT NOT NULL,
-  template_content JSONB NOT NULL,
-  required_fields TEXT[],
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
-ALTER TABLE incidents ADD COLUMN IF NOT EXISTS rca_template_id UUID REFERENCES rca_templates(id);
-ALTER TABLE incidents ADD COLUMN IF NOT EXISTS rca_completed_at TIMESTAMPTZ;
-ALTER TABLE incidents ADD COLUMN IF NOT EXISTS follow_up_date DATE;
-```
-
-### 3.3 Create Incident Bulk Resolution Component
-**New file**: `src/components/incidents/BulkResolutionPanel.tsx`
-
-- Multi-select with filters (severity, age, status)
-- Common resolution reason dropdown
-- Auto-link to RCA template
-- Batch close with audit trail
-
----
-
-## Phase 4: Unified Platform Configuration (Priority: HIGH)
-
-### 4.1 Create Configuration Registry Table
-**Database migration**:
-```sql
-CREATE TABLE platform_config (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  config_key TEXT NOT NULL UNIQUE,
-  config_value JSONB NOT NULL,
-  category TEXT NOT NULL CHECK (category IN ('engine_weights', 'thresholds', 'slo', 'escalation', 'policy')),
-  version INTEGER DEFAULT 1,
-  updated_by UUID REFERENCES auth.users(id),
-  updated_at TIMESTAMPTZ DEFAULT now(),
-  description TEXT
-);
-
-CREATE TABLE platform_config_history (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  config_id UUID REFERENCES platform_config(id),
-  previous_value JSONB,
-  new_value JSONB,
-  changed_by UUID REFERENCES auth.users(id),
-  changed_at TIMESTAMPTZ DEFAULT now()
-);
-```
-
-### 4.2 Create Config Management Hook
-**New file**: `src/hooks/usePlatformConfig.ts`
-
-Centralized configuration access with:
-- Type-safe config retrieval
-- Version tracking
-- Change history
-- Real-time updates via Supabase subscription
-
-### 4.3 Create Configuration Dashboard
-**New file**: `src/pages/Configuration.tsx`
-
-Admin UI for managing:
-- Engine weight profiles
-- DQ thresholds by dimension
-- Fairness thresholds (demographic parity, etc.)
-- SLO values (MTTD, MTTR)
-- Escalation rules
-- Policy settings
-
----
-
-## Phase 5: Golden Demo Automation Enhancement (Priority: MEDIUM)
-
-### 5.1 Add Demo Scenarios Table
-**Database migration**:
-```sql
-CREATE TABLE demo_scenarios (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  scenario_name TEXT NOT NULL,
-  description TEXT,
-  steps JSONB NOT NULL,
-  expected_outcomes JSONB,
-  duration_seconds INTEGER DEFAULT 90,
-  category TEXT CHECK (category IN ('sales', 'audit', 'investor', 'training')),
-  enabled BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-```
-
-### 5.2 Enhance Golden Demo Orchestrator
-**Modified file**: `src/hooks/useGoldenDemoOrchestrator.ts`
-
-Add:
-- Scenario-based execution from `demo_scenarios` table
-- Stepper-based visual walkthrough
-- Investor mode (condensed 60s version)
-- Audit mode (comprehensive 5min version)
-- Export demo log as evidence package
-
-### 5.3 Add Demo Narration Component
-**New file**: `src/components/golden/DemoNarrator.tsx`
-
-Visual overlay showing:
-- Current step description
-- What's happening technically
-- Why it matters for governance
-- Next step preview
-
----
-
-## Phase 6: Edge Function Observability (Priority: MEDIUM)
-
-### 6.1 Create Function Metrics Table
-**Database migration**:
-```sql
-CREATE TABLE function_metrics (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  function_name TEXT NOT NULL,
-  invocation_count INTEGER DEFAULT 0,
-  error_count INTEGER DEFAULT 0,
-  total_latency_ms BIGINT DEFAULT 0,
-  cold_start_count INTEGER DEFAULT 0,
-  measurement_window TIMESTAMPTZ DEFAULT now(),
-  recorded_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE INDEX idx_function_metrics_name_time ON function_metrics(function_name, recorded_at DESC);
-```
-
-### 6.2 Create Metrics Recording Utility
-**New file**: `supabase/functions/_shared/function-metrics.ts`
-
-Wrapper for edge functions that records:
-- Invocation count
-- Latency distribution
-- Error rates by type
-- Cold start detection
-
-### 6.3 Create Edge Function Dashboard
-**New file**: `src/components/observability/EdgeFunctionDashboard.tsx`
-
-Visualizations:
-- Latency heatmap by function
-- Error rate chart
-- Invocation volume sparklines
-- Cold start percentage
-
----
-
-## Phase 7: Governance Bypass Detection (Priority: MEDIUM)
-
-### 7.1 Create Bypass Detection Edge Function
-**New file**: `supabase/functions/detect-governance-bypass/index.ts`
-
-Monitors for:
-- API calls without signed JWT
-- Direct database access patterns
-- Unusual request patterns
-- Policy circumvention attempts
-- Suspicious rate limit behaviors
-
-### 7.2 Add Bypass Detection Alerts
-Automatically creates incidents when bypass detected:
-- Links to admin audit log
-- Captures request details
-- Assigns to security team
-
----
-
-## Phase 8: Rate Limiting Hardening (Priority: HIGH)
-
-### 8.1 Verify DB-Backed Rate Limiting
-The `rate_limits` table already exists with 29 entries. Verify all critical functions use it:
-
-**Functions to verify/update**:
-- `ai-gateway` - Uses DB-backed ✓
-- `llm-generate` - Uses DB-backed ✓
-- `cicd-gate` - Uses in-memory ✗ (needs fix)
-- `eval-*` functions - Need rate limiting
-
-### 8.2 Add Rate Limit Cleanup CRON
-**Database migration** (for scheduled cleanup):
-```sql
-SELECT cron.schedule(
-  'cleanup-rate-limits',
-  '*/15 * * * *',
-  $$DELETE FROM rate_limits WHERE window_start < now() - interval '1 hour'$$
-);
-```
-
-### 8.3 Fix `cicd-gate` Rate Limiting
-**Modified file**: `supabase/functions/cicd-gate/index.ts`
-
-Replace in-memory Map with database-backed implementation:
+**New imports**:
 ```typescript
-// Replace rateLimitMap with database queries
-async function checkRateLimit(identifier: string): Promise<boolean> {
-  const { count } = await supabase
-    .from('rate_limits')
-    .select('*', { count: 'exact', head: true })
-    .eq('identifier', identifier)
-    .gte('window_start', new Date(Date.now() - 60000).toISOString());
-  
-  return (count || 0) < RATE_LIMIT;
-}
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BulkTriagePanel } from "@/components/hitl/BulkTriagePanel";
+```
+
+**UI structure**:
+```
+┌─────────────────────────────────────┐
+│ HITL Console                        │
+├─────────────────────────────────────┤
+│ [Queue] [Bulk Triage] tabs          │
+├─────────────────────────────────────┤
+│ Tab Content:                        │
+│ - Queue: existing review cards      │
+│ - Bulk Triage: BulkTriagePanel      │
+└─────────────────────────────────────┘
 ```
 
 ---
 
-## Phase 9: Predictive Governance (Governance Capability 12)
+### Phase 3: Incidents Page (Incidents.tsx) Enhancements
 
-### 9.1 Create Predictive Model Table
-**Database migration**:
-```sql
-CREATE TABLE predictive_governance (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  entity_type TEXT CHECK (entity_type IN ('model', 'system', 'dataset')),
-  entity_id UUID NOT NULL,
-  prediction_type TEXT CHECK (prediction_type IN ('drift_risk', 'compliance_risk', 'incident_probability')),
-  risk_score NUMERIC NOT NULL,
-  confidence NUMERIC NOT NULL,
-  predicted_timeframe_hours INTEGER,
-  factors JSONB,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+**File**: `src/pages/Incidents.tsx`
+
+**Changes**:
+1. Add Tabs component for "List" | "Bulk Resolution" views
+2. Integrate `BulkResolutionPanel` component
+3. Add "Run Lifecycle Check" button in header (calls `incident-lifecycle`)
+4. Add RCA template indicator on resolved incidents
+5. Add follow-up date display for incidents with `follow_up_date`
+
+**New imports**:
+```typescript
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BulkResolutionPanel } from "@/components/incidents/BulkResolutionPanel";
 ```
-
-### 9.2 Create Predictive Analysis Edge Function
-**New file**: `supabase/functions/predictive-governance/index.ts`
-
-Analyzes historical patterns to predict:
-- Likelihood of drift based on traffic patterns
-- Compliance risk based on evaluation trends
-- Incident probability based on error rates
-
-### 9.3 Add Predictive Indicators to Dashboard
-**Modified file**: `src/pages/Index.tsx`
-
-Add predictive risk badges:
-- "Drift likely in 24h" warning
-- "Compliance risk increasing" indicator
-- "Model degradation trend" alert
 
 ---
 
-## Phase 10: Policy-as-Code Validation
+### Phase 4: Observability Page Enhancements
 
-### 10.1 Create Policy Linter Edge Function
-**New file**: `supabase/functions/policy-lint/index.ts`
+**File**: `src/pages/Observability.tsx`
 
-Static validation for policy configurations:
-- Syntax validation
-- Threshold range checks
-- Conflict detection
-- Regulatory alignment verification
+**Changes**:
+1. Add new tab: "Oversight Agent" with SimulationController
+2. Add `events_raw` count metric to dashboard
+3. Add real-time subscription for events_raw
+4. Add "Process Pending Events" button (calls `process-events`)
+5. Add Edge Function metrics display (if function_metrics has data)
 
-### 10.2 Add Policy Version History
-**Database migration**:
-```sql
-CREATE TABLE policy_versions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  policy_id UUID NOT NULL,
-  version INTEGER NOT NULL,
-  content JSONB NOT NULL,
-  validated BOOLEAN DEFAULT false,
-  validation_errors JSONB,
-  created_by UUID REFERENCES auth.users(id),
-  created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(policy_id, version)
-);
+**New section in tabs array**:
+```typescript
+{ id: 'oversight', label: 'Oversight Agent', icon: Zap }
 ```
-
-### 10.3 Integrate with CI/CD Gate
-**Modified file**: `supabase/functions/cicd-gate/index.ts`
-
-Add policy validation check before deployment approval.
 
 ---
 
-## Implementation Summary
+### Phase 5: Settings Page - Configuration Dashboard
 
-### New Database Tables (8)
-| Table | Purpose |
-|-------|---------|
-| `auto_approval_policies` | HITL automation rules |
-| `rca_templates` | Root cause analysis templates |
-| `platform_config` | Unified configuration |
-| `platform_config_history` | Config change tracking |
-| `demo_scenarios` | Golden Demo scripts |
-| `function_metrics` | Edge function observability |
-| `predictive_governance` | Governance predictions |
-| `policy_versions` | Policy versioning |
+**File**: `src/pages/Settings.tsx`
 
-### New Edge Functions (7)
-| Function | Purpose |
-|----------|---------|
-| `generate-synthetic-events` | Oversight Agent testing |
-| `hitl-auto-assist` | AI-powered HITL triage |
-| `incident-lifecycle` | Automated incident management |
-| `detect-governance-bypass` | Security monitoring |
-| `predictive-governance` | Risk prediction |
-| `policy-lint` | Policy validation |
-| `edge-function-metrics` | Observability wrapper |
+**Changes**:
+1. Add new tab: "Platform Configuration"
+2. Display/edit values from `platform_config` table
+3. Show configuration history from `platform_config_history`
+4. Group configs by category (engine_weights, thresholds, slo, escalation, policy)
 
-### Modified Edge Functions (2)
-| Function | Changes |
-|----------|---------|
-| `process-events` | Dynamic thresholds from config |
-| `cicd-gate` | DB-backed rate limiting |
+**New imports**:
+```typescript
+import { usePlatformConfig, useUpdateConfig, useConfigHistory } from "@/hooks/usePlatformConfig";
+```
 
-### New UI Components (8)
-| Component | Purpose |
-|-----------|---------|
-| `SimulationController` | Synthetic event generation UI |
-| `BulkTriagePanel` | HITL batch processing |
-| `BulkResolutionPanel` | Incident batch closing |
-| `Configuration.tsx` | Platform config management |
-| `DemoNarrator` | Golden Demo walkthrough |
-| `EdgeFunctionDashboard` | Function observability |
-| `PredictiveIndicators` | Risk prediction badges |
-| `PolicyLintResults` | Policy validation UI |
+**UI for each config category**:
+- Engine Weights: Sliders for each engine (0-100)
+- DQ Thresholds: Number inputs for 6 dimensions
+- SLO Targets: MTTD/MTTR minute inputs
+- Escalation Rules: Toggles and dropdowns
 
-### Modified UI Files (4)
+---
+
+### Phase 6: Sidebar Navigation Updates
+
+**File**: `src/components/layout/Sidebar.tsx`
+
+**Changes**:
+1. Add "Oversight Agent" link under Monitor section
+2. Add badge showing unprocessed events count
+3. Add Configuration link under Configure section
+
+**New nav items**:
+```typescript
+{ path: "/observability?tab=oversight", icon: Zap, label: "Oversight Agent" },
+{ path: "/settings?tab=config", icon: Sliders, label: "Configuration" },
+```
+
+---
+
+### Phase 7: Golden Demo V2 Enhancements
+
+**File**: `src/pages/GoldenDemoV2.tsx`
+
+**Changes**:
+1. Add scenario selector from `demo_scenarios` table
+2. Add SimulationController as optional step
+3. Add Predictive Governance step
+4. Add bypass detection check step
+
+**New demo steps**:
+```typescript
+const ENHANCED_DEMO_STEPS = [
+  ...existing_steps,
+  { step: 'oversight-agent', label: 'Oversight Agent Test' },
+  { step: 'predictive-check', label: 'Predictive Governance' },
+  { step: 'bypass-detection', label: 'Governance Bypass Check' },
+];
+```
+
+---
+
+### Phase 8: Create New Configuration Page
+
+**New File**: `src/pages/Configuration.tsx`
+
+**Purpose**: Dedicated page for platform configuration management
+
+**Components**:
+- Engine Weight Editor
+- Threshold Configuration
+- SLO Target Editor
+- Escalation Rules Manager
+- Config History Viewer
+
+**Route addition** in `App.tsx`:
+```typescript
+<Route path="/configuration" element={<ProtectedRoute requiredRoles={['admin']}><Configuration /></ProtectedRoute>} />
+```
+
+---
+
+### Phase 9: Create Runbooks Page
+
+**New File**: `src/pages/Runbooks.tsx`
+
+**Purpose**: Incident response guides and decision trees
+
+**Content**:
+- Incident triage decision tree (visual flowchart)
+- Escalation path visualization
+- Evidence attachment guide
+- RCA template list from `rca_templates` table
+
+**Route addition** in `App.tsx`:
+```typescript
+<Route path="/runbooks" element={<ProtectedRoute><Runbooks /></ProtectedRoute>} />
+```
+
+---
+
+### Phase 10: Create Predictive Dashboard Component
+
+**New File**: `src/components/dashboard/PredictiveRiskPanel.tsx`
+
+**Purpose**: Display predictive governance insights
+
+**Features**:
+- High-risk predictions list
+- Risk trend indicators
+- Prediction type distribution
+- "Run Analysis" button (calls `predictive-governance`)
+
+**Integration**: Add to Index.tsx dashboard
+
+---
+
+## File Changes Summary
+
+### Modified Files (9)
 | File | Changes |
 |------|---------|
-| `HITL.tsx` | Add bulk triage, AI assist |
-| `Index.tsx` | Add predictive indicators |
-| `Observability.tsx` | Add function metrics |
-| `useGoldenDemoOrchestrator.ts` | Add scenario-based execution |
+| `src/pages/Index.tsx` | +SimulationController, +PredictiveRiskPanel, +events subscription |
+| `src/pages/HITL.tsx` | +Tabs, +BulkTriagePanel integration |
+| `src/pages/Incidents.tsx` | +Tabs, +BulkResolutionPanel integration |
+| `src/pages/Observability.tsx` | +Oversight Agent tab, +events metrics |
+| `src/pages/Settings.tsx` | +Configuration tab with platform_config editor |
+| `src/pages/GoldenDemoV2.tsx` | +Enhanced demo steps, +scenario selector |
+| `src/components/layout/Sidebar.tsx` | +Oversight Agent link, +Configuration link |
+| `src/App.tsx` | +Configuration route, +Runbooks route |
+| `supabase/config.toml` | Already updated with all functions |
+
+### New Files (3)
+| File | Purpose |
+|------|---------|
+| `src/pages/Configuration.tsx` | Platform configuration management |
+| `src/pages/Runbooks.tsx` | Incident response guides |
+| `src/components/dashboard/PredictiveRiskPanel.tsx` | Predictive governance display |
 
 ---
 
-## Success Criteria (Target Metrics)
+## Technical Implementation Details
 
-| KPI | Current | Target |
-|-----|---------|--------|
-| Events in `events_raw` | 0 | 10,000+ |
-| HITL Backlog | 546 | <50 |
-| Open Incidents | 218 | <30 |
-| MTTD (Critical) | N/A | ≤5 min |
-| MTTR (Critical) | N/A | ≤60 min |
-| Rate Limiting | Partial | 100% DB-backed |
-| Golden Demo Automation | Partial | Complete |
-| Config Centralization | None | 100% |
-| Edge Function Observability | None | 100% |
-| Governance Capabilities | 11/11 | 12/12 (with predictive) |
+### Index.tsx Changes
+
+```typescript
+// New state for events count
+const { data: eventsCount } = useQuery({
+  queryKey: ['events-raw-count'],
+  queryFn: async () => {
+    const { count } = await supabase
+      .from('events_raw')
+      .select('*', { count: 'exact', head: true });
+    return count || 0;
+  },
+});
+
+// New realtime subscription
+.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'events_raw' }, () => {
+  queryClient.invalidateQueries({ queryKey: ['events-raw-count'] });
+})
+
+// New section in JSX
+<div className="mb-6">
+  <h2 className="text-lg font-semibold mb-4">Oversight Agent</h2>
+  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <SimulationController />
+    <PredictiveRiskPanel />
+  </div>
+</div>
+```
+
+### HITL.tsx Changes
+
+```typescript
+// Replace main content with tabs
+<Tabs defaultValue="queue" className="w-full">
+  <TabsList className="mb-4">
+    <TabsTrigger value="queue">Review Queue</TabsTrigger>
+    <TabsTrigger value="bulk">Bulk Triage</TabsTrigger>
+  </TabsList>
+  
+  <TabsContent value="queue">
+    {/* Existing review queue content */}
+  </TabsContent>
+  
+  <TabsContent value="bulk">
+    <BulkTriagePanel onComplete={() => { refetch(); refetchStats(); }} />
+  </TabsContent>
+</Tabs>
+```
+
+### Incidents.tsx Changes
+
+```typescript
+// Add tabs wrapper
+<Tabs defaultValue="list" className="w-full">
+  <TabsList className="mb-4">
+    <TabsTrigger value="list">Incident List</TabsTrigger>
+    <TabsTrigger value="bulk">Bulk Resolution</TabsTrigger>
+  </TabsList>
+  
+  <TabsContent value="list">
+    {/* Existing incident list */}
+  </TabsContent>
+  
+  <TabsContent value="bulk">
+    <BulkResolutionPanel onComplete={() => queryClient.invalidateQueries({ queryKey: ['incidents'] })} />
+  </TabsContent>
+</Tabs>
+```
+
+---
+
+## Database Queries for New Features
+
+### Events Count Query
+```sql
+SELECT COUNT(*) FROM events_raw WHERE processed = false;
+```
+
+### High-Risk Predictions Query
+```sql
+SELECT * FROM predictive_governance 
+WHERE risk_score >= 70 
+ORDER BY risk_score DESC 
+LIMIT 5;
+```
+
+### RCA Templates Query
+```sql
+SELECT * FROM rca_templates ORDER BY incident_type;
+```
+
+### Platform Config Query
+```sql
+SELECT * FROM platform_config ORDER BY category, config_key;
+```
+
+---
+
+## Success Criteria
+
+| Metric | Current | Target |
+|--------|---------|--------|
+| SimulationController visible on Index | No | Yes |
+| BulkTriagePanel integrated in HITL | No | Yes |
+| BulkResolutionPanel integrated in Incidents | No | Yes |
+| Predictive Risk Panel visible | No | Yes |
+| Configuration page accessible | No | Yes |
+| Runbooks page accessible | No | Yes |
+| All Edge Functions callable from UI | 50% | 100% |
+| Real-time events_raw subscription | No | Yes |
 
 ---
 
 ## Implementation Order
 
-1. **Phase 1**: Synthetic Event Generator + Oversight Agent validation (unblocks all SLO measurement)
-2. **Phase 2**: HITL Auto-Assist + Bulk Triage (clears 546 backlog)
-3. **Phase 3**: Incident Lifecycle Engine (clears 218 incidents)
-4. **Phase 8**: Rate Limiting Hardening (security requirement)
-5. **Phase 4**: Unified Platform Configuration
-6. **Phase 5**: Golden Demo Enhancement
-7. **Phase 6**: Edge Function Observability
-8. **Phase 7**: Governance Bypass Detection
-9. **Phase 9**: Predictive Governance
-10. **Phase 10**: Policy-as-Code Validation
+1. **Index.tsx** - Add SimulationController + PredictiveRiskPanel
+2. **HITL.tsx** - Add Tabs + BulkTriagePanel
+3. **Incidents.tsx** - Add Tabs + BulkResolutionPanel
+4. **Observability.tsx** - Add Oversight Agent tab
+5. **PredictiveRiskPanel.tsx** - Create new component
+6. **Configuration.tsx** - Create new page
+7. **Runbooks.tsx** - Create new page
+8. **Sidebar.tsx** - Add new navigation links
+9. **App.tsx** - Add new routes
+10. **Settings.tsx** - Add Configuration tab
