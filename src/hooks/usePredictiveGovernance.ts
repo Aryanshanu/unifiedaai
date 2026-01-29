@@ -1,5 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export interface PredictiveRisk {
   id: string;
@@ -102,5 +103,29 @@ export function usePredictionSummary() {
       };
     },
     refetchInterval: 60000,
+  });
+}
+
+export function useRunPredictiveAnalysis() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('predictive-governance', {
+        body: { action: 'analyze_all' }
+      });
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['predictive-governance'] });
+      queryClient.invalidateQueries({ queryKey: ['high-risk-predictions'] });
+      queryClient.invalidateQueries({ queryKey: ['prediction-summary'] });
+      toast.success("Predictive analysis complete");
+    },
+    onError: (error: Error) => {
+      toast.error("Analysis failed", { description: error.message });
+    }
   });
 }
