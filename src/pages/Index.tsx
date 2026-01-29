@@ -8,6 +8,8 @@ import GovernanceHealthCards, { GovernanceCoverageBadge } from "@/components/das
 import { GovernanceFlowDiagram } from "@/components/dashboard/GovernanceFlowDiagram";
 import { IncidentSummaryCard } from "@/components/dashboard/IncidentSummaryCard";
 import { FeedbackLoopDiagram } from "@/components/monitoring/FeedbackLoopDiagram";
+import { SLODashboard } from "@/components/dashboard/SLODashboard";
+import { OversightAgentStatus } from "@/components/dashboard/OversightAgentStatus";
 import { useUnsafeDeployments, usePlatformMetrics } from "@/hooks/usePlatformMetrics";
 import { useGovernanceMetrics } from "@/hooks/useGovernanceMetrics";
 import { Database, Scale, AlertCircle, ShieldAlert, Lock, Eye, AlertOctagon, ArrowRight, Shield, AlertTriangle } from "lucide-react";
@@ -163,6 +165,14 @@ export default function Index() {
       {/* 6-Stage Governance Pipeline Flow */}
       <div className="mb-6">
         <GovernanceFlowDiagram />
+      </div>
+
+      {/* SLO Dashboard & Oversight Agent Status */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+        <div className="lg:col-span-2">
+          <SLODashboard />
+        </div>
+        <OversightAgentStatus />
       </div>
 
       {/* Incident Summary and Feedback Loop - Side by Side */}
