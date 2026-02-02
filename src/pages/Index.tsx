@@ -32,7 +32,7 @@ export default function Index() {
   const { data: unsafeDeployments, isLoading: deploymentsLoading } = useUnsafeDeployments();
   const { data: metrics, isLoading: metricsLoading, isError: metricsError, refetch: refetchMetrics } = usePlatformMetrics();
   const { data: governanceMetrics } = useGovernanceMetrics();
-  const { data: highRiskPredictions } = useHighRiskPredictions(3);
+  const { data: highRiskPredictions } = useHighRiskPredictions(); // Default threshold is 70
   const navigate = useNavigate();
   
   const isLoading = modelsLoading || deploymentsLoading || metricsLoading;
