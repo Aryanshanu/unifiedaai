@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -24,15 +24,17 @@ interface AutoAssistResult {
 
 interface BulkTriagePanelProps {
   onComplete?: () => void;
+  autoAnalyze?: boolean;
 }
 
-export function BulkTriagePanel({ onComplete }: BulkTriagePanelProps) {
+export function BulkTriagePanel({ onComplete, autoAnalyze = true }: BulkTriagePanelProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [results, setResults] = useState<AutoAssistResult[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [filterDecision, setFilterDecision] = useState<string>("all");
   const [bulkRationale, setBulkRationale] = useState("");
+  const [hasAutoAnalyzed, setHasAutoAnalyzed] = useState(false);
 
   const analyzeQueue = async () => {
     setIsAnalyzing(true);
@@ -44,7 +46,9 @@ export function BulkTriagePanel({ onComplete }: BulkTriagePanelProps) {
       if (error) throw error;
 
       setResults(data.results || []);
-      toast.success(`Analyzed ${data.results?.length || 0} items`);
+      if (data.results?.length > 0) {
+        toast.success(`Analyzed ${data.results?.length || 0} items`);
+      }
     } catch (error) {
       console.error("Analysis error:", error);
       toast.error("Failed to analyze queue");
@@ -52,6 +56,14 @@ export function BulkTriagePanel({ onComplete }: BulkTriagePanelProps) {
       setIsAnalyzing(false);
     }
   };
+
+  // Auto-analyze on mount if autoAnalyze is true
+  useEffect(() => {
+    if (autoAnalyze && !hasAutoAnalyzed) {
+      setHasAutoAnalyzed(true);
+      analyzeQueue();
+    }
+  }, [autoAnalyze, hasAutoAnalyzed]);
 
   const filteredResults = results.filter((r) => {
     if (filterDecision === "all") return true;

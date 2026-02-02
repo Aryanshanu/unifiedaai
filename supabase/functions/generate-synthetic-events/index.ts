@@ -31,13 +31,14 @@ const EVENT_TYPE_DISTRIBUTION = {
   compliance: 0.08,
 };
 
-// Severity distributions (as percentages)
+// Severity distributions (as percentages) - adjusted to generate more alerts
+// Increased medium+ to ensure incidents are created
 const SEVERITY_DISTRIBUTION = {
-  critical: 0.05,
-  high: 0.15,
-  medium: 0.30,
-  low: 0.30,
-  info: 0.20,
+  critical: 0.10,
+  high: 0.25,
+  medium: 0.35,
+  low: 0.20,
+  info: 0.10,
 };
 
 function selectFromDistribution(distribution: Record<string, number>): string {

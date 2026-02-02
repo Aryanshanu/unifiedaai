@@ -116,6 +116,23 @@ export function useConfigHistory(configId?: string) {
   });
 }
 
+// Get all recent config history (for global history view)
+export function useAllConfigHistory(limit = 20) {
+  return useQuery({
+    queryKey: ["platform-config-history-all", limit],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("platform_config_history")
+        .select("*, platform_config:config_id(config_key, category)")
+        .order("changed_at", { ascending: false })
+        .limit(limit);
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 // Typed getters for specific configurations
 export function useEngineWeights() {
   return useConfigValue<{

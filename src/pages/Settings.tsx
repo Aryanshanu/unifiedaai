@@ -639,7 +639,14 @@ function PlatformConfigEditor() {
 
   useEffect(() => {
     if (engineWeights) {
-      setLocalWeights(engineWeights as Record<string, number>);
+      // Convert decimal weights (0.25) to percentages (25) for slider display
+      const convertedWeights: Record<string, number> = {};
+      for (const [key, value] of Object.entries(engineWeights)) {
+        const numValue = value as number;
+        // If value is <= 1, assume it's a decimal that needs conversion
+        convertedWeights[key] = numValue <= 1 ? Math.round(numValue * 100) : numValue;
+      }
+      setLocalWeights(convertedWeights);
     }
   }, [engineWeights]);
 
@@ -655,7 +662,12 @@ function PlatformConfigEditor() {
 
   const handleSaveWeights = async () => {
     try {
-      await updateConfig.mutateAsync({ configKey: 'engine_weights', value: localWeights });
+      // Convert percentages back to decimals for storage (25 -> 0.25)
+      const decimalWeights: Record<string, number> = {};
+      for (const [key, value] of Object.entries(localWeights)) {
+        decimalWeights[key] = value > 1 ? value / 100 : value;
+      }
+      await updateConfig.mutateAsync({ configKey: 'engine_weights', value: decimalWeights });
       toast.success("Engine weights updated");
     } catch {
       toast.error("Failed to save weights");
