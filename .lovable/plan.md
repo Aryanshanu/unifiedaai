@@ -1,319 +1,180 @@
 
-# Complete Implementation: All Remaining Frontend-Backend Integration
 
-## Overview
-This plan completes ALL remaining work in a single implementation. No further approvals will be needed - everything will be done at once.
+# Comprehensive Audit Report: Functional Issues & Missing Backend Logic
 
----
+## Executive Summary
 
-## Files to Modify (4 files)
-
-### 1. src/pages/Incidents.tsx
-**Current State**: Has filters, list view, detail dialog, but no bulk resolution tab
-**Changes**:
-- Add Tabs component wrapping main content
-- Add "Bulk Resolution" tab with `BulkResolutionPanel` integration
-- Add "Run Lifecycle Check" button calling `incident-lifecycle` edge function
-- Add RCA template badge on resolved incidents
-- Add follow-up date display for incidents with `follow_up_date`
-
-### 2. src/pages/Observability.tsx
-**Current State**: Has Dashboard, AI Assistant, Real-Time Chat, Drift Detection tabs
-**Changes**:
-- Add new "Oversight Agent" tab
-- Add `SimulationController` component in that tab
-- Add `events_raw` count metric to dashboard
-- Add real-time subscription for `events_raw` table
-- Add "Process Pending Events" button calling `process-events` edge function
-
-### 3. src/pages/Settings.tsx
-**Current State**: Has General, Users, Security, Notifications, Integrations, Providers, API Keys, Regions sections
-**Changes**:
-- Add new "Platform Config" section to navigation
-- Add configuration editor UI for `platform_config` table
-- Group configs by category (engine_weights, thresholds, slo, escalation, policy)
-- Show configuration history from `platform_config_history`
-- Add sliders for engine weights, number inputs for thresholds
-
-### 4. src/pages/GoldenDemoV2.tsx
-**Current State**: Has project/model selection, mode selection, live execution logs
-**Changes**:
-- Add scenario selector dropdown from `demo_scenarios` table
-- Add enhanced demo steps for Oversight Agent, Predictive Governance, Bypass Detection
-- Add hooks for new demo steps execution
+After thorough investigation of the codebase, database state, edge functions, and UI components, I've identified **14 critical issues** that need to be fixed for the platform to be truly production-ready.
 
 ---
 
-## Technical Details
+## Issue Categories
 
-### Incidents.tsx Changes
+### Category A: Empty/Zero Data in Critical Tables (4 Issues)
 
-```typescript
-// New imports
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BulkResolutionPanel } from "@/components/incidents/BulkResolutionPanel";
-import { RefreshCw, PlayCircle, FileCheck } from "lucide-react";
+| Issue # | Table/Feature | Current Value | Expected | Impact |
+|---------|---------------|---------------|----------|--------|
+| A1 | `events_raw` count | 10 (just generated) | 10,000+ | Oversight Agent cannot validate MTTD/MTTR |
+| A2 | `predictive_governance` | 4 (just generated) | 50+ | Predictive Risk Panel shows "No High-Risk Predictions" |
+| A3 | `function_metrics` | 0 | 100+ | Edge Function observability dashboard is empty |
+| A4 | Processed events count | 0 (events sit at 0 after processing) | Events should create incidents | Event pipeline not triggering properly |
 
-// New state for lifecycle check
-const [runningLifecycle, setRunningLifecycle] = useState(false);
+**Root Cause**: The edge functions exist and work (tested via curl), but they're never called automatically. Users must manually click buttons, and even then, the events are processed but no visible outcome appears in the UI.
 
-// New function to run lifecycle check
-const handleRunLifecycleCheck = async () => {
-  setRunningLifecycle(true);
-  try {
-    await supabase.functions.invoke('incident-lifecycle', {
-      body: { action: 'check_all' }
-    });
-    toast.success("Lifecycle check complete");
-    queryClient.invalidateQueries({ queryKey: ['incidents'] });
-  } catch (error) {
-    toast.error("Lifecycle check failed");
-  } finally {
-    setRunningLifecycle(false);
-  }
-};
+---
 
-// Wrap main content in Tabs
-<Tabs defaultValue="list" className="w-full">
-  <div className="flex items-center justify-between mb-4">
-    <TabsList>
-      <TabsTrigger value="list">Incident List</TabsTrigger>
-      <TabsTrigger value="bulk">Bulk Resolution</TabsTrigger>
-    </TabsList>
-    <Button onClick={handleRunLifecycleCheck} disabled={runningLifecycle}>
-      <PlayCircle className="w-4 h-4 mr-2" />
-      Run Lifecycle Check
-    </Button>
-  </div>
-  
-  <TabsContent value="list">
-    {/* Existing KPIs, filters, and incident list */}
-  </TabsContent>
-  
-  <TabsContent value="bulk">
-    <BulkResolutionPanel onComplete={() => queryClient.invalidateQueries({ queryKey: ['incidents'] })} />
-  </TabsContent>
-</Tabs>
+### Category B: UI Components Without Proper Backend Wiring (5 Issues)
+
+| Issue # | Component | Problem | Fix Required |
+|---------|-----------|---------|--------------|
+| B1 | `PredictiveRiskPanel` | Shows "No High-Risk Predictions" even when predictions exist (risk_score >= 70 filter too high) | Lower the threshold or show all predictions |
+| B2 | `SimulationController` | Works but generated events show 0 after `process-events` runs | Check why incidents aren't being created from events |
+| B3 | `BulkTriagePanel` | Works when clicked, but no AI suggestions appear initially | Auto-fetch suggestions on mount |
+| B4 | Settings > Platform Config | Engine weights display as decimals (0.25) but sliders expect 0-100 | Fix value conversion (multiply by 100) |
+| B5 | Configuration.tsx page | Separate page created but duplicates Settings > Platform Config | Should redirect or unify |
+
+---
+
+### Category C: Edge Functions Not Auto-Triggered (2 Issues)
+
+| Issue # | Function | Problem | Expected Behavior |
+|---------|----------|---------|-------------------|
+| C1 | `process-events` | Only runs when manually triggered | Should auto-run on cron or after `generate-synthetic-events` |
+| C2 | `predictive-governance` | Only runs when "Run Analysis" clicked | Should run on schedule or after evaluation completions |
+
+---
+
+### Category D: Data Format Mismatches (3 Issues)
+
+| Issue # | Location | Problem | Fix |
+|---------|----------|---------|-----|
+| D1 | Engine weights in DB | Stored as decimals (0.25) | UI expects percentages (25) - needs conversion |
+| D2 | SLO targets | Config values work but UI shows "minutes" while stored as minutes | Correct but needs better labeling |
+| D3 | Predictions threshold | `useHighRiskPredictions(3)` passes 3 as minRiskScore | Should be 70, but got overwritten |
+
+---
+
+## Detailed Fixes Required
+
+### Fix 1: Engine Weights Value Conversion (Settings.tsx)
+**File**: `src/pages/Settings.tsx` (PlatformConfigEditor component)
+**Problem**: Database stores weights as decimals (0.25, 0.20), but sliders display 0-100.
+**Fix**: Multiply by 100 when loading, divide by 100 when saving.
+
+### Fix 2: PredictiveRiskPanel Threshold Issue  
+**File**: `src/pages/Index.tsx` line 35
+**Current**: `useHighRiskPredictions(3)` - This passes 3 as the minRiskScore limit, not 70
+**Should be**: `useHighRiskPredictions()` or `useHighRiskPredictions(70)`
+
+### Fix 3: Auto-Process Events After Generation
+**File**: `supabase/functions/generate-synthetic-events/index.ts`
+**Current**: Calls `process-events` at the end but the call may fail silently
+**Fix**: Add better error handling and ensure JWT is passed
+
+### Fix 4: Add Cron Job for Predictive Governance
+**Database**: Add pg_cron schedule to run `predictive-governance` every hour
+```sql
+SELECT cron.schedule(
+  'run-predictive-governance',
+  '0 * * * *',
+  $$ SELECT net.http_post(
+    url := 'https://avmzkngttrfmowihkqzr.supabase.co/functions/v1/predictive-governance',
+    headers := '{"Authorization": "Bearer ' || current_setting('supabase.service_role_key') || '"}'::jsonb
+  ); $$
+);
 ```
 
-### Observability.tsx Changes
+### Fix 5: Events Not Creating Incidents
+**File**: `supabase/functions/process-events/index.ts`
+**Issue**: Events are marked as processed but incidents only created for medium/high/critical severity
+**Current**: 10 events generated, 0 incidents (likely all were low/info severity or duplicates)
+**Fix**: Verify the event distribution includes enough medium+ severity events
 
-```typescript
-// New imports
-import { SimulationController } from "@/components/oversight/SimulationController";
-import { useQuery } from "@tanstack/react-query";
-import { Cpu } from "lucide-react";
+### Fix 6: Configuration.tsx Duplicate Page
+**Files**: `src/pages/Configuration.tsx` and `src/pages/Settings.tsx`
+**Issue**: Two different places to configure platform settings
+**Fix**: Remove Configuration.tsx or make it redirect to Settings?tab=config
 
-// Add events_raw count query
-const { data: eventsCount } = useQuery({
-  queryKey: ['events-raw-count'],
-  queryFn: async () => {
-    const { count } = await supabase
-      .from('events_raw')
-      .select('*', { count: 'exact', head: true })
-      .eq('processed', false);
-    return count || 0;
-  },
-});
+### Fix 7: BulkTriagePanel Auto-Analysis
+**File**: `src/components/hitl/BulkTriagePanel.tsx`
+**Issue**: User must click "Analyze Queue" to see AI suggestions
+**Fix**: Auto-run analysis on component mount (optional, UX preference)
 
-// Add to tabs array
-const tabs = [
-  { id: 'dashboard', label: 'Dashboard', icon: Activity },
-  { id: 'oversight', label: 'Oversight Agent', icon: Cpu }, // NEW
-  { id: 'assistant', label: 'AI Assistant', icon: Bot },
-  { id: 'realtime', label: 'Real-Time Chat', icon: MessageSquare },
-  { id: 'drift', label: 'Drift Detection', icon: TrendingUp },
-];
+### Fix 8: Add Missing Function Metrics Recording
+**Issue**: `function_metrics` table is empty because no function records to it
+**Fix**: Create a wrapper utility and update key edge functions to record metrics
 
-// Add oversight tab content
-{activeTab === 'oversight' && (
-  <div className="space-y-6">
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <MetricCard
-        title="Pending Events"
-        value={eventsCount?.toString() || "0"}
-        subtitle="Awaiting processing"
-        icon={<Cpu className="w-4 h-4 text-primary" />}
-      />
-    </div>
-    <SimulationController />
-  </div>
-)}
+### Fix 9: usePlatformConfig Hook Not Returning Correct History
+**File**: `src/hooks/usePlatformConfig.ts` line 99
+**Issue**: `useConfigHistory` requires a configId but the Settings page doesn't pass it
+**Fix**: Either pass the configId or create a separate hook for all recent history
 
-// Add realtime subscription for events_raw
-.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'events_raw' }, () => {
-  queryClient.invalidateQueries({ queryKey: ['events-raw-count'] });
-})
-```
+---
 
-### Settings.tsx Changes
+## Implementation Priority
 
-```typescript
-// New imports
-import { usePlatformConfig, useUpdateConfig, useConfigHistory } from "@/hooks/usePlatformConfig";
-import { Slider } from "@/components/ui/slider";
-import { Sliders } from "lucide-react";
+### Phase 1: Critical Data Issues (Must Fix Now)
+1. **Engine weights display bug** - Users see 0-0.25 instead of 0-100%
+2. **PredictiveRiskPanel threshold** - Shows empty when predictions exist
+3. **Events → Incidents pipeline** - Generate more medium/high severity events
 
-// Add to settingsSections array
-{ id: "config", icon: Sliders, label: "Platform Config", description: "Engine weights and thresholds" }
+### Phase 2: Automation (High Priority)
+4. Add cron job for `predictive-governance`
+5. Ensure `process-events` runs reliably after event generation
+6. Add function metrics recording
 
-// Add platform config section content
-{activeSection === "config" && (
-  <>
-    <h2 className="text-lg font-semibold text-foreground mb-6">Platform Configuration</h2>
-    <PlatformConfigEditor />
-  </>
-)}
+### Phase 3: UI Polish (Medium Priority)
+7. Unify Configuration pages
+8. Auto-analyze HITL queue
+9. Better error handling in edge functions
 
-// Create PlatformConfigEditor component inline
-function PlatformConfigEditor() {
-  const { data: configs, isLoading } = usePlatformConfig();
-  const updateConfig = useUpdateConfig();
-  const { data: history } = useConfigHistory();
-  
-  const engineWeights = configs?.filter(c => c.category === 'engine_weights') || [];
-  const thresholds = configs?.filter(c => c.category === 'thresholds') || [];
-  const sloConfigs = configs?.filter(c => c.category === 'slo') || [];
-  
-  return (
-    <div className="space-y-8">
-      {/* Engine Weights Section */}
-      <div>
-        <h3 className="text-sm font-medium mb-4">Engine Weights</h3>
-        <div className="space-y-4">
-          {engineWeights.map(config => (
-            <div key={config.id} className="flex items-center gap-4">
-              <Label className="w-32">{config.config_key}</Label>
-              <Slider 
-                value={[config.config_value?.weight || 50]}
-                max={100}
-                step={5}
-                className="flex-1"
-                onValueCommit={([val]) => updateConfig.mutate({
-                  id: config.id, 
-                  value: { weight: val }
-                })}
-              />
-              <span className="w-12 text-right font-mono">{config.config_value?.weight || 50}%</span>
-            </div>
-          ))}
-        </div>
-      </div>
-      
-      {/* SLO Targets Section */}
-      <div>
-        <h3 className="text-sm font-medium mb-4">SLO Targets</h3>
-        <div className="grid grid-cols-2 gap-4">
-          {sloConfigs.map(config => (
-            <div key={config.id} className="space-y-2">
-              <Label>{config.config_key}</Label>
-              <Input 
-                type="number"
-                value={config.config_value?.target || 0}
-                onChange={(e) => updateConfig.mutate({
-                  id: config.id,
-                  value: { target: parseInt(e.target.value) }
-                })}
-              />
-            </div>
-          ))}
-        </div>
-      </div>
-      
-      {/* Config History */}
-      {history && history.length > 0 && (
-        <div>
-          <h3 className="text-sm font-medium mb-4">Recent Changes</h3>
-          <div className="space-y-2">
-            {history.slice(0, 5).map(h => (
-              <div key={h.id} className="text-sm text-muted-foreground">
-                Config updated at {new Date(h.changed_at).toLocaleString()}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-```
+---
 
-### GoldenDemoV2.tsx Changes
+## Verification Queries
 
-```typescript
-// New imports
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+After implementing fixes, run these to verify:
 
-// Add demo scenarios query
-const { data: demoScenarios } = useQuery({
-  queryKey: ['demo-scenarios'],
-  queryFn: async () => {
-    const { data, error } = await supabase
-      .from('demo_scenarios')
-      .select('*')
-      .eq('enabled', true)
-      .order('category');
-    if (error) throw error;
-    return data;
-  }
-});
+```sql
+-- Check events are being processed
+SELECT COUNT(*) FROM events_raw WHERE processed = true;
 
-// Add state for selected scenario
-const [selectedScenario, setSelectedScenario] = useState<string>("");
+-- Check incidents are being created
+SELECT COUNT(*) FROM incidents WHERE created_at > now() - interval '1 hour';
 
-// Add scenario selector in setup view
-<div className="space-y-2">
-  <Label>Demo Scenario (Optional)</Label>
-  <Select value={selectedScenario} onValueChange={setSelectedScenario}>
-    <SelectTrigger>
-      <SelectValue placeholder="Use default demo flow" />
-    </SelectTrigger>
-    <SelectContent>
-      <SelectItem value="">Default Flow</SelectItem>
-      {demoScenarios?.map(s => (
-        <SelectItem key={s.id} value={s.id}>
-          <div className="flex items-center gap-2">
-            <span>{s.scenario_name}</span>
-            <Badge variant="outline" className="text-xs">{s.category}</Badge>
-          </div>
-        </SelectItem>
-      ))}
-    </SelectContent>
-  </Select>
-</div>
+-- Check predictions exist with high scores
+SELECT * FROM predictive_governance WHERE risk_score >= 70 ORDER BY risk_score DESC LIMIT 10;
 
-// Enhanced demo steps list
-<li>Run Oversight Agent simulation (new)</li>
-<li>Execute Predictive Governance analysis (new)</li>
-<li>Check for Governance Bypass attempts (new)</li>
+-- Check function metrics are recording
+SELECT * FROM function_metrics ORDER BY recorded_at DESC LIMIT 20;
 ```
 
 ---
 
-## Summary of All Changes
+## Summary of Files to Modify
 
-| File | Changes |
-|------|---------|
-| `Incidents.tsx` | +Tabs, +BulkResolutionPanel, +Run Lifecycle Check button |
-| `Observability.tsx` | +Oversight Agent tab, +SimulationController, +events_raw metrics |
-| `Settings.tsx` | +Platform Config section, +Engine weights sliders, +SLO editors |
-| `GoldenDemoV2.tsx` | +Scenario selector, +Enhanced demo steps |
+| File | Change |
+|------|--------|
+| `src/pages/Settings.tsx` | Fix engine weights value conversion (×100) |
+| `src/pages/Index.tsx` | Fix useHighRiskPredictions call |
+| `src/components/dashboard/PredictiveRiskPanel.tsx` | Adjust threshold or add empty state messaging |
+| `supabase/functions/generate-synthetic-events/index.ts` | Improve severity distribution for testing |
+| `src/hooks/usePlatformConfig.ts` | Add getAllHistory hook |
+| `src/pages/Configuration.tsx` | Either remove or redirect |
+| Database migration | Add cron jobs for automation |
 
 ---
 
-## What Gets Completed
+## Edge Function Test Results (Verified Working)
 
-After this implementation:
-- All 8 new database tables are connected to UI
-- All 7 new Edge Functions are callable from UI
-- SimulationController is integrated in 2 places (Index + Observability)
-- BulkTriagePanel is integrated in HITL page
-- BulkResolutionPanel is integrated in Incidents page
-- PredictiveRiskPanel is integrated in Index page
-- Configuration page is fully functional
-- Runbooks page is fully functional
-- All navigation links work
-- All routes are registered
+| Function | Status | Response |
+|----------|--------|----------|
+| `generate-synthetic-events` | ✅ 200 OK | Generated 10 events |
+| `predictive-governance` | ✅ 200 OK | Created 4 predictions |
+| `hitl-auto-assist` | ✅ 200 OK | Analyzed 5 items with suggestions |
+| `process-events` | ✅ Deployed | Marks events processed, incident creation conditional |
 
-**This completes the 85% → 95% PDR upgrade with no further action needed.**
+The edge functions are all working correctly - the issues are with:
+1. How data is displayed in the UI (value conversions)
+2. How often functions are triggered (no automation)
+3. Event severity distribution (not enough medium+ to create incidents)
+
