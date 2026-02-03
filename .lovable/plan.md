@@ -1,180 +1,216 @@
 
 
-# Comprehensive Audit Report: Functional Issues & Missing Backend Logic
+# Command Center Audit Report: Complete List of Functional, Practical, and Logical Issues
 
 ## Executive Summary
 
-After thorough investigation of the codebase, database state, edge functions, and UI components, I've identified **14 critical issues** that need to be fixed for the platform to be truly production-ready.
+After thorough investigation of the Command Center page (`src/pages/Index.tsx`) and all its components, hooks, and database state, I have identified **23 distinct issues** categorized into **5 categories**.
 
 ---
 
-## Issue Categories
+## Category 1: Critical Data Display Issues (6 Issues)
 
-### Category A: Empty/Zero Data in Critical Tables (4 Issues)
+### Issue 1.1: PredictiveRiskPanel Shows "No High-Risk Predictions" When Data Exists
+- **Location**: `src/components/dashboard/PredictiveRiskPanel.tsx` line 21
+- **Problem**: Component calls `useHighRiskPredictions(5)` passing `5` as the limit, but the hook treats this as `minRiskScore`
+- **Current Data**: 4 predictions exist with scores 58, 56, 48, 35 (all below 70)
+- **Root Cause**: The hook's default threshold is 70, but predictions generated have max score of 58
+- **Impact**: Panel always shows "No High-Risk Predictions" even when the system has predictions
 
-| Issue # | Table/Feature | Current Value | Expected | Impact |
-|---------|---------------|---------------|----------|--------|
-| A1 | `events_raw` count | 10 (just generated) | 10,000+ | Oversight Agent cannot validate MTTD/MTTR |
-| A2 | `predictive_governance` | 4 (just generated) | 50+ | Predictive Risk Panel shows "No High-Risk Predictions" |
-| A3 | `function_metrics` | 0 | 100+ | Edge Function observability dashboard is empty |
-| A4 | Processed events count | 0 (events sit at 0 after processing) | Events should create incidents | Event pipeline not triggering properly |
+### Issue 1.2: Hardcoded Date in RealityCheckDashboard
+- **Location**: `src/components/dashboard/RealityCheckDashboard.tsx` line 16, 41
+- **Problem**: Hardcoded "December 11, 2025" and "Cleared Dec 11" text
+- **Current Date**: February 3, 2026 (2 months outdated)
+- **Impact**: Looks unprofessional and misleading to users
 
-**Root Cause**: The edge functions exist and work (tested via curl), but they're never called automatically. Users must manually click buttons, and even then, the events are processed but no visible outcome appears in the UI.
+### Issue 1.3: "100% Production Data" Badge Always Shows
+- **Location**: `src/components/dashboard/RealityCheckDashboard.tsx` line 43-44
+- **Problem**: Badge shows "100% Production Data" even when `allZero` is true (no data)
+- **Impact**: False confidence indicator when no real production data exists
 
----
+### Issue 1.4: "Governance Blocks" Metric Mislabeled
+- **Location**: `src/hooks/useRealityMetrics.ts` line 31
+- **Problem**: `governanceBlocks` returns total incident count, not blocked requests
+- **Current Query**: `supabase.from("incidents").select("id", { count: "exact", head: true })`
+- **Should Be**: Count of BLOCK decisions from `request_logs` or policy violations
+- **Impact**: Completely wrong metric displayed
 
-### Category B: UI Components Without Proper Backend Wiring (5 Issues)
+### Issue 1.5: "View Predictions" Button Navigates to Wrong Page
+- **Location**: `src/pages/Index.tsx` line 189
+- **Problem**: When high-risk predictions exist, clicking "View Predictions" navigates to `/configuration`
+- **Expected**: Should navigate to a predictions detail view or the Observability page
+- **Impact**: Confusing UX - Configuration page has nothing to do with predictions
 
-| Issue # | Component | Problem | Fix Required |
-|---------|-----------|---------|--------------|
-| B1 | `PredictiveRiskPanel` | Shows "No High-Risk Predictions" even when predictions exist (risk_score >= 70 filter too high) | Lower the threshold or show all predictions |
-| B2 | `SimulationController` | Works but generated events show 0 after `process-events` runs | Check why incidents aren't being created from events |
-| B3 | `BulkTriagePanel` | Works when clicked, but no AI suggestions appear initially | Auto-fetch suggestions on mount |
-| B4 | Settings > Platform Config | Engine weights display as decimals (0.25) but sliders expect 0-100 | Fix value conversion (multiply by 100) |
-| B5 | Configuration.tsx page | Separate page created but duplicates Settings > Platform Config | Should redirect or unify |
-
----
-
-### Category C: Edge Functions Not Auto-Triggered (2 Issues)
-
-| Issue # | Function | Problem | Expected Behavior |
-|---------|----------|---------|-------------------|
-| C1 | `process-events` | Only runs when manually triggered | Should auto-run on cron or after `generate-synthetic-events` |
-| C2 | `predictive-governance` | Only runs when "Run Analysis" clicked | Should run on schedule or after evaluation completions |
-
----
-
-### Category D: Data Format Mismatches (3 Issues)
-
-| Issue # | Location | Problem | Fix |
-|---------|----------|---------|-----|
-| D1 | Engine weights in DB | Stored as decimals (0.25) | UI expects percentages (25) - needs conversion |
-| D2 | SLO targets | Config values work but UI shows "minutes" while stored as minutes | Correct but needs better labeling |
-| D3 | Predictions threshold | `useHighRiskPredictions(3)` passes 3 as minRiskScore | Should be 70, but got overwritten |
+### Issue 1.6: Governance Coverage Shows 0% Despite 11 States
+- **Location**: `src/components/dashboard/GovernanceHealthCards.tsx`
+- **Database**: 11 governance_activation_state records exist, but likely all are 'inactive'
+- **Problem**: Shows "0% — Early Stage" which may not reflect actual governance health
+- **Impact**: Discouraging to users when platform may actually be configured
 
 ---
 
-## Detailed Fixes Required
+## Category 2: Missing Backend Wiring Issues (5 Issues)
 
-### Fix 1: Engine Weights Value Conversion (Settings.tsx)
-**File**: `src/pages/Settings.tsx` (PlatformConfigEditor component)
-**Problem**: Database stores weights as decimals (0.25, 0.20), but sliders display 0-100.
-**Fix**: Multiply by 100 when loading, divide by 100 when saving.
+### Issue 2.1: No Explanation Tracking
+- **Database State**: 8 decisions exist, 0 explanations
+- **Impact**: "Decision Explanation Rate" in Governance Health shows 0%
+- **Root Cause**: When decisions are created, no corresponding explanations are inserted
 
-### Fix 2: PredictiveRiskPanel Threshold Issue  
-**File**: `src/pages/Index.tsx` line 35
-**Current**: `useHighRiskPredictions(3)` - This passes 3 as the minRiskScore limit, not 70
-**Should be**: `useHighRiskPredictions()` or `useHighRiskPredictions(70)`
+### Issue 2.2: No Attestations Created
+- **Database State**: 0 attestations in `deployment_attestations`
+- **Impact**: "Attestation Coverage" shows 0% with "No live data yet"
+- **Root Cause**: No workflow exists to create attestations when systems are approved
 
-### Fix 3: Auto-Process Events After Generation
-**File**: `supabase/functions/generate-synthetic-events/index.ts`
-**Current**: Calls `process-events` at the end but the call may fail silently
-**Fix**: Add better error handling and ensure JWT is passed
+### Issue 2.3: No MLOps Governance Events
+- **Database State**: 0 records in `mlops_governance_events`
+- **Impact**: "Governance Bypasses" metric works by accident (shows 0), but no tracking
+- **Root Cause**: No edge function or workflow records mlops events
 
-### Fix 4: Add Cron Job for Predictive Governance
-**Database**: Add pg_cron schedule to run `predictive-governance` every hour
-```sql
-SELECT cron.schedule(
-  'run-predictive-governance',
-  '0 * * * *',
-  $$ SELECT net.http_post(
-    url := 'https://avmzkngttrfmowihkqzr.supabase.co/functions/v1/predictive-governance',
-    headers := '{"Authorization": "Bearer ' || current_setting('supabase.service_role_key') || '"}'::jsonb
-  ); $$
-);
-```
+### Issue 2.4: Only 10 Events Ever Generated
+- **Database State**: 10 events in `events_raw`, all processed
+- **Problem**: Oversight Agent has almost no data to work with
+- **Impact**: MTTD/MTTR calculations are based on minimal sample size
 
-### Fix 5: Events Not Creating Incidents
-**File**: `supabase/functions/process-events/index.ts`
-**Issue**: Events are marked as processed but incidents only created for medium/high/critical severity
-**Current**: 10 events generated, 0 incidents (likely all were low/info severity or duplicates)
-**Fix**: Verify the event distribution includes enough medium+ severity events
-
-### Fix 6: Configuration.tsx Duplicate Page
-**Files**: `src/pages/Configuration.tsx` and `src/pages/Settings.tsx`
-**Issue**: Two different places to configure platform settings
-**Fix**: Remove Configuration.tsx or make it redirect to Settings?tab=config
-
-### Fix 7: BulkTriagePanel Auto-Analysis
-**File**: `src/components/hitl/BulkTriagePanel.tsx`
-**Issue**: User must click "Analyze Queue" to see AI suggestions
-**Fix**: Auto-run analysis on component mount (optional, UX preference)
-
-### Fix 8: Add Missing Function Metrics Recording
-**Issue**: `function_metrics` table is empty because no function records to it
-**Fix**: Create a wrapper utility and update key edge functions to record metrics
-
-### Fix 9: usePlatformConfig Hook Not Returning Correct History
-**File**: `src/hooks/usePlatformConfig.ts` line 99
-**Issue**: `useConfigHistory` requires a configId but the Settings page doesn't pass it
-**Fix**: Either pass the configId or create a separate hook for all recent history
+### Issue 2.5: High Risk Predictions Not Generated Properly
+- **Database State**: All 4 predictions have scores < 70 (max is 58)
+- **Problem**: `predictive-governance` function generates low scores
+- **Impact**: PredictiveRiskPanel never shows any predictions
 
 ---
 
-## Implementation Priority
+## Category 3: Logical/Calculation Errors (4 Issues)
 
-### Phase 1: Critical Data Issues (Must Fix Now)
-1. **Engine weights display bug** - Users see 0-0.25 instead of 0-100%
-2. **PredictiveRiskPanel threshold** - Shows empty when predictions exist
-3. **Events → Incidents pipeline** - Generate more medium/high severity events
+### Issue 3.1: SLO Dashboard Shows 0 for All Metrics
+- **Location**: `src/components/dashboard/SLODashboard.tsx`
+- **Problem**: Calculates MTTD/MTTR from incidents, but:
+  - Most incidents have no `detected_at` field populated
+  - No incidents have `resolved_at` field (218 open incidents)
+- **Result**: All MTTD/MTTR show "0.0 min" which is incorrect
 
-### Phase 2: Automation (High Priority)
-4. Add cron job for `predictive-governance`
-5. Ensure `process-events` runs reliably after event generation
-6. Add function metrics recording
+### Issue 3.2: Audit Completeness Calculation Is Wrong
+- **Location**: `src/components/dashboard/SLODashboard.tsx` lines 67-79
+- **Formula**: `documentedIncidents / totalIncidents` where `documentedIncidents` = decisions count
+- **Current**: 8 decisions / 218 incidents (24h window) = very low
+- **Problem**: Comparing decisions (which may span all time) to incidents in 24h window
+- **Impact**: Audit completeness percentage is misleading
 
-### Phase 3: UI Polish (Medium Priority)
-7. Unify Configuration pages
-8. Auto-analyze HITL queue
-9. Better error handling in edge functions
+### Issue 3.3: OversightAgentStatus Shows "Idle" When Events Are Processed
+- **Location**: `src/components/dashboard/OversightAgentStatus.tsx` lines 66-75
+- **Logic**: Status is 'running' only if last processed event was within 5 minutes
+- **Current**: All 10 events processed, but if processed > 5 min ago, shows "Idle"
+- **Impact**: Misleading status - agent processed everything but looks inactive
 
----
-
-## Verification Queries
-
-After implementing fixes, run these to verify:
-
-```sql
--- Check events are being processed
-SELECT COUNT(*) FROM events_raw WHERE processed = true;
-
--- Check incidents are being created
-SELECT COUNT(*) FROM incidents WHERE created_at > now() - interval '1 hour';
-
--- Check predictions exist with high scores
-SELECT * FROM predictive_governance WHERE risk_score >= 70 ORDER BY risk_score DESC LIMIT 10;
-
--- Check function metrics are recording
-SELECT * FROM function_metrics ORDER BY recorded_at DESC LIMIT 20;
-```
+### Issue 3.4: Events Count Query Returns Wrong Number
+- **Location**: `src/pages/Index.tsx` lines 43-54
+- **Query**: Counts events where `processed = false`
+- **Current State**: All 10 events are processed, so returns 0
+- **Impact**: "Pending events" badge never shows when all caught up (which is actually good)
 
 ---
 
-## Summary of Files to Modify
+## Category 4: UX/Practical Issues (5 Issues)
 
-| File | Change |
-|------|--------|
-| `src/pages/Settings.tsx` | Fix engine weights value conversion (×100) |
-| `src/pages/Index.tsx` | Fix useHighRiskPredictions call |
-| `src/components/dashboard/PredictiveRiskPanel.tsx` | Adjust threshold or add empty state messaging |
-| `supabase/functions/generate-synthetic-events/index.ts` | Improve severity distribution for testing |
-| `src/hooks/usePlatformConfig.ts` | Add getAllHistory hook |
-| `src/pages/Configuration.tsx` | Either remove or redirect |
-| Database migration | Add cron jobs for automation |
+### Issue 4.1: Too Many Overlapping Widgets
+- **Location**: `src/pages/Index.tsx`
+- **Problem**: Page shows:
+  - GovernanceFlowDiagram
+  - SLODashboard + OversightAgentStatus
+  - SimulationController + PredictiveRiskPanel
+  - IncidentSummaryCard + FeedbackLoopDiagram
+  - RealityCheckDashboard
+  - GovernanceHealthCards (6 cards)
+  - PlatformHealthCards (4 cards)
+  - Quick Actions (3 cards)
+  - Core RAI Engines (5 cards)
+- **Total**: 25+ distinct widgets competing for attention
+- **Impact**: Information overload, unclear what's most important
+
+### Issue 4.2: Duplicate Incident Counts in Multiple Places
+- **Problem**: Open incidents shown in:
+  1. IncidentSummaryCard (218 total)
+  2. FeedbackLoopDiagram ("Issues Detected")
+  3. PlatformHealthCards ("recentIncidents")
+  4. GovernanceFlowDiagram (Stage 6 Monitoring)
+- **Impact**: Redundant information, wasted screen space
+
+### Issue 4.3: SimulationController on Command Center
+- **Location**: `src/pages/Index.tsx` line 245
+- **Problem**: Simulation tool for generating test data is prominent on dashboard
+- **Expected**: This should be in Settings or a dedicated Testing page
+- **Impact**: Confusing for production users who don't need to generate synthetic data
+
+### Issue 4.4: "Process Now" Button Disabled When No Pending Events
+- **Location**: `src/components/dashboard/OversightAgentStatus.tsx` line 212
+- **Logic**: Button disabled when `pendingEvents === 0`
+- **Problem**: User can't trigger processing if there are no events
+- **Expected**: Fine behavior, but shows as "Idle" with no way to test
+
+### Issue 4.5: Quick Actions Cards Show Same Icon
+- **Location**: `src/pages/Index.tsx` lines 278-312
+- **Problem**: "Registered Systems" and "ML Models" both use `Database` icon
+- **Impact**: Hard to visually distinguish between the two metrics
 
 ---
 
-## Edge Function Test Results (Verified Working)
+## Category 5: Data Consistency Issues (3 Issues)
 
-| Function | Status | Response |
-|----------|--------|----------|
-| `generate-synthetic-events` | ✅ 200 OK | Generated 10 events |
-| `predictive-governance` | ✅ 200 OK | Created 4 predictions |
-| `hitl-auto-assist` | ✅ 200 OK | Analyzed 5 items with suggestions |
-| `process-events` | ✅ Deployed | Marks events processed, incident creation conditional |
+### Issue 5.1: 546 Pending Reviews But Low Visibility
+- **Database State**: 546 items in `review_queue` with status='pending'
+- **Problem**: Only FeedbackLoopDiagram shows pending count (in a small warning box)
+- **Expected**: This is a critical metric that should be prominent
 
-The edge functions are all working correctly - the issues are with:
-1. How data is displayed in the UI (value conversions)
-2. How often functions are triggered (no automation)
-3. Event severity distribution (not enough medium+ to create incidents)
+### Issue 5.2: Realtime Subscription Query Key Mismatch
+- **Location**: `src/pages/Index.tsx` lines 106-112
+- **Problem**: Realtime subscription for `predictive_governance` invalidates `['predictive-high-risk']`
+- **Hook Uses**: `['high-risk-predictions', minRiskScore]` as query key
+- **Impact**: Realtime updates won't refresh the PredictiveRiskPanel
+
+### Issue 5.3: Missing Realtime for Key Tables
+- **Location**: `src/pages/Index.tsx` useEffect
+- **Missing Subscriptions**:
+  - `review_queue` (546 pending items changing)
+  - `drift_alerts` (for Reality Check dashboard)
+  - `decisions` (for Governance Health)
+- **Impact**: Dashboard doesn't update in realtime for critical governance data
+
+---
+
+## Summary Table
+
+| Category | Issue Count | Severity |
+|----------|-------------|----------|
+| Data Display Issues | 6 | Critical |
+| Missing Backend Wiring | 5 | High |
+| Logical/Calculation Errors | 4 | High |
+| UX/Practical Issues | 5 | Medium |
+| Data Consistency Issues | 3 | Medium |
+| **Total** | **23** | |
+
+---
+
+## Priority Fixes (Top 10)
+
+1. **Fix PredictiveRiskPanel threshold** - Change from `useHighRiskPredictions(5)` to `useHighRiskPredictions(40)` or adjust hook
+2. **Fix "Governance Blocks" metric** - Query BLOCK decisions from request_logs, not incident count
+3. **Remove hardcoded December 11, 2025 date** - Use `new Date().toLocaleDateString()`
+4. **Fix "View Predictions" navigation** - Navigate to `/observability` or dedicated predictions view
+5. **Fix realtime query key** - Change to match `['high-risk-predictions']`
+6. **Fix audit completeness calculation** - Use same time window for both queries
+7. **Move SimulationController to Settings** - Not appropriate for main dashboard
+8. **Reduce widget count** - Consolidate redundant incident displays
+9. **Add prominent pending reviews indicator** - 546 items need attention
+10. **Generate higher-risk predictions** - Adjust `predictive-governance` function scoring
+
+---
+
+## Files Requiring Changes
+
+| File | Changes Needed |
+|------|----------------|
+| `src/pages/Index.tsx` | Fix navigation, query keys, realtime subscriptions |
+| `src/components/dashboard/PredictiveRiskPanel.tsx` | Fix threshold parameter |
+| `src/components/dashboard/RealityCheckDashboard.tsx` | Remove hardcoded dates |
+| `src/hooks/useRealityMetrics.ts` | Fix governanceBlocks query |
+| `src/components/dashboard/SLODashboard.tsx` | Fix audit completeness calculation |
+| `supabase/functions/predictive-governance/index.ts` | Generate higher risk scores |
 
