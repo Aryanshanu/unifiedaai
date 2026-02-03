@@ -15,7 +15,7 @@ import { PredictiveRiskPanel } from "@/components/dashboard/PredictiveRiskPanel"
 import { useUnsafeDeployments, usePlatformMetrics } from "@/hooks/usePlatformMetrics";
 import { useGovernanceMetrics } from "@/hooks/useGovernanceMetrics";
 import { useHighRiskPredictions } from "@/hooks/usePredictiveGovernance";
-import { Database, Scale, AlertCircle, ShieldAlert, Lock, Eye, AlertOctagon, ArrowRight, Shield, AlertTriangle, Brain, Zap } from "lucide-react";
+import { Database, Scale, AlertCircle, ShieldAlert, Lock, Eye, AlertOctagon, ArrowRight, Shield, AlertTriangle, Brain, Zap, Cpu, ClipboardList } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { HealthIndicator } from "@/components/shared/HealthIndicator";
 import { useDataHealth } from "@/components/shared/DataHealthWrapper";
@@ -32,7 +32,7 @@ export default function Index() {
   const { data: unsafeDeployments, isLoading: deploymentsLoading } = useUnsafeDeployments();
   const { data: metrics, isLoading: metricsLoading, isError: metricsError, refetch: refetchMetrics } = usePlatformMetrics();
   const { data: governanceMetrics } = useGovernanceMetrics();
-  const { data: highRiskPredictions } = useHighRiskPredictions(); // Default threshold is 70
+  const { data: highRiskPredictions } = useHighRiskPredictions(70); // High risk only for alert banner
   const navigate = useNavigate();
   
   const isLoading = modelsLoading || deploymentsLoading || metricsLoading;
@@ -47,6 +47,20 @@ export default function Index() {
         .from('events_raw')
         .select('*', { count: 'exact', head: true })
         .eq('processed', false);
+      if (error) return 0;
+      return count || 0;
+    },
+    refetchInterval: 30000,
+  });
+
+  // Pending reviews count for prominent display
+  const { data: pendingReviewsCount } = useQuery({
+    queryKey: ['pending-reviews-count'],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('review_queue')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
       if (error) return 0;
       return count || 0;
     },
@@ -107,7 +121,32 @@ export default function Index() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'predictive_governance' },
         () => {
-          queryClient.invalidateQueries({ queryKey: ['predictive-high-risk'] });
+          // Fix: Use correct query key that matches the hook
+          queryClient.invalidateQueries({ queryKey: ['high-risk-predictions'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'review_queue' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['review-queue'] });
+          queryClient.invalidateQueries({ queryKey: ['governance-metrics'] });
+          queryClient.invalidateQueries({ queryKey: ['pending-reviews-count'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'drift_alerts' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['reality-metrics'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'decisions' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['governance-metrics'] });
+          queryClient.invalidateQueries({ queryKey: ['slo-dashboard'] });
         }
       )
       .subscribe();
@@ -173,6 +212,28 @@ export default function Index() {
         </div>
       }
     >
+      {/* Pending Reviews Alert - Critical HITL Queue */}
+      {(pendingReviewsCount || 0) > 10 && (
+        <div className="p-4 mb-6 rounded-xl border-2 border-primary bg-primary/5 flex items-start gap-4">
+          <ClipboardList className="h-6 w-6 text-primary shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="font-semibold text-primary">Human-in-the-Loop Queue</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              {pendingReviewsCount} item(s) require human review. Address pending reviews to maintain governance compliance.
+            </p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="mt-3 border-primary/50 text-primary hover:bg-primary/10"
+              onClick={() => navigate("/governance/hitl")}
+            >
+              Review Queue
+              <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* High-Risk Predictions Alert */}
       {highRiskPredictions && highRiskPredictions.length > 0 && (
         <div className="p-4 mb-6 rounded-xl border-2 border-warning bg-warning/5 flex items-start gap-4">
@@ -186,7 +247,7 @@ export default function Index() {
               variant="outline" 
               size="sm" 
               className="mt-3 border-warning/50 text-warning hover:bg-warning/10"
-              onClick={() => navigate("/configuration")}
+              onClick={() => navigate("/observability")}
             >
               View Predictions
               <ArrowRight className="h-4 w-4 ml-1" />
@@ -302,7 +363,7 @@ export default function Index() {
         <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate("/models")}>
           <CardContent className="pt-6 flex items-center gap-4">
             <div className="p-3 rounded-lg bg-muted">
-              <Database className="h-6 w-6 text-muted-foreground" />
+              <Cpu className="h-6 w-6 text-muted-foreground" />
             </div>
             <div>
               <p className="text-2xl font-bold">{models?.length || 0}</p>

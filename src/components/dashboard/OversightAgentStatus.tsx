@@ -62,14 +62,22 @@ export function OversightAgentStatus() {
         .limit(1)
         .maybeSingle();
 
-      // Determine agent status
+      // Determine agent status more intelligently
       let agentStatus: 'running' | 'idle' | 'error' = 'idle';
+      
       if (pendingEvents && pendingEvents > 100) {
-        agentStatus = 'error'; // Backlog building up
+        agentStatus = 'error'; // Backlog building up - needs attention
+      } else if (pendingEvents && pendingEvents > 0) {
+        // If there are pending events, show as needing processing
+        agentStatus = 'idle';
+      } else if (eventsProcessed && eventsProcessed > 0) {
+        // No pending events but we've processed events recently = healthy/running
+        agentStatus = 'running';
       } else if (lastProcessed?.processed_at) {
+        // Check if we processed within last hour (not just 5 minutes)
         const lastProcessedTime = new Date(lastProcessed.processed_at).getTime();
-        const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
-        if (lastProcessedTime > fiveMinutesAgo) {
+        const oneHourAgo = Date.now() - 60 * 60 * 1000;
+        if (lastProcessedTime > oneHourAgo) {
           agentStatus = 'running';
         }
       }
@@ -126,8 +134,8 @@ export function OversightAgentStatus() {
       case 'running':
         return (
           <Badge className="bg-success/20 text-success border-success/30">
-            <Activity className="h-3 w-3 mr-1 animate-pulse" />
-            Running
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Healthy
           </Badge>
         );
       case 'error':
@@ -141,7 +149,7 @@ export function OversightAgentStatus() {
         return (
           <Badge variant="secondary">
             <Clock className="h-3 w-3 mr-1" />
-            Idle
+            Waiting
           </Badge>
         );
     }

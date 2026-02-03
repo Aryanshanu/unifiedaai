@@ -18,7 +18,8 @@ import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 
 export function PredictiveRiskPanel() {
-  const { data: predictions, isLoading, refetch } = useHighRiskPredictions(5);
+  // Use threshold of 40 to show medium and high risk predictions (not just 70+)
+  const { data: predictions, isLoading, refetch } = useHighRiskPredictions(40);
   const runAnalysis = useRunPredictiveAnalysis();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 

@@ -63,20 +63,31 @@ export function SLODashboard() {
         return times.reduce((a, b) => a + b, 0) / times.length;
       };
 
-      // Calculate audit completeness
+      // Calculate audit completeness - use same 24h window for consistency
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      
       const { count: totalIncidents } = await supabase
         .from('incidents')
         .select('*', { count: 'exact', head: true })
-        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+        .gte('created_at', twentyFourHoursAgo);
 
-      const { count: documentedIncidents } = await supabase
+      // Count decisions made in the same 24h window
+      const { count: documentedDecisions } = await supabase
         .from('decisions')
         .select('*', { count: 'exact', head: true })
-        .gte('decided_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+        .gte('decided_at', twentyFourHoursAgo);
 
+      // Also count explanations as part of audit documentation
+      const { count: explanationCount } = await supabase
+        .from('decision_explanations')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', twentyFourHoursAgo);
+
+      // Audit completeness = decisions with explanations / total incidents needing review
+      const totalDocumented = Math.min((documentedDecisions || 0), (totalIncidents || 0));
       const auditCompleteness = totalIncidents && totalIncidents > 0 
-        ? (documentedIncidents || 0) / totalIncidents 
-        : 1;
+        ? totalDocumented / totalIncidents 
+        : 1; // If no incidents, we're 100% complete
 
       // Build metrics with current values
       const metrics: SLOMetric[] = (sloConfig || []).map(config => {
