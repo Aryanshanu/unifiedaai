@@ -37,7 +37,7 @@ export function usePredictiveGovernance(entityType?: string, limit = 20) {
   });
 }
 
-export function useHighRiskPredictions(minRiskScore = 70) {
+export function useHighRiskPredictions(minRiskScore = 40) {
   return useQuery({
     queryKey: ["high-risk-predictions", minRiskScore],
     queryFn: async () => {
