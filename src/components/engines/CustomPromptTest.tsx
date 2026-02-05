@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useCustomPromptTest, CustomTestResult } from "@/hooks/useCustomPromptTest";
 import { getAttackPromptsByEngine, AttackPrompt } from "@/lib/test-datasets";
+import { ExpandableModelResponse } from "./ExpandableModelResponse";
 
 interface CustomPromptTestProps {
   modelId: string;
@@ -265,11 +266,7 @@ export function CustomPromptTest({
                 <MessageSquare className="w-4 h-4 text-muted-foreground" />
                 <span className="text-sm font-medium text-foreground">Model Response</span>
               </div>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                {customResult.model_response.length > 500 
-                  ? customResult.model_response.slice(0, 500) + "..." 
-                  : customResult.model_response}
-              </p>
+              <ExpandableModelResponse response={customResult.model_response} />
             </div>
 
             {/* Analysis Summary */}

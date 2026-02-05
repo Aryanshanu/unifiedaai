@@ -354,7 +354,7 @@ serve(async (req) => {
         timestamp: new Date().toISOString(),
         type: "real_model_call",
         input: testCase.prompt,
-        output: result.output?.substring(0, 500) || result.error,
+        output: result.output || result.error,
         success: result.success,
         errorType: result.errorType,
         expectedFact: testCase.expectedFact,

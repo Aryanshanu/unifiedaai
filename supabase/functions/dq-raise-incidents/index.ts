@@ -231,6 +231,66 @@ serve(async (req) => {
       }
     }
 
+    // ALSO create entries in main incidents table and HITL queue for critical issues
+    for (const incident of incidents) {
+      // Map DQ priority to main incidents severity
+      const severityMap: Record<string, string> = {
+        P0: "critical",
+        P1: "high",
+        P2: "medium",
+      };
+      
+      const mainSeverity = severityMap[incident.severity] || "medium";
+      
+      // Insert into main incidents table
+      const { error: mainIncidentError } = await supabase
+        .from("incidents")
+        .insert({
+          title: `[DQ] ${incident.rule_name} - ${incident.dimension}`,
+          description: incident.action,
+          severity: mainSeverity,
+          status: "open",
+          incident_type: "data_quality",
+          metadata: {
+            dq_incident_id: incident.id,
+            dataset_id: incident.dataset_id,
+            rule_id: incident.rule_id,
+            dimension: incident.dimension,
+            failure_signature: incident.failure_signature,
+          },
+        });
+      
+      if (mainIncidentError) {
+        console.error("[DQ Incidents] Failed to create main incident:", mainIncidentError);
+      }
+      
+      // For P0/critical incidents, escalate to HITL review queue
+      if (incident.severity === "P0") {
+        const { error: hitlError } = await supabase
+          .from("review_queue")
+          .insert({
+            title: `Data Quality Critical: ${incident.rule_name}`,
+            description: incident.action,
+            review_type: "data_quality_violation",
+            severity: "critical",
+            status: "pending",
+            context: {
+              dq_incident_id: incident.id,
+              dataset_id: incident.dataset_id,
+              dimension: incident.dimension,
+              failed_rows_sample: incident.example_failed_rows,
+            },
+            sla_deadline: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(), // 2 hours SLA
+          });
+        
+        if (hitlError) {
+          console.error("[DQ Incidents] Failed to create HITL entry:", hitlError);
+        } else {
+          console.log(`[DQ Incidents] Created HITL escalation for critical incident: ${incident.rule_name}`);
+        }
+      }
+    }
+
     const response: IncidentsOutput = {
       status: "success",
       incident_count: incidents.length,

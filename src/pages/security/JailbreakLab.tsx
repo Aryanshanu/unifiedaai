@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Skull, Play, Zap, Search, Plus, RefreshCw, Shield, ShieldX } from 'lucide-react';
+import { FlaskConical, Play, Zap, Search, Plus, RefreshCw, Shield, ShieldX } from 'lucide-react';
 import { useSystems } from '@/hooks/useSystems';
 import { useAttackLibrary, Attack } from '@/hooks/useAttackLibrary';
 import { AttackCard } from '@/components/security/AttackCard';
@@ -123,7 +123,7 @@ export default function JailbreakLab() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Skull className="h-6 w-6 text-primary" />
+              <FlaskConical className="h-6 w-6 text-primary" />
               Jailbreak Lab
             </h1>
             <p className="text-muted-foreground">
@@ -241,7 +241,7 @@ export default function JailbreakLab() {
             ) : filteredAttacks.length === 0 ? (
               <Card>
                 <CardContent className="py-8 text-center text-muted-foreground">
-                  <Skull className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <FlaskConical className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>No attacks found</p>
                   <p className="text-sm">Try adjusting your filters</p>
                 </CardContent>
