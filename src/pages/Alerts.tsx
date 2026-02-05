@@ -476,22 +476,6 @@ export default function Alerts() {
                 </ul>
               </div>
             </div>
-                      {rule.channels.map(ch => (
-                        <Badge key={ch} variant="outline" className="text-xs capitalize">
-                          {ch}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      Not enforced
-                    </span>
-                    <Switch checked={rule.enabled} disabled />
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       )}
