@@ -1,296 +1,324 @@
 
-# Command Center Refactoring and Core System Enhancement Plan
+## Goal (what you asked for)
+1) Produce an end-to-end, **no-hallucination** architecture map for the sidebar domains you named: **Monitor, Govern, Respond, Impact, Configure**:
+- what the UI shows
+- which frontend files/hooks power it
+- which backend tables/functions it uses
+- how realtime syncing works
 
-## Executive Summary
+2) Identify and remove/replace anything that is **fake, simulated, hardcoded, misleading, or “looks real but isn’t”** across those areas (and any cross-cutting UI like header badges).
 
-This plan addresses the user's request to:
-1. **Refactor the Command Center** to display only Data Governance and Core RAI content (remove 6-stage governance pipeline components)
-2. **Ensure 100% functional accuracy** for Data Governance (Data Quality Engine, Data Contracts) and Core Security features
-3. **Fix icon and label issues** for Jailbreak Lab and AI Pentesting
-4. **Remove output restrictions** in Core RAI engines (currently truncating responses to 500 characters)
-5. **Implement proper incident/alert workflow** for Data Quality and Core RAI violations
-
----
-
-## Part 1: Command Center Page Refactoring
-
-### Current State Analysis
-The Command Center (`src/pages/Index.tsx`) currently displays 25+ widgets including:
-- GovernanceFlowDiagram (6-stage pipeline) - **TO REMOVE**
-- SLODashboard & OversightAgentStatus - **TO REMOVE**  
-- SimulationController & PredictiveRiskPanel - **TO REMOVE**
-- IncidentSummaryCard & FeedbackLoopDiagram - **TO REMOVE**
-- RealityCheckDashboard - **TO REMOVE**
-- GovernanceHealthCards - **TO REMOVE**
-- PlatformHealthCards - **TO KEEP (modify)**
-- Quick Actions cards - **TO MODIFY**
-- Core RAI Engines cards - **TO KEEP**
-
-### New Command Center Structure
-
-```text
-+------------------------------------------------------------------+
-|                     COMMAND CENTER                                |
-|  Autonomous Governance Platform                                   |
-+------------------------------------------------------------------+
-|                                                                   |
-|  [ Alert Banners: HITL Queue / High-Risk / Unsafe Deployments ]   |
-|                                                                   |
-+------------------------------------------------------------------+
-|  DATA GOVERNANCE                    |  CORE SECURITY              |
-|  +---------------------------+      |  +------------------------+ |
-|  | Data Quality Engine       |      |  | Security Dashboard     | |
-|  | - Datasets: X             |      |  | - Findings: X          | |
-|  | - Avg Score: X%           |      |  | - Critical: X          | |
-|  | - Incidents: X            |      |  +------------------------+ |
-|  +---------------------------+      |                             |
-|  +---------------------------+      |  +------------------------+ |
-|  | Data Contracts            |      |  | AI Pentesting          | |
-|  | - Active: X               |      |  | Jailbreak Lab          | |
-|  | - Violations: X           |      |  | Threat Modeling        | |
-|  +---------------------------+      |  | Attack Library         | |
-|                                     |  +------------------------+ |
-+------------------------------------------------------------------+
-|  CORE RAI ENGINES                                                 |
-|  +------------+ +-------------+ +-----------+ +--------+ +------+ |
-|  | Fairness   | | Hallucinate | | Toxicity  | | Privacy| |Explain||
-|  +------------+ +-------------+ +-----------+ +--------+ +------+ |
-+------------------------------------------------------------------+
-|  ACTIVITY & LOGS                                                  |
-|  +-----------------------------------------------------------+   |
-|  | Recent Incidents (from DQ & RAI) | Recent Alerts | Metrics |   |
-|  +-----------------------------------------------------------+   |
-+------------------------------------------------------------------+
-```
-
-### Files to Modify
-
-| File | Changes |
-|------|---------|
-| `src/pages/Index.tsx` | Remove 6-stage pipeline, oversight widgets; add Data Governance cards, Core Security cards, activity logs |
+3) Enforce a consistent “truth” pattern:
+- if data exists: show it (derived from backend)
+- if it doesn’t: show **N/A / Not available** (not “100”, not random, not “healthy”)
+- all clickable things either work end-to-end or are removed (no dead/disabled “coming soon” controls in production UI)
 
 ---
 
-## Part 2: Icon and Label Corrections
+## What I already verified in code (evidence-based, not guessing)
 
-### Current Issues
-- **Jailbreak Lab**: Uses `Skull` icon (morbid/unprofessional)
-- **AI Pentesting**: Uses `Bug` icon (too generic)
+### A) Sidebar routing (source of truth)
+- **Routes defined in**: `src/App.tsx`
+- **Sidebar items defined in**: `src/components/layout/Sidebar.tsx`
 
-### Proposed Changes
+The sections you asked about map to these core routes:
 
-| Location | Component | Current | New |
-|----------|-----------|---------|-----|
-| `src/components/layout/Sidebar.tsx` line 54 | Jailbreak Lab | `Skull` | `Swords` or `FlaskConical` |
-| `src/components/layout/Sidebar.tsx` line 53 | AI Pentesting | `Bug` | `ScanSearch` or `ShieldAlert` |
-| `src/pages/security/JailbreakLab.tsx` line 126 | Header icon | `Skull` | `FlaskConical` |
-| `src/pages/security/Pentesting.tsx` line 123 | Header icon | `Bug` | `ScanSearch` |
+**Monitor**
+- `/observability` → `src/pages/Observability.tsx`
+- `/alerts` → `src/pages/Alerts.tsx`
 
----
+**Govern**
+- `/governance/approvals` → `src/pages/Approvals.tsx`
+- `/decision-ledger` → `src/pages/DecisionLedger.tsx`
+- `/hitl` → `src/pages/HITL.tsx`
+- `/incidents` → `src/pages/Incidents.tsx`
+- `/lineage` → `src/pages/Lineage.tsx`
 
-## Part 3: Remove Output Restrictions in Core RAI Engines
+**Respond**
+- `/policy` → `src/pages/Policy.tsx`
+- `/golden` → `src/pages/GoldenDemoV2.tsx` (explicit demo page, allowed exception)
 
-### Current Truncation Issue
-Found in `src/components/engines/CustomPromptTest.tsx` lines 268-271:
-```tsx
-{customResult.model_response.length > 500 
-  ? customResult.model_response.slice(0, 500) + "..." 
-  : customResult.model_response}
-```
+**Impact**
+- `/impact-dashboard` → `src/pages/ImpactDashboard.tsx`
+- `/regulatory-reports` → `src/pages/RegulatoryReports.tsx`
 
-Also in backend at `supabase/functions/eval-toxicity-hf/index.ts` line 338:
-```ts
-output: result.output?.substring(0, 500) || result.error,
-```
-
-### Solution: Expandable Full Response
-
-Create a collapsible/expandable component that shows:
-- First 300 characters by default with "Show Full Response" button
-- Full response when expanded
-- Copy to clipboard functionality
-
-Files to modify:
-- `src/components/engines/CustomPromptTest.tsx` - Replace truncation with expandable view
-- All `eval-*-hf/index.ts` functions - Remove `substring(0, 500)` truncation in raw logs
+**Configure**
+- `/projects` → `src/pages/Projects.tsx`
+- `/models` → `src/pages/Models.tsx`
+- `/configuration` → `src/pages/Configuration.tsx` (redirects to `/settings`)
+- `/runbooks` → `src/pages/Runbooks.tsx`
+- `/settings` → `src/pages/Settings.tsx`
+- `/docs` → `src/pages/Documentation.tsx`
 
 ---
 
-## Part 4: Incident & Alert Workflow for Data Quality
+## Critical “fake/simulated/hardcoded” problems found (must be fixed)
 
-### Current State
-- `dq-raise-incidents` creates incidents in `dq_incidents` table
-- These are **NOT** connected to main `incidents` table or `alerts` page
-- No HITL escalation for DQ violations
+### 1) Simulated numbers and simulated “sync”
+**File**: `src/components/data/DataSourceConnectors.tsx`
+- Uses `setTimeout()` to “simulate sync completion”
+- Sets `row_count` using `Math.random()`
+This violates your “all numbers must be real” requirement.
 
-### Required Flow
+### 2) Synthetic event generation exposed in normal UI
+**File**: `src/components/oversight/SimulationController.tsx`
+- Calls backend function `generate-synthetic-events`
+- Shows “Starting synthetic event generation…”
+Even if this is “for testing”, it cannot be present in normal production navigation unless it’s restricted to `/golden` only (your exception).
 
-```text
-Data Quality Rule Violation
-    ↓
-dq-raise-incidents (creates dq_incident)
-    ↓
-NEW: Also create entry in main 'incidents' table
-    ↓
-NEW: If severity = P0/critical, auto-escalate to review_queue (HITL)
-    ↓
-NEW: Trigger send-notification for configured alert channels
-```
+### 3) “Fallback to 100” creates fake health/risk
+These patterns fabricate “healthy/minimal” status when scores are missing:
+- `fairness_score ?? 100`, `robustness_score ?? 100`
+Found in:
+- `src/pages/Observability.tsx` (`getModelStatus`)
+- `src/pages/Models.tsx` (status/risk fallback)
+- `src/components/dashboard/ModelCard.tsx` (`getRiskFromScores`)
+This produces incorrect UI when no evaluations exist.
 
-### Implementation
+### 4) Alerts page has disabled “coming soon” actions (dead UI)
+**File**: `src/pages/Alerts.tsx`
+- Filter button disabled with “coming soon”
+- Acknowledge/Resolve disabled with “coming soon”
+- “Alert Rules” tab is explicitly “reference only” and includes hardcoded rule examples
 
-1. **Modify `supabase/functions/dq-raise-incidents/index.ts`**:
-   - After inserting into `dq_incidents`, also insert into main `incidents` table
-   - Map P0 -> critical, P1 -> high, P2 -> medium severity
-   - For P0/critical, insert into `review_queue` for HITL
+This fails your mandate: no placeholder controls in production UI.
 
-2. **Add alert trigger**:
-   - Call `send-notification` for critical incidents
-   - Include incident details and remediation action
+### 5) Observability has “oversight simulation” exposed + other partial tooling
+**File**: `src/pages/Observability.tsx`
+- Contains an “Oversight Agent” tab that renders `SimulationController` (synthetic generator)
+- Also includes some “not implemented” notes
 
----
+### 6) Impact Dashboard currently has logic gaps that can look like “real metrics”
+**File**: `src/pages/ImpactDashboard.tsx`
+- Declares arrays like `groups` and `alerts` but doesn’t populate them from real queries
+- Some stats can default to “0” or “100%” without being backed by computation output
+This needs tightening so it never implies computed results if none were computed.
 
-## Part 5: Incident & Alert Workflow for Core RAI Engines
+### 7) Header notifications indicator is always “on”
+**File**: `src/components/layout/Header.tsx`
+- Notification bell shows a red dot unconditionally.
+That is a “fake signal” if there are zero open alerts/incidents.
 
-### Current State (Good)
-All 5 RAI engines already auto-escalate to HITL when non-compliant:
-- `eval-fairness/index.ts` lines 546-556: Inserts into `review_queue`
-- `eval-toxicity-hf/index.ts` lines 457-467: Inserts into `review_queue`
-- Similar pattern in privacy, hallucination, explainability engines
+### 8) Demo data seeding code exists (even if not wired into header right now)
+**File**: `src/hooks/useDemoMode.ts`
+- Defaults demo mode to TRUE for new visitors via localStorage
+- Contains seeding logic that calls backend functions and inserts “demo” records
+Your comment says “auto-init disabled”, and I did not find it actively called from main UI right now, but the existence + default behavior is risky. We should hard-lock this so demo seeding is only possible from `/golden`.
 
-### Missing Pieces
-1. **Main incidents table integration** - RAI violations create `review_queue` entries but NOT `incidents`
-2. **Alert page visibility** - Need to create alerts for RAI violations
-
-### Required Changes
-
-For each RAI engine (`eval-fairness`, `eval-toxicity-hf`, `eval-privacy-hf`, `eval-hallucination-hf`, `eval-explainability-hf`):
-
-1. Add incident creation when non-compliant:
-```typescript
-if (!isCompliant) {
-  // Existing: review_queue insert
-  
-  // NEW: Create incident
-  await serviceClient.from("incidents").insert({
-    title: `${engineType} NON-COMPLIANT: ${overallScore}%`,
-    description: `Model failed ${engineType} evaluation`,
-    severity: overallScore < 50 ? "critical" : "high",
-    status: "open",
-    incident_type: "rai_violation",
-    model_id: modelId,
-  });
-  
-  // NEW: Create drift alert for visibility
-  await serviceClient.from("drift_alerts").insert({
-    feature: engineType,
-    drift_type: "compliance",
-    drift_value: (100 - overallScore) / 100,
-    severity: overallScore < 50 ? "critical" : "high",
-    status: "open",
-  });
-}
-```
+### 9) Core RAI non-compliance → incident+alerts is inconsistent across engines
+From the backend functions inspected:
+- `eval-toxicity-hf` and `eval-privacy-hf` already create:
+  - `review_queue` item
+  - `incidents` row
+  - `drift_alerts` row (as a visibility “alert”)
+- `eval-fairness`, `eval-hallucination-hf`, `eval-explainability-hf` (in the ranges inspected) still **only** escalate to `review_queue` but do **not** consistently create `incidents` + `drift_alerts`.
+This creates gaps where “non-compliant” doesn’t propagate uniformly into Alerts/Incidents.
 
 ---
 
-## Part 6: Core Security - 100% Accuracy Verification
+## Deliverable 1: “How each sidebar feature works end-to-end” (architecture map)
+Instead of trying to “explain everything” verbally in chat (which becomes un-auditable), I will implement an in-app **Architecture & Truth Map** under `/docs` with a strict template per sidebar page:
 
-### Components to Verify
+For each page (Observability, Alerts, Approvals, Decision Ledger, HITL, Incidents, Knowledge Graph, Policy, Impact Dashboard, Regulatory Reports, Projects, Models, Settings):
+- Purpose (plain English)
+- UI Components (frontend file(s))
+- Data sources (tables + key columns)
+- Backend functions invoked (name + request/response shape)
+- Realtime subscriptions (which tables, what gets invalidated)
+- Metrics & formulas shown (where computed, with formula + units)
+- Escalation rules (when it creates Incident, Alert, HITL item)
+- “Truth rules” (what shows as N/A, what is computed, what is blocked)
 
-| Page | Status | Required Fixes |
-|------|--------|----------------|
-| SecurityDashboard.tsx | Functional | None identified |
-| Pentesting.tsx | Functional | Icon change only |
-| JailbreakLab.tsx | Functional | Icon change only |
-| ThreatModeling.tsx | Functional | None identified |
-| AttackLibrary.tsx | Functional | None identified |
-
-### Backend Edge Functions to Verify
-
-| Function | Status | Notes |
-|----------|--------|-------|
-| `agent-pentester` | Deployed | Functional |
-| `agent-jailbreaker` | Deployed | Functional |
-| `agent-threat-modeler` | Deployed | Functional |
-| `security-evidence-service` | Deployed | Functional |
-
-All Core Security functions appear correctly implemented based on code review.
+This turns your requirement into something reviewable and enforceable.
 
 ---
 
-## Part 7: Data Governance - 100% Accuracy Verification
+## Deliverable 2: Remove/replace fake/simulated UI + enforce “truth UI” everywhere
 
-### Data Quality Engine Pipeline
+### Phase 1 — Purge simulation from production navigation (highest priority)
+1) Remove `SimulationController` from `/observability` (keep it only for `/golden` if you still want synthetic generation there).
+2) Ensure any synthetic generators and demo seeders are gated by:
+   - route == `/golden` OR query param `?sandbox=true` (explicit)  
+   - and never run automatically
 
-| Stage | Function | Status | Issues |
-|-------|----------|--------|--------|
-| 1. Ingest | `dq-ingest-data` | Deployed | None |
-| 2. Profile | `dq-profile-dataset` | Deployed | None |
-| 3. Generate Rules | `dq-generate-rules` | Deployed | None |
-| 4. Execute Rules | `dq-execute-rules` | Deployed | None |
-| 5. Dashboard Assets | `dq-generate-dashboard-assets` | Deployed | None |
-| 6. Raise Incidents | `dq-raise-incidents` | Deployed | Needs main incidents integration |
+Files:
+- `src/pages/Observability.tsx`
+- `src/components/oversight/SimulationController.tsx`
+- `src/hooks/useDemoMode.ts`
+- any other demo seed entry points discovered during implementation
 
-### Data Contracts
-
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Contract creation | Functional | Via DataContractsContent.tsx |
-| Contract validation | Functional | validate-contract edge function |
-| SLA enforcement | Functional | Checked in eval-data-quality |
+Acceptance:
+- No UI path outside `/golden` can generate synthetic events or seed demo data.
 
 ---
 
-## Implementation Summary
+### Phase 2 — Remove “fake defaults” (replace with “N/A / Unknown”)
+1) Replace `?? 100` fallbacks for model scores:
+- If `fairness_score`/`robustness_score` is null → status becomes `"unknown"` (new UI state) and UI shows “N/A” not “healthy”.
 
-### Phase 1: Command Center Refactoring
-1. Rewrite `src/pages/Index.tsx` to remove pipeline components
-2. Add Data Governance summary cards
-3. Add Core Security summary cards
-4. Keep Core RAI engine cards
-5. Add activity/logs section
+2) Update `ModelCard` and `Models` page helpers:
+- Risk level and environment must not be inferred from missing scores.
 
-### Phase 2: Icon and Label Fixes
-1. Update `src/components/layout/Sidebar.tsx` icons
-2. Update page header icons in Pentesting.tsx and JailbreakLab.tsx
+Files:
+- `src/components/dashboard/ModelCard.tsx`
+- `src/pages/Models.tsx`
+- `src/pages/Observability.tsx`
 
-### Phase 3: Output Restriction Removal
-1. Modify `CustomPromptTest.tsx` with expandable response component
-2. Update all 5 RAI engine edge functions to remove raw log truncation
-
-### Phase 4: Incident/Alert Workflow
-1. Modify `dq-raise-incidents` to create main incidents + HITL escalation
-2. Modify all 5 RAI engines to create incidents + alerts on non-compliance
-
-### Phase 5: Deploy and Test
-1. Deploy modified edge functions
-2. Test DQ pipeline end-to-end
-3. Test RAI engines with non-compliant scenarios
-4. Verify incidents appear in Incidents page
-5. Verify alerts appear in Alerts page
-6. Verify HITL queue receives escalations
+Acceptance:
+- A brand new model with no evals never appears “minimal risk / healthy / production” by default.
 
 ---
 
-## Technical Notes
+### Phase 3 — Alerts page: remove disabled “coming soon” and make it fully functional
+Implement real actions:
+- **Filter** (client-side filter is fine, but must work)
+- **Acknowledge** and **Resolve** must update backend records:
+  - Incidents: update `incidents.status`
+  - Drift alerts: update `drift_alerts.status`
+If the schema doesn’t support “acknowledged” as a distinct status, we will:
+- either add a column like `acknowledged_at`, `acknowledged_by`
+- or add `status = 'acknowledged'` (with migration updating enum/constraints if needed)
 
-### Edge Functions to Modify
-- `supabase/functions/dq-raise-incidents/index.ts`
+Also: remove the “Alert Rules” tab if it’s not backed by real enforcement, or fully implement it using persisted configuration (no “reference only” pretending).
+
+Files:
+- `src/pages/Alerts.tsx`
+- Potential DB migration (depending on existing `drift_alerts` fields)
+
+Acceptance:
+- No disabled “coming soon” buttons remain on Alerts.
+- Every displayed alert row can be actioned and updates in realtime.
+
+---
+
+### Phase 4 — Data source connectors: remove random row counts + simulated sync
+Minimum truth-safe behavior:
+- If we cannot actually sync to an external database/API yet, then:
+  - “Sync” must be removed, or replaced with a backend-driven operation that returns real results (even if results are “Not supported yet”)
+  - `row_count` must come from real ingestion metrics or be shown as N/A
+
+Files:
+- `src/components/data/DataSourceConnectors.tsx`
+- Potential new backend function to validate connectors (if we keep “Sync”)
+
+Acceptance:
+- No `Math.random()` affects displayed data.
+- No setTimeout “fake sync completion”.
+
+---
+
+### Phase 5 — Governance chain correctness (Decision Ledger truth)
+The current UI shows “Chain Valid” based on a weak heuristic.
+We will implement actual chain verification:
+- recompute each record hash deterministically from canonical fields
+- verify `previous_hash` matches the prior row’s `record_hash`
+- show “Valid / Broken / Unknown” with evidence
+
+Files:
+- `src/pages/DecisionLedger.tsx`
+- possibly shared hash utilities (frontend-only verification using WebCrypto SHA-256)
+
+Acceptance:
+- “Chain Valid” is only shown if validated, otherwise “Not validated / Broken”.
+
+---
+
+### Phase 6 — Standardize escalation rules so everything routes consistently
+Define a single escalation contract used by:
+- Data Quality incidents
+- All Core RAI engines
+
+Contract:
+- Non-compliant evaluation ⇒ create:
+  1) `incidents` row (canonical incident)
+  2) `review_queue` row (human decision required)
+  3) `drift_alerts` row (visibility on Alerts page) OR a dedicated `alerts` table if you prefer cleaner separation
+
+Then ensure HITL decisions:
+- can resolve/close linked incident(s)
+- can resolve corresponding alert(s)
+
+Files (backend):
 - `supabase/functions/eval-fairness/index.ts`
-- `supabase/functions/eval-toxicity-hf/index.ts`
-- `supabase/functions/eval-privacy-hf/index.ts`
 - `supabase/functions/eval-hallucination-hf/index.ts`
 - `supabase/functions/eval-explainability-hf/index.ts`
+- (verify DQ path) `supabase/functions/dq-raise-incidents/index.ts`
 
-### Frontend Files to Modify
-- `src/pages/Index.tsx` (major rewrite)
-- `src/components/layout/Sidebar.tsx` (icon changes)
-- `src/pages/security/JailbreakLab.tsx` (icon change)
-- `src/pages/security/Pentesting.tsx` (icon change)
-- `src/components/engines/CustomPromptTest.tsx` (expandable response)
+Acceptance:
+- Any engine failure is visible in:
+  - Incidents page
+  - Alerts page
+  - HITL queue
+…and linked, not duplicated without traceability.
 
-### New Components to Create
-- `ExpandableModelResponse.tsx` - Collapsible full response viewer
-- `DataGovernanceSummaryCard.tsx` - DQ metrics summary for Command Center
-- `SecuritySummaryCard.tsx` - Security metrics summary for Command Center
+---
+
+### Phase 7 — Header truth
+- Notification dot should reflect actual open alerts/incidents count.
+- If count == 0, show no dot.
+
+Files:
+- `src/components/layout/Header.tsx`
+- small hook (or reuse existing hooks) to compute open items
+
+Acceptance:
+- Header never signals “new notifications” if there are none.
+
+---
+
+## End-to-end verification (what “100% real-time + no fake” means in practice)
+I will run a “Brutal Audit” style checklist across each sidebar area:
+
+For each page:
+1) Open page with empty DB state → must show empty state, not fabricated numbers.
+2) Trigger a real event (example):
+   - run a DQ pipeline to create a DQ incident
+   - run a Core RAI eval that fails threshold
+   - run a pentest scan that creates findings
+3) Confirm realtime propagation:
+   - new records appear in Alerts
+   - incident appears in Incidents
+   - HITL item appears in HITL queue
+4) Confirm actions work:
+   - acknowledge/resolve updates backend state
+   - state changes reflect across pages via realtime subscriptions
+5) Confirm UI never shows raw technical errors:
+   - replace direct `toast.error(error.message)` patterns with sanitized messaging or centralized wrappers (`safeInvoke`, `sanitizeErrorMessage`).
+
+---
+
+## Files expected to change (implementation scope)
+Frontend (high confidence):
+- `src/pages/Observability.tsx`
+- `src/pages/Alerts.tsx`
+- `src/components/layout/Header.tsx`
+- `src/pages/ImpactDashboard.tsx`
+- `src/components/data/DataSourceConnectors.tsx`
+- `src/pages/Models.tsx`
+- `src/components/dashboard/ModelCard.tsx`
+- `src/pages/DecisionLedger.tsx`
+- `/docs` page updates (likely `src/pages/Documentation.tsx`)
+
+Backend functions (high confidence):
+- `supabase/functions/eval-fairness/index.ts`
+- `supabase/functions/eval-hallucination-hf/index.ts`
+- `supabase/functions/eval-explainability-hf/index.ts`
+- verify/adjust `supabase/functions/dq-raise-incidents/index.ts`
+
+Database migration (possible, depending on current schema):
+- Add acknowledged fields/status support for alerts/incidents if missing
+- Add linkage fields or standardize linkage via `metadata` JSON
+
+---
+
+## Acceptance criteria (what you can use to judge “40% → 100%”)
+1) No user-visible simulated numbers (no random counts, no fake “sync”).
+2) No default “100” or “healthy” when data is missing; must be “N/A/Unknown”.
+3) Alerts page has working Filter + Acknowledge + Resolve (no disabled placeholders).
+4) Non-compliant results consistently create and link:
+   - Incident
+   - Alert visibility
+   - HITL escalation
+5) Header notification indicator reflects real counts only.
+6) `/golden` remains the only place where synthetic/demo behaviors are allowed.
+
