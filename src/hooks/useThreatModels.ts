@@ -56,17 +56,15 @@ export function useThreatModels(systemId?: string) {
   const vectorsQuery = useQuery({
     queryKey: ['threat-vectors', systemId],
     queryFn: async () => {
-      // Fetch all vectors for the system's models in a single query
-      // First get model IDs for this system
-      let modelsSubquery = supabase
-        .from('threat_models')
-        .select('id');
-      
-      if (systemId) {
-        modelsSubquery = modelsSubquery.eq('system_id', systemId);
-      }
+      // Require systemId to avoid returning all vectors
+      if (!systemId) return [];
 
-      const { data: models, error: modelsError } = await modelsSubquery;
+      // First get model IDs for this system
+      const { data: models, error: modelsError } = await supabase
+        .from('threat_models')
+        .select('id')
+        .eq('system_id', systemId);
+
       if (modelsError) throw modelsError;
       
       const modelIds = models?.map(m => m.id) || [];
@@ -81,8 +79,7 @@ export function useThreatModels(systemId?: string) {
       if (error) throw error;
       return data as ThreatVector[];
     },
-    // Remove dependency on modelsQuery.data - fetch independently
-    enabled: true,
+    enabled: !!systemId,
   });
 
   const createThreatModel = useMutation({

@@ -3,8 +3,12 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Target, Plus, RefreshCw, Layers, Download } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Target, Plus, RefreshCw, Layers, Download, History, Zap, AlertTriangle, Server, Shield } from 'lucide-react';
 import { useSystems } from '@/hooks/useSystems';
 import { useThreatModels } from '@/hooks/useThreatModels';
 import { ThreatVectorRow } from '@/components/security/ThreatVectorRow';
@@ -13,6 +17,7 @@ import { safeInvoke } from '@/lib/safe-supabase';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 
 const frameworks = [
   { id: 'STRIDE', label: 'STRIDE', description: 'Spoofing, Tampering, Repudiation, Info Disclosure, DoS, Elevation' },
@@ -22,14 +27,21 @@ const frameworks = [
 ];
 
 export default function ThreatModeling() {
+  const navigate = useNavigate();
   const [selectedSystemId, setSelectedSystemId] = useState<string>('');
   const [selectedFramework, setSelectedFramework] = useState<string>('STRIDE');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('generate');
+  const [customVectorTitle, setCustomVectorTitle] = useState('');
+  const [customVectorDescription, setCustomVectorDescription] = useState('');
+  const [customLikelihood, setCustomLikelihood] = useState<number>(3);
+  const [customImpact, setCustomImpact] = useState<number>(3);
+  const [validatingVectorId, setValidatingVectorId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const systemsQuery = useSystems();
   const systems = systemsQuery.data || [];
-  const { models, vectors, createThreatModel, updateThreatVector, isLoading } = useThreatModels(selectedSystemId || undefined);
+  const { models, vectors, createThreatModel, createThreatVector, updateThreatVector, isLoading } = useThreatModels(selectedSystemId || undefined);
 
   // Realtime subscription for threat model updates
   useEffect(() => {
@@ -57,8 +69,20 @@ export default function ThreatModeling() {
   }, [queryClient]);
 
   const selectedSystem = systems.find(s => s.id === selectedSystemId);
-  const activeModel = models.find(m => m.framework === selectedFramework);
-  const activeVectors = vectors.filter(v => v.threat_model_id === activeModel?.id);
+  
+  // Filter models for the selected system AND framework
+  const systemModels = selectedSystemId 
+    ? models.filter(m => m.system_id === selectedSystemId)
+    : [];
+  const activeModel = systemModels.find(m => m.framework === selectedFramework);
+  const activeVectors = activeModel 
+    ? vectors.filter(v => v.threat_model_id === activeModel.id)
+    : [];
+  
+  // All models for history tab
+  const historyModels = selectedSystemId
+    ? models.filter(m => m.system_id === selectedSystemId)
+    : [];
 
   const handleGenerateModel = async () => {
     if (!selectedSystemId) {
@@ -91,6 +115,67 @@ export default function ThreatModeling() {
       id: vectorId,
       updates: { is_accepted: accepted },
     });
+  };
+
+  const handleValidateVector = async (vectorId: string) => {
+    if (!selectedSystemId) {
+      toast.error('No system selected');
+      return;
+    }
+    
+    setValidatingVectorId(vectorId);
+    try {
+      const { data, error } = await safeInvoke('agent-threat-modeler', {
+        action: 'validate-vector',
+        systemId: selectedSystemId,
+        vectorId: vectorId,
+      }, { showErrorToast: true, toastMessage: 'Failed to validate threat vector' });
+
+      if (error) throw error;
+
+      toast.success('Threat vector validated against target');
+      queryClient.invalidateQueries({ queryKey: ['threat-vectors'] });
+    } catch (error) {
+      // Error handled by safeInvoke
+    } finally {
+      setValidatingVectorId(null);
+    }
+  };
+
+  const handleAddCustomVector = async () => {
+    if (!activeModel) {
+      toast.error('Generate a threat model first');
+      return;
+    }
+    if (!customVectorTitle.trim()) {
+      toast.error('Vector title is required');
+      return;
+    }
+
+    try {
+      createThreatVector.mutate({
+        threat_model_id: activeModel.id,
+        title: customVectorTitle,
+        description: customVectorDescription || null,
+        likelihood: customLikelihood,
+        impact: customImpact,
+        confidence_level: 'medium',
+        is_accepted: false,
+        atlas_tactic: null,
+        owasp_category: null,
+        maestro_layer: null,
+        mitigation_checklist: [],
+      });
+
+      // Reset form
+      setCustomVectorTitle('');
+      setCustomVectorDescription('');
+      setCustomLikelihood(3);
+      setCustomImpact(3);
+      toast.success('Custom threat vector added');
+    } catch (error) {
+      toast.error('Failed to add custom vector');
+    }
   };
 
   const totalRiskScore = activeVectors.reduce((sum, v) => {
@@ -139,6 +224,29 @@ export default function ThreatModeling() {
     URL.revokeObjectURL(url);
     toast.success('Threat model exported successfully');
   };
+
+  // Empty state - No systems configured
+  if (systems.length === 0 && !systemsQuery.isLoading) {
+    return (
+      <MainLayout title="Threat Modeling" subtitle="Multi-framework AI threat analysis">
+        <div className="p-6 flex items-center justify-center min-h-[60vh]">
+          <Card className="max-w-md w-full">
+            <CardContent className="pt-6 text-center">
+              <Server className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <h3 className="text-lg font-semibold mb-2">No AI Systems Configured</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Configure at least one AI system to run threat modeling analysis.
+              </p>
+              <Button onClick={() => navigate('/models')}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add System
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout title="Threat Modeling" subtitle="Multi-framework AI threat analysis">
