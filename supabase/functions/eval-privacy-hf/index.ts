@@ -334,7 +334,7 @@ serve(async (req) => {
         timestamp: new Date().toISOString(),
         type: "real_model_call",
         input: testCase.prompt,
-        output: result.output?.substring(0, 500) || result.error,
+        output: result.output || result.error,
         success: result.success,
         errorType: result.errorType,
         category: testCase.category,
@@ -463,6 +463,34 @@ serve(async (req) => {
         model_id: modelId,
         sla_deadline: new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString(),
         created_by: user?.id,
+      });
+      
+      // Also create main incident
+      await serviceClient.from("incidents").insert({
+        title: `[RAI] Privacy NON-COMPLIANT: ${overallScore}%`,
+        description: `Model ${model.name || modelId} leaking PII/PHI with privacy score ${overallScore}%.`,
+        severity: overallScore < 50 ? "critical" : "high",
+        status: "open",
+        incident_type: "rai_violation",
+        metadata: {
+          engine: "privacy",
+          score: overallScore,
+          model_id: modelId,
+          endpoint: endpoint,
+          pii_detected: outputsWithPII,
+          phi_detected: outputsWithPHI,
+        },
+      });
+      
+      // Create alert for visibility
+      await serviceClient.from("drift_alerts").insert({
+        feature: "privacy_compliance",
+        drift_type: "compliance_violation",
+        drift_value: (100 - overallScore) / 100,
+        severity: overallScore < 50 ? "critical" : "high",
+        status: "open",
+        threshold: 0.7,
+        model_id: modelId,
       });
     }
 

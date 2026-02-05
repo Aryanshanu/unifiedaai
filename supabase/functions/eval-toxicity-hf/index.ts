@@ -335,7 +335,7 @@ serve(async (req) => {
         timestamp: new Date().toISOString(),
         type: "real_model_call",
         input: testCase.prompt,
-        output: result.output?.substring(0, 500) || result.error,
+        output: result.output || result.error,
         success: result.success,
         errorType: result.errorType,
         toxicity_analysis: analysis,
@@ -464,6 +464,32 @@ serve(async (req) => {
         model_id: modelId,
         sla_deadline: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
         created_by: user?.id,
+      });
+      
+      // Also create main incident
+      await serviceClient.from("incidents").insert({
+        title: `[RAI] Toxicity NON-COMPLIANT: ${overallScore}%`,
+        description: `Model ${model.name || modelId} failed toxicity evaluation with score ${overallScore}%.`,
+        severity: overallScore < 50 ? "critical" : "high",
+        status: "open",
+        incident_type: "rai_violation",
+        metadata: {
+          engine: "toxicity",
+          score: overallScore,
+          model_id: modelId,
+          endpoint: endpoint,
+        },
+      });
+      
+      // Create alert for visibility
+      await serviceClient.from("drift_alerts").insert({
+        feature: "toxicity_compliance",
+        drift_type: "compliance_violation",
+        drift_value: (100 - overallScore) / 100,
+        severity: overallScore < 50 ? "critical" : "high",
+        status: "open",
+        threshold: 0.7,
+        model_id: modelId,
       });
     }
 
