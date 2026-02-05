@@ -509,7 +509,7 @@ export default function Index() {
                 <AlertTriangle className="h-6 w-6 text-muted-foreground" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{metrics?.openIncidents || 0}</p>
+                <p className="text-2xl font-bold">{metrics?.recentIncidents || 0}</p>
                 <p className="text-sm text-muted-foreground">Open Alerts</p>
               </div>
             </CardContent>
