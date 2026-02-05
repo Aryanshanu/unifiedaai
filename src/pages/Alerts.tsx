@@ -281,9 +281,9 @@ export default function Alerts() {
                           onClick={async () => {
                             try {
                               if (alert.type === 'drift') {
-                                await supabase.from('drift_alerts').update({ status: 'acknowledged' }).eq('id', alert.id);
+                                await supabase.from('drift_alerts').update({ status: 'investigating' }).eq('id', alert.id);
                               } else {
-                                await supabase.from('incidents').update({ status: 'acknowledged' }).eq('id', alert.id);
+                                await supabase.from('incidents').update({ status: 'investigating' }).eq('id', alert.id);
                               }
                               queryClient.invalidateQueries({ queryKey: ['drift-alerts'] });
                               queryClient.invalidateQueries({ queryKey: ['incidents'] });
@@ -292,7 +292,7 @@ export default function Alerts() {
                               toast.error("Failed to acknowledge alert");
                             }
                           }}
-                          disabled={alert.status === 'resolved' || alert.status === 'acknowledged'}
+                          disabled={alert.status === 'resolved' || alert.status === 'investigating' || alert.status === 'mitigating'}
                         >
                           Acknowledge
                         </Button>
