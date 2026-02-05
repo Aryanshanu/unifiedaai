@@ -343,7 +343,7 @@ export default function ThreatModeling() {
                 </Card>
                 <Card>
                   <CardContent className="pt-6">
-                    <div className="text-2xl font-bold text-green-600">{acceptedCount}</div>
+                    <div className="text-2xl font-bold text-primary">{acceptedCount}</div>
                     <div className="text-sm text-muted-foreground">Accepted Risks</div>
                   </CardContent>
                 </Card>
