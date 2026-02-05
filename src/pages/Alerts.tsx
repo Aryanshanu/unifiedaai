@@ -214,7 +214,6 @@ export default function Alerts() {
                 placeholder="Search alerts..." 
                 className="w-64 bg-secondary border-border"
               />
-              <Button variant="outline" size="sm" disabled title="Filter functionality coming soon">
               <Button variant="outline" size="sm" onClick={() => toast.info("Use search to filter alerts")}>
                 <Filter className="w-4 h-4 mr-2" />
                 Filter
