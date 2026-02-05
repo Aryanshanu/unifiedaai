@@ -1,16 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { FlaskConical, Play, Zap, Search, Plus, RefreshCw, Shield, ShieldX } from 'lucide-react';
+import { FlaskConical, Play, Zap, Search, Plus, RefreshCw, Shield, ShieldX, Download } from 'lucide-react';
 import { useSystems } from '@/hooks/useSystems';
 import { useAttackLibrary, Attack } from '@/hooks/useAttackLibrary';
 import { AttackCard } from '@/components/security/AttackCard';
-import { supabase } from '@/integrations/supabase/client';
+import { safeInvoke } from '@/lib/safe-supabase';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 const attackCategories = [
   { id: 'all', label: 'All Categories' },
@@ -37,10 +38,18 @@ export default function JailbreakLab() {
   const [isRunning, setIsRunning] = useState(false);
   const [runningAttackId, setRunningAttackId] = useState<string | null>(null);
   const [results, setResults] = useState<AttackResult[]>([]);
+  const queryClient = useQueryClient();
 
   const systemsQuery = useSystems();
   const systems = systemsQuery.data || [];
   const { attacks, isLoading } = useAttackLibrary(categoryFilter === 'all' ? undefined : categoryFilter);
+
+  // Log results to console for persistence tracking (future: save to DB)
+  useEffect(() => {
+    if (results.length > 0) {
+      console.log('[JailbreakLab] Results updated:', results.length, 'total');
+    }
+  }, [results]);
 
   const filteredAttacks = attacks.filter(attack =>
     attack.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -55,13 +64,11 @@ export default function JailbreakLab() {
 
     setRunningAttackId(attack.id);
     try {
-      const { data, error } = await supabase.functions.invoke('agent-jailbreaker', {
-        body: {
+      const { data, error } = await safeInvoke<{ blocked: boolean; response: string; confidence: number }>('agent-jailbreaker', {
           action: 'execute',
           systemId: selectedSystemId,
           attackId: attack.id,
-        },
-      });
+        }, { showErrorToast: true, toastMessage: 'Failed to execute attack' });
 
       if (error) throw error;
 
@@ -75,8 +82,7 @@ export default function JailbreakLab() {
 
       toast.success(data?.blocked ? 'Attack blocked!' : 'Attack succeeded - vulnerability found');
     } catch (error) {
-      console.error('Attack failed:', error);
-      toast.error('Failed to execute attack');
+      // Error already handled by safeInvoke
     } finally {
       setRunningAttackId(null);
     }
@@ -90,13 +96,11 @@ export default function JailbreakLab() {
 
     setIsRunning(true);
     try {
-      const { data, error } = await supabase.functions.invoke('agent-jailbreaker', {
-        body: {
+      const { data, error } = await safeInvoke<{ results: AttackResult[]; total: number }>('agent-jailbreaker', {
           action: 'automated',
           systemId: selectedSystemId,
           category: categoryFilter === 'all' ? undefined : categoryFilter,
-        },
-      });
+        }, { showErrorToast: true, toastMessage: 'Failed to run automated tests' });
 
       if (error) throw error;
 
@@ -106,8 +110,7 @@ export default function JailbreakLab() {
 
       toast.success(`Completed ${data?.total || 0} attack tests`);
     } catch (error) {
-      console.error('Automated run failed:', error);
-      toast.error('Failed to run automated tests');
+      // Error already handled by safeInvoke
     } finally {
       setIsRunning(false);
     }
@@ -115,6 +118,21 @@ export default function JailbreakLab() {
 
   const blockedCount = results.filter(r => r.blocked).length;
   const successCount = results.filter(r => !r.blocked).length;
+
+  const handleExportResults = () => {
+    if (results.length === 0) {
+      toast.info('No results to export');
+      return;
+    }
+    const blob = new Blob([JSON.stringify(results, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `jailbreak-results-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Results exported successfully');
+  };
 
   return (
     <MainLayout title="Jailbreak Lab" subtitle="Adversarial attack testing">
@@ -181,6 +199,13 @@ export default function JailbreakLab() {
             )}
             Run All Attacks
           </Button>
+
+          {results.length > 0 && (
+            <Button variant="outline" onClick={handleExportResults}>
+              <Download className="h-4 w-4 mr-2" />
+              Export Results
+            </Button>
+          )}
         </div>
 
         {/* Results Summary */}

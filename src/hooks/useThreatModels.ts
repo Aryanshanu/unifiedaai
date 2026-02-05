@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useQueries } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -56,7 +56,20 @@ export function useThreatModels(systemId?: string) {
   const vectorsQuery = useQuery({
     queryKey: ['threat-vectors', systemId],
     queryFn: async () => {
-      const modelIds = modelsQuery.data?.map(m => m.id) || [];
+      // Fetch all vectors for the system's models in a single query
+      // First get model IDs for this system
+      let modelsSubquery = supabase
+        .from('threat_models')
+        .select('id');
+      
+      if (systemId) {
+        modelsSubquery = modelsSubquery.eq('system_id', systemId);
+      }
+
+      const { data: models, error: modelsError } = await modelsSubquery;
+      if (modelsError) throw modelsError;
+      
+      const modelIds = models?.map(m => m.id) || [];
       if (modelIds.length === 0) return [];
 
       const { data, error } = await supabase
@@ -68,7 +81,8 @@ export function useThreatModels(systemId?: string) {
       if (error) throw error;
       return data as ThreatVector[];
     },
-    enabled: !!modelsQuery.data && modelsQuery.data.length > 0,
+    // Remove dependency on modelsQuery.data - fetch independently
+    enabled: true,
   });
 
   const createThreatModel = useMutation({

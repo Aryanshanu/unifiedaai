@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
   Shield, 
-  Bug, 
-  Skull, 
+  ScanSearch, 
+  FlaskConical, 
   Target, 
   AlertTriangle,
   ShieldCheck,
@@ -27,8 +27,8 @@ export default function SecurityDashboard() {
   const recentFindings = findings.slice(0, 5);
 
   const quickActions = [
-    { label: 'Run Pentest', path: '/security/pentesting', icon: Bug, color: 'bg-blue-500' },
-    { label: 'Jailbreak Lab', path: '/security/jailbreak-lab', icon: Skull, color: 'bg-purple-500' },
+    { label: 'AI Pentesting', path: '/security/pentesting', icon: ScanSearch, color: 'bg-blue-500' },
+    { label: 'Jailbreak Lab', path: '/security/jailbreak-lab', icon: FlaskConical, color: 'bg-purple-500' },
     { label: 'Threat Model', path: '/security/threat-modeling', icon: Target, color: 'bg-orange-500' },
   ];
 

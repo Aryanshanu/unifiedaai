@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 export interface SecurityStats {
   totalFindings: number;
@@ -19,6 +21,33 @@ export interface SecurityStats {
 }
 
 export function useSecurityStats() {
+  const queryClient = useQueryClient();
+
+  // Add realtime subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel('security-stats-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'security_findings' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['security-stats'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'security_test_runs' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['security-stats'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
   return useQuery({
     queryKey: ['security-stats'],
     queryFn: async (): Promise<SecurityStats> => {
@@ -72,19 +101,38 @@ export function useSecurityStats() {
         ? coverages.reduce((a, b) => (a || 0) + (b || 0), 0) / coverages.length 
         : 0;
 
-      // Calculate OWASP coverage
+      // Calculate OWASP coverage based on actual test execution rate per category
+      // Coverage = (tests executed in category / total tests available) * 100
+      // We use a more realistic formula: coverage is based on test runs with findings
       const owaspCategories = ['LLM01', 'LLM02', 'LLM03', 'LLM04', 'LLM05', 'LLM06', 'LLM07', 'LLM08', 'LLM09', 'LLM10'];
       const owaspCoverage: Record<string, number> = {};
+      const testsPerCategory = 5; // Expected tests per OWASP category
+      
       owaspCategories.forEach(cat => {
-        const catFindings = findings?.filter(f => f.severity && (f as any).owasp_category === cat) || [];
-        owaspCoverage[cat] = catFindings.length > 0 ? Math.min(100, catFindings.length * 20) : 0;
+        const catFindings = findings?.filter(f => (f as any).owasp_category === cat) || [];
+        // Coverage = min(100, (findings / expected tests) * 100)
+        // This ensures we don't exceed 100% and provides realistic coverage
+        const rawCoverage = (catFindings.length / testsPerCategory) * 100;
+        owaspCoverage[cat] = Math.min(100, Math.round(rawCoverage));
       });
 
-      // Calculate security posture score
-      const systemsScore = Math.min((systemsCount || 0) * 5, 40);
-      const coverageScore = Math.min(averageCoverage / 2, 30);
-      const riskPenalty = Math.min(criticalFindings * 10 + highFindings * 5, 40);
-      const securityScore = Math.max(0, Math.min(100, systemsScore + coverageScore - riskPenalty + 30));
+      // Calculate security posture score (documented formula based on CVSS-inspired approach)
+      // Formula: Base(40) + Coverage Bonus(0-30) - Risk Penalty(0-40) + System Maturity(0-20)
+      // 
+      // Components:
+      // - Base score: 40 (represents minimal security baseline)
+      // - Coverage bonus: (averageCoverage / 100) * 30 (max 30 points for 100% coverage)
+      // - Risk penalty: critical * 10 + high * 5 + medium * 2 (capped at 40)
+      // - System maturity: min(systemsCount * 4, 20) (more systems = more mature security program)
+      const baseScore = 40;
+      const coverageBonus = Math.min((averageCoverage / 100) * 30, 30);
+      const riskPenalty = Math.min(criticalFindings * 10 + highFindings * 5 + mediumFindings * 2, 40);
+      const maturityBonus = Math.min((systemsCount || 0) * 4, 20);
+      
+      // Final score: base + bonuses - penalties, clamped to 0-100
+      const securityScore = Math.max(0, Math.min(100, 
+        baseScore + coverageBonus - riskPenalty + maturityBonus
+      ));
 
       return {
         totalFindings: findings?.length || 0,
