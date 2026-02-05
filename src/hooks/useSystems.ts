@@ -47,24 +47,53 @@ export interface CreateSystemInput {
 }
 
 export function useSystems(projectId?: string) {
-  return useQuery({
-    queryKey: ["systems", projectId],
-    queryFn: async () => {
-      let query = supabase
-        .from("systems")
-        .select("*")
-        .order("created_at", { ascending: false });
-      
-      if (projectId) {
-        query = query.eq("project_id", projectId);
-      }
-      
-      const { data, error } = await query;
-      
-      if (error) throw error;
-      return data as System[];
-    },
-  });
+   return useQuery({
+     queryKey: ["systems", projectId],
+     queryFn: async () => {
+       // SECURITY: Never select api_token_encrypted - tokens must stay server-side only
+       let query = supabase
+         .from("systems")
+         .select(`
+           id,
+           project_id,
+           name,
+           system_type,
+           provider,
+           model_name,
+           endpoint,
+           use_case,
+           status,
+           deployment_status,
+           requires_approval,
+           owner_id,
+           created_at,
+           updated_at,
+           uri_score,
+           runtime_risk_score,
+           last_risk_calculation,
+           registry_locked,
+           locked_at,
+           locked_by,
+           lock_reason
+         `)
+         .order("created_at", { ascending: false });
+       
+       if (projectId) {
+         query = query.eq("project_id", projectId);
+       }
+       
+       const { data, error } = await query;
+       
+       if (error) throw error;
+       
+       // Map to System interface (api_headers and api_token_encrypted will be null from client-side)
+       return (data || []).map(s => ({
+         ...s,
+         api_headers: null,
+         api_token_encrypted: null,
+       })) as System[];
+     },
+   });
 }
 
 export function useSystem(id: string) {
