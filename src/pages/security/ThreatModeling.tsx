@@ -3,8 +3,12 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Target, Plus, RefreshCw, Layers, Download } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Target, Plus, RefreshCw, Layers, Download, History, Zap, AlertTriangle, Server, Shield } from 'lucide-react';
 import { useSystems } from '@/hooks/useSystems';
 import { useThreatModels } from '@/hooks/useThreatModels';
 import { ThreatVectorRow } from '@/components/security/ThreatVectorRow';
@@ -13,6 +17,7 @@ import { safeInvoke } from '@/lib/safe-supabase';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 
 const frameworks = [
   { id: 'STRIDE', label: 'STRIDE', description: 'Spoofing, Tampering, Repudiation, Info Disclosure, DoS, Elevation' },
@@ -22,14 +27,21 @@ const frameworks = [
 ];
 
 export default function ThreatModeling() {
+  const navigate = useNavigate();
   const [selectedSystemId, setSelectedSystemId] = useState<string>('');
   const [selectedFramework, setSelectedFramework] = useState<string>('STRIDE');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('generate');
+  const [customVectorTitle, setCustomVectorTitle] = useState('');
+  const [customVectorDescription, setCustomVectorDescription] = useState('');
+  const [customLikelihood, setCustomLikelihood] = useState<number>(3);
+  const [customImpact, setCustomImpact] = useState<number>(3);
+  const [validatingVectorId, setValidatingVectorId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const systemsQuery = useSystems();
   const systems = systemsQuery.data || [];
-  const { models, vectors, createThreatModel, updateThreatVector, isLoading } = useThreatModels(selectedSystemId || undefined);
+  const { models, vectors, createThreatModel, createThreatVector, updateThreatVector, isLoading } = useThreatModels(selectedSystemId || undefined);
 
   // Realtime subscription for threat model updates
   useEffect(() => {
@@ -57,8 +69,20 @@ export default function ThreatModeling() {
   }, [queryClient]);
 
   const selectedSystem = systems.find(s => s.id === selectedSystemId);
-  const activeModel = models.find(m => m.framework === selectedFramework);
-  const activeVectors = vectors.filter(v => v.threat_model_id === activeModel?.id);
+  
+  // Filter models for the selected system AND framework
+  const systemModels = selectedSystemId 
+    ? models.filter(m => m.system_id === selectedSystemId)
+    : [];
+  const activeModel = systemModels.find(m => m.framework === selectedFramework);
+  const activeVectors = activeModel 
+    ? vectors.filter(v => v.threat_model_id === activeModel.id)
+    : [];
+  
+  // All models for history tab
+  const historyModels = selectedSystemId
+    ? models.filter(m => m.system_id === selectedSystemId)
+    : [];
 
   const handleGenerateModel = async () => {
     if (!selectedSystemId) {
@@ -91,6 +115,67 @@ export default function ThreatModeling() {
       id: vectorId,
       updates: { is_accepted: accepted },
     });
+  };
+
+  const handleValidateVector = async (vectorId: string) => {
+    if (!selectedSystemId) {
+      toast.error('No system selected');
+      return;
+    }
+    
+    setValidatingVectorId(vectorId);
+    try {
+      const { data, error } = await safeInvoke('agent-threat-modeler', {
+        action: 'validate-vector',
+        systemId: selectedSystemId,
+        vectorId: vectorId,
+      }, { showErrorToast: true, toastMessage: 'Failed to validate threat vector' });
+
+      if (error) throw error;
+
+      toast.success('Threat vector validated against target');
+      queryClient.invalidateQueries({ queryKey: ['threat-vectors'] });
+    } catch (error) {
+      // Error handled by safeInvoke
+    } finally {
+      setValidatingVectorId(null);
+    }
+  };
+
+  const handleAddCustomVector = async () => {
+    if (!activeModel) {
+      toast.error('Generate a threat model first');
+      return;
+    }
+    if (!customVectorTitle.trim()) {
+      toast.error('Vector title is required');
+      return;
+    }
+
+    try {
+      createThreatVector.mutate({
+        threat_model_id: activeModel.id,
+        title: customVectorTitle,
+        description: customVectorDescription || null,
+        likelihood: customLikelihood,
+        impact: customImpact,
+        confidence_level: 'medium',
+        is_accepted: false,
+        atlas_tactic: null,
+        owasp_category: null,
+        maestro_layer: null,
+        mitigation_checklist: [],
+      });
+
+      // Reset form
+      setCustomVectorTitle('');
+      setCustomVectorDescription('');
+      setCustomLikelihood(3);
+      setCustomImpact(3);
+      toast.success('Custom threat vector added');
+    } catch (error) {
+      toast.error('Failed to add custom vector');
+    }
   };
 
   const totalRiskScore = activeVectors.reduce((sum, v) => {
@@ -139,6 +224,29 @@ export default function ThreatModeling() {
     URL.revokeObjectURL(url);
     toast.success('Threat model exported successfully');
   };
+
+  // Empty state - No systems configured
+  if (systems.length === 0 && !systemsQuery.isLoading) {
+    return (
+      <MainLayout title="Threat Modeling" subtitle="Multi-framework AI threat analysis">
+        <div className="p-6 flex items-center justify-center min-h-[60vh]">
+          <Card className="max-w-md w-full">
+            <CardContent className="pt-6 text-center">
+              <Server className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <h3 className="text-lg font-semibold mb-2">No AI Systems Configured</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Configure at least one AI system to run threat modeling analysis.
+              </p>
+              <Button onClick={() => navigate('/models')}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add System
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout title="Threat Modeling" subtitle="Multi-framework AI threat analysis">
@@ -198,98 +306,272 @@ export default function ThreatModeling() {
             )}
             Generate Threat Model
           </Button>
+
+          {/* Framework Badge */}
+          <div className="ml-auto">
+            <FrameworkBadge framework={selectedFramework as any} size="lg" />
+          </div>
         </div>
 
-        {/* Framework Description */}
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-4">
-              <FrameworkBadge framework={selectedFramework as any} size="lg" />
+        {/* Empty state when no system selected */}
+        {!selectedSystemId ? (
+          <Card className="mt-4">
+            <CardContent className="py-12 text-center">
+              <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+              <h3 className="text-lg font-medium mb-2">Select a Target System</h3>
               <p className="text-sm text-muted-foreground">
-                {frameworks.find(f => f.id === selectedFramework)?.description}
+                Choose an AI system from the dropdown above to begin threat modeling.
               </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Model Overview */}
-        {activeModel && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-2xl font-bold">{activeVectors.length}</div>
-                <div className="text-sm text-muted-foreground">Threat Vectors</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-2xl font-bold text-red-500">{totalRiskScore}</div>
-                <div className="text-sm text-muted-foreground">Total Risk Score</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-2xl font-bold text-green-500">{acceptedCount}</div>
-                <div className="text-sm text-muted-foreground">Accepted Risks</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-2xl font-bold">
-                  {activeModel.risk_score?.toFixed(1) || 'N/A'}
-                </div>
-                <div className="text-sm text-muted-foreground">Overall Risk Score</div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Threat Vectors Table */}
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium">Threat Vectors</CardTitle>
-              <Button variant="outline" size="sm" onClick={handleExport}>
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="text-center py-8 text-muted-foreground">Loading...</div>
-            ) : activeVectors.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No threat vectors found</p>
-                <p className="text-sm">Generate a threat model to see vectors</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            {/* Model Overview */}
+            {activeModel && (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-2xl font-bold">{activeVectors.length}</div>
+                    <div className="text-sm text-muted-foreground">Threat Vectors</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-2xl font-bold text-destructive">{totalRiskScore}</div>
+                    <div className="text-sm text-muted-foreground">Total Risk Score</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-2xl font-bold text-primary">{acceptedCount}</div>
+                    <div className="text-sm text-muted-foreground">Accepted Risks</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-2xl font-bold">
+                      {activeModel.risk_score?.toFixed(1) || 'N/A'}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Overall Risk Score</div>
+                  </CardContent>
+                </Card>
               </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Threat</TableHead>
-                    <TableHead>Framework Mapping</TableHead>
-                    <TableHead className="text-center">Likelihood</TableHead>
-                    <TableHead className="text-center">Impact</TableHead>
-                    <TableHead className="text-center">Risk</TableHead>
-                    <TableHead>Confidence</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {activeVectors.map((vector) => (
-                    <ThreatVectorRow
-                      key={vector.id}
-                      vector={vector}
-                      onAccept={handleAcceptRisk}
-                    />
-                  ))}
-                </TableBody>
-              </Table>
             )}
-          </CardContent>
-        </Card>
+
+            {/* Tabbed Interface */}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-3 max-w-md">
+                <TabsTrigger value="generate" className="flex items-center gap-2">
+                  <Zap className="h-4 w-4" />
+                  Generate
+                </TabsTrigger>
+                <TabsTrigger value="history" className="flex items-center gap-2">
+                  <History className="h-4 w-4" />
+                  History
+                </TabsTrigger>
+                <TabsTrigger value="custom" className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  Custom
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Generate Tab */}
+              <TabsContent value="generate" className="space-y-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium">
+                        Threat Vectors ({activeVectors.length})
+                      </CardTitle>
+                      <Button variant="outline" size="sm" onClick={handleExport} disabled={activeVectors.length === 0}>
+                        <Download className="h-4 w-4 mr-2" />
+                        Export
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoading ? (
+                      <div className="text-center py-8 text-muted-foreground">Loading...</div>
+                    ) : activeVectors.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No threat vectors found for {selectedFramework}</p>
+                        <p className="text-sm">Click "Generate Threat Model" above to create one</p>
+                      </div>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Threat</TableHead>
+                            <TableHead>Framework Mapping</TableHead>
+                            <TableHead className="text-center">Likelihood</TableHead>
+                            <TableHead className="text-center">Impact</TableHead>
+                            <TableHead className="text-center">Risk</TableHead>
+                            <TableHead>Confidence</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {activeVectors.map((vector) => (
+                            <ThreatVectorRow
+                              key={vector.id}
+                              vector={vector}
+                              onAccept={handleAcceptRisk}
+                              onValidate={handleValidateVector}
+                              isValidating={validatingVectorId === vector.id}
+                            />
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* History Tab */}
+              <TabsContent value="history" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm font-medium">
+                      Threat Model History ({historyModels.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {historyModels.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <History className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No previous threat models</p>
+                        <p className="text-sm">Generate your first threat model in the Generate tab</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {historyModels.map((model) => {
+                          const modelVectors = vectors.filter(v => v.threat_model_id === model.id);
+                          const modelRiskScore = modelVectors.reduce(
+                            (sum, v) => sum + ((v.likelihood || 1) * (v.impact || 1)),
+                            0
+                          );
+                          return (
+                            <div
+                              key={model.id}
+                              className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 cursor-pointer"
+                              onClick={() => {
+                                setSelectedFramework(model.framework || 'STRIDE');
+                                setActiveTab('generate');
+                              }}
+                            >
+                              <div className="flex items-center gap-3">
+                                <FrameworkBadge framework={model.framework as any} />
+                                <div>
+                                  <div className="font-medium">{model.name}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {new Date(model.created_at).toLocaleDateString()} •{' '}
+                                    {modelVectors.length} vectors
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="font-bold text-lg">
+                                  {model.risk_score?.toFixed(1) || 'N/A'}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  Risk: {modelRiskScore}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Custom Tab */}
+              <TabsContent value="custom" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm font-medium">Add Custom Threat Vector</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {!activeModel ? (
+                      <div className="text-center py-4 text-muted-foreground">
+                        <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">Generate a threat model first to add custom vectors</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="grid gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="vectorTitle">Threat Title</Label>
+                            <Input
+                              id="vectorTitle"
+                              placeholder="e.g., Prompt Injection via User Input"
+                              value={customVectorTitle}
+                              onChange={(e) => setCustomVectorTitle(e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="vectorDescription">Description</Label>
+                            <Textarea
+                              id="vectorDescription"
+                              placeholder="Describe the threat in detail..."
+                              value={customVectorDescription}
+                              onChange={(e) => setCustomVectorDescription(e.target.value)}
+                              rows={3}
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Likelihood (1-5)</Label>
+                              <Select
+                                value={String(customLikelihood)}
+                                onValueChange={(v) => setCustomLikelihood(Number(v))}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {[1, 2, 3, 4, 5].map((n) => (
+                                    <SelectItem key={n} value={String(n)}>
+                                      {n} - {['Rare', 'Unlikely', 'Possible', 'Likely', 'Certain'][n - 1]}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Impact (1-5)</Label>
+                              <Select
+                                value={String(customImpact)}
+                                onValueChange={(v) => setCustomImpact(Number(v))}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {[1, 2, 3, 4, 5].map((n) => (
+                                    <SelectItem key={n} value={String(n)}>
+                                      {n} - {['Negligible', 'Minor', 'Moderate', 'Major', 'Severe'][n - 1]}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </div>
+                        <Button onClick={handleAddCustomVector} className="w-full">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Custom Threat Vector
+                        </Button>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </>
+        )}
       </div>
     </MainLayout>
   );
