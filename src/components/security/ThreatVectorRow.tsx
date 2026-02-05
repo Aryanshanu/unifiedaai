@@ -9,8 +9,9 @@ import {
   ChevronUp,
   Target
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { ThreatVector } from '@/hooks/useThreatModels';
+import { toast } from 'sonner';
 
 interface ThreatVectorRowProps {
   vector: ThreatVector;
@@ -97,12 +98,23 @@ export function ThreatVectorRow({ vector, onAccept }: ThreatVectorRowProps) {
                 <div>
                   <h5 className="text-xs font-medium text-muted-foreground mb-2">Mitigation Checklist</h5>
                   <div className="space-y-2">
-                    {vector.mitigation_checklist.map((item: any, idx: number) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <Checkbox checked={item.completed} disabled />
-                        <span className="text-sm">{item.task || item}</span>
-                      </div>
-                    ))}
+                    {vector.mitigation_checklist.map((item: any, idx: number) => {
+                      const isCompleted = typeof item === 'object' ? item.completed : false;
+                      const taskText = typeof item === 'object' ? item.task : item;
+                      return (
+                        <div key={idx} className="flex items-center gap-2">
+                          <Checkbox 
+                            checked={isCompleted} 
+                            onCheckedChange={() => {
+                              toast.info('Mitigation tracking: Feature coming soon');
+                            }}
+                          />
+                          <span className={`text-sm ${isCompleted ? 'line-through text-muted-foreground' : ''}`}>
+                            {taskText}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
