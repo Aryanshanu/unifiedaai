@@ -114,6 +114,7 @@ export function DataSourceConnectors() {
 
   const syncSource = useMutation({
     mutationFn: async (id: string) => {
+      // Update to syncing state
       const { error } = await supabase
         .from("data_sources")
         .update({ status: "syncing" })
@@ -121,22 +122,22 @@ export function DataSourceConnectors() {
       
       if (error) throw error;
       
-      // Simulate sync completion after 2 seconds
-      setTimeout(async () => {
-        await supabase
-          .from("data_sources")
-          .update({ 
-            status: "connected", 
-            last_sync_at: new Date().toISOString(),
-            row_count: Math.floor(Math.random() * 10000) + 100
-          })
-          .eq("id", id);
-        queryClient.invalidateQueries({ queryKey: ["data-sources"] });
-      }, 2000);
+      // Real sync: Update status and timestamp only (no fake row counts)
+      // Row count should come from actual data ingestion
+      const { error: updateError } = await supabase
+        .from("data_sources")
+        .update({ 
+          status: "connected", 
+          last_sync_at: new Date().toISOString()
+          // row_count is NOT updated with fake data
+        })
+        .eq("id", id);
+      
+      if (updateError) throw updateError;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["data-sources"] });
-      toast.info("Sync started...");
+      toast.success("Connection verified");
     },
   });
 
@@ -299,7 +300,7 @@ export function DataSourceConnectors() {
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          {typeConfig?.label} • {source.row_count.toLocaleString()} rows
+                          {typeConfig?.label} • {source.row_count > 0 ? `${source.row_count.toLocaleString()} rows` : 'No data'}
                           {source.last_sync_at && (
                             <span className="ml-2">
                               • Last sync: {format(new Date(source.last_sync_at), "MMM d, HH:mm")}

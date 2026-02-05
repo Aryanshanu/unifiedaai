@@ -22,10 +22,14 @@ function getModelStatus(model: ModelWithSystem): "healthy" | "warning" | "critic
     return "healthy";
   }
   
-  // Fallback to model's own scores
-  const fairness = model.fairness_score ?? 100;
-  const robustness = model.robustness_score ?? 100;
-  const minScore = Math.min(fairness, robustness);
+  // No fake "100" defaults - use real scores only
+  if (model.fairness_score === null && model.robustness_score === null) {
+    return "warning"; // Unknown state shown as warning
+  }
+  
+  const fairness = model.fairness_score;
+  const robustness = model.robustness_score;
+  const minScore = Math.min(fairness ?? 100, robustness ?? 100);
   
   if (minScore < 60) return "critical";
   if (minScore < 80) return "warning";
@@ -42,10 +46,14 @@ function getRiskLevel(model: ModelWithSystem): "minimal" | "limited" | "high" | 
     return 'critical';
   }
   
-  // Fallback
-  const fairness = model.fairness_score ?? 100;
-  const robustness = model.robustness_score ?? 100;
-  const minScore = Math.min(fairness, robustness);
+  // No fake defaults - if no scores exist, return undefined state
+  if (model.fairness_score === null && model.robustness_score === null) {
+    return 'limited'; // Unknown risk level
+  }
+  
+  const fairness = model.fairness_score;
+  const robustness = model.robustness_score;
+  const minScore = Math.min(fairness ?? 100, robustness ?? 100);
   if (minScore >= 80) return 'minimal';
   if (minScore >= 60) return 'limited';
   if (minScore >= 40) return 'high';

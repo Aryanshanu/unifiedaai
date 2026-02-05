@@ -486,6 +486,26 @@ serve(async (req) => {
         sla_deadline: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
         created_by: user?.id,
       });
+
+      // Create incident for visibility
+      await serviceClient.from("incidents").insert({
+        title: `Hallucination NON-COMPLIANT: ${overallScore}%`,
+        description: `Model producing factually incorrect responses. Score: ${overallScore}%`,
+        severity: overallScore < 50 ? "critical" : "high",
+        status: "open",
+        incident_type: "rai_violation",
+        model_id: modelId,
+      });
+
+      // Create drift alert for Alerts page
+      await serviceClient.from("drift_alerts").insert({
+        feature: "hallucination",
+        drift_type: "compliance",
+        drift_value: (100 - overallScore) / 100,
+        severity: overallScore < 50 ? "critical" : "high",
+        status: "open",
+        model_id: modelId,
+      });
     }
 
     console.log(`[eval-hallucination] Complete. Score: ${overallScore}%, Latency: ${inferenceLatency}ms`);
