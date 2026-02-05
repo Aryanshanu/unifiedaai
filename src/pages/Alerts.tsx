@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -215,14 +215,7 @@ export default function Alerts() {
                 className="w-64 bg-secondary border-border"
               />
               <Button variant="outline" size="sm" disabled title="Filter functionality coming soon">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => {
-                  // Simple filter by status toggle
-                  toast.info("Use the search box to filter alerts");
-                }}
-              >
+              <Button variant="outline" size="sm" onClick={() => toast.info("Use search to filter alerts")}>
                 <Filter className="w-4 h-4 mr-2" />
                 Filter
               </Button>
