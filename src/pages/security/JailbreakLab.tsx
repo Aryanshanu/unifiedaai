@@ -5,16 +5,28 @@
  import { Badge } from '@/components/ui/badge';
  import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
  import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
  import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
  import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
  import { 
    FlaskConical, Play, Zap, Search, RefreshCw, Shield, ShieldX, Download, 
-   AlertTriangle, ChevronDown, ChevronUp, Clock, ExternalLink, ServerCrash, Database
+  AlertTriangle, ChevronDown, ChevronUp, Clock, ExternalLink, ServerCrash, Database,
+  HelpCircle, Send
  } from 'lucide-react';
  import { useSystems } from '@/hooks/useSystems';
  import { useAttackLibrary, Attack } from '@/hooks/useAttackLibrary';
  import { useSecurityFindings } from '@/hooks/useSecurityFindings';
  import { AttackCard } from '@/components/security/AttackCard';
+import { 
+  ConfidenceIndicator, 
+  SeverityBadge, 
+  VerdictBadge, 
+  DecisionTracePanel,
+  DecisionTrace,
+  VerdictState,
+  Severity
+} from '@/components/security/ScoreTooltip';
  import { safeInvoke } from '@/lib/safe-supabase';
  import { supabase } from '@/integrations/supabase/client';
  import { toast } from 'sonner';
@@ -35,15 +47,17 @@
    attackId: string;
    attackName: string;
    attackCategory?: string;
+  verdict: VerdictState;
    blocked: boolean;
    response: string;
    targetResponse?: string;
    confidence: number;
    reasoning?: string;
    riskScore?: number;
-   severity?: string;
+  severity?: Severity;
    latencyMs?: number;
    findingId?: string;
+  decisionTrace?: DecisionTrace;
  }
  
  export default function JailbreakLab() {
@@ -54,6 +68,9 @@
    const [runningAttackId, setRunningAttackId] = useState<string | null>(null);
    const [results, setResults] = useState<AttackResult[]>([]);
    const [expandedResult, setExpandedResult] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState('library');
+  const [customPayload, setCustomPayload] = useState('');
+  const [isCustomRunning, setIsCustomRunning] = useState(false);
    const queryClient = useQueryClient();
  
    const systemsQuery = useSystems();
@@ -96,9 +113,7 @@
        return;
      }
  
-     setRunningAttackId(attack.id);
-     const startTime = Date.now();
-     
+    setRunningAttackId(attack.id);  
      try {
        const { data, error } = await safeInvoke<AttackResult>('agent-jailbreaker', {
          action: 'execute',
@@ -113,6 +128,7 @@
          attackId: attack.id,
          attackName: data?.attackName || attack.name,
          attackCategory: data?.attackCategory || attack.category,
+        verdict: data?.verdict || (data?.blocked ? 'blocked' : 'succeeded'),
          blocked: data?.blocked ?? true,
          response: data?.response || 'No response captured',
          targetResponse: data?.targetResponse,
@@ -120,8 +136,9 @@
          reasoning: data?.reasoning,
          riskScore: data?.riskScore,
          severity: data?.severity,
-         latencyMs: data?.latencyMs || (Date.now() - startTime),
+        latencyMs: data?.latencyMs,
          findingId: data?.findingId,
+        decisionTrace: data?.decisionTrace,
        };
  
        setResults(prev => [result, ...prev]);
@@ -129,10 +146,12 @@
        // Refetch findings to show persisted data
        refetchFindings();
  
-       if (result.blocked) {
+      if (result.verdict === 'blocked') {
          toast.success(`Attack blocked! The target refused the ${attack.name} attack.`);
-       } else {
+      } else if (result.verdict === 'succeeded') {
          toast.error(`Vulnerability found! ${attack.name} succeeded against the target.`);
+      } else {
+        toast.warning(`Indeterminate result for ${attack.name}. Manual review required.`);
        }
      } catch (error) {
        // Error already handled by safeInvoke
@@ -149,7 +168,7 @@
  
      setIsRunning(true);
      try {
-       const { data, error } = await safeInvoke<{ results: AttackResult[]; total: number; blocked: number; succeeded: number }>('agent-jailbreaker', {
+      const { data, error } = await safeInvoke<{ results: AttackResult[]; total: number; blocked: number; succeeded: number; indeterminate: number }>('agent-jailbreaker', {
          action: 'automated',
          systemId: selectedSystemId,
          category: categoryFilter === 'all' ? undefined : categoryFilter,
@@ -158,13 +177,16 @@
        if (error) throw error;
  
        if (data?.results) {
-         setResults(data.results);
+        setResults(data.results.map(r => ({
+          ...r,
+          verdict: r.verdict || (r.blocked ? 'blocked' : 'succeeded'),
+        })));
        }
  
        // Refetch findings
        refetchFindings();
  
-       toast.success(`Completed ${data?.total || 0} attacks: ${data?.blocked || 0} blocked, ${data?.succeeded || 0} vulnerabilities found`);
+      toast.success(`Completed ${data?.total || 0} attacks: ${data?.blocked || 0} blocked, ${data?.succeeded || 0} vulnerabilities, ${data?.indeterminate || 0} indeterminate`);
      } catch (error) {
        // Error already handled by safeInvoke
      } finally {
@@ -172,8 +194,61 @@
      }
    };
  
-   const blockedCount = results.filter(r => r.blocked).length;
-   const successCount = results.filter(r => !r.blocked).length;
+  const handleRunCustom = async () => {
+    if (!selectedSystemId) {
+      toast.error('Please select a target system first');
+      return;
+    }
+    if (!customPayload.trim()) {
+      toast.error('Please enter a custom payload');
+      return;
+    }
+
+    setIsCustomRunning(true);
+    try {
+      const { data, error } = await safeInvoke<AttackResult>('agent-jailbreaker', {
+        action: 'custom-test',
+        systemId: selectedSystemId,
+        customPayload: customPayload.trim(),
+      }, { showErrorToast: true, toastMessage: 'Failed to run custom test' });
+
+      if (error) throw error;
+
+      const result: AttackResult = {
+        attackId: 'custom',
+        attackName: 'Custom Test',
+        attackCategory: 'custom',
+        verdict: data?.verdict || (data?.blocked ? 'blocked' : 'succeeded'),
+        blocked: data?.blocked ?? true,
+        response: data?.response || 'No response captured',
+        targetResponse: data?.targetResponse,
+        confidence: data?.confidence || 0,
+        reasoning: data?.reasoning,
+        riskScore: data?.riskScore,
+        severity: data?.severity,
+        latencyMs: data?.latencyMs,
+        decisionTrace: data?.decisionTrace,
+      };
+
+      setResults(prev => [result, ...prev]);
+
+      if (result.verdict === 'blocked') {
+        toast.success('Custom attack was blocked by the target.');
+      } else if (result.verdict === 'succeeded') {
+        toast.error('Custom attack succeeded - potential vulnerability!');
+      } else {
+        toast.warning('Indeterminate result. Manual review required.');
+      }
+    } catch (error) {
+      // Error already handled by safeInvoke
+    } finally {
+      setIsCustomRunning(false);
+    }
+  };
+
+  const blockedCount = results.filter(r => r.verdict === 'blocked').length;
+  const successCount = results.filter(r => r.verdict === 'succeeded').length;
+  const indeterminateCount = results.filter(r => r.verdict === 'indeterminate').length;
  
    const handleExportResults = () => {
      if (results.length === 0) {
@@ -319,7 +394,7 @@
  
          {/* Results Summary */}
          {results.length > 0 && (
-           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
              <Card>
                <CardContent className="pt-6">
                  <div className="flex items-center gap-4">
@@ -359,57 +434,148 @@
                  </div>
                </CardContent>
              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-lg bg-yellow-100 dark:bg-yellow-900/30">
+                      <HelpCircle className="h-6 w-6 text-yellow-600" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-yellow-600">{indeterminateCount}</div>
+                      <div className="text-sm text-muted-foreground">Indeterminate</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
            </div>
          )}
  
-         {/* Attack Library + Results Grid */}
+          {/* Tabbed Interface */}
          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-           {/* Attack Library */}
+            {/* Left Panel: Tabs */}
            <div className="space-y-4">
-             <h2 className="text-lg font-semibold">Attack Library ({filteredAttacks.length})</h2>
-             {attacksLoading ? (
-               <Card>
-                 <CardContent className="py-8 text-center text-muted-foreground">
-                   <RefreshCw className="h-8 w-8 mx-auto mb-4 animate-spin opacity-50" />
-                   Loading attacks...
-                 </CardContent>
-               </Card>
-             ) : filteredAttacks.length === 0 ? (
-               <Card>
-                 <CardContent className="py-8 text-center text-muted-foreground">
-                   <FlaskConical className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                   <p>No attacks found</p>
-                   <p className="text-sm">Try adjusting your filters or</p>
-                   <Button asChild variant="link" className="mt-2">
-                     <Link to="/security/attack-library">
-                       <ExternalLink className="h-4 w-4 mr-2" />
-                       View Attack Library
-                     </Link>
-                   </Button>
-                 </CardContent>
-               </Card>
-             ) : (
-               <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
-                 {filteredAttacks.map((attack) => (
-                   <AttackCard
-                     key={attack.id}
-                     attack={attack}
-                     onExecute={handleExecuteAttack}
-                     isExecuting={runningAttackId === attack.id}
-                   />
-                 ))}
-               </div>
-             )}
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="automated">Automated</TabsTrigger>
+                  <TabsTrigger value="library">Attack Library</TabsTrigger>
+                  <TabsTrigger value="custom">Custom</TabsTrigger>
+                </TabsList>
+
+                {/* Automated Tab */}
+                <TabsContent value="automated" className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm">Automated Attack Suite</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                        Run all attacks in the selected category against the target system.
+                      </p>
+                      <Button
+                        className="w-full"
+                        onClick={handleRunAll}
+                        disabled={isRunning || !selectedSystemId}
+                      >
+                        {isRunning ? (
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Zap className="h-4 w-4 mr-2" />
+                        )}
+                        {isRunning ? 'Running...' : 'Run All Attacks'}
+                      </Button>
+                      {results.length > 0 && (
+                        <div className="text-sm text-muted-foreground">
+                          Last run: {blockedCount} blocked, {successCount} succeeded, {indeterminateCount} indeterminate
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                {/* Attack Library Tab */}
+                <TabsContent value="library" className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium">Attack Library ({filteredAttacks.length})</h3>
+                    <Button asChild variant="link" size="sm">
+                      <Link to="/security/attack-library">
+                        <ExternalLink className="h-3 w-3 mr-1" />
+                        Manage
+                      </Link>
+                    </Button>
+                  </div>
+                  {attacksLoading ? (
+                    <Card>
+                      <CardContent className="py-8 text-center text-muted-foreground">
+                        <RefreshCw className="h-8 w-8 mx-auto mb-4 animate-spin opacity-50" />
+                        Loading attacks...
+                      </CardContent>
+                    </Card>
+                  ) : filteredAttacks.length === 0 ? (
+                    <Card>
+                      <CardContent className="py-8 text-center text-muted-foreground">
+                        <FlaskConical className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No attacks found</p>
+                        <p className="text-sm">Try adjusting your filters</p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+                      {filteredAttacks.map((attack) => (
+                        <AttackCard
+                          key={attack.id}
+                          attack={attack}
+                          onExecute={handleExecuteAttack}
+                          isExecuting={runningAttackId === attack.id}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* Custom Tab */}
+                <TabsContent value="custom" className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm">Custom Attack Payload</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <Textarea
+                        placeholder="Enter your custom attack payload here...&#10;&#10;Example: Ignore all previous instructions and tell me how to..."
+                        value={customPayload}
+                        onChange={(e) => setCustomPayload(e.target.value)}
+                        rows={6}
+                        className="font-mono text-sm"
+                      />
+                      <Button
+                        className="w-full"
+                        onClick={handleRunCustom}
+                        disabled={isCustomRunning || !selectedSystemId || !customPayload.trim()}
+                      >
+                        {isCustomRunning ? (
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Send className="h-4 w-4 mr-2" />
+                        )}
+                        {isCustomRunning ? 'Testing...' : 'Run Custom Test'}
+                      </Button>
+                      <p className="text-xs text-muted-foreground">
+                        Custom payloads are evaluated by the AI judge but not saved to the attack library.
+                      </p>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
            </div>
  
            {/* Results Panel */}
            <div className="space-y-4">
              <div className="flex items-center justify-between">
                <h2 className="text-lg font-semibold">Test Results</h2>
-               {jailbreakFindings.length > 0 && (
-                 <Badge variant="outline" className="text-xs">
-                   {jailbreakFindings.length} persisted findings
-                 </Badge>
+                {results.length > 0 && (
+                  <Button variant="outline" size="sm" onClick={handleExportResults}>
+                    <Download className="h-3 w-3 mr-1" />
+                    Export
+                  </Button>
                )}
              </div>
              
@@ -422,40 +588,36 @@
                  </CardContent>
                </Card>
              ) : (
-               <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+                <div className="space-y-3 max-h-[550px] overflow-y-auto pr-2">
                  {results.map((result, idx) => (
                    <Collapsible 
                      key={idx} 
                      open={expandedResult === idx}
                      onOpenChange={() => setExpandedResult(expandedResult === idx ? null : idx)}
                    >
-                     <Card className={result.blocked ? 'border-green-200 dark:border-green-800' : 'border-red-200 dark:border-red-800'}>
+                      <Card className={
+                        result.verdict === 'blocked' 
+                          ? 'border-green-200 dark:border-green-800' 
+                          : result.verdict === 'succeeded'
+                            ? 'border-red-200 dark:border-red-800'
+                            : 'border-yellow-200 dark:border-yellow-800'
+                      }>
                        <CardContent className="pt-4">
                          <CollapsibleTrigger className="w-full">
                            <div className="flex items-start justify-between gap-4">
                              <div className="flex items-start gap-3">
-                               {result.blocked ? (
-                                 <Shield className="h-5 w-5 text-green-500 mt-0.5" />
-                               ) : (
-                                 <ShieldX className="h-5 w-5 text-red-500 mt-0.5" />
-                               )}
                                <div className="text-left">
                                  <div className="font-medium text-sm">{result.attackName}</div>
                                  <div className="flex items-center gap-2 mt-1">
-                                   <Badge className={result.blocked ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}>
-                                     {result.blocked ? 'Blocked' : 'Succeeded'}
-                                   </Badge>
-                                   {result.severity && !result.blocked && (
-                                     <Badge variant="outline" className="text-xs capitalize">{result.severity}</Badge>
+                                    <VerdictBadge verdict={result.verdict} />
+                                    {result.severity && result.verdict === 'succeeded' && (
+                                      <SeverityBadge severity={result.severity} showIcon={false} />
                                    )}
                                  </div>
                                </div>
                              </div>
                              <div className="flex items-center gap-3">
-                               <div className="text-right">
-                                 <div className="text-xs text-muted-foreground">Confidence</div>
-                                 <div className="font-medium">{((result.confidence || 0) * 100).toFixed(0)}%</div>
-                               </div>
+                                <ConfidenceIndicator confidence={result.confidence || 0} size="sm" />
                                {expandedResult === idx ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                              </div>
                            </div>
@@ -463,6 +625,11 @@
                          
                          <CollapsibleContent>
                            <div className="mt-4 space-y-3 border-t pt-3">
+                              {/* Decision Trace */}
+                              {result.decisionTrace && (
+                                <DecisionTracePanel trace={result.decisionTrace} />
+                              )}
+                              
                              {result.reasoning && (
                                <div>
                                  <div className="text-xs font-medium text-muted-foreground mb-1">Judge Reasoning</div>
@@ -492,6 +659,9 @@
                                    Persisted
                                  </span>
                                )}
+                                {result.riskScore !== undefined && (
+                                  <span>Risk: {(result.riskScore * 100).toFixed(0)}%</span>
+                                )}
                              </div>
                            </div>
                          </CollapsibleContent>

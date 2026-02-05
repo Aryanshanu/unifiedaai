@@ -143,3 +143,6 @@ verify_jwt = false
 
 [functions.detect-governance-bypass]
 verify_jwt = false
+
+[functions.target-executor]
+verify_jwt = false
