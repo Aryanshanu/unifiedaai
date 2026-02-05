@@ -5,23 +5,36 @@ import { toast } from 'sonner';
 const DEMO_MODE_KEY = 'fractal-rai-demo-mode';
 const DEMO_INITIALIZED_KEY = 'fractal-rai-demo-initialized';
 
+// TRUTH ENFORCEMENT: Demo mode is ONLY allowed on /golden route
+function isGoldenDemoRoute(): boolean {
+  if (typeof window !== 'undefined') {
+    return window.location.pathname === '/golden' || window.location.pathname.startsWith('/golden');
+  }
+  return false;
+}
+
 export function useDemoMode() {
-  // Default to TRUE for first-time visitors (when localStorage key doesn't exist)
+  // CRITICAL: Demo mode ONLY enabled when on /golden route
+  // Never auto-enable for regular visitors
   const [isDemoMode, setIsDemoMode] = useState(() => {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(DEMO_MODE_KEY);
-      // If key doesn't exist, default to true (new visitor)
-      if (stored === null) {
-        localStorage.setItem(DEMO_MODE_KEY, 'true');
-        return true;
+      // Only allow demo mode on /golden route
+      if (!isGoldenDemoRoute()) {
+        return false;
       }
+      const stored = localStorage.getItem(DEMO_MODE_KEY);
       return stored === 'true';
     }
-    return true; // Default to true
+    return false; // Default to FALSE - no demo data in production UI
   });
   const [isInitializing, setIsInitializing] = useState(false);
 
   const toggleDemoMode = useCallback((enabled: boolean) => {
+    // Only allow enabling demo mode on /golden route
+    if (enabled && !isGoldenDemoRoute()) {
+      console.warn('Demo mode can only be enabled on /golden route');
+      return;
+    }
     setIsDemoMode(enabled);
     localStorage.setItem(DEMO_MODE_KEY, String(enabled));
     if (enabled) {
@@ -32,7 +45,10 @@ export function useDemoMode() {
   }, []);
 
   const initializeDemoData = useCallback(async () => {
-    if (!isDemoMode || isInitializing) return;
+    // CRITICAL: Only initialize demo data on /golden route
+    if (!isDemoMode || isInitializing || !isGoldenDemoRoute()) {
+      return;
+    }
     
     // Check if already initialized this session
     const alreadyInitialized = sessionStorage.getItem(DEMO_INITIALIZED_KEY);

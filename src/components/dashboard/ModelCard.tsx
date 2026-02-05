@@ -60,7 +60,19 @@ function getEnvFromStatus(status: string): "production" | "staging" | "developme
 }
 
 function getRiskFromScores(fairness?: number | null, robustness?: number | null): "minimal" | "limited" | "high" | "critical" {
-  const minScore = Math.min(fairness ?? 100, robustness ?? 100);
+  // No fake defaults - if both scores are null, return unknown state
+  if (fairness === null && robustness === null) {
+    return "limited"; // Unknown displayed as limited risk
+  }
+  
+  // Use real scores only
+  const scores: number[] = [];
+  if (fairness !== null && fairness !== undefined) scores.push(fairness);
+  if (robustness !== null && robustness !== undefined) scores.push(robustness);
+  
+  if (scores.length === 0) return "limited";
+  
+  const minScore = Math.min(...scores);
   if (minScore >= 80) return "minimal";
   if (minScore >= 60) return "limited";
   if (minScore >= 40) return "high";

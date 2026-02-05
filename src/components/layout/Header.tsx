@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { Bell, Search, User, LogOut, Settings, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 interface HeaderProps {
   title: string;
@@ -36,6 +37,32 @@ export function Header({ title, subtitle, headerActions }: HeaderProps) {
 
   const displayName = profile?.full_name || user?.email || 'User';
   const primaryRole = roles[0] || 'viewer';
+
+  // Real notification count from open incidents and drift alerts
+  const [notificationCount, setNotificationCount] = useState(0);
+  
+  useEffect(() => {
+    const fetchCounts = async () => {
+      const [{ count: incidentCount }, { count: driftCount }] = await Promise.all([
+        supabase.from('incidents').select('*', { count: 'exact', head: true }).eq('status', 'open'),
+        supabase.from('drift_alerts').select('*', { count: 'exact', head: true }).eq('status', 'open'),
+      ]);
+      setNotificationCount((incidentCount || 0) + (driftCount || 0));
+    };
+    
+    fetchCounts();
+    
+    // Subscribe to realtime changes
+    const channel = supabase
+      .channel('header-notifications')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'incidents' }, fetchCounts)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'drift_alerts' }, fetchCounts)
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   return (
     <header className="h-16 border-b border-border bg-background/80 backdrop-blur-sm flex items-center justify-between px-6 sticky top-0 z-30">
@@ -60,7 +87,9 @@ export function Header({ title, subtitle, headerActions }: HeaderProps) {
         {/* Notifications */}
         <Button variant="ghost" size="icon" className="relative h-9 w-9">
           <Bell className="w-4 h-4" />
-          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-danger rounded-full" />
+          {notificationCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-danger rounded-full" />
+          )}
         </Button>
 
         {/* User Menu */}
