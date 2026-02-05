@@ -1,356 +1,216 @@
 
+## What’s actually broken (root cause, not vibes)
 
-# Dual-Agent Audit Report: Core Security Module
-## SME Architect Analysis + QA Auditor Validation
+### 1) “Core Security is not working / I don’t see anything”
+From the live preview inspection:
+- `attack_library` loads successfully (HTTP 200). So the data is there.
+- The Jailbreak Lab can execute an attack and returns a result (we got **“Hypothetical Scenario Escape → Blocked”**).
+So the UI is not globally dead.
+
+However, your deeper complaint is valid:
+
+### 2) The module is **not testing the target LLM** (it is simulating)
+Right now the security agents (`agent-jailbreaker`, `agent-pentester`, `agent-threat-modeler`) do **not** call the “target system” LLM endpoint/model. They call the Lovable AI gateway and ask it to *guess* whether a typical system would be blocked/vulnerable.
+
+That means:
+- Selecting a “target system” mostly just changes the text included in the prompt.
+- Results are not grounded in the actual model’s behavior.
+- This is why it feels like “rubbish”: it’s an LLM judging an imagined system, not a real red-team harness.
+
+### 3) There is also a security correctness problem
+`useSystems()` currently does `.select('*')`, which includes `api_token_encrypted` in the response. That is a serious design flaw: tokens should never be readable by the browser, even if “encrypted”.
 
 ---
 
-## Executive Summary
-
-As both Senior Full-Stack Architect (SME) and Critical QA Auditor (Judge), I have completed a comprehensive audit of the Core Security module (AI Pentesting, Jailbreak Lab, Threat Modeling, Attack Library). The module is **80% functional** with several critical issues requiring immediate attention.
+## Goal (SME + Judge contract)
+Make Core Security:
+1) **Actually execute prompts against the selected target LLM** (the “system”).
+2) Use a separate **Judge LLM** only to *score* the observed response (not simulate it).
+3) Persist evidence + results to backend tables (auditability).
+4) Provide self-healing + early detection signals (health log + actionable errors).
+5) Ensure UI never shows “blank nothing” without an explicit reason (no silent failure).
 
 ---
 
-## 1. Architecture Analysis (SME Perspective)
+## Target Architecture (real test harness, not simulation)
 
-### 1.1 Data Flow Diagram
-
+### Runtime flow for Jailbreak Lab (execute 1 attack)
 ```text
-+-------------------+     +---------------------+     +------------------+
-|   Frontend UI     |     |   Edge Functions    |     |   Database       |
-+-------------------+     +---------------------+     +------------------+
-|                   |     |                     |     |                  |
-| Pentesting.tsx ───────> agent-pentester ──────────> security_findings |
-|                   |     |     │               |     | security_test_runs|
-| JailbreakLab.tsx ─────> agent-jailbreaker ────────> attack_library    |
-|                   |     |     │               |     |                  |
-| ThreatModeling.tsx ───> agent-threat-modeler ─────> threat_models     |
-|                   |     |                     |     | threat_vectors   |
-| AttackLibrary.tsx ────────────────────────────────> attack_library    |
-+-------------------+     +---------------------+     +------------------+
-         │                         │                          │
-         │                         ▼                          │
-         │               +------------------+                 │
-         │               | Lovable AI API   |                 │
-         │               | (Gemini 2.5 Flash)|                │
-         │               +------------------+                 │
-         │                                                    │
-         └─────────── React Query ───────────────────────────┘
-                    (State Management)
+UI (JailbreakLab.tsx)
+  -> invoke backend function: agent-jailbreaker
+      -> Auth check (validateSession + canAccessSystem)
+      -> Fetch system config (provider + model_name + token) server-side
+      -> Execute attack against TARGET LLM (real call)
+      -> Judge response using Lovable AI (classification/scoring)
+      -> Persist evidence:
+           - security_test_runs (type=jailbreak)
+           - security_findings (severity/status + evidence JSON)
+      -> Return: blocked/succeeded + confidence + excerpts + ids
+  -> UI updates + realtime refresh
 ```
 
-### 1.2 Component Hierarchy
-
-| Layer | Component | Status | Issues Found |
-|-------|-----------|--------|--------------|
-| **Pages** | `Pentesting.tsx` | ✅ Functional | Error handling needs sanitization |
-| | `JailbreakLab.tsx` | ✅ Functional | Results not persisted to DB |
-| | `ThreatModeling.tsx` | ✅ Functional | No realtime subscription |
-| | `AttackLibrary.tsx` | ✅ Functional | None |
-| | `SecurityDashboard.tsx` | ⚠️ Partial | Old icons (Bug, Skull) still referenced |
-| **Hooks** | `useSecurityFindings.ts` | ✅ Complete | None |
-| | `useSecurityTestRuns.ts` | ✅ Complete | None |
-| | `useAttackLibrary.ts` | ✅ Complete | None |
-| | `useThreatModels.ts` | ⚠️ Partial | Dependent query issue (vectors load before models) |
-| | `useSecurityStats.ts` | ✅ Complete | OWASP coverage calculation is heuristic-based |
-| **Edge Functions** | `agent-pentester` | ✅ Functional | Returns 200, working AI analysis |
-| | `agent-jailbreaker` | ✅ Functional | Success rate update is fire-and-forget |
-| | `agent-threat-modeler` | ✅ Functional | None |
-| **Components** | `FindingCard.tsx` | ✅ Complete | None |
-| | `AttackCard.tsx` | ✅ Complete | None |
-| | `ThreatVectorRow.tsx` | ✅ Complete | Mitigation checkbox is disabled |
-| | `PentestProgress.tsx` | ✅ Complete | None |
-| | `SecurityPostureGauge.tsx` | ✅ Complete | None |
-| | `OWASPCoverageChart.tsx` | ✅ Complete | Coverage is estimated, not measured |
+### Runtime flow for Pentesting (run N OWASP tests)
+Same pattern:
+- Execute each test prompt on the **target LLM**
+- Judge outcome using **Lovable AI**
+- Persist findings and update test run totals
 
 ---
 
-## 2. Critical Issues Identified (Judge Validation)
+## Implementation Plan (sequenced, minimal risk)
 
-### 2.1 HIGH Priority Issues
+### Phase 0 — Make the “blank screen” impossible (Early Detection UX)
+**Frontend**
+- Add explicit empty states and diagnostics to Jailbreak Lab:
+  - If `systems.length === 0`: show “No target systems configured” + link CTA to model connection.
+  - If `attacks.length === 0`: show “Attack library empty” + link to Attack Library.
+- Add a compact “Security Health” debug drawer (hidden behind a small icon) that shows:
+  - last 20 health events from `useSecurityHealthMonitor`
+  - last edge-function failures (from logged errors)
+This makes it impossible for the UI to “show nothing” without telling you why.
 
-#### Issue #1: SecurityDashboard Still Uses Old Icons
-**Location**: `src/pages/security/SecurityDashboard.tsx` lines 8, 30-32
-**Finding**: The quick actions array still references `Bug` and `Skull` icons even though we changed sidebar icons
-```typescript
-// Line 8 - imports unused old icons
-import { Shield, Bug, Skull, Target, ... } from 'lucide-react';
-
-// Lines 30-32 - uses old icons in quick actions
-{ label: 'Run Pentest', path: '/security/pentesting', icon: Bug, ... },
-{ label: 'Jailbreak Lab', path: '/security/jailbreak-lab', icon: Skull, ... },
-```
-**Impact**: Visual inconsistency between sidebar and dashboard
-**Fix**: Replace `Bug` with `ScanSearch`, `Skull` with `FlaskConical`
-
-#### Issue #2: JailbreakLab Results Not Persisted
-**Location**: `src/pages/security/JailbreakLab.tsx` lines 68-74
-**Finding**: Attack results are only stored in React state, not in database
-```typescript
-setResults(prev => [{
-  attackId: attack.id,
-  attackName: attack.name,
-  blocked: data?.blocked || false,
-  ...
-}, ...prev]);
-```
-**Impact**: Results are lost on page refresh; no audit trail for jailbreak tests
-**Fix**: Create `security_jailbreak_results` table or persist to existing `security_findings`
-
-#### Issue #3: No Realtime Subscriptions for Security Module
-**Location**: All security pages
-**Finding**: No Supabase realtime subscriptions found in security pages
-**Impact**: Multiple users won't see updates in real-time; dashboard requires manual refresh
-**Fix**: Add realtime subscriptions for `security_findings`, `security_test_runs`, `threat_models`
-
-#### Issue #4: OWASP Coverage Is Heuristic, Not Measured
-**Location**: `src/hooks/useSecurityStats.ts` lines 78-81
-**Finding**: Coverage is estimated as `Math.min(100, catFindings.length * 20)`
-```typescript
-owaspCategories.forEach(cat => {
-  const catFindings = findings?.filter(...);
-  owaspCoverage[cat] = catFindings.length > 0 ? Math.min(100, catFindings.length * 20) : 0;
-});
-```
-**Impact**: 5 findings = 100% coverage (misleading metric)
-**Fix**: Calculate based on test case execution rate per category
-
-#### Issue #5: useThreatModels Has Dependent Query Issue
-**Location**: `src/hooks/useThreatModels.ts` lines 56-72
-**Finding**: `vectorsQuery` depends on `modelsQuery.data` but uses stale reference on first load
-```typescript
-const modelIds = modelsQuery.data?.map(m => m.id) || [];
-if (modelIds.length === 0) return [];  // Returns empty on initial load
-```
-**Impact**: Vectors may not load on first render; requires manual refetch
-**Fix**: Use `select` or restructure as joined query
-
-### 2.2 MEDIUM Priority Issues
-
-#### Issue #6: RLS Policies Are Too Permissive
-**Location**: Database security
-**Finding**: Linter found 12 `USING (true)` policies for INSERT/UPDATE/DELETE operations
-**Impact**: Any authenticated user can modify security findings, test runs, attacks
-**Fix**: Implement proper user-scoped or role-based RLS policies
-
-#### Issue #7: Security Score Formula Is Arbitrary
-**Location**: `src/hooks/useSecurityStats.ts` lines 84-87
-**Finding**: Score calculation has no documented basis
-```typescript
-const systemsScore = Math.min((systemsCount || 0) * 5, 40);
-const coverageScore = Math.min(averageCoverage / 2, 30);
-const riskPenalty = Math.min(criticalFindings * 10 + highFindings * 5, 40);
-const securityScore = Math.max(0, Math.min(100, systemsScore + coverageScore - riskPenalty + 30));
-```
-**Impact**: Arbitrary +30 baseline means minimum score is 30 even with many findings
-**Fix**: Document formula or align with industry standard (CVSS-based)
-
-#### Issue #8: Export Buttons Are Non-Functional
-**Location**: `Pentesting.tsx` line 229, `ThreatModeling.tsx` line 185
-**Finding**: Export buttons exist but have no onClick handlers
-```tsx
-<Button variant="outline" size="sm">
-  <Download className="h-4 w-4 mr-2" />
-  Export
-</Button>
-```
-**Impact**: Dead UI element violates "no placeholder controls" mandate
-**Fix**: Implement JSON/PDF export or remove buttons
-
-#### Issue #9: Mitigation Checkboxes Are Disabled
-**Location**: `src/components/security/ThreatVectorRow.tsx` line 102
-**Finding**: Checkbox is always disabled, preventing user interaction
-```tsx
-<Checkbox checked={item.completed} disabled />
-```
-**Impact**: Users cannot track mitigation progress
-**Fix**: Make interactive and persist state to database
-
-#### Issue #10: Error Messages Not Sanitized
-**Location**: Multiple security pages
-**Finding**: Direct console.error + generic toast without using `sanitizeErrorMessage`
-```typescript
-} catch (error) {
-  console.error('Scan failed:', error);
-  toast.error('Security scan failed. Please try again.');
-}
-```
-**Impact**: Inconsistent with error handling mandate (should use safeInvoke wrapper)
-**Fix**: Use `safeInvoke` from `src/lib/safe-supabase.ts` for all edge function calls
-
-### 2.3 LOW Priority Issues
-
-#### Issue #11: Attack Success Rate Update Has No Error Handling
-**Location**: `supabase/functions/agent-jailbreaker/index.ts` lines 109-116
-**Finding**: Success rate update is fire-and-forget with no error capture
-**Fix**: Log update failures
-
-#### Issue #12: Missing Loading States for Some Operations
-**Location**: `AttackLibrary.tsx` `handleAddAttack`
-**Finding**: No loading indicator during attack creation
-**Fix**: Add isLoading state
+**Judge checks**
+- Simulate: not logged in, logged in with no systems, systems exist but no attacks, slow network. Each must show a clear message, not emptiness.
 
 ---
 
-## 3. Self-Healing Protocol Implementation Plan
+### Phase 1 — Convert “simulation agents” into “real execution agents”
+This is the core fix.
 
-### 3.1 Early Detection Layer
+#### 1A) Implement server-side target model execution
+**Backend**
+- Add a shared helper for security agents (in `supabase/functions/_shared/`):
+  - Input: system_id, prompt/messages
+  - Output: model response text + latency + raw provider metadata
+  - Must never expose API tokens to the client
+  - Must include timeout + retry
+- Use the existing `_shared/llm-gateway` adapters where possible (preferred) so:
+  - provider selection is normalized
+  - errors become structured (`MODEL_NOT_FOUND`, `RATE_LIMITED`, etc.)
 
-```typescript
-// NEW: src/hooks/useSecurityHealthMonitor.ts
-export function useSecurityHealthMonitor() {
-  const [healthLog, setHealthLog] = useState<HealthEntry[]>([]);
-  
-  const logEvent = useCallback((event: string, status: 'success' | 'error', metadata?: any) => {
-    setHealthLog(prev => [...prev.slice(-99), {
-      timestamp: new Date().toISOString(),
-      event,
-      status,
-      metadata,
-    }]);
-    
-    // Also log to Supabase for persistence
-    logApiError('security_health', { event, status, ...metadata });
-  }, []);
-  
-  return { healthLog, logEvent };
-}
-```
+**Important design choice**
+- “Target LLM” should come from `systems.provider` + `systems.model_name`.
+- “Judge LLM” should default to Lovable AI models (deterministic, no keys required).
 
-### 3.2 Validation Logic (Judge Layer)
+**Judge checks**
+- If system has no provider/model_name → hard fail with clear error.
+- If model call returns non-2xx → return structured error and log evidence.
 
-For every operation, implement pre/post validation:
+#### 1B) Update `agent-jailbreaker` to:
+- Authenticate properly (use `validateSession` + `requireAuth`)
+- Authorize access to `systemId` (use `canAccessSystem`)
+- Execute attack payload against the target model (real call)
+- Judge the response using Lovable AI (classification: succeeded vs blocked)
+- Persist results:
+  - Create/attach `security_test_runs` row (test_type=`jailbreak`)
+  - Insert into `security_findings` with:
+    - vulnerability_id = attack id or attack name
+    - severity derived from judge risk score
+    - evidence JSON includes: prompt, target_response excerpt, judge_result, timestamps, latency
 
-```typescript
-// Example: Before running pentest
-const validatePentestInput = (systemId: string, categories: string[]) => {
-  if (!systemId) throw new ValidationError('System ID required');
-  if (categories.length === 0) throw new ValidationError('Select at least one category');
-  if (categories.some(c => !VALID_OWASP_CATEGORIES.includes(c))) {
-    throw new ValidationError('Invalid OWASP category');
-  }
-};
+**Judge checks**
+- Attack payload includes placeholders like `[harmful topic]`: ensure we keep it synthetic and do not expand it into real harmful content.
+- Ensure evidence is stored and reproducible.
 
-// Example: After pentest completes
-const validatePentestOutput = (result: PentestResult) => {
-  if (result.passed + result.failed !== result.total) {
-    console.warn('[Judge] Test count mismatch', result);
-  }
-  if (result.coverage > 100) {
-    throw new IntegrityError('Coverage exceeds 100%');
-  }
-};
-```
+#### 1C) Update `agent-pentester` similarly
+Right now it only uses Lovable AI to “analyze” vulnerability without calling the target model at all.
+Fix to:
+- execute prompt_template on target model
+- judge the output vs expected_secure_behavior
 
-### 3.3 State Tracking
-
-```typescript
-// Component lifecycle tracking
-useEffect(() => {
-  logEvent('component_mounted', 'success', { component: 'Pentesting' });
-  return () => logEvent('component_unmounted', 'success', { component: 'Pentesting' });
-}, []);
-
-// Function success rate tracking
-const { execute } = useSelfHealing(async () => {
-  return await supabase.functions.invoke('agent-pentester', { body });
-}, {
-  onRetry: (attempt) => logEvent('pentest_retry', 'error', { attempt }),
-  onRecovery: () => logEvent('pentest_recovered', 'success'),
-  onFailure: (err) => logEvent('pentest_failed', 'error', { error: err.message }),
-});
-```
+**Judge checks**
+- Ensure `tests_passed + tests_failed === tests_total`.
+- Ensure coverage never exceeds 100.
+- Ensure partial failures don’t kill the whole run; persist what completed.
 
 ---
 
-## 4. Implementation Plan (Priority Order)
+### Phase 2 — Make Jailbreak Lab results real + persistent in the UI
+**Frontend**
+- Refactor `JailbreakLab.tsx`:
+  - When executing, show:
+    - “Target response” (expandable)
+    - “Judge verdict” (blocked/succeeded) with confidence
+  - Add “History” section backed by database (not React state)
+  - Add realtime invalidation/subscription for:
+    - `security_findings`
+    - `security_test_runs`
+- Export should export the persisted evidence (not ephemeral state)
 
-### Phase 1: Critical Fixes (Immediate)
-
-| Task | File(s) | Effort |
-|------|---------|--------|
-| 1. Fix SecurityDashboard icons | `SecurityDashboard.tsx` | 5 min |
-| 2. Replace raw toast.error with safeInvoke | All security pages | 30 min |
-| 3. Fix useThreatModels dependent query | `useThreatModels.ts` | 15 min |
-| 4. Add realtime subscriptions | Security pages | 45 min |
-
-### Phase 2: Functional Completeness
-
-| Task | File(s) | Effort |
-|------|---------|--------|
-| 5. Persist jailbreak results to DB | `JailbreakLab.tsx`, new table | 45 min |
-| 6. Implement Export functionality | `Pentesting.tsx`, `ThreatModeling.tsx` | 30 min |
-| 7. Make mitigation checkboxes interactive | `ThreatVectorRow.tsx`, backend | 30 min |
-| 8. Fix OWASP coverage calculation | `useSecurityStats.ts` | 20 min |
-
-### Phase 3: Security Hardening
-
-| Task | File(s) | Effort |
-|------|---------|--------|
-| 9. Tighten RLS policies | Database migration | 45 min |
-| 10. Document security score formula | `useSecurityStats.ts`, `/docs` | 15 min |
-
-### Phase 4: Self-Healing Implementation
-
-| Task | File(s) | Effort |
-|------|---------|--------|
-| 11. Create useSecurityHealthMonitor | New hook | 30 min |
-| 12. Add validation layer to edge functions | Edge functions | 45 min |
-| 13. Implement retry with exponential backoff | Wrap existing calls | 30 min |
+**Judge checks**
+- Refresh page: results still visible.
+- Open Security Dashboard: metrics reflect the run immediately.
 
 ---
 
-## 5. Verified Working Features
+### Phase 3 — Fix the token exposure / security correctness
+This is mandatory for a real target-LLM harness.
 
-The Judge confirms these features are **100% functional**:
+**Frontend**
+- Change `useSystems()` to never select token fields.
+  - Replace `.select('*')` with an explicit column list excluding `api_token_encrypted`.
 
-✅ **AI Pentesting** - Edge function returns valid results (tested: 4 failed/0 passed)
-✅ **Jailbreak Detection** - AI correctly identifies and blocks DAN jailbreak (confidence: 80%)
-✅ **Threat Model Generation** - Creates valid STRIDE model with 13 threat vectors
-✅ **Attack Library** - 48 curated attacks across 6 categories
-✅ **Security Stats** - Real counts from database (32 findings, 3 test runs)
-✅ **Finding Card** - Status changes persist to database
-✅ **OWASP Radar Chart** - Renders correctly with real data
+**Backend**
+- All agent functions that need tokens must fetch them server-side using service role + explicit access checks.
 
----
-
-## 6. Database Current State
-
-| Table | Count | Status |
-|-------|-------|--------|
-| `systems` | 3 | ✅ Target systems available |
-| `automated_test_cases` (pentesting) | 36 | ✅ Full OWASP LLM Top 10 coverage |
-| `attack_library` | 48+ | ✅ Rich attack patterns |
-| `security_findings` | 32 | ✅ Real vulnerability data |
-| `security_test_runs` | 3 | ✅ All completed |
-| `threat_models` | 1 | ✅ STRIDE model generated |
-| `threat_vectors` | 13 | ✅ Linked to threat model |
+**Judge checks**
+- Browser network tab must never show `api_token_encrypted` in responses.
+- Attempt to read token as a non-owner must fail.
 
 ---
 
-## 7. Files Requiring Changes
+### Phase 4 — Self-healing + early detection hardening (non-negotiable)
+**Frontend**
+- Ensure each security page uses:
+  - `safeInvoke` for backend function calls
+  - `useSecurityHealthMonitor` to log:
+    - component mount/unmount
+    - operation retries/failures
+    - recovery events
 
-| File | Changes Needed | Priority |
-|------|----------------|----------|
-| `src/pages/security/SecurityDashboard.tsx` | Replace Bug/Skull icons | HIGH |
-| `src/pages/security/Pentesting.tsx` | Add safeInvoke, export, realtime | HIGH |
-| `src/pages/security/JailbreakLab.tsx` | Persist results, safeInvoke | HIGH |
-| `src/pages/security/ThreatModeling.tsx` | Add safeInvoke, export | MEDIUM |
-| `src/hooks/useThreatModels.ts` | Fix dependent query | MEDIUM |
-| `src/hooks/useSecurityStats.ts` | Fix OWASP coverage calc | MEDIUM |
-| `src/components/security/ThreatVectorRow.tsx` | Enable mitigation checkboxes | MEDIUM |
-| Database | Tighten RLS policies | MEDIUM |
+**Backend**
+- Add consistent structured logging:
+  - Include correlation id per run
+  - Store run metadata in `security_test_runs.summary`
+
+**Judge checks**
+- Force 429/402/timeout: UI must show precise, user-actionable messages.
+- Retry logic must not create duplicate test runs; idempotency keys needed for “Run All”.
 
 ---
 
-## 8. Conclusion
+## End-to-end Validation Checklist (what you will use to judge me)
+1) Go to **Jailbreak Lab**
+   - select a system
+   - execute 1 attack
+   - see target response + judge verdict
+   - refresh page: result still present
+2) Go to **Security Dashboard**
+   - counts update (findings/test runs)
+3) Go to **AI Pentesting**
+   - run scan
+   - verify findings were produced from actual target responses (evidence includes target output excerpt)
+4) Confirm no secrets are present in any browser responses
+5) Confirm failures are visible (not silent) and self-heal retries are logged
 
-The Core Security module is architecturally sound with well-structured edge functions and React Query hooks. The primary gaps are:
+---
 
-1. **Consistency issues** (old icons, unsanitized errors)
-2. **Missing persistence** (jailbreak results)
-3. **Missing realtime** (no subscriptions)
-4. **Dead UI** (export buttons, disabled checkboxes)
+## Files expected to change (high confidence)
+**Frontend**
+- `src/pages/security/JailbreakLab.tsx` (move from local-only results to persisted history + better error UX)
+- `src/pages/security/Pentesting.tsx` (ensure real target execution evidence is used)
+- `src/hooks/useSystems.ts` (stop selecting `*`, remove token field exposure)
 
-Implementing the Phase 1 fixes will bring the module to **95% completion**. The self-healing protocol additions will ensure long-term reliability and observability.
+**Backend**
+- `supabase/functions/agent-jailbreaker/index.ts` (real target execution + judge + persistence + auth)
+- `supabase/functions/agent-pentester/index.ts` (real target execution + judge + persistence + auth)
+- New helper in `supabase/functions/_shared/` for target model execution via `_shared/llm-gateway`
 
+**Possible DB migration**
+- Only if we need additional columns for better linking/idempotency (prefer to store in `summary`/`evidence` first to minimize schema churn).
+
+---
+
+## Immediate next thing I will do after approval
+1) Implement the “target execution helper” (backend) and wire `agent-jailbreaker` to call the selected system for real.
+2) Make Jailbreak Lab show the *real* target response + persist it as evidence so you can’t lose it on refresh.
