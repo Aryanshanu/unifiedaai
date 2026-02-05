@@ -1,216 +1,296 @@
 
-
-# Command Center Audit Report: Complete List of Functional, Practical, and Logical Issues
+# Command Center Refactoring and Core System Enhancement Plan
 
 ## Executive Summary
 
-After thorough investigation of the Command Center page (`src/pages/Index.tsx`) and all its components, hooks, and database state, I have identified **23 distinct issues** categorized into **5 categories**.
+This plan addresses the user's request to:
+1. **Refactor the Command Center** to display only Data Governance and Core RAI content (remove 6-stage governance pipeline components)
+2. **Ensure 100% functional accuracy** for Data Governance (Data Quality Engine, Data Contracts) and Core Security features
+3. **Fix icon and label issues** for Jailbreak Lab and AI Pentesting
+4. **Remove output restrictions** in Core RAI engines (currently truncating responses to 500 characters)
+5. **Implement proper incident/alert workflow** for Data Quality and Core RAI violations
 
 ---
 
-## Category 1: Critical Data Display Issues (6 Issues)
+## Part 1: Command Center Page Refactoring
 
-### Issue 1.1: PredictiveRiskPanel Shows "No High-Risk Predictions" When Data Exists
-- **Location**: `src/components/dashboard/PredictiveRiskPanel.tsx` line 21
-- **Problem**: Component calls `useHighRiskPredictions(5)` passing `5` as the limit, but the hook treats this as `minRiskScore`
-- **Current Data**: 4 predictions exist with scores 58, 56, 48, 35 (all below 70)
-- **Root Cause**: The hook's default threshold is 70, but predictions generated have max score of 58
-- **Impact**: Panel always shows "No High-Risk Predictions" even when the system has predictions
+### Current State Analysis
+The Command Center (`src/pages/Index.tsx`) currently displays 25+ widgets including:
+- GovernanceFlowDiagram (6-stage pipeline) - **TO REMOVE**
+- SLODashboard & OversightAgentStatus - **TO REMOVE**  
+- SimulationController & PredictiveRiskPanel - **TO REMOVE**
+- IncidentSummaryCard & FeedbackLoopDiagram - **TO REMOVE**
+- RealityCheckDashboard - **TO REMOVE**
+- GovernanceHealthCards - **TO REMOVE**
+- PlatformHealthCards - **TO KEEP (modify)**
+- Quick Actions cards - **TO MODIFY**
+- Core RAI Engines cards - **TO KEEP**
 
-### Issue 1.2: Hardcoded Date in RealityCheckDashboard
-- **Location**: `src/components/dashboard/RealityCheckDashboard.tsx` line 16, 41
-- **Problem**: Hardcoded "December 11, 2025" and "Cleared Dec 11" text
-- **Current Date**: February 3, 2026 (2 months outdated)
-- **Impact**: Looks unprofessional and misleading to users
+### New Command Center Structure
 
-### Issue 1.3: "100% Production Data" Badge Always Shows
-- **Location**: `src/components/dashboard/RealityCheckDashboard.tsx` line 43-44
-- **Problem**: Badge shows "100% Production Data" even when `allZero` is true (no data)
-- **Impact**: False confidence indicator when no real production data exists
+```text
++------------------------------------------------------------------+
+|                     COMMAND CENTER                                |
+|  Autonomous Governance Platform                                   |
++------------------------------------------------------------------+
+|                                                                   |
+|  [ Alert Banners: HITL Queue / High-Risk / Unsafe Deployments ]   |
+|                                                                   |
++------------------------------------------------------------------+
+|  DATA GOVERNANCE                    |  CORE SECURITY              |
+|  +---------------------------+      |  +------------------------+ |
+|  | Data Quality Engine       |      |  | Security Dashboard     | |
+|  | - Datasets: X             |      |  | - Findings: X          | |
+|  | - Avg Score: X%           |      |  | - Critical: X          | |
+|  | - Incidents: X            |      |  +------------------------+ |
+|  +---------------------------+      |                             |
+|  +---------------------------+      |  +------------------------+ |
+|  | Data Contracts            |      |  | AI Pentesting          | |
+|  | - Active: X               |      |  | Jailbreak Lab          | |
+|  | - Violations: X           |      |  | Threat Modeling        | |
+|  +---------------------------+      |  | Attack Library         | |
+|                                     |  +------------------------+ |
++------------------------------------------------------------------+
+|  CORE RAI ENGINES                                                 |
+|  +------------+ +-------------+ +-----------+ +--------+ +------+ |
+|  | Fairness   | | Hallucinate | | Toxicity  | | Privacy| |Explain||
+|  +------------+ +-------------+ +-----------+ +--------+ +------+ |
++------------------------------------------------------------------+
+|  ACTIVITY & LOGS                                                  |
+|  +-----------------------------------------------------------+   |
+|  | Recent Incidents (from DQ & RAI) | Recent Alerts | Metrics |   |
+|  +-----------------------------------------------------------+   |
++------------------------------------------------------------------+
+```
 
-### Issue 1.4: "Governance Blocks" Metric Mislabeled
-- **Location**: `src/hooks/useRealityMetrics.ts` line 31
-- **Problem**: `governanceBlocks` returns total incident count, not blocked requests
-- **Current Query**: `supabase.from("incidents").select("id", { count: "exact", head: true })`
-- **Should Be**: Count of BLOCK decisions from `request_logs` or policy violations
-- **Impact**: Completely wrong metric displayed
+### Files to Modify
 
-### Issue 1.5: "View Predictions" Button Navigates to Wrong Page
-- **Location**: `src/pages/Index.tsx` line 189
-- **Problem**: When high-risk predictions exist, clicking "View Predictions" navigates to `/configuration`
-- **Expected**: Should navigate to a predictions detail view or the Observability page
-- **Impact**: Confusing UX - Configuration page has nothing to do with predictions
-
-### Issue 1.6: Governance Coverage Shows 0% Despite 11 States
-- **Location**: `src/components/dashboard/GovernanceHealthCards.tsx`
-- **Database**: 11 governance_activation_state records exist, but likely all are 'inactive'
-- **Problem**: Shows "0% — Early Stage" which may not reflect actual governance health
-- **Impact**: Discouraging to users when platform may actually be configured
-
----
-
-## Category 2: Missing Backend Wiring Issues (5 Issues)
-
-### Issue 2.1: No Explanation Tracking
-- **Database State**: 8 decisions exist, 0 explanations
-- **Impact**: "Decision Explanation Rate" in Governance Health shows 0%
-- **Root Cause**: When decisions are created, no corresponding explanations are inserted
-
-### Issue 2.2: No Attestations Created
-- **Database State**: 0 attestations in `deployment_attestations`
-- **Impact**: "Attestation Coverage" shows 0% with "No live data yet"
-- **Root Cause**: No workflow exists to create attestations when systems are approved
-
-### Issue 2.3: No MLOps Governance Events
-- **Database State**: 0 records in `mlops_governance_events`
-- **Impact**: "Governance Bypasses" metric works by accident (shows 0), but no tracking
-- **Root Cause**: No edge function or workflow records mlops events
-
-### Issue 2.4: Only 10 Events Ever Generated
-- **Database State**: 10 events in `events_raw`, all processed
-- **Problem**: Oversight Agent has almost no data to work with
-- **Impact**: MTTD/MTTR calculations are based on minimal sample size
-
-### Issue 2.5: High Risk Predictions Not Generated Properly
-- **Database State**: All 4 predictions have scores < 70 (max is 58)
-- **Problem**: `predictive-governance` function generates low scores
-- **Impact**: PredictiveRiskPanel never shows any predictions
+| File | Changes |
+|------|---------|
+| `src/pages/Index.tsx` | Remove 6-stage pipeline, oversight widgets; add Data Governance cards, Core Security cards, activity logs |
 
 ---
 
-## Category 3: Logical/Calculation Errors (4 Issues)
+## Part 2: Icon and Label Corrections
 
-### Issue 3.1: SLO Dashboard Shows 0 for All Metrics
-- **Location**: `src/components/dashboard/SLODashboard.tsx`
-- **Problem**: Calculates MTTD/MTTR from incidents, but:
-  - Most incidents have no `detected_at` field populated
-  - No incidents have `resolved_at` field (218 open incidents)
-- **Result**: All MTTD/MTTR show "0.0 min" which is incorrect
+### Current Issues
+- **Jailbreak Lab**: Uses `Skull` icon (morbid/unprofessional)
+- **AI Pentesting**: Uses `Bug` icon (too generic)
 
-### Issue 3.2: Audit Completeness Calculation Is Wrong
-- **Location**: `src/components/dashboard/SLODashboard.tsx` lines 67-79
-- **Formula**: `documentedIncidents / totalIncidents` where `documentedIncidents` = decisions count
-- **Current**: 8 decisions / 218 incidents (24h window) = very low
-- **Problem**: Comparing decisions (which may span all time) to incidents in 24h window
-- **Impact**: Audit completeness percentage is misleading
+### Proposed Changes
 
-### Issue 3.3: OversightAgentStatus Shows "Idle" When Events Are Processed
-- **Location**: `src/components/dashboard/OversightAgentStatus.tsx` lines 66-75
-- **Logic**: Status is 'running' only if last processed event was within 5 minutes
-- **Current**: All 10 events processed, but if processed > 5 min ago, shows "Idle"
-- **Impact**: Misleading status - agent processed everything but looks inactive
-
-### Issue 3.4: Events Count Query Returns Wrong Number
-- **Location**: `src/pages/Index.tsx` lines 43-54
-- **Query**: Counts events where `processed = false`
-- **Current State**: All 10 events are processed, so returns 0
-- **Impact**: "Pending events" badge never shows when all caught up (which is actually good)
+| Location | Component | Current | New |
+|----------|-----------|---------|-----|
+| `src/components/layout/Sidebar.tsx` line 54 | Jailbreak Lab | `Skull` | `Swords` or `FlaskConical` |
+| `src/components/layout/Sidebar.tsx` line 53 | AI Pentesting | `Bug` | `ScanSearch` or `ShieldAlert` |
+| `src/pages/security/JailbreakLab.tsx` line 126 | Header icon | `Skull` | `FlaskConical` |
+| `src/pages/security/Pentesting.tsx` line 123 | Header icon | `Bug` | `ScanSearch` |
 
 ---
 
-## Category 4: UX/Practical Issues (5 Issues)
+## Part 3: Remove Output Restrictions in Core RAI Engines
 
-### Issue 4.1: Too Many Overlapping Widgets
-- **Location**: `src/pages/Index.tsx`
-- **Problem**: Page shows:
-  - GovernanceFlowDiagram
-  - SLODashboard + OversightAgentStatus
-  - SimulationController + PredictiveRiskPanel
-  - IncidentSummaryCard + FeedbackLoopDiagram
-  - RealityCheckDashboard
-  - GovernanceHealthCards (6 cards)
-  - PlatformHealthCards (4 cards)
-  - Quick Actions (3 cards)
-  - Core RAI Engines (5 cards)
-- **Total**: 25+ distinct widgets competing for attention
-- **Impact**: Information overload, unclear what's most important
+### Current Truncation Issue
+Found in `src/components/engines/CustomPromptTest.tsx` lines 268-271:
+```tsx
+{customResult.model_response.length > 500 
+  ? customResult.model_response.slice(0, 500) + "..." 
+  : customResult.model_response}
+```
 
-### Issue 4.2: Duplicate Incident Counts in Multiple Places
-- **Problem**: Open incidents shown in:
-  1. IncidentSummaryCard (218 total)
-  2. FeedbackLoopDiagram ("Issues Detected")
-  3. PlatformHealthCards ("recentIncidents")
-  4. GovernanceFlowDiagram (Stage 6 Monitoring)
-- **Impact**: Redundant information, wasted screen space
+Also in backend at `supabase/functions/eval-toxicity-hf/index.ts` line 338:
+```ts
+output: result.output?.substring(0, 500) || result.error,
+```
 
-### Issue 4.3: SimulationController on Command Center
-- **Location**: `src/pages/Index.tsx` line 245
-- **Problem**: Simulation tool for generating test data is prominent on dashboard
-- **Expected**: This should be in Settings or a dedicated Testing page
-- **Impact**: Confusing for production users who don't need to generate synthetic data
+### Solution: Expandable Full Response
 
-### Issue 4.4: "Process Now" Button Disabled When No Pending Events
-- **Location**: `src/components/dashboard/OversightAgentStatus.tsx` line 212
-- **Logic**: Button disabled when `pendingEvents === 0`
-- **Problem**: User can't trigger processing if there are no events
-- **Expected**: Fine behavior, but shows as "Idle" with no way to test
+Create a collapsible/expandable component that shows:
+- First 300 characters by default with "Show Full Response" button
+- Full response when expanded
+- Copy to clipboard functionality
 
-### Issue 4.5: Quick Actions Cards Show Same Icon
-- **Location**: `src/pages/Index.tsx` lines 278-312
-- **Problem**: "Registered Systems" and "ML Models" both use `Database` icon
-- **Impact**: Hard to visually distinguish between the two metrics
+Files to modify:
+- `src/components/engines/CustomPromptTest.tsx` - Replace truncation with expandable view
+- All `eval-*-hf/index.ts` functions - Remove `substring(0, 500)` truncation in raw logs
 
 ---
 
-## Category 5: Data Consistency Issues (3 Issues)
+## Part 4: Incident & Alert Workflow for Data Quality
 
-### Issue 5.1: 546 Pending Reviews But Low Visibility
-- **Database State**: 546 items in `review_queue` with status='pending'
-- **Problem**: Only FeedbackLoopDiagram shows pending count (in a small warning box)
-- **Expected**: This is a critical metric that should be prominent
+### Current State
+- `dq-raise-incidents` creates incidents in `dq_incidents` table
+- These are **NOT** connected to main `incidents` table or `alerts` page
+- No HITL escalation for DQ violations
 
-### Issue 5.2: Realtime Subscription Query Key Mismatch
-- **Location**: `src/pages/Index.tsx` lines 106-112
-- **Problem**: Realtime subscription for `predictive_governance` invalidates `['predictive-high-risk']`
-- **Hook Uses**: `['high-risk-predictions', minRiskScore]` as query key
-- **Impact**: Realtime updates won't refresh the PredictiveRiskPanel
+### Required Flow
 
-### Issue 5.3: Missing Realtime for Key Tables
-- **Location**: `src/pages/Index.tsx` useEffect
-- **Missing Subscriptions**:
-  - `review_queue` (546 pending items changing)
-  - `drift_alerts` (for Reality Check dashboard)
-  - `decisions` (for Governance Health)
-- **Impact**: Dashboard doesn't update in realtime for critical governance data
+```text
+Data Quality Rule Violation
+    ↓
+dq-raise-incidents (creates dq_incident)
+    ↓
+NEW: Also create entry in main 'incidents' table
+    ↓
+NEW: If severity = P0/critical, auto-escalate to review_queue (HITL)
+    ↓
+NEW: Trigger send-notification for configured alert channels
+```
 
----
+### Implementation
 
-## Summary Table
+1. **Modify `supabase/functions/dq-raise-incidents/index.ts`**:
+   - After inserting into `dq_incidents`, also insert into main `incidents` table
+   - Map P0 -> critical, P1 -> high, P2 -> medium severity
+   - For P0/critical, insert into `review_queue` for HITL
 
-| Category | Issue Count | Severity |
-|----------|-------------|----------|
-| Data Display Issues | 6 | Critical |
-| Missing Backend Wiring | 5 | High |
-| Logical/Calculation Errors | 4 | High |
-| UX/Practical Issues | 5 | Medium |
-| Data Consistency Issues | 3 | Medium |
-| **Total** | **23** | |
+2. **Add alert trigger**:
+   - Call `send-notification` for critical incidents
+   - Include incident details and remediation action
 
 ---
 
-## Priority Fixes (Top 10)
+## Part 5: Incident & Alert Workflow for Core RAI Engines
 
-1. **Fix PredictiveRiskPanel threshold** - Change from `useHighRiskPredictions(5)` to `useHighRiskPredictions(40)` or adjust hook
-2. **Fix "Governance Blocks" metric** - Query BLOCK decisions from request_logs, not incident count
-3. **Remove hardcoded December 11, 2025 date** - Use `new Date().toLocaleDateString()`
-4. **Fix "View Predictions" navigation** - Navigate to `/observability` or dedicated predictions view
-5. **Fix realtime query key** - Change to match `['high-risk-predictions']`
-6. **Fix audit completeness calculation** - Use same time window for both queries
-7. **Move SimulationController to Settings** - Not appropriate for main dashboard
-8. **Reduce widget count** - Consolidate redundant incident displays
-9. **Add prominent pending reviews indicator** - 546 items need attention
-10. **Generate higher-risk predictions** - Adjust `predictive-governance` function scoring
+### Current State (Good)
+All 5 RAI engines already auto-escalate to HITL when non-compliant:
+- `eval-fairness/index.ts` lines 546-556: Inserts into `review_queue`
+- `eval-toxicity-hf/index.ts` lines 457-467: Inserts into `review_queue`
+- Similar pattern in privacy, hallucination, explainability engines
+
+### Missing Pieces
+1. **Main incidents table integration** - RAI violations create `review_queue` entries but NOT `incidents`
+2. **Alert page visibility** - Need to create alerts for RAI violations
+
+### Required Changes
+
+For each RAI engine (`eval-fairness`, `eval-toxicity-hf`, `eval-privacy-hf`, `eval-hallucination-hf`, `eval-explainability-hf`):
+
+1. Add incident creation when non-compliant:
+```typescript
+if (!isCompliant) {
+  // Existing: review_queue insert
+  
+  // NEW: Create incident
+  await serviceClient.from("incidents").insert({
+    title: `${engineType} NON-COMPLIANT: ${overallScore}%`,
+    description: `Model failed ${engineType} evaluation`,
+    severity: overallScore < 50 ? "critical" : "high",
+    status: "open",
+    incident_type: "rai_violation",
+    model_id: modelId,
+  });
+  
+  // NEW: Create drift alert for visibility
+  await serviceClient.from("drift_alerts").insert({
+    feature: engineType,
+    drift_type: "compliance",
+    drift_value: (100 - overallScore) / 100,
+    severity: overallScore < 50 ? "critical" : "high",
+    status: "open",
+  });
+}
+```
 
 ---
 
-## Files Requiring Changes
+## Part 6: Core Security - 100% Accuracy Verification
 
-| File | Changes Needed |
-|------|----------------|
-| `src/pages/Index.tsx` | Fix navigation, query keys, realtime subscriptions |
-| `src/components/dashboard/PredictiveRiskPanel.tsx` | Fix threshold parameter |
-| `src/components/dashboard/RealityCheckDashboard.tsx` | Remove hardcoded dates |
-| `src/hooks/useRealityMetrics.ts` | Fix governanceBlocks query |
-| `src/components/dashboard/SLODashboard.tsx` | Fix audit completeness calculation |
-| `supabase/functions/predictive-governance/index.ts` | Generate higher risk scores |
+### Components to Verify
 
+| Page | Status | Required Fixes |
+|------|--------|----------------|
+| SecurityDashboard.tsx | Functional | None identified |
+| Pentesting.tsx | Functional | Icon change only |
+| JailbreakLab.tsx | Functional | Icon change only |
+| ThreatModeling.tsx | Functional | None identified |
+| AttackLibrary.tsx | Functional | None identified |
+
+### Backend Edge Functions to Verify
+
+| Function | Status | Notes |
+|----------|--------|-------|
+| `agent-pentester` | Deployed | Functional |
+| `agent-jailbreaker` | Deployed | Functional |
+| `agent-threat-modeler` | Deployed | Functional |
+| `security-evidence-service` | Deployed | Functional |
+
+All Core Security functions appear correctly implemented based on code review.
+
+---
+
+## Part 7: Data Governance - 100% Accuracy Verification
+
+### Data Quality Engine Pipeline
+
+| Stage | Function | Status | Issues |
+|-------|----------|--------|--------|
+| 1. Ingest | `dq-ingest-data` | Deployed | None |
+| 2. Profile | `dq-profile-dataset` | Deployed | None |
+| 3. Generate Rules | `dq-generate-rules` | Deployed | None |
+| 4. Execute Rules | `dq-execute-rules` | Deployed | None |
+| 5. Dashboard Assets | `dq-generate-dashboard-assets` | Deployed | None |
+| 6. Raise Incidents | `dq-raise-incidents` | Deployed | Needs main incidents integration |
+
+### Data Contracts
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Contract creation | Functional | Via DataContractsContent.tsx |
+| Contract validation | Functional | validate-contract edge function |
+| SLA enforcement | Functional | Checked in eval-data-quality |
+
+---
+
+## Implementation Summary
+
+### Phase 1: Command Center Refactoring
+1. Rewrite `src/pages/Index.tsx` to remove pipeline components
+2. Add Data Governance summary cards
+3. Add Core Security summary cards
+4. Keep Core RAI engine cards
+5. Add activity/logs section
+
+### Phase 2: Icon and Label Fixes
+1. Update `src/components/layout/Sidebar.tsx` icons
+2. Update page header icons in Pentesting.tsx and JailbreakLab.tsx
+
+### Phase 3: Output Restriction Removal
+1. Modify `CustomPromptTest.tsx` with expandable response component
+2. Update all 5 RAI engine edge functions to remove raw log truncation
+
+### Phase 4: Incident/Alert Workflow
+1. Modify `dq-raise-incidents` to create main incidents + HITL escalation
+2. Modify all 5 RAI engines to create incidents + alerts on non-compliance
+
+### Phase 5: Deploy and Test
+1. Deploy modified edge functions
+2. Test DQ pipeline end-to-end
+3. Test RAI engines with non-compliant scenarios
+4. Verify incidents appear in Incidents page
+5. Verify alerts appear in Alerts page
+6. Verify HITL queue receives escalations
+
+---
+
+## Technical Notes
+
+### Edge Functions to Modify
+- `supabase/functions/dq-raise-incidents/index.ts`
+- `supabase/functions/eval-fairness/index.ts`
+- `supabase/functions/eval-toxicity-hf/index.ts`
+- `supabase/functions/eval-privacy-hf/index.ts`
+- `supabase/functions/eval-hallucination-hf/index.ts`
+- `supabase/functions/eval-explainability-hf/index.ts`
+
+### Frontend Files to Modify
+- `src/pages/Index.tsx` (major rewrite)
+- `src/components/layout/Sidebar.tsx` (icon changes)
+- `src/pages/security/JailbreakLab.tsx` (icon change)
+- `src/pages/security/Pentesting.tsx` (icon change)
+- `src/components/engines/CustomPromptTest.tsx` (expandable response)
+
+### New Components to Create
+- `ExpandableModelResponse.tsx` - Collapsible full response viewer
+- `DataGovernanceSummaryCard.tsx` - DQ metrics summary for Command Center
+- `SecuritySummaryCard.tsx` - Security metrics summary for Command Center
