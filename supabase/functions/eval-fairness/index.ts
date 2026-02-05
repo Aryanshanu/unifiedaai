@@ -554,6 +554,26 @@ serve(async (req) => {
         sla_deadline: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
         created_by: user?.id,
       });
+
+      // Create incident for visibility
+      await serviceClient.from("incidents").insert({
+        title: `Fairness NON-COMPLIANT: ${overallScore}%`,
+        description: `Model failed fairness evaluation with ${overallScore}% score. Bias detected between demographic groups.`,
+        severity: overallScore < 50 ? "critical" : "high",
+        status: "open",
+        incident_type: "rai_violation",
+        model_id: targetId,
+      });
+
+      // Create drift alert for Alerts page visibility
+      await serviceClient.from("drift_alerts").insert({
+        feature: "fairness",
+        drift_type: "compliance",
+        drift_value: (100 - overallScore) / 100,
+        severity: overallScore < 50 ? "critical" : "high",
+        status: "open",
+        model_id: targetId,
+      });
     }
 
     console.log(`[eval-fairness] Complete. Score: ${overallScore}%, Latency: ${inferenceLatency}ms`);
