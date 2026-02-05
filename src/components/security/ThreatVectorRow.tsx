@@ -13,7 +13,7 @@ import {
 import { useState } from 'react';
 import { ThreatVector } from '@/hooks/useThreatModels';
 import { toast } from 'sonner';
-import { ConfidenceIndicator, SeverityBadge, DecisionTracePanel } from '@/components/security/ScoreTooltip';
+import { ConfidenceIndicator, SeverityBadge, DecisionTracePanel, getSeverityFromRiskScore, DecisionTrace } from '@/components/security/ScoreTooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface ThreatVectorRowProps {
@@ -42,34 +42,34 @@ export function ThreatVectorRow({ vector, onAccept, onValidate, isValidating }: 
   const [expanded, setExpanded] = useState(false);
   const riskScore = (vector.likelihood || 1) * (vector.impact || 1);
   const confidenceValue = confidenceToNumber(vector.confidence_level);
-  const severityValue = riskToSeverity(riskScore);
+  const severityValue = getSeverityFromRiskScore(riskToSeverity(riskScore));
 
   const getRiskColor = (score: number) => {
     if (score >= 20) return 'text-destructive';
-    if (score >= 12) return 'text-orange-500';
-    if (score >= 6) return 'text-yellow-500';
+    if (score >= 12) return 'text-amber-600';
+    if (score >= 6) return 'text-yellow-600';
     return 'text-green-600';
   };
 
-  // Build decision trace for explainability
-  const decisionTrace = {
-    signals: [
-      { signal: 'Likelihood Score', triggered: true, details: `${vector.likelihood || 1}/5` },
-      { signal: 'Impact Score', triggered: true, details: `${vector.impact || 1}/5` },
-      { signal: 'Risk Calculation', triggered: true, details: `${vector.likelihood || 1} × ${vector.impact || 1} = ${riskScore}` },
-    ],
-    rulesFired: [
+  // Build decision trace for explainability (matching DecisionTrace interface)
+  const decisionTrace: DecisionTrace = {
+    parseSuccess: true,
+    signalsTriggered: 3,
+    hasContradiction: false,
+    confidenceBreakdown: {
+      parseSuccessScore: 0.4,
+      signalConsistencyScore: vector.confidence_level === 'high' ? 0.3 : vector.confidence_level === 'medium' ? 0.2 : 0.1,
+      explanationQualityScore: vector.description ? 0.2 : 0.1,
+      noErrorsScore: 0.1,
+    },
+    rawConfidence: confidenceValue,
+    rulesEvaluated: [
       ...(vector.atlas_tactic ? [`ATLAS Tactic: ${vector.atlas_tactic}`] : []),
       ...(vector.owasp_category ? [`OWASP: ${vector.owasp_category}`] : []),
       ...(vector.maestro_layer ? [`MAESTRO Layer: ${vector.maestro_layer}`] : []),
+      `Likelihood: ${vector.likelihood || 1}/5`,
+      `Impact: ${vector.impact || 1}/5`,
     ],
-    rawResponse: vector.description || 'No detailed description available',
-    confidenceBreakdown: {
-      parseSuccess: true,
-      signalConsistency: vector.confidence_level === 'high' ? 0.3 : vector.confidence_level === 'medium' ? 0.2 : 0.1,
-      explanationQuality: vector.description ? 0.2 : 0.1,
-      noErrors: 0.1,
-    },
   };
 
   return (
@@ -109,7 +109,7 @@ export function ThreatVectorRow({ vector, onAccept, onValidate, isValidating }: 
             <span className={`font-bold ${getRiskColor(riskScore)}`}>
               {riskScore}
             </span>
-            <SeverityBadge score={severityValue} />
+            <SeverityBadge severity={severityValue} />
           </div>
         </TableCell>
         <TableCell onClick={() => setExpanded(!expanded)}>
@@ -150,11 +150,16 @@ export function ThreatVectorRow({ vector, onAccept, onValidate, isValidating }: 
             <div className="p-4 space-y-4">
               {/* Decision Trace Panel */}
               <DecisionTracePanel
-                signals={decisionTrace.signals}
-                rulesFired={decisionTrace.rulesFired}
-                rawResponse={decisionTrace.rawResponse}
-                confidenceBreakdown={decisionTrace.confidenceBreakdown}
+                trace={decisionTrace}
               />
+              
+              {/* Description */}
+              {vector.description && (
+                <div className="border-t pt-4">
+                  <h5 className="text-xs font-medium text-muted-foreground mb-1">Description</h5>
+                  <p className="text-sm">{vector.description}</p>
+                </div>
+              )}
               
               {/* Mitigation Checklist */}
               {Array.isArray(vector.mitigation_checklist) && vector.mitigation_checklist.length > 0 && (
