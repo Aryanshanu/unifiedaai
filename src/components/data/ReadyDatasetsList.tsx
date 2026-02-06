@@ -306,25 +306,45 @@ export function ReadyDatasetsList() {
                               </Button>
                             )}
                             {dataset.ai_approval_status === "pending" && (
-                              <>
+                              <div className="space-y-2">
                                 <Button
                                   size="sm"
-                                  onClick={() => approveDataset.mutate(dataset.id)}
-                                  disabled={approveDataset.isPending}
+                                  variant="outline"
+                                  onClick={() => setExpandedGate(expandedGate === dataset.id ? null : dataset.id)}
                                 >
-                                  <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                                  Approve
+                                  {expandedGate === dataset.id ? (
+                                    <ChevronUp className="h-3.5 w-3.5 mr-1" />
+                                  ) : (
+                                    <ChevronDown className="h-3.5 w-3.5 mr-1" />
+                                  )}
+                                  Quality Gate
                                 </Button>
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => rejectDataset.mutate(dataset.id)}
-                                  disabled={rejectDataset.isPending}
-                                >
-                                  <XCircle className="h-3.5 w-3.5 mr-1" />
-                                  Reject
-                                </Button>
-                              </>
+                                {gatesPassed[dataset.id] && (
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      size="sm"
+                                      onClick={() => approveDataset.mutate(dataset.id)}
+                                      disabled={approveDataset.isPending}
+                                    >
+                                      {approveDataset.isPending ? (
+                                        <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                                      ) : (
+                                        <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                                      )}
+                                      Approve
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={() => rejectDataset.mutate(dataset.id)}
+                                      disabled={rejectDataset.isPending}
+                                    >
+                                      <XCircle className="h-3.5 w-3.5 mr-1" />
+                                      Reject
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
                             )}
                             {dataset.ai_approval_status === "approved" && (
                               <div className="flex items-center gap-2">
