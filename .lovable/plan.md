@@ -1,190 +1,364 @@
 
-Goal: Make every Core Security surface (Security Dashboard, AI Pentesting, Jailbreak Lab, Threat Modeling, Attack Library) work end-to-end in Preview with “Built-in fallback” as the target, with evidence-based outputs (real target responses, real judge reasoning, explicit labels) and no silent failures.
 
-Non-negotiables (your mandates translated into engineering constraints)
-- No “pretend success”: every UI success state must correspond to a real DB write and/or a real backend function response.
-- No “fake” coverage/metrics: dashboards must be computed from persisted runs/results, not inferred from unrelated tables.
-- No raw technical errors shown to end users: errors must be friendly but still truthful (e.g., “Selected model unavailable” rather than generic “not found”).
-- Built-in fallback must be explicit and auditable: UI must clearly state when the “Built-in target” is used vs a user-configured external system.
+# Data Quality & AI Governance Enhancement Plan
+## Implementing End-to-End Data-to-Model Traceability
 
-What I verified (hard evidence, not guesses)
-1) Security Dashboard renders and pulls real stats. I can see real counts (findings, attacks, threat models) in the UI extract.
-2) AI Pentesting “Run Full Scan” creates a test run row in the database and triggers the backend.
-3) The actual failure cause for “Not real / No action” is in backend execution:
-   - agent-pentester logs show repeated OpenRouter 404: “No endpoints found for qwen/qwen3-30b-a3b:free.”
-   - This yields 30/30 indeterminate and 0% coverage.
-4) The PentestProgress UI can appear stuck “Running” because the UI chooses the first “running” test run it finds — and there are older runs stuck in “running” status in the DB. So even when a new run completes, the UI can still display an old “running” run.
+---
 
-Root causes (why it feels “broken” across modules)
-A) “Built-in fallback” is not actually enforced
-- You selected “Built-in fallback” as the desired target setup, but the system dropdown is selecting external OpenRouter systems.
-- The target-executor currently routes based on system.provider/endpoint; if the chosen system points to OpenRouter and that model is unavailable, you get indeterminate results (not real vulnerability verdicts).
+## Current State Analysis
 
-B) Stale “running” test runs poison UI state
-- There are older security_test_runs rows stuck in status=running.
-- Pentesting page picks “any running run” first, so progress can look permanently running.
+After exploring the codebase, I found that significant foundation exists:
 
-C) Truth/UX gaps: indeterminate outcomes are not surfaced clearly
-- Pentesting UI mainly shows findings. When tests are indeterminate (target failed), you get “no findings,” which looks like “no action” or “not real,” even though the backend ran.
-- Error sanitization currently maps many 404-ish errors to generic “not found,” which hides the real reason (model unavailable).
+### What Already Exists
 
-D) Threat modeling uses inconsistent system fields
-- agent-threat-modeler references system.endpoint_url (likely not the correct column; systems uses endpoint). That makes system info inaccurate and contributes to “not real” perception.
+| Feature | Current Implementation |
+|---------|----------------------|
+| **Data Profiling** | Full pipeline via `dq-control-plane` with 6 dimensions |
+| **Rules Engine** | `dq_rules` table with severity, thresholds, CDE tagging |
+| **Business Impact Tagging** | `business_impact` field on `dq_rules` and `datasets` tables |
+| **CDEs (Critical Data Elements)** | `is_critical_element` boolean on rules |
+| **Dataset Approval** | `ai_approval_status`, `ai_approved_at`, versioning via `dataset_snapshots` |
+| **Bias Scan** | `DatasetBiasScan.tsx` component with demographic skew detection |
+| **Model Registration** | Full form with `training_dataset_id`, `intended_use`, `limitations`, `risk_classification` |
+| **Drift Detection** | `drift_alerts` table, `detect-drift` edge function |
+| **Lineage/Knowledge Graph** | Full KG with nodes/edges for models, datasets, evaluations |
+| **Regulatory Reports** | `regulatory_reports` table with EU AI Act, Model Cards, Data Cards |
 
-Plan (implementation sequencing, minimal risk, and explicit verification)
+### What's Missing or Needs Enhancement
 
-Phase 1 — Make “Built-in Target” a first-class, click-to-create option (so fallback is real, explicit, and user-driven)
-1. Add a “Built-in Target (no external keys)” option that the user can create from the UI:
-   - Best place: /models page and also a CTA inside each Core Security page empty/blocked state.
-   - This creates a real row in systems table with:
-     - provider = 'lovable'
-     - endpoint = null
-     - api_token_encrypted = null
-     - model_name = (optional) 'google/gemini-2.5-flash' or left null
-   - This satisfies “no fake data” because it’s a user-initiated configuration, not hidden seeding.
-2. Update all Core Security pages to strongly guide selection:
-   - If user has external systems but chooses “Built-in target,” the UI must show: “Target: Built-in (Lovable AI)”.
-   - If user selects an external system and it fails, the UI should recommend switching to Built-in target.
+| Gap | Priority |
+|-----|----------|
+| Freshness tracking (last updated, staleness alerts) | High |
+| Quality scorecards with trend visualization | High |
+| Anomaly detection beyond profiling | Medium |
+| Data transformation lineage tracking | High |
+| Model drift detection (not just data drift) | High |
+| Policy violation auto-escalation | Medium |
+| Audit trail consolidation view | High |
 
-Files likely involved
-- src/pages/Models.tsx (add “Create Built-in Target” button using existing useCreateSystem hook)
-- src/pages/security/Pentesting.tsx, JailbreakLab.tsx, ThreatModeling.tsx (add CTA banner if failures detected)
+---
 
-Acceptance criteria
-- User can create Built-in target in 1 click, see it in the dropdown, and run tests without any external provider dependency.
+## Implementation Plan
 
-Phase 2 — Fix target execution so fallback is guaranteed to work and is labeled (no silent OpenRouter dependency)
-1. Update supabase/functions/target-executor/index.ts routing logic:
-   - If provider === 'lovable': always run executeLovable() and return metadata.provider='lovable', metadata.model='google/gemini-2.5-flash'.
-   - If OpenRouter returns “No endpoints found…”:
-     - Return success=false with a specific errorCode (e.g., MODEL_UNAVAILABLE) and a user-safe error message.
-     - Do not silently convert to success.
-2. Ensure CORS headers match the platform-required list (prevents “no action” due to preflight mismatch in some browsers):
-   - Expand Access-Control-Allow-Headers to include the full set required by the platform (authorization, x-client-info, apikey, content-type, x-supabase-client-platform, etc.).
+### Phase 1: Data Quality & Trust Foundation Enhancements
 
-Files likely involved
-- supabase/functions/target-executor/index.ts
+#### 1.1 Freshness Tracking & Staleness Alerts
 
-Acceptance criteria
-- Built-in target always returns a real model response (not empty) and includes metadata showing it was built-in.
-- OpenRouter failures are explicit and traceable, not masked.
+**Database Changes:**
+```sql
+-- Add freshness tracking to datasets
+ALTER TABLE datasets ADD COLUMN IF NOT EXISTS last_data_update TIMESTAMPTZ;
+ALTER TABLE datasets ADD COLUMN IF NOT EXISTS staleness_status TEXT DEFAULT 'fresh';
+ALTER TABLE datasets ADD COLUMN IF NOT EXISTS freshness_threshold_days INTEGER DEFAULT 7;
 
-Phase 3 — Stop Pentesting from lying via UI state (stale runs + indeterminate visibility)
-1. Fix the “currentRun” selection logic in src/pages/security/Pentesting.tsx:
-   - Prefer the most recent run by created_at.
-   - Only treat a run as “running” if it started recently (e.g., within last 10–15 minutes). Otherwise mark it “stale.”
-2. Add a “Resolve stale run” action:
-   - Button: “Mark stale run as failed” (updates the row to status='failed' and completed_at=now).
-3. Update UI to show indeterminate results clearly:
-   - If agent-pentester returns indeterminate > 0 and passed+failed = 0:
-     - Show a prominent warning card: “All tests indeterminate — target unreachable/unavailable.”
-     - Show the top error reason (from backend response if available).
-     - Offer one-click suggestion: “Switch to Built-in target.”
-4. Fix the type mismatch and returned fields expectation:
-   - Frontend currently expects {passed, failed, coverage}. Backend returns {passed, failed, indeterminate, total, coverage, ...}.
-   - Update front-end typing so it can consume indeterminate and show it.
+-- Create freshness check function
+CREATE OR REPLACE FUNCTION check_dataset_freshness() RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.last_data_update IS NOT NULL THEN
+    IF NEW.last_data_update < now() - (NEW.freshness_threshold_days || ' days')::interval THEN
+      NEW.staleness_status := 'stale';
+    ELSIF NEW.last_data_update < now() - ((NEW.freshness_threshold_days * 0.5) || ' days')::interval THEN
+      NEW.staleness_status := 'warning';
+    ELSE
+      NEW.staleness_status := 'fresh';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+```
 
-Files likely involved
-- src/pages/security/Pentesting.tsx
-- src/components/security/PentestProgress.tsx (add indeterminate/stale display)
-- src/lib/ui-helpers.ts (improve sanitizeErrorMessage mapping for OpenRouter “No endpoints found…”)
+**New Component:** `src/components/engines/FreshnessIndicator.tsx`
+- Shows freshness status with color-coded badge (Fresh/Warning/Stale)
+- Displays time since last update
+- Clickable to configure threshold
 
-Acceptance criteria
-- Running scan always transitions out of “Running” (either completed or failed) and UI reflects it correctly.
-- If 0 findings because everything indeterminate, UI explains why (truthfully) rather than appearing “dead.”
+#### 1.2 Quality Scorecards with Trends
 
-Phase 4 — Make backend test runs self-healing (no more stuck “running” rows)
-1. Update agent-pentester to update security_test_runs server-side using testRunId:
-   - On start: confirm status running (optional)
-   - On finish (success OR all-indeterminate): set status='completed', completed_at, tests_passed/failed, coverage_percentage, and store a summary that includes:
-     - indeterminate count
-     - resultsByCategory counts
-     - top errors (aggregated)
-   - On fatal error: set status='failed' and store error summary.
-2. Update agent-jailbreaker similarly if it ever writes runs (if not, skip).
-3. Add a lightweight cleanup path:
-   - If a run is “running” but older than threshold, allow UI + backend to mark it failed.
+**New Component:** `src/components/engines/DQScorecard.tsx`
+- Consolidates all 6 dimension scores
+- Shows trend sparklines using existing `QualityTrendChart` pattern
+- Exportable PDF/JSON with hash verification
+- Links to EU AI Act Article 10 (Data Governance)
 
-Files likely involved
-- supabase/functions/agent-pentester/index.ts (small targeted edits only; avoid rewriting the whole large file)
-- potentially supabase/functions/agent-jailbreaker/index.ts (only if it writes runs)
+**Enhancements to existing:** `src/components/engines/DQDashboardVisual.tsx`
+- Add dimension trend comparison chart
+- Add pass/fail threshold visualization
+- Add CDE coverage percentage
 
-Acceptance criteria
-- Even if the user navigates away mid-run, the backend still finalizes the run status, preventing stale running rows.
+#### 1.3 Anomaly Detection Service
 
-Phase 5 — Threat Modeling correctness + “Validate vector” must use the same truthful target pipeline
-1. Fix system field usage in agent-threat-modeler:
-   - Replace endpoint_url with endpoint (or remove endpoint from prompt if not needed).
-   - Restrict select('*') to only needed fields to reduce accidental leakage.
-2. Make validate-vector execution consistent:
-   - Use target-executor and record whether the target call succeeded.
-   - If executionSuccess=false, return success=false and show a clear UI message “Could not validate against target.”
-3. In the UI (ThreatVectorRow), remove any synthetic “decision trace” values that are not derived from backend:
-   - Right now ThreatVectorRow constructs a DecisionTrace locally (signalsTriggered=3, parseSuccess=true, etc.). That violates your “no hallucination” rule because it looks like real computation.
-   - Replace with either:
-     - “Decision trace unavailable (not computed)” or
-     - A real decision trace returned from backend validation, persisted in mitigation_checklist or a dedicated field.
+**New Edge Function:** `supabase/functions/dq-detect-anomalies/index.ts`
+- Runs after profiling
+- Detects: outliers (IQR method), distribution shifts, sudden null spikes
+- Creates incidents for critical anomalies
+- Stores results in new `dataset_anomalies` table
 
-Files likely involved
-- supabase/functions/agent-threat-modeler/index.ts
-- src/components/security/ThreatVectorRow.tsx
-- src/pages/security/ThreatModeling.tsx
+**Database:**
+```sql
+CREATE TABLE dataset_anomalies (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  dataset_id UUID REFERENCES datasets(id),
+  column_name TEXT NOT NULL,
+  anomaly_type TEXT NOT NULL, -- 'outlier', 'distribution_shift', 'null_spike', 'pattern_break'
+  severity TEXT NOT NULL,
+  detected_value JSONB,
+  expected_range JSONB,
+  detected_at TIMESTAMPTZ DEFAULT now(),
+  status TEXT DEFAULT 'open',
+  resolved_at TIMESTAMPTZ,
+  resolved_by UUID
+);
+```
 
-Acceptance criteria
-- Threat modeling shows only real computed traces (from backend) or explicitly shows “not available,” never made-up values.
+#### 1.4 Enhanced Business Impact Tagging UI
 
-Phase 6 — Attack Library reliability and honesty polish (so it never feels “dead”)
-1. Add inline success/failure feedback after “Add Attack”:
-   - If createAttack fails due to permissions/RLS, show a friendly actionable message.
-2. Ensure “Add Attack” never silently closes if mutation fails.
+**Update:** `src/components/engines/DQRulesUnified.tsx`
+- Add prominent business impact selector (High/Medium/Low)
+- Show impact score calculation: `Impact = (Severity × Business Impact × CDE Flag) / 100`
+- Visual indicator showing which rules affect AI-approved datasets
 
-Files likely involved
-- src/pages/security/AttackLibrary.tsx
-- src/hooks/useAttackLibrary.ts
+---
 
-Acceptance criteria
-- User can add an attack and immediately see it in the grid, or gets a clear, non-technical reason why it can’t be added.
+### Phase 2: Data Readiness for AI
 
-Phase 7 — One-click Core Security “Smoke Test” (evidence-based verification, not “trust me”)
-Add a “Run Core Security Smoke Test” button on Security Dashboard:
-- It runs a minimal sequence (fast, deterministic) against Built-in target:
-  1) target-executor: simple prompt → expect a response
-  2) JailbreakLab custom-test: “Say X” → verify a result object and DB evidence write (if vulnerability)
-  3) Pentesting custom-test: simple test → verify result and that a test_run is finalized
-  4) Threat modeling generate: create a model + vectors row count check
-- Show a checklist UI with PASS/FAIL and correlation IDs for each step.
+#### 2.1 Enhanced Dataset Approval Workflow
 
-Files likely involved
-- src/pages/security/SecurityDashboard.tsx (add button)
-- supabase/functions/security-smoke-test/index.ts (new backend function) OR reuse existing functions directly from UI with careful sequencing and DB verification.
+**Update:** `src/components/data/ReadyDatasetsList.tsx`
+- Add "Quality Gate Check" before approval
+- Requirements: Completeness ≥ 95%, Bias Score ≥ 80%, No Critical Anomalies
+- Show blocking reasons if not met
+- Add "Run Quality Check" button that validates all gates
 
-Acceptance criteria
-- You can press one button and get a factual PASS/FAIL report for each Core Security module, with correlation IDs.
+**New Component:** `src/components/data/DatasetQualityGate.tsx`
+```typescript
+interface QualityGate {
+  name: string;
+  required: number;
+  actual: number;
+  passed: boolean;
+  regulation: string; // e.g., "EU AI Act Art. 10"
+}
+```
 
-End-to-end verification checklist (what I will do after implementing, in Preview)
-1) Create Built-in target from /models.
-2) Security Dashboard: confirm stats load and quick links navigate.
-3) Attack Library: open, filter, show payload, add a test attack (optional).
-4) Jailbreak Lab:
-   - select Built-in target
-   - run Custom payload test
-   - run 1 library attack
-   - verify result shows targetResponse and judge reasoning
-5) AI Pentesting:
-   - select Built-in target
-   - run scan
-   - confirm test run finalizes (no stuck running), and UI shows indeterminate if applicable
-6) Threat Modeling:
-   - generate model
-   - validate one vector
-   - confirm no fake decision traces; only backend-derived or “unavailable”
+#### 2.2 Bias Checks at Data Level
 
-Important note (truth statement)
-- With “Built-in fallback,” results are real model outputs and real judge outputs, but they are not testing your external OpenRouter systems. The UI will explicitly label the target as “Built-in” so it cannot be mistaken as external testing.
+**Enhance:** `src/components/engines/DatasetBiasScan.tsx`
+- Add protected attribute detection (auto-suggest based on column names)
+- Add fairness metric calculations: Demographic Parity Difference, Equal Opportunity
+- Store bias audit history in `dataset_bias_reports` (already exists)
+- Block AI approval if bias score < 70%
 
-Scope control (because you said TIME CRITICAL)
-- This plan prioritizes: (1) make fallback truly functional everywhere, (2) eliminate stale run confusion, (3) eliminate any fabricated traces, (4) add a smoke-test so we can prove it works.
-- If you want me to also make OpenRouter/external systems “work 100%,” that is a separate follow-up request because it requires validating model IDs/availability per provider and possibly reworking how provider endpoints/models are stored.
+#### 2.3 Lineage + Transformations Tracking
 
-If you want me to continue after this request:
-- I will implement Phases 1–4 first (those unblock “works now” with built-in fallback), then Phase 5 (remove fake traces), then Phase 7 (smoke test).
+**Database Changes:**
+```sql
+CREATE TABLE data_transformations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  source_dataset_id UUID REFERENCES datasets(id),
+  target_dataset_id UUID REFERENCES datasets(id),
+  transformation_type TEXT NOT NULL, -- 'filter', 'aggregate', 'join', 'derive', 'clean'
+  transformation_logic TEXT,
+  columns_affected TEXT[],
+  row_count_before INTEGER,
+  row_count_after INTEGER,
+  executed_at TIMESTAMPTZ DEFAULT now(),
+  executed_by UUID
+);
+```
+
+**New Component:** `src/components/data/TransformationLineage.tsx`
+- Visual flow diagram showing dataset transformations
+- Click-through to source datasets
+- Integration with Knowledge Graph
+
+**Update Knowledge Graph sync:** Add trigger to create KG edges for transformations:
+```sql
+-- Edge type: dataset -> derived_from -> dataset
+```
+
+---
+
+### Phase 3: AI Development & Deployment
+
+#### 3.1 Model Registration Enhancements
+
+**Already exists but enhance:** `src/components/models/ModelRegistrationForm.tsx`
+
+Current fields work well. Add:
+- **Training Data Quality Badge** - Show quality score of linked dataset
+- **Auto-block if dataset not approved** - Prevent submission without approved training data
+- **Governance Checklist** - Required fields validation:
+  - ☑ Training dataset linked
+  - ☑ Intended use documented
+  - ☑ Limitations documented
+  - ☑ Risk classification selected
+
+**New Validation:**
+```typescript
+// In ModelRegistrationForm submit handler
+if (formData.training_dataset_id) {
+  const dataset = await supabase.from('datasets')
+    .select('ai_approval_status, dimension_scores')
+    .eq('id', formData.training_dataset_id)
+    .single();
+  
+  if (dataset.ai_approval_status !== 'approved') {
+    throw new Error('Training dataset must be AI-approved before model registration');
+  }
+}
+```
+
+#### 3.2 Training Data Traceability
+
+**New Component:** `src/components/models/TrainingDataLineage.tsx`
+- Shows full lineage: Raw Data → Transformations → Approved Dataset → Model
+- Click-through to each stage
+- Quality scores at each stage
+
+**Update Model Detail Page:** Add "Training Data" tab showing:
+- Dataset name, version, approval date
+- Quality scores at time of training
+- Link to bias report
+
+---
+
+### Phase 4: Continuous Monitoring & Feedback
+
+#### 4.1 Data Drift (Enhance Existing)
+
+**Update:** `supabase/functions/detect-drift/index.ts`
+- Add data drift detection (currently only tracks model drift)
+- Compare current dataset profile against baseline (stored in `dq_profiles`)
+- Calculate PSI (Population Stability Index) for each column
+- Auto-create incidents for PSI > 0.25
+
+**New Database:**
+```sql
+CREATE TABLE data_drift_alerts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  dataset_id UUID REFERENCES datasets(id),
+  column_name TEXT NOT NULL,
+  drift_type TEXT NOT NULL, -- 'psi', 'kl_divergence', 'mean_shift'
+  baseline_profile_id UUID REFERENCES dq_profiles(id),
+  current_profile_id UUID REFERENCES dq_profiles(id),
+  drift_value NUMERIC,
+  severity TEXT,
+  detected_at TIMESTAMPTZ DEFAULT now(),
+  status TEXT DEFAULT 'open'
+);
+```
+
+#### 4.2 Model Drift
+
+**Update:** `supabase/functions/detect-drift/index.ts`
+- Track prediction distribution shift
+- Track confidence score degradation
+- Compare against baseline evaluation scores
+- Auto-escalate to HITL if drift exceeds threshold
+
+#### 4.3 Policy Violations Auto-Escalation
+
+**New Edge Function:** `supabase/functions/policy-violation-handler/index.ts`
+- Triggered when incidents are created
+- Checks policy rules from `policies` table
+- Auto-routes based on severity:
+  - Critical: Create HITL entry + send notification
+  - High: Create HITL entry
+  - Medium/Low: Log only
+
+**Update:** `src/hooks/useIncidents.ts`
+- Add `escalation_status` field
+- Track time-to-acknowledge, time-to-resolve
+
+#### 4.4 Audit & Regulatory Reporting Dashboard
+
+**New Page:** `src/pages/AuditCenter.tsx`
+- Consolidated view of all audit-relevant events
+- Filters by: date range, entity type, severity, regulation
+- One-click regulatory report generation
+- Immutable audit trail with hash chain verification
+
+**Tabs:**
+1. **Timeline** - Chronological audit events
+2. **Data Governance** - Dataset quality, approvals, transformations
+3. **Model Governance** - Registrations, evaluations, deployments
+4. **Incidents** - All violations with resolution status
+5. **Reports** - Generated regulatory documents
+
+---
+
+## Files to Create
+
+| File | Purpose |
+|------|---------|
+| `src/components/engines/FreshnessIndicator.tsx` | Dataset freshness status display |
+| `src/components/engines/DQScorecard.tsx` | Quality scorecard with trends |
+| `src/components/data/DatasetQualityGate.tsx` | AI approval prerequisites check |
+| `src/components/data/TransformationLineage.tsx` | Data flow visualization |
+| `src/components/models/TrainingDataLineage.tsx` | Model-to-data traceability |
+| `src/pages/AuditCenter.tsx` | Consolidated audit dashboard |
+| `src/hooks/useDataDrift.ts` | Data drift monitoring |
+| `supabase/functions/dq-detect-anomalies/index.ts` | Anomaly detection service |
+| `supabase/functions/policy-violation-handler/index.ts` | Auto-escalation service |
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/pages/engines/DataQualityEngine.tsx` | Add Freshness and Anomaly tabs |
+| `src/components/engines/DQRulesUnified.tsx` | Enhance business impact UI |
+| `src/components/data/ReadyDatasetsList.tsx` | Add quality gate checks |
+| `src/components/engines/DatasetBiasScan.tsx` | Add protected attribute detection |
+| `src/components/models/ModelRegistrationForm.tsx` | Add validation for training data |
+| `src/hooks/useDriftDetection.ts` | Add data drift functions |
+| `supabase/functions/detect-drift/index.ts` | Add data drift detection |
+
+---
+
+## Database Migrations Required
+
+```sql
+-- Migration 1: Freshness tracking
+ALTER TABLE datasets ADD COLUMN IF NOT EXISTS last_data_update TIMESTAMPTZ;
+ALTER TABLE datasets ADD COLUMN IF NOT EXISTS staleness_status TEXT DEFAULT 'fresh';
+
+-- Migration 2: Anomaly detection
+CREATE TABLE IF NOT EXISTS dataset_anomalies (...);
+
+-- Migration 3: Data transformations
+CREATE TABLE IF NOT EXISTS data_transformations (...);
+
+-- Migration 4: Data drift alerts
+CREATE TABLE IF NOT EXISTS data_drift_alerts (...);
+
+-- Migration 5: Enable realtime for new tables
+ALTER PUBLICATION supabase_realtime ADD TABLE dataset_anomalies;
+ALTER PUBLICATION supabase_realtime ADD TABLE data_drift_alerts;
+```
+
+---
+
+## Implementation Order
+
+1. **Database migrations** (foundational)
+2. **Freshness tracking** (quick win, visible impact)
+3. **Quality Gate for AI approval** (governance enforcement)
+4. **Data drift detection** (monitoring extension)
+5. **Transformation lineage** (traceability)
+6. **Audit Center page** (consolidation)
+7. **Anomaly detection** (advanced feature)
+
+---
+
+## Acceptance Criteria
+
+- [ ] Dataset freshness status visible on all dataset views
+- [ ] Quality gate blocks AI approval if thresholds not met
+- [ ] Model registration requires linked, approved training dataset
+- [ ] Data drift alerts appear in Observability dashboard
+- [ ] Full lineage visible from model → training data → raw sources
+- [ ] Audit Center shows 90-day trail with hash verification
+- [ ] All new incidents auto-escalate based on policy rules
+- [ ] Regulatory reports include all new governance data
+
