@@ -9,11 +9,12 @@ import { Textarea } from '@/components/ui/textarea';
  import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
  import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
- import { 
-   FlaskConical, Play, Zap, Search, RefreshCw, Shield, ShieldX, Download, 
+import { 
+  FlaskConical, Play, Zap, Search, RefreshCw, Shield, ShieldX, Download, 
   AlertTriangle, ChevronDown, ChevronUp, Clock, ExternalLink, ServerCrash, Database,
   HelpCircle, Send
- } from 'lucide-react';
+} from 'lucide-react';
+import { BuiltInTargetButton, BuiltInTargetBanner } from '@/components/security/BuiltInTargetButton';
  import { useSystems } from '@/hooks/useSystems';
  import { useAttackLibrary, Attack } from '@/hooks/useAttackLibrary';
  import { useSecurityFindings } from '@/hooks/useSecurityFindings';
@@ -280,28 +281,28 @@ import {
      toast.success('Results exported successfully');
    };
  
-   // Empty states
-   if (systems.length === 0 && !systemsQuery.isLoading) {
-     return (
-       <MainLayout title="Jailbreak Lab" subtitle="Adversarial attack testing">
-         <div className="p-6">
-           <Alert className="border-yellow-500 bg-yellow-50">
-             <AlertTriangle className="h-4 w-4 text-yellow-600" />
-             <AlertTitle>No Target Systems Configured</AlertTitle>
-             <AlertDescription className="mt-2">
-               <p>You need to configure at least one AI system to test.</p>
-               <Button asChild className="mt-3" variant="outline">
-                 <Link to="/models">
-                   <ServerCrash className="h-4 w-4 mr-2" />
-                   Configure Target System
-                 </Link>
-               </Button>
-             </AlertDescription>
-           </Alert>
-         </div>
-       </MainLayout>
-     );
-   }
+  // Empty states
+  const isBuiltInTarget = selectedSystem?.provider === 'lovable';
+
+  if (systems.length === 0 && !systemsQuery.isLoading) {
+    return (
+      <MainLayout title="Jailbreak Lab" subtitle="Adversarial attack testing">
+        <div className="p-6 space-y-4">
+          <BuiltInTargetBanner 
+            showWhen="no-systems" 
+            onCreated={(id) => setSelectedSystemId(id)} 
+          />
+          <Alert className="border-border">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>No Target Systems Configured</AlertTitle>
+            <AlertDescription className="mt-2">
+              <p>You need to configure at least one AI system to test. Use the Built-in Target above for quick testing without external APIs.</p>
+            </AlertDescription>
+          </Alert>
+        </div>
+      </MainLayout>
+    );
+  }
  
    return (
      <MainLayout title="Jailbreak Lab" subtitle="Adversarial attack testing">
@@ -321,21 +322,25 @@ import {
  
          {/* Controls */}
          <div className="flex flex-wrap items-center gap-4">
-           <Select value={selectedSystemId} onValueChange={setSelectedSystemId}>
-             <SelectTrigger className="w-[220px]">
-               <SelectValue placeholder="Select target system" />
-             </SelectTrigger>
-             <SelectContent>
-               {systems.map((system) => (
-                 <SelectItem key={system.id} value={system.id}>
-                   <span className="flex items-center gap-2">
-                     {system.name}
-                     <Badge variant="outline" className="text-xs">{system.provider}</Badge>
-                   </span>
-                 </SelectItem>
-               ))}
-             </SelectContent>
-           </Select>
+          <Select value={selectedSystemId} onValueChange={setSelectedSystemId}>
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder="Select target system" />
+            </SelectTrigger>
+            <SelectContent>
+              {systems.map((system) => (
+                <SelectItem key={system.id} value={system.id}>
+                  <span className="flex items-center gap-2">
+                    {system.name}
+                    {system.provider === 'lovable' ? (
+                      <Badge variant="secondary" className="text-xs">Built-in</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-xs">{system.provider}</Badge>
+                    )}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
  
            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
              <SelectTrigger className="w-[180px]">
@@ -380,17 +385,26 @@ import {
            )}
          </div>
  
-         {/* Target System Info */}
-         {selectedSystem && (
-           <Alert className="border-blue-200 bg-blue-50/50">
-             <Database className="h-4 w-4 text-blue-600" />
-             <AlertTitle className="text-blue-800">Target: {selectedSystem.name}</AlertTitle>
-             <AlertDescription className="text-blue-700">
-               Provider: {selectedSystem.provider} • Model: {selectedSystem.model_name || 'Default'} • 
-               Attacks will be executed against this system in real-time
-             </AlertDescription>
-           </Alert>
-         )}
+        {/* Target System Info */}
+        {selectedSystem && (
+          <Alert className="border-border bg-muted/50">
+            <Database className="h-4 w-4" />
+            <AlertTitle>Target: {selectedSystem.name}</AlertTitle>
+            <AlertDescription>
+              {isBuiltInTarget ? (
+                <span className="flex items-center gap-1.5">
+                  <Shield className="h-3.5 w-3.5" />
+                  Built-in Target (Lovable AI) • Fast, reliable testing without external dependencies
+                </span>
+              ) : (
+                <>
+                  Provider: {selectedSystem.provider} • Model: {selectedSystem.model_name || 'Default'} • 
+                  Attacks will be executed against this system in real-time
+                </>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
  
          {/* Results Summary */}
          {results.length > 0 && (
