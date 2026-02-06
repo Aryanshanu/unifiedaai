@@ -91,14 +91,14 @@ export function ConnectionTestButton({ systemId, systemName, className, onSucces
       {testResult && (
         <Alert variant={testResult.success ? 'default' : 'destructive'} className="mt-3">
           {testResult.success ? (
-            <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+            <CheckCircle className="h-4 w-4" />
           ) : (
-            <XCircle className="h-4 w-4 text-destructive" />
+            <XCircle className="h-4 w-4" />
           )}
-          <AlertTitle className={testResult.success ? 'text-green-800 dark:text-green-300' : 'text-destructive'}>
+          <AlertTitle>
             {testResult.success ? 'Connection Successful' : 'Connection Failed'}
           </AlertTitle>
-          <AlertDescription className={testResult.success ? 'text-green-700 dark:text-green-400' : 'text-destructive/80'}>
+          <AlertDescription>
             {testResult.success ? (
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
