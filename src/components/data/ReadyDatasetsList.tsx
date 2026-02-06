@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,13 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
 import { 
   CheckCircle, Clock, XCircle, Database, 
   ArrowRight, ShieldCheck, AlertTriangle, FileCheck,
-  GitBranch, History
+  GitBranch, History, ChevronDown, ChevronUp, Loader2
 } from "lucide-react";
 import { format } from "date-fns";
+import { DatasetQualityGate } from "./DatasetQualityGate";
+import { FreshnessIndicator } from "@/components/engines/FreshnessIndicator";
 
 interface Dataset {
   id: string;
@@ -28,6 +31,8 @@ interface Dataset {
   ai_approved_by: string | null;
   version: string | null;
   created_at: string;
+  last_data_update: string | null;
+  freshness_threshold_days: number | null;
 }
 
 const statusConfig: Record<string, { color: string; icon: React.ComponentType<{ className?: string }>; label: string }> = {
