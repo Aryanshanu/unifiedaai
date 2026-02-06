@@ -233,6 +233,7 @@ export function ReadyDatasetsList() {
                   <tr className="border-b border-border bg-muted/30">
                     <th className="text-left p-4 text-xs font-semibold text-muted-foreground uppercase">Dataset</th>
                     <th className="text-center p-4 text-xs font-semibold text-muted-foreground uppercase">Rows</th>
+                    <th className="text-center p-4 text-xs font-semibold text-muted-foreground uppercase">Freshness</th>
                     <th className="text-center p-4 text-xs font-semibold text-muted-foreground uppercase">Impact</th>
                     <th className="text-center p-4 text-xs font-semibold text-muted-foreground uppercase">Status</th>
                     <th className="text-center p-4 text-xs font-semibold text-muted-foreground uppercase">Version</th>
