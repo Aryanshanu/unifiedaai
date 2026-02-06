@@ -44,6 +44,8 @@ const statusConfig: Record<string, { color: string; icon: React.ComponentType<{ 
 
 export function ReadyDatasetsList() {
   const [showApprovedOnly, setShowApprovedOnly] = useState(false);
+  const [expandedGate, setExpandedGate] = useState<string | null>(null);
+  const [gatesPassed, setGatesPassed] = useState<Record<string, boolean>>({});
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -64,6 +66,11 @@ export function ReadyDatasetsList() {
       return data as Dataset[];
     },
   });
+
+  // Handle quality gate readiness callback
+  const handleApprovalReady = (datasetId: string, ready: boolean) => {
+    setGatesPassed(prev => ({ ...prev, [datasetId]: ready }));
+  };
 
   const requestApproval = useMutation({
     mutationFn: async (datasetId: string) => {
