@@ -392,7 +392,7 @@ export function ReadyDatasetsList() {
                           </td>
                         </tr>
                       )}
-                    </>
+                      </React.Fragment>
                     );
                   })}
                 </tbody>
