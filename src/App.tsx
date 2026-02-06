@@ -45,6 +45,7 @@ import ImpactDashboard from "./pages/ImpactDashboard";
 import RegulatoryReports from "./pages/RegulatoryReports";
 import Configuration from "./pages/Configuration";
 import Runbooks from "./pages/Runbooks";
+import AuditCenter from "./pages/AuditCenter";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -115,6 +116,8 @@ const App = () => (
               {/* Configuration & Runbooks */}
               <Route path="/configuration" element={<ProtectedRoute requiredRoles={['admin']}><Configuration /></ProtectedRoute>} />
               <Route path="/runbooks" element={<ProtectedRoute><Runbooks /></ProtectedRoute>} />
+              {/* Audit */}
+              <Route path="/audit-center" element={<ProtectedRoute><AuditCenter /></ProtectedRoute>} />
               {/* Demo */}
               <Route path="/golden" element={<ProtectedRoute><GoldenDemoV2 /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
