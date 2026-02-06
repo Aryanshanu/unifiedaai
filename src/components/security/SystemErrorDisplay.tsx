@@ -119,7 +119,7 @@ export function SystemErrorDisplay({ error, systemName, onRetry }: SystemErrorDi
   const { hint, action } = getErrorHints(error);
 
   return (
-    <Alert className="border-red-300 bg-red-50 dark:bg-red-950/20 dark:border-red-800">
+    <Alert className="border-destructive/50 bg-destructive/10">
       <XCircle className="h-4 w-4 text-red-600" />
       <AlertTitle className="text-red-800 dark:text-red-400">
         Target System Error{systemName && `: ${systemName}`}

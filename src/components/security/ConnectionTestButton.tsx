@@ -89,7 +89,7 @@ export function ConnectionTestButton({ systemId, systemName, className, onSucces
       </Button>
 
       {testResult && (
-        <Alert className={`mt-3 ${testResult.success ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'}`}>
+        <Alert className={`mt-3 ${testResult.success ? 'border-green-500/50 bg-green-50/50 dark:bg-green-950/20' : 'border-destructive/50 bg-destructive/10'}`}>
           {testResult.success ? (
             <CheckCircle className="h-4 w-4 text-green-600" />
           ) : (
