@@ -47,7 +47,6 @@ export function BuiltInTargetButton({
         name: 'Built-in Target (Lovable AI)',
         provider: 'lovable',
         model_name: 'google/gemini-2.5-flash',
-        system_type: 'llm',
         use_case: 'Security testing with built-in fallback - no external API keys required',
       });
 
