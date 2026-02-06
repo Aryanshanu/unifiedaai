@@ -116,6 +116,8 @@ const App = () => (
               {/* Configuration & Runbooks */}
               <Route path="/configuration" element={<ProtectedRoute requiredRoles={['admin']}><Configuration /></ProtectedRoute>} />
               <Route path="/runbooks" element={<ProtectedRoute><Runbooks /></ProtectedRoute>} />
+              {/* Audit */}
+              <Route path="/audit-center" element={<ProtectedRoute><AuditCenter /></ProtectedRoute>} />
               {/* Demo */}
               <Route path="/golden" element={<ProtectedRoute><GoldenDemoV2 /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
