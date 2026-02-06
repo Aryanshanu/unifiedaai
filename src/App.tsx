@@ -45,6 +45,7 @@ import ImpactDashboard from "./pages/ImpactDashboard";
 import RegulatoryReports from "./pages/RegulatoryReports";
 import Configuration from "./pages/Configuration";
 import Runbooks from "./pages/Runbooks";
+import AuditCenter from "./pages/AuditCenter";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
