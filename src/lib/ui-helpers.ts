@@ -17,6 +17,18 @@ export function sanitizeErrorMessage(message: string): string {
     [/RULES_FAILED/i, 'Rule generation failed.'],
     [/EXECUTION_FAILED/i, 'Rule execution failed.'],
     
+    // OpenRouter specific errors - CRITICAL for Core Security
+    [/no endpoints found/i, 'Model unavailable on OpenRouter. Please select a different model or use Built-in Target.'],
+    [/MODEL_UNAVAILABLE/i, 'Selected model is unavailable. Try a different model or Built-in Target.'],
+    [/openrouter.*404/i, 'Model not found on OpenRouter. Check model name or use Built-in Target.'],
+    [/openrouter.*error/i, 'OpenRouter connection failed. Check API key or use Built-in Target.'],
+    
+    // Target executor specific
+    [/target.*unreachable/i, 'Target system unreachable. Check endpoint configuration.'],
+    [/target.*timeout/i, 'Target system timed out. The model may be slow or unavailable.'],
+    [/PROVIDER_ERROR/i, 'Provider returned an error. Check your configuration.'],
+    [/SYSTEM_NOT_FOUND/i, 'Target system not found. Please select a valid system.'],
+    
     // Rate limits (most common user-facing issue)
     [/rate limit/i, 'The model is busy. Please wait a moment and try again.'],
     [/429/i, 'Too many requests. Please wait a moment and try again.'],
@@ -33,15 +45,17 @@ export function sanitizeErrorMessage(message: string): string {
     [/403|forbidden|access denied/i, "You don't have permission for this action."],
     [/jwt/i, 'Session expired. Please sign in again.'],
     
-    // Not found
-    [/404|not found/i, 'The requested item could not be found.'],
+    // Not found - more specific mapping
     [/model not found/i, 'Model not found. Please check your selection.'],
+    [/system not found/i, 'Target system not found. Please select a valid system.'],
+    [/404.*not found/i, 'The requested resource could not be found.'],
     
     // Model/endpoint config errors
     [/not a valid model id/i, 'Model configuration issue. Please update endpoint in Settings.'],
     [/endpoint.*not configured/i, 'Model endpoint not configured. Please update Settings.'],
     [/api.*token.*not configured/i, 'API token not configured. Please update Settings.'],
     [/unable to reach.*model/i, 'Unable to reach the model. Please check configuration.'],
+    [/api key.*required/i, 'API key required. Please configure in Settings or use Built-in Target.'],
     
     // Server errors
     [/500|internal server/i, 'Temporary issue — please try again.'],
