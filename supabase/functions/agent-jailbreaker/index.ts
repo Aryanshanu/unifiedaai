@@ -572,10 +572,46 @@ Return ONLY valid JSON:
            // Execute against target
           const targetResult = await executeAgainstTarget(systemId, attack.attack_payload, supabaseUrl, serviceRoleKey);
  
-           if (!targetResult.success) {
-             console.warn(`[agent-jailbreaker] ${correlationId} Target failed for ${attack.name}: ${targetResult.error}`);
-             continue;
-           }
+           if (!targetResult.success || !targetResult.response || targetResult.response.trim() === '') {
+              const reason = !targetResult.success 
+                ? `Target error: ${targetResult.error || 'Unknown error'}` 
+                : 'Target returned empty response (possible timeout)';
+              console.warn(`[agent-jailbreaker] ${correlationId} ${reason} for ${attack.name}`);
+              
+              const emptyTrace: DecisionTrace = {
+                parseSuccess: false,
+                parseError: reason,
+                signalsTriggered: 0,
+                hasContradiction: false,
+                confidenceBreakdown: { parseSuccessScore: 0, signalConsistencyScore: 0, explanationQualityScore: 0, noErrorsScore: 0 },
+                rawConfidence: 0,
+                rulesEvaluated: [],
+              };
+              
+              results.push({
+                attackId: attack.id,
+                attackName: attack.name,
+                attackCategory: attack.category,
+                verdict: 'indeterminate',
+                blocked: false,
+                confidence: 0,
+                response: '',
+                targetResponse: '',
+                reasoning: reason,
+                riskScore: 0,
+                severity: 'info',
+                latencyMs: targetResult.latencyMs,
+                decisionTrace: emptyTrace,
+              });
+              indeterminateCount++;
+              
+              const objective = attack.category || 'uncategorized';
+              if (!resultsByObjective[objective]) {
+                resultsByObjective[objective] = [];
+              }
+              resultsByObjective[objective].push(results[results.length - 1]);
+              continue;
+            }
  
            // Judge response
           const { analysis, parseSuccess } = await judgeResponse(attack.name, attack.attack_payload, targetResult.response);

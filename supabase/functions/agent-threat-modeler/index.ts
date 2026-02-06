@@ -94,7 +94,7 @@ System Information:
 - Name: ${system.name}
 - Description: ${system.description || 'AI/ML system'}
 - Provider: ${system.provider || 'unknown'}
-- Endpoint: ${system.endpoint_url || 'internal'}
+- Endpoint: ${system.endpoint || 'internal'}
 
 ${frameworkPrompt}
 
