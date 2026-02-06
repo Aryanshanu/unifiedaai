@@ -256,32 +256,49 @@ async function executeOpenRouter(
   
   console.log(`[target-executor][OpenRouter] Calling with model ${model}`);
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://fractal-rai.lovable.app',
-      'X-Title': 'Fractal RAI-OS Security Testing',
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      max_tokens: maxTokens,
-      temperature,
-    }),
-  });
+  // Add timeout for long-running requests
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 55000); // 55 second timeout
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`[target-executor][OpenRouter] Error: ${response.status} - ${errorText.substring(0, 300)}`);
-    return { success: false, error: `OpenRouter API error (${response.status}): ${errorText.substring(0, 200)}` };
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://fractal-rai.lovable.app',
+        'X-Title': 'Fractal RAI-OS Security Testing',
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        max_tokens: maxTokens,
+        temperature,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[target-executor][OpenRouter] Error: ${response.status} - ${errorText.substring(0, 300)}`);
+      return { success: false, error: `OpenRouter API error (${response.status}): ${errorText.substring(0, 200)}` };
+    }
+
+    const result = await response.json();
+    const content = result.choices?.[0]?.message?.content || '';
+    console.log(`[target-executor][OpenRouter] Success, response length: ${content.length}`);
+    return { success: true, response: content };
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err instanceof Error && err.name === 'AbortError') {
+      console.error(`[target-executor][OpenRouter] Request timed out after 55s`);
+      return { success: false, error: 'OpenRouter request timed out. The model may be slow or unavailable.' };
+    }
+    console.error(`[target-executor][OpenRouter] Network error:`, err);
+    return { success: false, error: `OpenRouter network error: ${err instanceof Error ? err.message : 'Unknown error'}` };
   }
-
-  const result = await response.json();
-  const content = result.choices?.[0]?.message?.content || '';
-  console.log(`[target-executor][OpenRouter] Success, response length: ${content.length}`);
-  return { success: true, response: content };
 }
 
 async function executeCustom(
