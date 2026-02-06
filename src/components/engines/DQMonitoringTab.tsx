@@ -258,8 +258,9 @@ export function DQMonitoringTab({ datasetId }: DQMonitoringTabProps) {
                 </p>
               </div>
               <FreshnessIndicator 
-                lastUpdate={dataset.last_data_update} 
-                thresholdDays={dataset.freshness_threshold_days || 7}
+                lastDataUpdate={dataset.last_data_update} 
+                stalenessStatus={dataset.staleness_status}
+                freshnessThresholdDays={dataset.freshness_threshold_days || 7}
               />
             </div>
           </CardContent>
