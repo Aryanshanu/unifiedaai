@@ -322,21 +322,25 @@ import {
  
          {/* Controls */}
          <div className="flex flex-wrap items-center gap-4">
-           <Select value={selectedSystemId} onValueChange={setSelectedSystemId}>
-             <SelectTrigger className="w-[220px]">
-               <SelectValue placeholder="Select target system" />
-             </SelectTrigger>
-             <SelectContent>
-               {systems.map((system) => (
-                 <SelectItem key={system.id} value={system.id}>
-                   <span className="flex items-center gap-2">
-                     {system.name}
-                     <Badge variant="outline" className="text-xs">{system.provider}</Badge>
-                   </span>
-                 </SelectItem>
-               ))}
-             </SelectContent>
-           </Select>
+          <Select value={selectedSystemId} onValueChange={setSelectedSystemId}>
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder="Select target system" />
+            </SelectTrigger>
+            <SelectContent>
+              {systems.map((system) => (
+                <SelectItem key={system.id} value={system.id}>
+                  <span className="flex items-center gap-2">
+                    {system.name}
+                    {system.provider === 'lovable' ? (
+                      <Badge variant="secondary" className="text-xs">Built-in</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-xs">{system.provider}</Badge>
+                    )}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
  
            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
              <SelectTrigger className="w-[180px]">
