@@ -385,17 +385,26 @@ import {
            )}
          </div>
  
-         {/* Target System Info */}
-         {selectedSystem && (
-           <Alert className="border-blue-200 bg-blue-50/50">
-             <Database className="h-4 w-4 text-blue-600" />
-             <AlertTitle className="text-blue-800">Target: {selectedSystem.name}</AlertTitle>
-             <AlertDescription className="text-blue-700">
-               Provider: {selectedSystem.provider} • Model: {selectedSystem.model_name || 'Default'} • 
-               Attacks will be executed against this system in real-time
-             </AlertDescription>
-           </Alert>
-         )}
+        {/* Target System Info */}
+        {selectedSystem && (
+          <Alert className="border-border bg-muted/50">
+            <Database className="h-4 w-4" />
+            <AlertTitle>Target: {selectedSystem.name}</AlertTitle>
+            <AlertDescription>
+              {isBuiltInTarget ? (
+                <span className="flex items-center gap-1.5">
+                  <Shield className="h-3.5 w-3.5" />
+                  Built-in Target (Lovable AI) • Fast, reliable testing without external dependencies
+                </span>
+              ) : (
+                <>
+                  Provider: {selectedSystem.provider} • Model: {selectedSystem.model_name || 'Default'} • 
+                  Attacks will be executed against this system in real-time
+                </>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
  
          {/* Results Summary */}
          {results.length > 0 && (
