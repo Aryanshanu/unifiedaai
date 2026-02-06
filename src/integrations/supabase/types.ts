@@ -607,6 +607,74 @@ export type Database = {
           },
         ]
       }
+      data_drift_alerts: {
+        Row: {
+          baseline_profile_id: string | null
+          baseline_value: Json | null
+          column_name: string
+          created_at: string | null
+          current_profile_id: string | null
+          current_value: Json | null
+          dataset_id: string | null
+          detected_at: string | null
+          drift_type: string
+          drift_value: number | null
+          id: string
+          incident_id: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          status: string | null
+          threshold: number | null
+        }
+        Insert: {
+          baseline_profile_id?: string | null
+          baseline_value?: Json | null
+          column_name: string
+          created_at?: string | null
+          current_profile_id?: string | null
+          current_value?: Json | null
+          dataset_id?: string | null
+          detected_at?: string | null
+          drift_type: string
+          drift_value?: number | null
+          id?: string
+          incident_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity: string
+          status?: string | null
+          threshold?: number | null
+        }
+        Update: {
+          baseline_profile_id?: string | null
+          baseline_value?: Json | null
+          column_name?: string
+          created_at?: string | null
+          current_profile_id?: string | null
+          current_value?: Json | null
+          dataset_id?: string | null
+          detected_at?: string | null
+          drift_type?: string
+          drift_value?: number | null
+          id?: string
+          incident_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          status?: string | null
+          threshold?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_drift_alerts_dataset_id_fkey"
+            columns: ["dataset_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       data_drift_events: {
         Row: {
           baseline_value: Json
@@ -759,6 +827,75 @@ export type Database = {
         }
         Relationships: []
       }
+      data_transformations: {
+        Row: {
+          columns_affected: string[] | null
+          created_at: string | null
+          executed_at: string | null
+          executed_by: string | null
+          id: string
+          metadata: Json | null
+          quality_score_after: number | null
+          quality_score_before: number | null
+          row_count_after: number | null
+          row_count_before: number | null
+          source_dataset_id: string | null
+          target_dataset_id: string | null
+          transformation_logic: string | null
+          transformation_name: string | null
+          transformation_type: string
+        }
+        Insert: {
+          columns_affected?: string[] | null
+          created_at?: string | null
+          executed_at?: string | null
+          executed_by?: string | null
+          id?: string
+          metadata?: Json | null
+          quality_score_after?: number | null
+          quality_score_before?: number | null
+          row_count_after?: number | null
+          row_count_before?: number | null
+          source_dataset_id?: string | null
+          target_dataset_id?: string | null
+          transformation_logic?: string | null
+          transformation_name?: string | null
+          transformation_type: string
+        }
+        Update: {
+          columns_affected?: string[] | null
+          created_at?: string | null
+          executed_at?: string | null
+          executed_by?: string | null
+          id?: string
+          metadata?: Json | null
+          quality_score_after?: number | null
+          quality_score_before?: number | null
+          row_count_after?: number | null
+          row_count_before?: number | null
+          source_dataset_id?: string | null
+          target_dataset_id?: string | null
+          transformation_logic?: string | null
+          transformation_name?: string | null
+          transformation_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_transformations_source_dataset_id_fkey"
+            columns: ["source_dataset_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_transformations_target_dataset_id_fkey"
+            columns: ["target_dataset_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       data_uploads: {
         Row: {
           analysis_details: Json | null
@@ -838,6 +975,62 @@ export type Database = {
             columns: ["contract_id"]
             isOneToOne: false
             referencedRelation: "data_contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dataset_anomalies: {
+        Row: {
+          anomaly_type: string
+          column_name: string
+          created_at: string | null
+          dataset_id: string | null
+          description: string | null
+          detected_at: string | null
+          detected_value: Json | null
+          expected_range: Json | null
+          id: string
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          status: string | null
+        }
+        Insert: {
+          anomaly_type: string
+          column_name: string
+          created_at?: string | null
+          dataset_id?: string | null
+          description?: string | null
+          detected_at?: string | null
+          detected_value?: Json | null
+          expected_range?: Json | null
+          id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity: string
+          status?: string | null
+        }
+        Update: {
+          anomaly_type?: string
+          column_name?: string
+          created_at?: string | null
+          dataset_id?: string | null
+          description?: string | null
+          detected_at?: string | null
+          detected_value?: Json | null
+          expected_range?: Json | null
+          id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dataset_anomalies_dataset_id_fkey"
+            columns: ["dataset_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
             referencedColumns: ["id"]
           },
         ]
@@ -1066,6 +1259,7 @@ export type Database = {
           id: string
           ingested_row_count: number
           jurisdiction: string[] | null
+          last_data_update: string | null
           name: string
           owner_id: string | null
           retention_days: number | null
@@ -1074,6 +1268,7 @@ export type Database = {
           source: string
           source_id: string | null
           source_url: string | null
+          staleness_status: string | null
           updated_at: string
           version: string | null
         }
@@ -1091,6 +1286,7 @@ export type Database = {
           id?: string
           ingested_row_count?: number
           jurisdiction?: string[] | null
+          last_data_update?: string | null
           name: string
           owner_id?: string | null
           retention_days?: number | null
@@ -1099,6 +1295,7 @@ export type Database = {
           source: string
           source_id?: string | null
           source_url?: string | null
+          staleness_status?: string | null
           updated_at?: string
           version?: string | null
         }
@@ -1116,6 +1313,7 @@ export type Database = {
           id?: string
           ingested_row_count?: number
           jurisdiction?: string[] | null
+          last_data_update?: string | null
           name?: string
           owner_id?: string | null
           retention_days?: number | null
@@ -1124,6 +1322,7 @@ export type Database = {
           source?: string
           source_id?: string | null
           source_url?: string | null
+          staleness_status?: string | null
           updated_at?: string
           version?: string | null
         }
