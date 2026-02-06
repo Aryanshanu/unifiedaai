@@ -422,20 +422,22 @@ function detectProviderFromEndpoint(endpoint: string | null, currentProvider: st
 // ============================================================================
 
 function extractModelFromOpenRouterUrl(endpoint: string, modelName: string | null): string {
-  // If model_name is already set, use it
-  if (modelName && modelName.trim()) {
+  // If model_name looks like a valid OpenRouter model ID (contains /), use it
+  if (modelName && modelName.trim() && modelName.includes('/')) {
     return modelName;
   }
   
-  // Try to extract model from URL path like https://openrouter.ai/qwen/qwen3-235b-a22b:free
+  // model_name is missing or invalid (e.g. "Gemma" instead of "google/gemma-3n-e4b-it")
+  // Try to extract model from URL path like https://openrouter.ai/google/gemma-3n-e4b-it
   const urlMatch = endpoint.match(/openrouter\.ai\/([^/]+\/[^/?\s]+)/);
   if (urlMatch) {
     const extractedModel = urlMatch[1];
-    console.log(`[target-executor] Extracted model from URL: ${extractedModel}`);
+    console.log(`[target-executor] model_name "${modelName}" is not a valid OpenRouter ID, extracted from URL: ${extractedModel}`);
     return extractedModel;
   }
   
   // Default fallback
+  console.warn(`[target-executor] Could not resolve OpenRouter model from name="${modelName}" or endpoint="${endpoint}", using fallback`);
   return 'openai/gpt-4o-mini';
 }
 
