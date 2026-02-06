@@ -246,7 +246,7 @@ export function ReadyDatasetsList() {
                     const StatusIcon = status.icon;
                     
                     return (
-                      <tr key={dataset.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
+                      <>
                         <td className="p-4">
                           <div className="flex items-center gap-3">
                             <div className="p-2 rounded-lg bg-secondary">
