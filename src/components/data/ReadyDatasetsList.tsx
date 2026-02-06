@@ -264,6 +264,14 @@ export function ReadyDatasetsList() {
                           {(dataset.row_count || 0).toLocaleString()}
                         </td>
                         <td className="p-4 text-center">
+                          <FreshnessIndicator 
+                            lastDataUpdate={dataset.last_data_update}
+                            stalenessStatus={null}
+                            freshnessThresholdDays={dataset.freshness_threshold_days || 7}
+                            size="sm"
+                          />
+                        </td>
+                        <td className="p-4 text-center">
                           {dataset.business_impact ? (
                             <Badge variant={
                               dataset.business_impact === "high" ? "destructive" :
