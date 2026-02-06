@@ -374,6 +374,25 @@ export function ReadyDatasetsList() {
                           </div>
                         </td>
                       </tr>
+                      {/* Quality Gate Expansion Row */}
+                      {dataset.ai_approval_status === "pending" && expandedGate === dataset.id && (
+                        <tr className="bg-muted/10">
+                          <td colSpan={7} className="p-4">
+                            <DatasetQualityGate 
+                              datasetId={dataset.id}
+                              onApprovalReady={(ready) => handleApprovalReady(dataset.id, ready)}
+                              showActions={false}
+                            />
+                            {!gatesPassed[dataset.id] && (
+                              <div className="mt-3 flex items-center gap-2 text-sm text-destructive">
+                                <AlertTriangle className="h-4 w-4" />
+                                Quality gates must pass before approval
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </>
                     );
                   })}
                 </tbody>
