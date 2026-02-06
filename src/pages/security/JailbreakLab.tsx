@@ -9,11 +9,12 @@ import { Textarea } from '@/components/ui/textarea';
  import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
  import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
- import { 
-   FlaskConical, Play, Zap, Search, RefreshCw, Shield, ShieldX, Download, 
+import { 
+  FlaskConical, Play, Zap, Search, RefreshCw, Shield, ShieldX, Download, 
   AlertTriangle, ChevronDown, ChevronUp, Clock, ExternalLink, ServerCrash, Database,
   HelpCircle, Send
- } from 'lucide-react';
+} from 'lucide-react';
+import { BuiltInTargetButton, BuiltInTargetBanner } from '@/components/security/BuiltInTargetButton';
  import { useSystems } from '@/hooks/useSystems';
  import { useAttackLibrary, Attack } from '@/hooks/useAttackLibrary';
  import { useSecurityFindings } from '@/hooks/useSecurityFindings';
