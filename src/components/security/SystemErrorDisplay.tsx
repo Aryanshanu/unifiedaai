@@ -120,12 +120,12 @@ export function SystemErrorDisplay({ error, systemName, onRetry }: SystemErrorDi
 
   return (
     <Alert className="border-destructive/50 bg-destructive/10">
-      <XCircle className="h-4 w-4 text-red-600" />
-      <AlertTitle className="text-red-800 dark:text-red-400">
+      <XCircle className="h-4 w-4 text-destructive" />
+      <AlertTitle className="text-destructive">
         Target System Error{systemName && `: ${systemName}`}
       </AlertTitle>
-      <AlertDescription className="text-red-700 dark:text-red-300 space-y-2">
-        <p className="font-mono text-sm">{error}</p>
+      <AlertDescription className="text-muted-foreground space-y-2">
+        <p className="font-mono text-sm text-destructive/90">{error}</p>
         <p className="text-sm">{hint}</p>
         {action}
       </AlertDescription>

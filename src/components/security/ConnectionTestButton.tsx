@@ -95,10 +95,10 @@ export function ConnectionTestButton({ systemId, systemName, className, onSucces
           ) : (
             <XCircle className="h-4 w-4 text-destructive" />
           )}
-          <AlertTitle className={testResult.success ? 'text-green-800' : 'text-red-800'}>
+          <AlertTitle className={testResult.success ? 'text-green-800 dark:text-green-300' : 'text-destructive'}>
             {testResult.success ? 'Connection Successful' : 'Connection Failed'}
           </AlertTitle>
-          <AlertDescription className={testResult.success ? 'text-green-700' : 'text-red-700'}>
+          <AlertDescription className={testResult.success ? 'text-green-700 dark:text-green-400' : 'text-destructive/80'}>
             {testResult.success ? (
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
