@@ -246,152 +246,153 @@ export function ReadyDatasetsList() {
                     const StatusIcon = status.icon;
                     
                     return (
-                      <>
-                        <td className="p-4">
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-secondary">
-                              <Database className="h-4 w-4 text-primary" />
+                      <React.Fragment key={dataset.id}>
+                        <tr className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-lg bg-secondary">
+                                <Database className="h-4 w-4 text-primary" />
+                              </div>
+                              <div>
+                                <p className="font-medium">{dataset.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {dataset.source} • {dataset.sensitivity_level || "Unknown"} sensitivity
+                                </p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="font-medium">{dataset.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {dataset.source} • {dataset.sensitivity_level || "Unknown"} sensitivity
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="p-4 text-center text-sm">
-                          {(dataset.row_count || 0).toLocaleString()}
-                        </td>
-                        <td className="p-4 text-center">
-                          <FreshnessIndicator 
-                            lastDataUpdate={dataset.last_data_update}
-                            stalenessStatus={null}
-                            freshnessThresholdDays={dataset.freshness_threshold_days || 7}
-                            size="sm"
-                          />
-                        </td>
-                        <td className="p-4 text-center">
-                          {dataset.business_impact ? (
-                            <Badge variant={
-                              dataset.business_impact === "high" ? "destructive" :
-                              dataset.business_impact === "medium" ? "default" : "secondary"
-                            }>
-                              {dataset.business_impact}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">—</span>
-                          )}
-                        </td>
-                        <td className="p-4 text-center">
-                          <Badge variant="outline" className={status.color}>
-                            <StatusIcon className="h-3 w-3 mr-1" />
-                            {status.label}
-                          </Badge>
-                        </td>
-                        <td className="p-4 text-center text-sm text-muted-foreground">
-                          v{dataset.version || "1.0"}
-                        </td>
-                        <td className="p-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            {dataset.ai_approval_status === "draft" && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => requestApproval.mutate(dataset.id)}
-                                disabled={requestApproval.isPending}
-                              >
-                                <FileCheck className="h-3.5 w-3.5 mr-1" />
-                                Request Approval
-                              </Button>
+                          </td>
+                          <td className="p-4 text-center text-sm">
+                            {(dataset.row_count || 0).toLocaleString()}
+                          </td>
+                          <td className="p-4 text-center">
+                            <FreshnessIndicator 
+                              lastDataUpdate={dataset.last_data_update}
+                              stalenessStatus={null}
+                              freshnessThresholdDays={dataset.freshness_threshold_days || 7}
+                              size="sm"
+                            />
+                          </td>
+                          <td className="p-4 text-center">
+                            {dataset.business_impact ? (
+                              <Badge variant={
+                                dataset.business_impact === "high" ? "destructive" :
+                                dataset.business_impact === "medium" ? "default" : "secondary"
+                              }>
+                                {dataset.business_impact}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">—</span>
                             )}
-                            {dataset.ai_approval_status === "pending" && (
-                              <div className="space-y-2">
+                          </td>
+                          <td className="p-4 text-center">
+                            <Badge variant="outline" className={status.color}>
+                              <StatusIcon className="h-3 w-3 mr-1" />
+                              {status.label}
+                            </Badge>
+                          </td>
+                          <td className="p-4 text-center text-sm text-muted-foreground">
+                            v{dataset.version || "1.0"}
+                          </td>
+                          <td className="p-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {dataset.ai_approval_status === "draft" && (
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => setExpandedGate(expandedGate === dataset.id ? null : dataset.id)}
+                                  onClick={() => requestApproval.mutate(dataset.id)}
+                                  disabled={requestApproval.isPending}
                                 >
-                                  {expandedGate === dataset.id ? (
-                                    <ChevronUp className="h-3.5 w-3.5 mr-1" />
-                                  ) : (
-                                    <ChevronDown className="h-3.5 w-3.5 mr-1" />
-                                  )}
-                                  Quality Gate
+                                  <FileCheck className="h-3.5 w-3.5 mr-1" />
+                                  Request Approval
                                 </Button>
-                                {gatesPassed[dataset.id] && (
-                                  <div className="flex items-center gap-2">
-                                    <Button
-                                      size="sm"
-                                      onClick={() => approveDataset.mutate(dataset.id)}
-                                      disabled={approveDataset.isPending}
-                                    >
-                                      {approveDataset.isPending ? (
-                                        <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
-                                      ) : (
-                                        <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                                      )}
-                                      Approve
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="destructive"
-                                      onClick={() => rejectDataset.mutate(dataset.id)}
-                                      disabled={rejectDataset.isPending}
-                                    >
-                                      <XCircle className="h-3.5 w-3.5 mr-1" />
-                                      Reject
-                                    </Button>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            {dataset.ai_approval_status === "approved" && (
-                              <div className="flex items-center gap-2">
-                                <Badge variant="outline" className="bg-success/10 text-success border-success/20">
-                                  <ShieldCheck className="h-3 w-3 mr-1" />
-                                  Ready for AI
-                                </Badge>
+                              )}
+                              {dataset.ai_approval_status === "pending" && (
+                                <div className="space-y-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setExpandedGate(expandedGate === dataset.id ? null : dataset.id)}
+                                  >
+                                    {expandedGate === dataset.id ? (
+                                      <ChevronUp className="h-3.5 w-3.5 mr-1" />
+                                    ) : (
+                                      <ChevronDown className="h-3.5 w-3.5 mr-1" />
+                                    )}
+                                    Quality Gate
+                                  </Button>
+                                  {gatesPassed[dataset.id] && (
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        size="sm"
+                                        onClick={() => approveDataset.mutate(dataset.id)}
+                                        disabled={approveDataset.isPending}
+                                      >
+                                        {approveDataset.isPending ? (
+                                          <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                                        ) : (
+                                          <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                                        )}
+                                        Approve
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        onClick={() => rejectDataset.mutate(dataset.id)}
+                                        disabled={rejectDataset.isPending}
+                                      >
+                                        <XCircle className="h-3.5 w-3.5 mr-1" />
+                                        Reject
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              {dataset.ai_approval_status === "approved" && (
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="bg-success/10 text-success border-success/20">
+                                    <ShieldCheck className="h-3 w-3 mr-1" />
+                                    Ready for AI
+                                  </Badge>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => navigate(`/lineage?dataset=${dataset.id}`)}
+                                    title="View Lineage"
+                                  >
+                                    <GitBranch className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              )}
+                              {dataset.ai_approval_status === "rejected" && (
                                 <Button
                                   size="sm"
-                                  variant="ghost"
-                                  onClick={() => navigate(`/lineage?dataset=${dataset.id}`)}
-                                  title="View Lineage"
+                                  variant="outline"
+                                  onClick={() => requestApproval.mutate(dataset.id)}
                                 >
-                                  <GitBranch className="h-3.5 w-3.5" />
+                                  Re-submit
                                 </Button>
-                              </div>
-                            )}
-                            {dataset.ai_approval_status === "rejected" && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => requestApproval.mutate(dataset.id)}
-                              >
-                                Re-submit
-                              </Button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                      {/* Quality Gate Expansion Row */}
-                      {dataset.ai_approval_status === "pending" && expandedGate === dataset.id && (
-                        <tr className="bg-muted/10">
-                          <td colSpan={7} className="p-4">
-                            <DatasetQualityGate 
-                              datasetId={dataset.id}
-                              onApprovalReady={(ready) => handleApprovalReady(dataset.id, ready)}
-                              showActions={false}
-                            />
-                            {!gatesPassed[dataset.id] && (
-                              <div className="mt-3 flex items-center gap-2 text-sm text-destructive">
-                                <AlertTriangle className="h-4 w-4" />
-                                Quality gates must pass before approval
-                              </div>
-                            )}
+                              )}
+                            </div>
                           </td>
                         </tr>
-                      )}
+                        {/* Quality Gate Expansion Row */}
+                        {dataset.ai_approval_status === "pending" && expandedGate === dataset.id && (
+                          <tr className="bg-muted/10">
+                            <td colSpan={7} className="p-4">
+                              <DatasetQualityGate 
+                                datasetId={dataset.id}
+                                onApprovalReady={(ready) => handleApprovalReady(dataset.id, ready)}
+                                showActions={false}
+                              />
+                              {!gatesPassed[dataset.id] && (
+                                <div className="mt-3 flex items-center gap-2 text-sm text-destructive">
+                                  <AlertTriangle className="h-4 w-4" />
+                                  Quality gates must pass before approval
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        )}
                       </React.Fragment>
                     );
                   })}
