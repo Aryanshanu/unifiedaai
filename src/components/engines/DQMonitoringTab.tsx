@@ -104,7 +104,13 @@ export function DQMonitoringTab({ datasetId }: DQMonitoringTabProps) {
         .eq('id', datasetId)
         .single();
       if (error) throw error;
-      return data;
+      return data as { 
+        id: string; 
+        name: string; 
+        last_data_update: string | null; 
+        freshness_threshold_days: number | null; 
+        staleness_status: string | null;
+      };
     },
     enabled: !!datasetId,
   });
