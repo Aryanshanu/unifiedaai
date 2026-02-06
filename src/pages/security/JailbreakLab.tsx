@@ -281,28 +281,28 @@ import {
      toast.success('Results exported successfully');
    };
  
-   // Empty states
-   if (systems.length === 0 && !systemsQuery.isLoading) {
-     return (
-       <MainLayout title="Jailbreak Lab" subtitle="Adversarial attack testing">
-         <div className="p-6">
-           <Alert className="border-yellow-500 bg-yellow-50">
-             <AlertTriangle className="h-4 w-4 text-yellow-600" />
-             <AlertTitle>No Target Systems Configured</AlertTitle>
-             <AlertDescription className="mt-2">
-               <p>You need to configure at least one AI system to test.</p>
-               <Button asChild className="mt-3" variant="outline">
-                 <Link to="/models">
-                   <ServerCrash className="h-4 w-4 mr-2" />
-                   Configure Target System
-                 </Link>
-               </Button>
-             </AlertDescription>
-           </Alert>
-         </div>
-       </MainLayout>
-     );
-   }
+  // Empty states
+  const isBuiltInTarget = selectedSystem?.provider === 'lovable';
+
+  if (systems.length === 0 && !systemsQuery.isLoading) {
+    return (
+      <MainLayout title="Jailbreak Lab" subtitle="Adversarial attack testing">
+        <div className="p-6 space-y-4">
+          <BuiltInTargetBanner 
+            showWhen="no-systems" 
+            onCreated={(id) => setSelectedSystemId(id)} 
+          />
+          <Alert className="border-border">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>No Target Systems Configured</AlertTitle>
+            <AlertDescription className="mt-2">
+              <p>You need to configure at least one AI system to test. Use the Built-in Target above for quick testing without external APIs.</p>
+            </AlertDescription>
+          </Alert>
+        </div>
+      </MainLayout>
+    );
+  }
  
    return (
      <MainLayout title="Jailbreak Lab" subtitle="Adversarial attack testing">
