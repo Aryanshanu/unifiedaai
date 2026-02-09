@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { safeValidateArray, DriftAlertSchema } from '@/lib/api-validators';
 
 interface DriftAlert {
   id: string;
@@ -44,7 +45,7 @@ export function useDriftAlerts(systemId?: string, page = 1, pageSize = 50) {
       const { data, error, count } = await query.range(start, start + pageSize - 1);
       
       if (error) throw error;
-      return { data: data as DriftAlert[], totalCount: count ?? 0, hasMore: (count ?? 0) > start + pageSize };
+      return { data: safeValidateArray(DriftAlertSchema, data ?? [], 'drift-alerts'), totalCount: count ?? 0, hasMore: (count ?? 0) > start + pageSize };
     },
   });
 }

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { safeValidateArray, IncidentSchema } from '@/lib/api-validators';
 
 export type SeverityLevel = 'low' | 'medium' | 'high' | 'critical';
 export type IncidentStatus = 'open' | 'investigating' | 'mitigating' | 'resolved';
@@ -44,7 +45,7 @@ export function useIncidents(filters?: { status?: IncidentStatus; severity?: Sev
       
       const { data, error, count } = await query.range(start, start + pageSize - 1);
       if (error) throw error;
-      return { data: data as Incident[], totalCount: count ?? 0, hasMore: (count ?? 0) > start + pageSize };
+      return { data: safeValidateArray(IncidentSchema, data ?? [], 'incidents') as unknown as Incident[], totalCount: count ?? 0, hasMore: (count ?? 0) > start + pageSize };
     },
   });
 }

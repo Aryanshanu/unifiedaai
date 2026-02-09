@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import { safeValidateArray, PolicyPackSchema } from '@/lib/api-validators';
 
 export type PolicyStatus = 'draft' | 'active' | 'disabled';
 export type CampaignStatus = 'draft' | 'running' | 'completed' | 'paused';
@@ -52,7 +53,7 @@ export function usePolicyPacks() {
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      return data as PolicyPack[];
+      return safeValidateArray(PolicyPackSchema, data ?? [], 'policy-packs');
     },
   });
 }
