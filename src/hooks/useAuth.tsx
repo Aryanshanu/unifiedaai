@@ -57,9 +57,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    let initialSessionHandled = false;
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        initialSessionHandled = true;
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -78,8 +81,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    // THEN check for existing session
+    // THEN check for existing session - only if listener hasn't fired yet
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (initialSessionHandled) return; // Listener already handled it
+      
       setSession(session);
       setUser(session?.user ?? null);
       

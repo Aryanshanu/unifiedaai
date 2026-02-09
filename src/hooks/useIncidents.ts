@@ -21,14 +21,18 @@ export interface Incident {
   archived_by?: string | null;
 }
 
-export function useIncidents(filters?: { status?: IncidentStatus; severity?: SeverityLevel }) {
+export function useIncidents(filters?: { status?: IncidentStatus; severity?: SeverityLevel; page?: number; pageSize?: number }) {
+  const page = filters?.page ?? 1;
+  const pageSize = filters?.pageSize ?? 100;
+
   return useQuery({
     queryKey: ['incidents', filters],
     queryFn: async () => {
+      const start = (page - 1) * pageSize;
       let query = supabase
         .from('incidents')
-        .select('*')
-        .is('archived_at', null) // Exclude archived incidents
+        .select('*', { count: 'exact' })
+        .is('archived_at', null)
         .order('created_at', { ascending: false });
       
       if (filters?.status) {
@@ -38,9 +42,9 @@ export function useIncidents(filters?: { status?: IncidentStatus; severity?: Sev
         query = query.eq('severity', filters.severity);
       }
       
-      const { data, error } = await query;
+      const { data, error, count } = await query.range(start, start + pageSize - 1);
       if (error) throw error;
-      return data as Incident[];
+      return { data: data as Incident[], totalCount: count ?? 0, hasMore: (count ?? 0) > start + pageSize };
     },
   });
 }

@@ -27,23 +27,24 @@ interface DriftDetectionResult {
   };
 }
 
-export function useDriftAlerts(systemId?: string) {
+export function useDriftAlerts(systemId?: string, page = 1, pageSize = 50) {
   return useQuery({
-    queryKey: ['drift-alerts', systemId],
+    queryKey: ['drift-alerts', systemId, page],
     queryFn: async () => {
+      const start = (page - 1) * pageSize;
       let query = supabase
         .from('drift_alerts')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('detected_at', { ascending: false });
       
       if (systemId) {
         query = query.eq('model_id', systemId);
       }
       
-      const { data, error } = await query.limit(50);
+      const { data, error, count } = await query.range(start, start + pageSize - 1);
       
       if (error) throw error;
-      return data as DriftAlert[];
+      return { data: data as DriftAlert[], totalCount: count ?? 0, hasMore: (count ?? 0) > start + pageSize };
     },
   });
 }

@@ -37,12 +37,25 @@ export default function Governance() {
     refetchAttestations();
   };
 
-  // Control groups for compliance gauge - use actual compliant count per framework
+  // Build Map indexes for O(1) lookups instead of O(n²) nested finds
+  const controlMap = new Map(controls?.map(c => [c.id, c]) || []);
+  const assessmentsByFramework = new Map<string, typeof controlAssessments>();
+  controlAssessments?.forEach(a => {
+    const control = controlMap.get(a.control_id);
+    if (!control) return;
+    const fId = control.framework_id;
+    if (!assessmentsByFramework.has(fId)) {
+      assessmentsByFramework.set(fId, []);
+    }
+    assessmentsByFramework.get(fId)!.push(a);
+  });
+
+  // Build assessment lookup by control_id for pending controls
+  const assessmentByControl = new Map(controlAssessments?.map(a => [a.control_id, a]) || []);
+
+  // Control groups for compliance gauge - O(n) with Map
   const controlGroups = frameworks?.map(f => {
-    const frameworkAssessments = controlAssessments?.filter(a => {
-      const control = controls?.find(c => c.id === a.control_id);
-      return control?.framework_id === f.id;
-    }) || [];
+    const frameworkAssessments = assessmentsByFramework.get(f.id) || [];
     const satisfied = frameworkAssessments.filter(a => a.status === 'compliant').length;
     return {
       name: f.name,
@@ -51,10 +64,9 @@ export default function Governance() {
     };
   }) || [];
 
-  // Get pending controls (not compliant) - check actual assessments
+  // Get pending controls - O(n) with Map lookup
   const pendingControls = controls?.filter(control => {
-    const assessment = controlAssessments?.find(a => a.control_id === control.id);
-    // Show control if no assessment or if not compliant
+    const assessment = assessmentByControl.get(control.id);
     return !assessment || assessment.status !== 'compliant';
   }).slice(0, 5) || [];
 

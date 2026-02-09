@@ -26,8 +26,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EnforcementBadge } from "@/components/shared/EnforcementBadge";
 
 function getModelStatus(model: Model): "healthy" | "warning" | "critical" {
-  const fairness = model.fairness_score ?? 100;
-  const robustness = model.robustness_score ?? 100;
+  // No fake defaults - if no scores exist, show warning (unevaluated)
+  if (model.fairness_score === null && model.robustness_score === null) {
+    return "warning";
+  }
+  // Use Infinity for null scores so only real scores participate in Math.min
+  const fairness = model.fairness_score ?? Infinity;
+  const robustness = model.robustness_score ?? Infinity;
   const minScore = Math.min(fairness, robustness);
   
   if (minScore < 60) return "critical";

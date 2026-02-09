@@ -188,3 +188,19 @@ export function getComplianceConfig(status: string | null | undefined): Complian
   const normalized = status?.toLowerCase().replace(/[_\s]/g, "-") as ComplianceLevel;
   return FRACTAL_COMPLIANCE[normalized] || FRACTAL_COMPLIANCE["not-assessed"];
 }
+
+// =============================================================================
+// CHART COLORS - CSS variable-based, theme-aware
+// =============================================================================
+
+export const CHART_COLORS = {
+  primary: "hsl(var(--primary))",
+  success: "hsl(var(--success))",
+  warning: "hsl(173, 80%, 45%)", // Fractal teal accent
+  danger: "hsl(var(--destructive))",
+  muted: "hsl(var(--muted-foreground))",
+  accent: "hsl(var(--accent))",
+  riskCritical: "hsl(var(--risk-critical))",
+  riskHigh: "hsl(var(--risk-high))",
+  riskMedium: "hsl(var(--risk-medium))",
+} as const;
