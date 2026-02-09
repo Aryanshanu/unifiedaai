@@ -442,7 +442,7 @@ export function enforceDataQualityTruth(data: {
   let percentagesChecked = 0;
   let ratiosChecked = 0;
   let countsChecked = 0;
-  const numericFailures = 0;
+  let numericFailures = 0;
   
   // Validate all metrics
   if (data.metrics) {
