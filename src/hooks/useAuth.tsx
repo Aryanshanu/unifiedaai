@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -99,7 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string, fullName?: string) => {
+  const signUp = useCallback(async (email: string, password: string, fullName?: string) => {
     const redirectUrl = `${window.location.origin}/`;
     
     const { error } = await supabase.auth.signUp({
@@ -114,43 +114,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     
     return { error };
-  };
+  }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     
     return { error };
-  };
+  }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
     setProfile(null);
     setRoles([]);
-  };
+  }, []);
 
-  const hasRole = (role: AppRole) => roles.includes(role);
+  const hasRole = useCallback((role: AppRole) => roles.includes(role), [roles]);
   
-  const hasAnyRole = (checkRoles: AppRole[]) => 
-    checkRoles.some(role => roles.includes(role));
+  const hasAnyRole = useCallback((checkRoles: AppRole[]) => 
+    checkRoles.some(role => roles.includes(role)), [roles]);
+
+  const value = useMemo(() => ({
+    user,
+    session,
+    profile,
+    roles,
+    loading,
+    signUp,
+    signIn,
+    signOut,
+    hasRole,
+    hasAnyRole,
+  }), [user, session, profile, roles, loading, signUp, signIn, signOut, hasRole, hasAnyRole]);
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      session,
-      profile,
-      roles,
-      loading,
-      signUp,
-      signIn,
-      signOut,
-      hasRole,
-      hasAnyRole,
-    }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

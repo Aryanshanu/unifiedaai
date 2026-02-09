@@ -196,7 +196,7 @@ export function getComplianceConfig(status: string | null | undefined): Complian
 export const CHART_COLORS = {
   primary: "hsl(var(--primary))",
   success: "hsl(var(--success))",
-  warning: "hsl(173, 80%, 45%)", // Fractal teal accent
+  warning: "hsl(var(--warning))",
   danger: "hsl(var(--destructive))",
   muted: "hsl(var(--muted-foreground))",
   accent: "hsl(var(--accent))",

@@ -54,7 +54,7 @@ function getRiskLevel(model: ModelWithSystem): "minimal" | "limited" | "high" | 
   
   const fairness = model.fairness_score;
   const robustness = model.robustness_score;
-  const minScore = Math.min(fairness ?? 100, robustness ?? 100);
+  const minScore = Math.min(fairness ?? Infinity, robustness ?? Infinity);
   if (minScore >= 80) return 'minimal';
   if (minScore >= 60) return 'limited';
   if (minScore >= 40) return 'high';

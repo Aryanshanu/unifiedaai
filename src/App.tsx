@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,47 +9,66 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ErrorBoundary } from "@/components/error/ErrorBoundary";
 import { GlobalBanner } from "@/components/layout/GlobalBanner";
 import { SidebarProvider } from "@/contexts/SidebarContext";
-import Auth from "./pages/Auth";
-import Index from "./pages/Index";
-import Error from "./pages/Error";
-import Projects from "./pages/Projects";
-import ProjectDetail from "./pages/ProjectDetail";
-import SystemDetail from "./pages/SystemDetail";
-import Models from "./pages/Models";
-import ModelDetail from "./pages/ModelDetail";
-import Approvals from "./pages/Approvals";
-import HITL from "./pages/HITL";
-import Incidents from "./pages/Incidents";
-import Lineage from "./pages/Lineage";
-import Observability from "./pages/Observability";
-import Alerts from "./pages/Alerts";
-import Policy from "./pages/Policy";
-import FairnessEngine from "./pages/engines/FairnessEngine";
-import HallucinationEngine from "./pages/engines/HallucinationEngine";
-import ToxicityEngine from "./pages/engines/ToxicityEngine";
-import PrivacyEngine from "./pages/engines/PrivacyEngine";
-import ExplainabilityEngine from "./pages/engines/ExplainabilityEngine";
-import DataQualityEngine from "./pages/engines/DataQualityEngine";
-import DataContracts from "./pages/DataContracts";
-import SecurityDashboard from "./pages/security/SecurityDashboard";
-import Pentesting from "./pages/security/Pentesting";
-import JailbreakLab from "./pages/security/JailbreakLab";
-import ThreatModeling from "./pages/security/ThreatModeling";
-import AttackLibrary from "./pages/security/AttackLibrary";
-import Settings from "./pages/Settings";
-import Documentation from "./pages/Documentation";
-import Governance from "./pages/Governance";
-import Evaluation from "./pages/Evaluation";
-import GoldenDemoV2 from "./pages/GoldenDemoV2";
-import DecisionLedger from "./pages/DecisionLedger";
-import ImpactDashboard from "./pages/ImpactDashboard";
-import RegulatoryReports from "./pages/RegulatoryReports";
-import Configuration from "./pages/Configuration";
-import Runbooks from "./pages/Runbooks";
-import AuditCenter from "./pages/AuditCenter";
-import NotFound from "./pages/NotFound";
+import { Loader2 } from "lucide-react";
 
-const queryClient = new QueryClient();
+// Lazy-loaded pages
+const Auth = lazy(() => import("./pages/Auth"));
+const Index = lazy(() => import("./pages/Index"));
+const Error = lazy(() => import("./pages/Error"));
+const Projects = lazy(() => import("./pages/Projects"));
+const ProjectDetail = lazy(() => import("./pages/ProjectDetail"));
+const SystemDetail = lazy(() => import("./pages/SystemDetail"));
+const Models = lazy(() => import("./pages/Models"));
+const ModelDetail = lazy(() => import("./pages/ModelDetail"));
+const Approvals = lazy(() => import("./pages/Approvals"));
+const HITL = lazy(() => import("./pages/HITL"));
+const Incidents = lazy(() => import("./pages/Incidents"));
+const Lineage = lazy(() => import("./pages/Lineage"));
+const Observability = lazy(() => import("./pages/Observability"));
+const Alerts = lazy(() => import("./pages/Alerts"));
+const Policy = lazy(() => import("./pages/Policy"));
+const FairnessEngine = lazy(() => import("./pages/engines/FairnessEngine"));
+const HallucinationEngine = lazy(() => import("./pages/engines/HallucinationEngine"));
+const ToxicityEngine = lazy(() => import("./pages/engines/ToxicityEngine"));
+const PrivacyEngine = lazy(() => import("./pages/engines/PrivacyEngine"));
+const ExplainabilityEngine = lazy(() => import("./pages/engines/ExplainabilityEngine"));
+const DataQualityEngine = lazy(() => import("./pages/engines/DataQualityEngine"));
+const DataContracts = lazy(() => import("./pages/DataContracts"));
+const SecurityDashboard = lazy(() => import("./pages/security/SecurityDashboard"));
+const Pentesting = lazy(() => import("./pages/security/Pentesting"));
+const JailbreakLab = lazy(() => import("./pages/security/JailbreakLab"));
+const ThreatModeling = lazy(() => import("./pages/security/ThreatModeling"));
+const AttackLibrary = lazy(() => import("./pages/security/AttackLibrary"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Documentation = lazy(() => import("./pages/Documentation"));
+const Governance = lazy(() => import("./pages/Governance"));
+const Evaluation = lazy(() => import("./pages/Evaluation"));
+const GoldenDemoV2 = lazy(() => import("./pages/GoldenDemoV2"));
+const DecisionLedger = lazy(() => import("./pages/DecisionLedger"));
+const ImpactDashboard = lazy(() => import("./pages/ImpactDashboard"));
+const RegulatoryReports = lazy(() => import("./pages/RegulatoryReports"));
+const Configuration = lazy(() => import("./pages/Configuration"));
+const Runbooks = lazy(() => import("./pages/Runbooks"));
+const AuditCenter = lazy(() => import("./pages/AuditCenter"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      retry: 2,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
+function PageFallback() {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <Loader2 className="w-8 h-8 text-primary animate-spin" />
+    </div>
+  );
+}
 
 const App = () => (
   <ErrorBoundary>
@@ -60,74 +80,76 @@ const App = () => (
             <Sonner />
             <BrowserRouter>
               <GlobalBanner />
-              <Routes>
-                <Route path="/auth" element={<Auth />} />
-              <Route path="/error" element={<Error />} />
-              <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-              {/* Project & System Registry */}
-              <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
-              <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetail /></ProtectedRoute>} />
-              <Route path="/systems/:id" element={<ProtectedRoute><SystemDetail /></ProtectedRoute>} />
-              <Route path="/models" element={<ProtectedRoute><Models /></ProtectedRoute>} />
-              <Route path="/models/:id" element={<ProtectedRoute><ModelDetail /></ProtectedRoute>} />
-              {/* Governance */}
-              <Route path="/governance" element={<ProtectedRoute><Governance /></ProtectedRoute>} />
-              <Route path="/governance/approvals" element={
-                <ProtectedRoute requiredRoles={['admin', 'reviewer']}>
-                  <Approvals />
-                </ProtectedRoute>
-              } />
-              <Route path="/hitl" element={<ProtectedRoute><HITL /></ProtectedRoute>} />
-              <Route path="/decision-ledger" element={<ProtectedRoute><DecisionLedger /></ProtectedRoute>} />
-              <Route path="/incidents" element={<ProtectedRoute><Incidents /></ProtectedRoute>} />
-              {/* Knowledge Graph */}
-              <Route path="/lineage" element={<ProtectedRoute><Lineage /></ProtectedRoute>} />
-              {/* Monitoring */}
-              <Route path="/observability" element={<ProtectedRoute><Observability /></ProtectedRoute>} />
-              <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
-              <Route path="/evaluation" element={<ProtectedRoute><Evaluation /></ProtectedRoute>} />
-              {/* Impact */}
-              <Route path="/impact-dashboard" element={<ProtectedRoute><ImpactDashboard /></ProtectedRoute>} />
-              <Route path="/regulatory-reports" element={<ProtectedRoute><RegulatoryReports /></ProtectedRoute>} />
-              {/* Core RAI Engines */}
-              <Route path="/engine/fairness" element={<ProtectedRoute><FairnessEngine /></ProtectedRoute>} />
-              <Route path="/engine/hallucination" element={<ProtectedRoute><HallucinationEngine /></ProtectedRoute>} />
-              <Route path="/engine/toxicity" element={<ProtectedRoute><ToxicityEngine /></ProtectedRoute>} />
-              <Route path="/engine/privacy" element={<ProtectedRoute><PrivacyEngine /></ProtectedRoute>} />
-              <Route path="/engine/explainability" element={<ProtectedRoute><ExplainabilityEngine /></ProtectedRoute>} />
-              <Route path="/engine/data-quality" element={<ProtectedRoute><DataQualityEngine /></ProtectedRoute>} />
-              {/* Data Governance */}
-              <Route path="/data-contracts" element={<ProtectedRoute><DataContracts /></ProtectedRoute>} />
-              {/* Core Security */}
-              <Route path="/security" element={<ProtectedRoute><SecurityDashboard /></ProtectedRoute>} />
-              <Route path="/security/pentesting" element={<ProtectedRoute><Pentesting /></ProtectedRoute>} />
-              <Route path="/security/jailbreak-lab" element={<ProtectedRoute><JailbreakLab /></ProtectedRoute>} />
-              <Route path="/security/threat-modeling" element={<ProtectedRoute><ThreatModeling /></ProtectedRoute>} />
-              <Route path="/security/attack-library" element={<ProtectedRoute><AttackLibrary /></ProtectedRoute>} />
-              {/* Policy */}
-              <Route path="/policy" element={<ProtectedRoute><Policy /></ProtectedRoute>} />
-              {/* Settings & Docs */}
-              <Route path="/settings" element={
-                <ProtectedRoute requiredRoles={['admin']}>
-                  <Settings />
-                </ProtectedRoute>
-              } />
-              <Route path="/docs" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
-              {/* Configuration & Runbooks */}
-              <Route path="/configuration" element={<ProtectedRoute requiredRoles={['admin']}><Configuration /></ProtectedRoute>} />
-              <Route path="/runbooks" element={<ProtectedRoute><Runbooks /></ProtectedRoute>} />
-              {/* Audit */}
-              <Route path="/audit-center" element={<ProtectedRoute><AuditCenter /></ProtectedRoute>} />
-              {/* Demo */}
-              <Route path="/golden" element={<ProtectedRoute><GoldenDemoV2 /></ProtectedRoute>} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </SidebarProvider>
-    </AuthProvider>
-  </QueryClientProvider>
-</ErrorBoundary>
+              <Suspense fallback={<PageFallback />}>
+                <Routes>
+                  <Route path="/auth" element={<Auth />} />
+                <Route path="/error" element={<Error />} />
+                <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+                {/* Project & System Registry */}
+                <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
+                <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetail /></ProtectedRoute>} />
+                <Route path="/systems/:id" element={<ProtectedRoute><SystemDetail /></ProtectedRoute>} />
+                <Route path="/models" element={<ProtectedRoute><Models /></ProtectedRoute>} />
+                <Route path="/models/:id" element={<ProtectedRoute><ModelDetail /></ProtectedRoute>} />
+                {/* Governance */}
+                <Route path="/governance" element={<ProtectedRoute><Governance /></ProtectedRoute>} />
+                <Route path="/governance/approvals" element={
+                  <ProtectedRoute requiredRoles={['admin', 'reviewer']}>
+                    <Approvals />
+                  </ProtectedRoute>
+                } />
+                <Route path="/hitl" element={<ProtectedRoute><HITL /></ProtectedRoute>} />
+                <Route path="/decision-ledger" element={<ProtectedRoute><DecisionLedger /></ProtectedRoute>} />
+                <Route path="/incidents" element={<ProtectedRoute><Incidents /></ProtectedRoute>} />
+                {/* Knowledge Graph */}
+                <Route path="/lineage" element={<ProtectedRoute><Lineage /></ProtectedRoute>} />
+                {/* Monitoring */}
+                <Route path="/observability" element={<ProtectedRoute><Observability /></ProtectedRoute>} />
+                <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
+                <Route path="/evaluation" element={<ProtectedRoute><Evaluation /></ProtectedRoute>} />
+                {/* Impact */}
+                <Route path="/impact-dashboard" element={<ProtectedRoute><ImpactDashboard /></ProtectedRoute>} />
+                <Route path="/regulatory-reports" element={<ProtectedRoute><RegulatoryReports /></ProtectedRoute>} />
+                {/* Core RAI Engines */}
+                <Route path="/engine/fairness" element={<ProtectedRoute><FairnessEngine /></ProtectedRoute>} />
+                <Route path="/engine/hallucination" element={<ProtectedRoute><HallucinationEngine /></ProtectedRoute>} />
+                <Route path="/engine/toxicity" element={<ProtectedRoute><ToxicityEngine /></ProtectedRoute>} />
+                <Route path="/engine/privacy" element={<ProtectedRoute><PrivacyEngine /></ProtectedRoute>} />
+                <Route path="/engine/explainability" element={<ProtectedRoute><ExplainabilityEngine /></ProtectedRoute>} />
+                <Route path="/engine/data-quality" element={<ProtectedRoute><DataQualityEngine /></ProtectedRoute>} />
+                {/* Data Governance */}
+                <Route path="/data-contracts" element={<ProtectedRoute><DataContracts /></ProtectedRoute>} />
+                {/* Core Security */}
+                <Route path="/security" element={<ProtectedRoute><SecurityDashboard /></ProtectedRoute>} />
+                <Route path="/security/pentesting" element={<ProtectedRoute><Pentesting /></ProtectedRoute>} />
+                <Route path="/security/jailbreak-lab" element={<ProtectedRoute><JailbreakLab /></ProtectedRoute>} />
+                <Route path="/security/threat-modeling" element={<ProtectedRoute><ThreatModeling /></ProtectedRoute>} />
+                <Route path="/security/attack-library" element={<ProtectedRoute><AttackLibrary /></ProtectedRoute>} />
+                {/* Policy */}
+                <Route path="/policy" element={<ProtectedRoute><Policy /></ProtectedRoute>} />
+                {/* Settings & Docs */}
+                <Route path="/settings" element={
+                  <ProtectedRoute requiredRoles={['admin']}>
+                    <Settings />
+                  </ProtectedRoute>
+                } />
+                <Route path="/docs" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
+                {/* Configuration & Runbooks */}
+                <Route path="/configuration" element={<ProtectedRoute requiredRoles={['admin']}><Configuration /></ProtectedRoute>} />
+                <Route path="/runbooks" element={<ProtectedRoute><Runbooks /></ProtectedRoute>} />
+                {/* Audit */}
+                <Route path="/audit-center" element={<ProtectedRoute><AuditCenter /></ProtectedRoute>} />
+                {/* Demo */}
+                <Route path="/golden" element={<ProtectedRoute><GoldenDemoV2 /></ProtectedRoute>} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+              </Suspense>
+            </BrowserRouter>
+          </TooltipProvider>
+        </SidebarProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
