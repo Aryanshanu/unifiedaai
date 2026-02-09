@@ -330,23 +330,26 @@ export default function Lineage() {
 
   // Update blast radius when lineage data changes
   useMemo(() => {
+    const MAX_BLAST_RADIUS_NODES = 200;
     if (lineageData?.blast_radius) {
       const affectedIds = new Set<string>();
       // blast_radius is an object with critical_paths array, not an array itself
       const criticalPaths = lineageData.blast_radius.critical_paths;
       if (Array.isArray(criticalPaths)) {
-        criticalPaths.forEach((item: any) => {
-          if (item.node_id) affectedIds.add(item.node_id);
-          if (item.id) affectedIds.add(item.id);
-        });
+        for (const item of criticalPaths) {
+          if (affectedIds.size >= MAX_BLAST_RADIUS_NODES) break;
+          if ((item as any).node_id) affectedIds.add((item as any).node_id);
+          if ((item as any).id) affectedIds.add((item as any).id);
+        }
       }
       // Also add downstream nodes from lineage
-      if (Array.isArray(lineageData.nodes)) {
-        lineageData.nodes.forEach((node: any) => {
-          if (node.direction === 'downstream' && node.id) {
-            affectedIds.add(node.id);
+      if (Array.isArray(lineageData.nodes) && affectedIds.size < MAX_BLAST_RADIUS_NODES) {
+        for (const node of lineageData.nodes) {
+          if (affectedIds.size >= MAX_BLAST_RADIUS_NODES) break;
+          if ((node as any).direction === 'downstream' && (node as any).id) {
+            affectedIds.add((node as any).id);
           }
-        });
+        }
       }
       setBlastRadiusNodes(affectedIds);
     }

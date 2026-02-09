@@ -53,7 +53,7 @@ export function usePolicyPacks() {
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      return data as PolicyPack[];
+      return safeValidateArray(PolicyPackSchema, data ?? [], 'policy-packs');
     },
   });
 }
