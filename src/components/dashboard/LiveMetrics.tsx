@@ -62,7 +62,7 @@ export function LiveMetrics({ metrics }: LiveMetricsProps) {
                 <span className="text-xs text-muted-foreground ml-1">{metric.unit}</span>
               </p>
             </div>
-            <MiniChart data={metric.trend} color="hsl(173, 80%, 45%)" />
+            <MiniChart data={metric.trend} color={CHART_COLORS.warning} />
           </div>
         ))}
       </div>

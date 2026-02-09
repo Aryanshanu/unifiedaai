@@ -27,9 +27,10 @@ function getModelStatus(model: ModelWithSystem): "healthy" | "warning" | "critic
     return "warning"; // Unknown state shown as warning
   }
   
-  const fairness = model.fairness_score;
-  const robustness = model.robustness_score;
-  const minScore = Math.min(fairness ?? 100, robustness ?? 100);
+  // Use Infinity for null so only real scores participate in Math.min
+  const fairness = model.fairness_score ?? Infinity;
+  const robustness = model.robustness_score ?? Infinity;
+  const minScore = Math.min(fairness, robustness);
   
   if (minScore < 60) return "critical";
   if (minScore < 80) return "warning";
