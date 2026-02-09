@@ -27,7 +27,6 @@ export class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     this.setState({ errorInfo });
     
-    // Log error to Supabase
     logError({
       error_type: 'react_boundary',
       error_message: error.message,
@@ -40,6 +39,42 @@ export class ErrorBoundary extends Component<Props, State> {
       },
     });
   }
+
+  componentDidMount() {
+    window.addEventListener('error', this.handleGlobalError);
+    window.addEventListener('unhandledrejection', this.handleRejection);
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener('error', this.handleGlobalError);
+    window.removeEventListener('unhandledrejection', this.handleRejection);
+  }
+
+  private handleGlobalError = (event: ErrorEvent) => {
+    logError({
+      error_type: 'global_error',
+      error_message: event.message,
+      error_stack: event.error?.stack,
+      component_name: 'window',
+      page_url: window.location.href,
+      user_agent: navigator.userAgent,
+    });
+  };
+
+  private handleRejection = (event: PromiseRejectionEvent) => {
+    const message = event.reason instanceof Error
+      ? event.reason.message
+      : String(event.reason);
+
+    logError({
+      error_type: 'unhandled_rejection',
+      error_message: message,
+      error_stack: event.reason instanceof Error ? event.reason.stack : undefined,
+      component_name: 'promise',
+      page_url: window.location.href,
+      user_agent: navigator.userAgent,
+    });
+  };
 
   handleRetry = () => {
     this.setState({ hasError: false, error: null, errorInfo: null });
@@ -58,7 +93,6 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="min-h-screen bg-background flex items-center justify-center p-6">
           <div className="max-w-md w-full text-center space-y-6">
-            {/* Pulsing Logo */}
             <div className="flex justify-center">
               <div className="relative">
                 <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center animate-pulse">
@@ -70,7 +104,6 @@ export class ErrorBoundary extends Component<Props, State> {
               </div>
             </div>
 
-            {/* Friendly Message */}
             <div className="space-y-2">
               <h1 className="text-2xl font-bold text-foreground">
                 Temporary issue
@@ -80,7 +113,6 @@ export class ErrorBoundary extends Component<Props, State> {
               </p>
             </div>
 
-            {/* Status Card */}
             <div className="bg-card border border-border rounded-lg p-4 text-left space-y-3">
               <div className="flex items-center gap-2 text-sm">
                 <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
@@ -96,7 +128,6 @@ export class ErrorBoundary extends Component<Props, State> {
               </div>
             </div>
 
-            {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Button onClick={this.handleRetry} variant="default" className="gap-2">
                 <RefreshCw className="h-4 w-4" />
@@ -107,7 +138,6 @@ export class ErrorBoundary extends Component<Props, State> {
               </Button>
             </div>
 
-            {/* Fractal Branding */}
             <p className="text-xs text-muted-foreground pt-4">
               Fractal Unified-OS • Autonomous Governance Platform
             </p>
@@ -120,7 +150,6 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 }
 
-// Inline Error Boundary for specific components
 export function ComponentErrorBoundary({ 
   children, 
   fallback 

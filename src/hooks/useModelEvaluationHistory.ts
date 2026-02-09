@@ -128,7 +128,7 @@ export function useEvaluationTrends(
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
 
-      let query = supabase
+      const query = supabase
         .from('evaluation_runs')
         .select('id, model_id, engine_type, overall_score, completed_at, models!inner(project_id, system_id)')
         .eq('status', 'completed')
