@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { Activity } from "lucide-react";
+import { CHART_COLORS } from "@/lib/fractal-theme";
 
 interface MetricStream {
   label: string;
