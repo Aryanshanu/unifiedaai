@@ -25,7 +25,7 @@ export function BulkResolutionPanel({ onComplete }: BulkResolutionPanelProps) {
   const [filterAge, setFilterAge] = useState<string>("all");
   const [resolutionReason, setResolutionReason] = useState("");
 
-  const openIncidents = incidents?.filter((i) => i.status === "open" || i.status === "investigating") || [];
+  const openIncidents = incidents?.data?.filter((i) => i.status === "open" || i.status === "investigating") || [];
 
   const filteredIncidents = openIncidents.filter((incident) => {
     if (filterSeverity !== "all" && incident.severity !== filterSeverity) return false;

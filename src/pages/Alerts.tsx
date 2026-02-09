@@ -125,7 +125,7 @@ export default function Alerts() {
       created_at: a.detected_at,
       details: `${a.drift_type} drift of ${(a.drift_value * 100).toFixed(1)}%`,
     })),
-    ...(incidents || []).map(i => ({
+    ...(incidents?.data || []).map(i => ({
       id: i.id,
       type: 'incident',
       title: i.title,

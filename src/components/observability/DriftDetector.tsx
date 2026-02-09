@@ -34,7 +34,7 @@ export function DriftDetector() {
   const { data: stats } = useDriftStats();
   const runDetection = useRunDriftDetection();
 
-  const openAlerts = alerts?.filter(a => a.status === 'open') || [];
+  const openAlerts = alerts?.data?.filter(a => a.status === 'open') || [];
 
   return (
     <Card>

@@ -171,7 +171,7 @@ export default function ModelDetail() {
   const { data: approvals } = useSystemApprovals(model?.system_id);
   const requestApproval = useRequestApproval();
   
-  const modelIncidents = incidents?.filter(i => i.model_id === id) || [];
+  const modelIncidents = incidents?.data?.filter(i => i.model_id === id) || [];
   const modelEvaluations = evaluationRuns?.filter(e => e.model_id === id) || [];
   const modelDriftAlerts = driftAlerts?.filter(d => d.model_id === id) || [];
   

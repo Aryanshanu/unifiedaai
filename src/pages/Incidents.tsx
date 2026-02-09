@@ -112,7 +112,7 @@ export default function Incidents() {
     };
   }, [queryClient]);
 
-  const filteredIncidents = incidents?.filter(incident => {
+  const filteredIncidents = incidents?.data?.filter(incident => {
     const matchesStatus = statusFilter === 'all' || incident.status === statusFilter;
     const matchesSearch = incident.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          incident.description?.toLowerCase().includes(searchQuery.toLowerCase());

@@ -92,7 +92,7 @@ export default function Models() {
   const { data: incidents } = useIncidents();
 
   // Count incidents per model
-  const incidentCountByModel = incidents?.reduce((acc, inc) => {
+  const incidentCountByModel = incidents?.data?.reduce((acc, inc) => {
     if (inc.model_id && inc.status !== 'resolved') {
       acc[inc.model_id] = (acc[inc.model_id] || 0) + 1;
     }
