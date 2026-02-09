@@ -45,7 +45,7 @@ export function useIncidents(filters?: { status?: IncidentStatus; severity?: Sev
       
       const { data, error, count } = await query.range(start, start + pageSize - 1);
       if (error) throw error;
-      return { data: safeValidateArray(IncidentSchema, data ?? [], 'incidents'), totalCount: count ?? 0, hasMore: (count ?? 0) > start + pageSize };
+      return { data: safeValidateArray(IncidentSchema, data ?? [], 'incidents') as unknown as Incident[], totalCount: count ?? 0, hasMore: (count ?? 0) > start + pageSize };
     },
   });
 }
