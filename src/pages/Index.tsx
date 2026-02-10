@@ -17,7 +17,10 @@ import {
   ClipboardList,
   FileText,
   CheckCircle,
-  XCircle
+  XCircle,
+  ScanSearch,
+  FlaskConical,
+  Target,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { HealthIndicator } from "@/components/shared/HealthIndicator";
