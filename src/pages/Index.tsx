@@ -16,10 +16,6 @@ import {
   AlertTriangle,
   ClipboardList,
   FileText,
-  FlaskConical,
-  ScanSearch,
-  Target,
-  Library,
   CheckCircle,
   XCircle
 } from "lucide-react";
@@ -76,23 +72,6 @@ export default function Index() {
     refetchInterval: 60000,
   });
 
-  // Security metrics
-  const { data: securityMetrics } = useQuery({
-    queryKey: ['security-summary'],
-    queryFn: async () => {
-      const [findingsRes, criticalRes, testRunsRes] = await Promise.all([
-        supabase.from('security_findings').select('*', { count: 'exact', head: true }).eq('status', 'open'),
-        supabase.from('security_findings').select('*', { count: 'exact', head: true }).eq('severity', 'critical').eq('status', 'open'),
-        supabase.from('security_test_runs').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
-      ]);
-      return {
-        openFindings: findingsRes.count || 0,
-        criticalFindings: criticalRes.count || 0,
-        completedScans: testRunsRes.count || 0,
-      };
-    },
-    refetchInterval: 60000,
-  });
 
   // Recent incidents for activity log
   const { data: recentIncidents } = useQuery({
@@ -144,13 +123,6 @@ export default function Index() {
           queryClient.invalidateQueries({ queryKey: ['pending-reviews-count'] });
         }
       )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'security_findings' },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['security-summary'] });
-        }
-      )
       .subscribe();
 
     return () => {
@@ -196,13 +168,6 @@ export default function Index() {
     },
   ];
 
-  const securityItems = [
-    { name: "Security Dashboard", icon: Shield, path: "/security", description: "Overview of security posture" },
-    { name: "AI Pentesting", icon: ScanSearch, path: "/security/pentesting", description: "OWASP LLM Top 10 scanning" },
-    { name: "Jailbreak Lab", icon: FlaskConical, path: "/security/jailbreak-lab", description: "Adversarial attack testing" },
-    { name: "Threat Modeling", icon: Target, path: "/security/threat-modeling", description: "AI threat analysis" },
-    { name: "Attack Library", icon: Library, path: "/security/attack-library", description: "Browse attack patterns" },
-  ];
 
   return (
     <MainLayout 
@@ -244,9 +209,8 @@ export default function Index() {
         </div>
       )}
 
-      {/* Main Grid: Data Governance & Core Security */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Data Governance Section */}
+      {/* Data Governance */}
+      <div className="mb-6">
         <div className="space-y-4">
           <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
             <Database className="w-5 h-5 text-primary" />
@@ -318,74 +282,6 @@ export default function Index() {
               </div>
             </CardContent>
           </Card>
-        </div>
-
-        {/* Core Security Section */}
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-            <Shield className="w-5 h-5 text-primary" />
-            Core Security
-          </h2>
-          
-          {/* Security Dashboard Summary Card */}
-          <Card 
-            className="cursor-pointer hover:border-primary/50 transition-colors"
-            onClick={() => navigate("/security")}
-          >
-            <CardContent className="pt-6">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 rounded-lg bg-destructive/10">
-                    <Shield className="h-6 w-6 text-destructive" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground">Security Dashboard</h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Security posture and vulnerability overview
-                    </p>
-                  </div>
-                </div>
-                <ArrowRight className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t">
-                <div>
-                  <p className="text-2xl font-bold">{securityMetrics?.openFindings || 0}</p>
-                  <p className="text-xs text-muted-foreground">Open Findings</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-destructive">{securityMetrics?.criticalFindings || 0}</p>
-                  <p className="text-xs text-muted-foreground">Critical</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-success">{securityMetrics?.completedScans || 0}</p>
-                  <p className="text-xs text-muted-foreground">Scans</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Security Quick Links */}
-          <div className="grid grid-cols-2 gap-3">
-            {securityItems.slice(1).map((item) => {
-              const Icon = item.icon;
-              return (
-                <Card 
-                  key={item.path}
-                  className="cursor-pointer hover:border-primary/50 transition-colors"
-                  onClick={() => navigate(item.path)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <Icon className="h-5 w-5 text-muted-foreground" />
-                      <div>
-                        <p className="text-sm font-medium">{item.name}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
         </div>
       </div>
 

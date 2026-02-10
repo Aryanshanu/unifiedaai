@@ -34,11 +34,6 @@ const PrivacyEngine = lazy(() => import("./pages/engines/PrivacyEngine"));
 const ExplainabilityEngine = lazy(() => import("./pages/engines/ExplainabilityEngine"));
 const DataQualityEngine = lazy(() => import("./pages/engines/DataQualityEngine"));
 const DataContracts = lazy(() => import("./pages/DataContracts"));
-const SecurityDashboard = lazy(() => import("./pages/security/SecurityDashboard"));
-const Pentesting = lazy(() => import("./pages/security/Pentesting"));
-const JailbreakLab = lazy(() => import("./pages/security/JailbreakLab"));
-const ThreatModeling = lazy(() => import("./pages/security/ThreatModeling"));
-const AttackLibrary = lazy(() => import("./pages/security/AttackLibrary"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Documentation = lazy(() => import("./pages/Documentation"));
 const Governance = lazy(() => import("./pages/Governance"));
@@ -119,12 +114,6 @@ const App = () => (
                 <Route path="/engine/data-quality" element={<ProtectedRoute><DataQualityEngine /></ProtectedRoute>} />
                 {/* Data Governance */}
                 <Route path="/data-contracts" element={<ProtectedRoute><DataContracts /></ProtectedRoute>} />
-                {/* Core Security */}
-                <Route path="/security" element={<ProtectedRoute><SecurityDashboard /></ProtectedRoute>} />
-                <Route path="/security/pentesting" element={<ProtectedRoute><Pentesting /></ProtectedRoute>} />
-                <Route path="/security/jailbreak-lab" element={<ProtectedRoute><JailbreakLab /></ProtectedRoute>} />
-                <Route path="/security/threat-modeling" element={<ProtectedRoute><ThreatModeling /></ProtectedRoute>} />
-                <Route path="/security/attack-library" element={<ProtectedRoute><AttackLibrary /></ProtectedRoute>} />
                 {/* Policy */}
                 <Route path="/policy" element={<ProtectedRoute><Policy /></ProtectedRoute>} />
                 {/* Settings & Docs */}
