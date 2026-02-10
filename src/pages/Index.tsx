@@ -123,13 +123,6 @@ export default function Index() {
           queryClient.invalidateQueries({ queryKey: ['pending-reviews-count'] });
         }
       )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'security_findings' },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['security-summary'] });
-        }
-      )
       .subscribe();
 
     return () => {
