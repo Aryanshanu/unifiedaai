@@ -72,23 +72,6 @@ export default function Index() {
     refetchInterval: 60000,
   });
 
-  // Security metrics
-  const { data: securityMetrics } = useQuery({
-    queryKey: ['security-summary'],
-    queryFn: async () => {
-      const [findingsRes, criticalRes, testRunsRes] = await Promise.all([
-        supabase.from('security_findings').select('*', { count: 'exact', head: true }).eq('status', 'open'),
-        supabase.from('security_findings').select('*', { count: 'exact', head: true }).eq('severity', 'critical').eq('status', 'open'),
-        supabase.from('security_test_runs').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
-      ]);
-      return {
-        openFindings: findingsRes.count || 0,
-        criticalFindings: criticalRes.count || 0,
-        completedScans: testRunsRes.count || 0,
-      };
-    },
-    refetchInterval: 60000,
-  });
 
   // Recent incidents for activity log
   const { data: recentIncidents } = useQuery({
