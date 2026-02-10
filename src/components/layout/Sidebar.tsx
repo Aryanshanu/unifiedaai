@@ -28,6 +28,9 @@ import {
   FileCheck,
   Sliders,
   BookMarked,
+  ScanSearch,
+  FlaskConical,
+  Target,
 } from "lucide-react";
 
 const navItems = [
