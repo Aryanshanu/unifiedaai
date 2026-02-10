@@ -5,13 +5,12 @@ export function useSecurityTestRuns(modelId?: string) {
   return useQuery({
     queryKey: ['security-test-runs', modelId],
     queryFn: async () => {
-      let query = supabase
+      const q = supabase
         .from('security_test_runs')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(50);
-      if (modelId) query = query.eq('model_id', modelId);
-      const { data, error } = await query;
+      const { data, error } = modelId ? await q.eq('model_id', modelId) : await q;
       if (error) throw error;
       return data || [];
     },
