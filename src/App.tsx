@@ -114,12 +114,6 @@ const App = () => (
                 <Route path="/engine/data-quality" element={<ProtectedRoute><DataQualityEngine /></ProtectedRoute>} />
                 {/* Data Governance */}
                 <Route path="/data-contracts" element={<ProtectedRoute><DataContracts /></ProtectedRoute>} />
-                {/* Core Security */}
-                <Route path="/security" element={<ProtectedRoute><SecurityDashboard /></ProtectedRoute>} />
-                <Route path="/security/pentesting" element={<ProtectedRoute><Pentesting /></ProtectedRoute>} />
-                <Route path="/security/jailbreak-lab" element={<ProtectedRoute><JailbreakLab /></ProtectedRoute>} />
-                <Route path="/security/threat-modeling" element={<ProtectedRoute><ThreatModeling /></ProtectedRoute>} />
-                <Route path="/security/attack-library" element={<ProtectedRoute><AttackLibrary /></ProtectedRoute>} />
                 {/* Policy */}
                 <Route path="/policy" element={<ProtectedRoute><Policy /></ProtectedRoute>} />
                 {/* Settings & Docs */}
