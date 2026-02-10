@@ -26,10 +26,6 @@ import {
   Play,
   BarChart3,
   FileCheck,
-  ScanSearch,
-  FlaskConical,
-  Target,
-  Library,
   Sliders,
   BookMarked,
 } from "lucide-react";
