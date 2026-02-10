@@ -108,16 +108,13 @@ verify_jwt = false
 [functions.dq-truth-enforcer]
 verify_jwt = false
 
-[functions.agent-pentester]
+[functions.security-pentest]
 verify_jwt = false
 
-[functions.agent-jailbreaker]
+[functions.security-jailbreak]
 verify_jwt = false
 
-[functions.agent-threat-modeler]
-verify_jwt = false
-
-[functions.security-evidence-service]
+[functions.security-threat-model]
 verify_jwt = false
 
 [functions.ingest-events]

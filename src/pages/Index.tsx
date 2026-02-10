@@ -17,7 +17,10 @@ import {
   ClipboardList,
   FileText,
   CheckCircle,
-  XCircle
+  XCircle,
+  ScanSearch,
+  FlaskConical,
+  Target,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { HealthIndicator } from "@/components/shared/HealthIndicator";
@@ -282,6 +285,34 @@ export default function Index() {
               </div>
             </CardContent>
           </Card>
+        </div>
+      </div>
+
+      {/* Core Security Engines */}
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+          <Shield className="w-5 h-5 text-primary" />
+          Core Security
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[
+            { name: 'AI Pentesting', icon: ScanSearch, path: '/security/pentest', description: 'OWASP LLM Top 10 adversarial testing' },
+            { name: 'Jailbreak Lab', icon: FlaskConical, path: '/security/jailbreak', description: 'Prompt injection resistance testing' },
+            { name: 'Threat Modeling', icon: Target, path: '/security/threats', description: 'STRIDE, OWASP, MAESTRO, ATLAS' },
+          ].map((engine) => {
+            const Icon = engine.icon;
+            return (
+              <Card key={engine.path} className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate(engine.path)}>
+                <CardContent className="pt-6">
+                  <div className="flex flex-col items-center text-center">
+                    <div className="p-3 rounded-lg bg-muted mb-3"><Icon className="w-6 h-6 text-muted-foreground" /></div>
+                    <h3 className="font-semibold text-foreground text-sm">{engine.name}</h3>
+                    <p className="text-xs text-muted-foreground mt-1">{engine.description}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </div>
 

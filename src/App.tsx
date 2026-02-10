@@ -34,6 +34,10 @@ const PrivacyEngine = lazy(() => import("./pages/engines/PrivacyEngine"));
 const ExplainabilityEngine = lazy(() => import("./pages/engines/ExplainabilityEngine"));
 const DataQualityEngine = lazy(() => import("./pages/engines/DataQualityEngine"));
 const DataContracts = lazy(() => import("./pages/DataContracts"));
+const SecurityDashboard = lazy(() => import("./pages/security/SecurityDashboard"));
+const SecurityPentest = lazy(() => import("./pages/security/SecurityPentest"));
+const SecurityJailbreak = lazy(() => import("./pages/security/SecurityJailbreak"));
+const SecurityThreatModel = lazy(() => import("./pages/security/SecurityThreatModel"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Documentation = lazy(() => import("./pages/Documentation"));
 const Governance = lazy(() => import("./pages/Governance"));
@@ -112,6 +116,11 @@ const App = () => (
                 <Route path="/engine/privacy" element={<ProtectedRoute><PrivacyEngine /></ProtectedRoute>} />
                 <Route path="/engine/explainability" element={<ProtectedRoute><ExplainabilityEngine /></ProtectedRoute>} />
                 <Route path="/engine/data-quality" element={<ProtectedRoute><DataQualityEngine /></ProtectedRoute>} />
+                {/* Core Security */}
+                <Route path="/security" element={<ProtectedRoute><SecurityDashboard /></ProtectedRoute>} />
+                <Route path="/security/pentest" element={<ProtectedRoute><SecurityPentest /></ProtectedRoute>} />
+                <Route path="/security/jailbreak" element={<ProtectedRoute><SecurityJailbreak /></ProtectedRoute>} />
+                <Route path="/security/threats" element={<ProtectedRoute><SecurityThreatModel /></ProtectedRoute>} />
                 {/* Data Governance */}
                 <Route path="/data-contracts" element={<ProtectedRoute><DataContracts /></ProtectedRoute>} />
                 {/* Policy */}
