@@ -7,21 +7,21 @@ export function useSecurityTestRuns(modelId?: string) {
     queryFn: async () => {
       if (modelId) {
         const { data, error } = await supabase
-          .from('security_test_runs')
+          .from('security_test_runs' as any)
           .select('*')
           .eq('model_id', modelId)
           .order('created_at', { ascending: false })
           .limit(50);
         if (error) throw error;
-        return data ?? [];
+        return (data as any[]) ?? [];
       }
       const { data, error } = await supabase
-        .from('security_test_runs')
+        .from('security_test_runs' as any)
         .select('*')
         .order('created_at', { ascending: false })
         .limit(50);
       if (error) throw error;
-      return data ?? [];
+      return (data as any[]) ?? [];
     },
     staleTime: 30_000,
   });
@@ -33,21 +33,21 @@ export function useSecurityFindings(testRunId?: string) {
     queryFn: async () => {
       if (testRunId) {
         const { data, error } = await supabase
-          .from('security_findings')
+          .from('security_findings' as any)
           .select('*')
           .eq('test_run_id', testRunId)
           .order('created_at', { ascending: false })
           .limit(100);
         if (error) throw error;
-        return data ?? [];
+        return (data as any[]) ?? [];
       }
       const { data, error } = await supabase
-        .from('security_findings')
+        .from('security_findings' as any)
         .select('*')
         .order('created_at', { ascending: false })
         .limit(100);
       if (error) throw error;
-      return data ?? [];
+      return (data as any[]) ?? [];
     },
     staleTime: 30_000,
   });
@@ -58,31 +58,31 @@ export function useSecurityStats() {
     queryKey: ['security-stats'],
     queryFn: async () => {
       const { data: runs } = await supabase
-        .from('security_test_runs')
+        .from('security_test_runs' as any)
         .select('*')
         .order('created_at', { ascending: false })
         .limit(100);
       const { data: openFindings } = await supabase
-        .from('security_findings')
+        .from('security_findings' as any)
         .select('*')
         .eq('status', 'open');
 
-      const allRuns = runs ?? [];
-      const findings = openFindings ?? [];
+      const allRuns = (runs as any[]) ?? [];
+      const findings = (openFindings as any[]) ?? [];
       const totalScans = allRuns.length;
 
-      const pentestRuns = allRuns.filter((r) => r.test_type === 'pentest');
-      const jailbreakRuns = allRuns.filter((r) => r.test_type === 'jailbreak');
-      const threatRuns = allRuns.filter((r) => r.test_type === 'threat_model');
+      const pentestRuns = allRuns.filter((r: any) => r.test_type === 'pentest');
+      const jailbreakRuns = allRuns.filter((r: any) => r.test_type === 'jailbreak');
+      const threatRuns = allRuns.filter((r: any) => r.test_type === 'threat_model');
 
       const avgVulnScore = pentestRuns.length > 0
-        ? pentestRuns.reduce((acc, r) => acc + (r.overall_score ?? 0), 0) / pentestRuns.length
+        ? pentestRuns.reduce((acc: number, r: any) => acc + (r.overall_score ?? 0), 0) / pentestRuns.length
         : null;
       const avgResistance = jailbreakRuns.length > 0
-        ? jailbreakRuns.reduce((acc, r) => acc + ((r.overall_score ?? 0) * 100), 0) / jailbreakRuns.length
+        ? jailbreakRuns.reduce((acc: number, r: any) => acc + ((r.overall_score ?? 0) * 100), 0) / jailbreakRuns.length
         : null;
       const avgThreatScore = threatRuns.length > 0
-        ? threatRuns.reduce((acc, r) => acc + (r.overall_score ?? 0), 0) / threatRuns.length
+        ? threatRuns.reduce((acc: number, r: any) => acc + (r.overall_score ?? 0), 0) / threatRuns.length
         : null;
 
       let securityHealth: number | null = null;
