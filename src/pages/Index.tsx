@@ -168,13 +168,6 @@ export default function Index() {
     },
   ];
 
-  const securityItems = [
-    { name: "Security Dashboard", icon: Shield, path: "/security", description: "Overview of security posture" },
-    { name: "AI Pentesting", icon: ScanSearch, path: "/security/pentesting", description: "OWASP LLM Top 10 scanning" },
-    { name: "Jailbreak Lab", icon: FlaskConical, path: "/security/jailbreak-lab", description: "Adversarial attack testing" },
-    { name: "Threat Modeling", icon: Target, path: "/security/threat-modeling", description: "AI threat analysis" },
-    { name: "Attack Library", icon: Library, path: "/security/attack-library", description: "Browse attack patterns" },
-  ];
 
   return (
     <MainLayout 
