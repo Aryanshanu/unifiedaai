@@ -209,9 +209,8 @@ export default function Index() {
         </div>
       )}
 
-      {/* Main Grid: Data Governance & Core Security */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Data Governance Section */}
+      {/* Data Governance */}
+      <div className="mb-6">
         <div className="space-y-4">
           <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
             <Database className="w-5 h-5 text-primary" />
