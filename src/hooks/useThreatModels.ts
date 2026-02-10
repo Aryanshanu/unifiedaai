@@ -5,13 +5,12 @@ export function useThreatModels(modelId?: string) {
   return useQuery({
     queryKey: ['threat-models', modelId],
     queryFn: async () => {
-      let query = supabase
+      const q = supabase
         .from('threat_models')
         .select('*, threat_vectors(*)')
         .order('created_at', { ascending: false })
         .limit(20);
-      if (modelId) query = query.eq('model_id', modelId);
-      const { data, error } = await query;
+      const { data, error } = modelId ? await q.eq('model_id', modelId) : await q;
       if (error) throw error;
       return data || [];
     },

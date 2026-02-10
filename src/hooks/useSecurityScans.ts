@@ -22,13 +22,12 @@ export function useSecurityFindings(testRunId?: string) {
   return useQuery({
     queryKey: ['security-findings', testRunId],
     queryFn: async () => {
-      let query = supabase
+      const q = supabase
         .from('security_findings')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(100);
-      if (testRunId) query = query.eq('test_run_id', testRunId);
-      const { data, error } = await query;
+      const { data, error } = testRunId ? await q.eq('test_run_id', testRunId) : await q;
       if (error) throw error;
       return data || [];
     },
