@@ -16,10 +16,6 @@ import {
   AlertTriangle,
   ClipboardList,
   FileText,
-  FlaskConical,
-  ScanSearch,
-  Target,
-  Library,
   CheckCircle,
   XCircle
 } from "lucide-react";
