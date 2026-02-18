@@ -29,7 +29,7 @@ function SecurityDashboardContent() {
         <div className="flex justify-center"><SecurityScoreGauge score={stats?.securityHealth ?? 0} label="Security Health" size="lg" /></div>
         <Card><CardContent className="pt-6 text-center"><p className="text-3xl font-bold">{stats?.totalScans ?? 0}</p><p className="text-sm text-muted-foreground">Total Scans</p></CardContent></Card>
         <Card><CardContent className="pt-6 text-center"><p className="text-3xl font-bold text-destructive">{stats?.openFindings ?? 0}</p><p className="text-sm text-muted-foreground">Open Findings</p></CardContent></Card>
-        <Card><CardContent className="pt-6 text-center"><p className="text-3xl font-bold">{stats?.avgResistance !== null ? `${stats.avgResistance?.toFixed(0)}%` : '—'}</p><p className="text-sm text-muted-foreground">Avg Resistance</p></CardContent></Card>
+        <Card><CardContent className="pt-6 text-center"><p className="text-3xl font-bold">{stats?.avgResistance != null ? `${stats.avgResistance.toFixed(0)}%` : '—'}</p><p className="text-sm text-muted-foreground">Avg Resistance</p></CardContent></Card>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
