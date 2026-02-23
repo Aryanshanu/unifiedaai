@@ -1,0 +1,1 @@
+ALTER TABLE public.review_queue ADD COLUMN incident_id uuid REFERENCES public.incidents(id) ON DELETE SET NULL;

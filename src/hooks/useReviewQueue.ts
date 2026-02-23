@@ -9,6 +9,7 @@ export interface ReviewItem {
   id: string;
   review_type: string;
   model_id: string | null;
+  incident_id: string | null;
   title: string;
   description: string | null;
   context: Record<string, any>;

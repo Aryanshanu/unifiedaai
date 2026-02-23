@@ -454,33 +454,59 @@ serve(async (req) => {
     });
 
     if (autoEscalate && !isCompliant) {
-      await serviceClient.from("review_queue").insert({
-        title: `Privacy NON-COMPLIANT: ${overallScore}%`,
-        description: `Model endpoint ${endpoint} leaking PII/PHI.`,
-        review_type: "privacy_flag",
-        severity: "critical",
-        status: "pending",
-        model_id: modelId,
-        sla_deadline: new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString(),
-        created_by: user?.id,
-      });
-      
-      // Also create main incident
-      await serviceClient.from("incidents").insert({
-        title: `[RAI] Privacy NON-COMPLIANT: ${overallScore}%`,
-        description: `Model ${model.name || modelId} leaking PII/PHI with privacy score ${overallScore}%.`,
-        severity: overallScore < 50 ? "critical" : "high",
-        status: "open",
-        incident_type: "rai_violation",
-        metadata: {
-          engine: "privacy",
-          score: overallScore,
+      // Dedup: check for existing open incident
+      const { data: existingIncident } = await serviceClient
+        .from("incidents")
+        .select("id")
+        .eq("model_id", modelId)
+        .eq("incident_type", "rai_violation")
+        .eq("status", "open")
+        .maybeSingle();
+
+      let incidentId = existingIncident?.id;
+
+      if (!incidentId) {
+        const { data: newIncident } = await serviceClient.from("incidents").insert({
+          title: `[RAI] Privacy NON-COMPLIANT: ${overallScore}%`,
+          description: `Model ${model.name || modelId} leaking PII/PHI with privacy score ${overallScore}%.`,
+          severity: overallScore < 50 ? "critical" : "high",
+          status: "open",
+          incident_type: "rai_violation",
+          metadata: {
+            engine: "privacy",
+            score: overallScore,
+            model_id: modelId,
+            endpoint: endpoint,
+            pii_detected: outputsWithPII,
+            phi_detected: outputsWithPHI,
+          },
+        }).select("id").single();
+        incidentId = newIncident?.id;
+      }
+
+      // Dedup: check for existing pending review
+      const { data: existingReview } = await serviceClient
+        .from("review_queue")
+        .select("id")
+        .eq("model_id", modelId)
+        .eq("review_type", "privacy_flag")
+        .eq("status", "pending")
+        .maybeSingle();
+
+      if (!existingReview) {
+        await serviceClient.from("review_queue").insert({
+          title: `Privacy NON-COMPLIANT: ${overallScore}%`,
+          description: `Model endpoint ${endpoint} leaking PII/PHI.`,
+          review_type: "privacy_flag",
+          severity: "critical",
+          status: "pending",
           model_id: modelId,
-          endpoint: endpoint,
-          pii_detected: outputsWithPII,
-          phi_detected: outputsWithPHI,
-        },
-      });
+          incident_id: incidentId || null,
+          sla_deadline: new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString(),
+          created_by: user?.id,
+          context: { incident_id: incidentId },
+        });
+      }
       
       // Create alert for visibility
       await serviceClient.from("drift_alerts").insert({

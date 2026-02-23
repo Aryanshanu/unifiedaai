@@ -542,28 +542,54 @@ serve(async (req) => {
       triggered_by: user?.id,
     });
 
-    // Auto-escalate to HITL if non-compliant
+    // Auto-escalate to HITL if non-compliant (with deduplication)
     if (!isCompliant) {
-      await serviceClient.from("review_queue").insert({
-        title: `Fairness NON-COMPLIANT: ${overallScore}%`,
-        description: `Model endpoint ${endpoint} failed fairness evaluation. DPD: ${Math.round(dpScore * 100)}%, EOD: ${Math.round(eoScore * 100)}%`,
-        review_type: "fairness_flag",
-        severity: overallScore < 50 ? "critical" : "high",
-        status: "pending",
-        model_id: targetId,
-        sla_deadline: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
-        created_by: user?.id,
-      });
+      // Dedup: check for existing open incident
+      const { data: existingIncident } = await serviceClient
+        .from("incidents")
+        .select("id")
+        .eq("model_id", targetId)
+        .eq("incident_type", "rai_violation")
+        .eq("status", "open")
+        .maybeSingle();
 
-      // Create incident for visibility
-      await serviceClient.from("incidents").insert({
-        title: `Fairness NON-COMPLIANT: ${overallScore}%`,
-        description: `Model failed fairness evaluation with ${overallScore}% score. Bias detected between demographic groups.`,
-        severity: overallScore < 50 ? "critical" : "high",
-        status: "open",
-        incident_type: "rai_violation",
-        model_id: targetId,
-      });
+      let incidentId = existingIncident?.id;
+
+      if (!incidentId) {
+        const { data: newIncident } = await serviceClient.from("incidents").insert({
+          title: `Fairness NON-COMPLIANT: ${overallScore}%`,
+          description: `Model failed fairness evaluation with ${overallScore}% score. Bias detected between demographic groups.`,
+          severity: overallScore < 50 ? "critical" : "high",
+          status: "open",
+          incident_type: "rai_violation",
+          model_id: targetId,
+        }).select("id").single();
+        incidentId = newIncident?.id;
+      }
+
+      // Dedup: check for existing pending review
+      const { data: existingReview } = await serviceClient
+        .from("review_queue")
+        .select("id")
+        .eq("model_id", targetId)
+        .eq("review_type", "fairness_flag")
+        .eq("status", "pending")
+        .maybeSingle();
+
+      if (!existingReview) {
+        await serviceClient.from("review_queue").insert({
+          title: `Fairness NON-COMPLIANT: ${overallScore}%`,
+          description: `Model endpoint ${endpoint} failed fairness evaluation. DPD: ${Math.round(dpScore * 100)}%, EOD: ${Math.round(eoScore * 100)}%`,
+          review_type: "fairness_flag",
+          severity: overallScore < 50 ? "critical" : "high",
+          status: "pending",
+          model_id: targetId,
+          incident_id: incidentId || null,
+          sla_deadline: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
+          created_by: user?.id,
+          context: { incident_id: incidentId },
+        });
+      }
 
       // Create drift alert for Alerts page visibility
       await serviceClient.from("drift_alerts").insert({
