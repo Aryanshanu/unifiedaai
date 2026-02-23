@@ -3,6 +3,7 @@ import { MetricCard } from "@/components/dashboard/MetricCard";
 import { ScoreRing } from "@/components/dashboard/ScoreRing";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Activity, Play, Calendar, Plus } from "lucide-react";
 import { useEvaluationRuns, useEvaluationSuites, useEvaluationStats, EvaluationRun } from "@/hooks/useEvaluations";
 import { useModels } from "@/hooks/useModels";
@@ -73,9 +74,10 @@ export default function Evaluation() {
         <div className="lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-foreground">Recent Evaluations</h2>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" disabled>
               <Calendar className="w-4 h-4 mr-2" />
               Schedule
+              <Badge variant="secondary" className="ml-2 text-[10px]">Coming Soon</Badge>
             </Button>
           </div>
 
@@ -149,7 +151,7 @@ export default function Evaluation() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-foreground">Evaluation Suites</h2>
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" disabled>
               <Plus className="w-4 h-4" />
             </Button>
           </div>
@@ -166,9 +168,9 @@ export default function Evaluation() {
           ) : suites?.length === 0 ? (
             <div className="bg-card border border-border rounded-xl p-6 text-center">
               <p className="text-muted-foreground text-sm">No evaluation suites created yet</p>
-              <Button variant="outline" size="sm" className="mt-4">
+              <Button variant="outline" size="sm" className="mt-4" disabled>
                 <Plus className="w-4 h-4 mr-2" />
-                Create Suite
+                Create Suite (Coming Soon)
               </Button>
             </div>
           ) : (

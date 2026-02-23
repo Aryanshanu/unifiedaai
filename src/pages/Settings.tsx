@@ -495,7 +495,7 @@ export default function Settings() {
                 <div className="space-y-4">
                   <PlannedFeatureCard
                     title="API Key Management"
-                    description="Generate and manage API keys for programmatic access to the Fractal RAI-OS API. Includes key rotation, scope permissions, and audit logging."
+                    description="Generate and manage API keys for programmatic access to the platform API. Includes key rotation, scope permissions, and audit logging."
                     regulation="SOC 2 CC6.1"
                     status="Backend pending"
                   />

@@ -47,7 +47,7 @@ const GoldenDemoV2 = lazy(() => import("./pages/GoldenDemoV2"));
 const DecisionLedger = lazy(() => import("./pages/DecisionLedger"));
 const ImpactDashboard = lazy(() => import("./pages/ImpactDashboard"));
 const RegulatoryReports = lazy(() => import("./pages/RegulatoryReports"));
-const Configuration = lazy(() => import("./pages/Configuration"));
+
 const Runbooks = lazy(() => import("./pages/Runbooks"));
 const AuditCenter = lazy(() => import("./pages/AuditCenter"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -135,7 +135,7 @@ const App = () => (
                 } />
                 <Route path="/docs" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
                 {/* Configuration & Runbooks */}
-                <Route path="/configuration" element={<ProtectedRoute requiredRoles={['admin']}><Configuration /></ProtectedRoute>} />
+                
                 <Route path="/runbooks" element={<ProtectedRoute><Runbooks /></ProtectedRoute>} />
                 {/* Audit */}
                 <Route path="/audit-center" element={<ProtectedRoute><AuditCenter /></ProtectedRoute>} />
