@@ -5,23 +5,22 @@ export function useSecurityTestRuns(modelId?: string) {
   return useQuery({
     queryKey: ['security-test-runs', modelId],
     queryFn: async () => {
-      if (modelId) {
-        const { data, error } = await supabase
-          .from('security_test_runs' as any)
-          .select('*')
-          .eq('model_id', modelId)
-          .order('created_at', { ascending: false })
-          .limit(50);
-        if (error) throw error;
-        return (data as any[]) ?? [];
-      }
-      const { data, error } = await supabase
+      let query = supabase
         .from('security_test_runs' as any)
         .select('*')
         .order('created_at', { ascending: false })
         .limit(50);
+
+      // Filter by model_id stored inside summary jsonb if provided
+      // Since there's no model_id column, we fetch all and filter client-side
+      const { data, error } = await query;
       if (error) throw error;
-      return (data as any[]) ?? [];
+      const runs = (data as any[]) ?? [];
+
+      if (modelId) {
+        return runs.filter((r: any) => r.summary?.model_id === modelId);
+      }
+      return runs;
     },
     staleTime: 30_000,
   });
@@ -71,18 +70,30 @@ export function useSecurityStats() {
       const findings = (openFindings as any[]) ?? [];
       const totalScans = allRuns.length;
 
+      // Extract scores from summary jsonb
+      const getScore = (run: any): number | null => {
+        return run.summary?.overall_score ?? null;
+      };
+      const getRiskLevel = (run: any): string | null => {
+        return run.summary?.risk_level ?? null;
+      };
+
       const pentestRuns = allRuns.filter((r: any) => r.test_type === 'pentest');
       const jailbreakRuns = allRuns.filter((r: any) => r.test_type === 'jailbreak');
       const threatRuns = allRuns.filter((r: any) => r.test_type === 'threat_model');
 
-      const avgVulnScore = pentestRuns.length > 0
-        ? pentestRuns.reduce((acc: number, r: any) => acc + (r.overall_score ?? 0), 0) / pentestRuns.length
+      const pentestScores = pentestRuns.map(getScore).filter((s): s is number => s != null);
+      const jailbreakScores = jailbreakRuns.map(getScore).filter((s): s is number => s != null);
+      const threatScores = threatRuns.map(getScore).filter((s): s is number => s != null);
+
+      const avgVulnScore = pentestScores.length > 0
+        ? pentestScores.reduce((a, b) => a + b, 0) / pentestScores.length
         : null;
-      const avgResistance = jailbreakRuns.length > 0
-        ? jailbreakRuns.reduce((acc: number, r: any) => acc + ((r.overall_score ?? 0) * 100), 0) / jailbreakRuns.length
+      const avgResistance = jailbreakScores.length > 0
+        ? (jailbreakScores.reduce((a, b) => a + b, 0) / jailbreakScores.length) * 100
         : null;
-      const avgThreatScore = threatRuns.length > 0
-        ? threatRuns.reduce((acc: number, r: any) => acc + (r.overall_score ?? 0), 0) / threatRuns.length
+      const avgThreatScore = threatScores.length > 0
+        ? threatScores.reduce((a, b) => a + b, 0) / threatScores.length
         : null;
 
       let securityHealth: number | null = null;
