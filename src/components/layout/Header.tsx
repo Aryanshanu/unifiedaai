@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useState } from "react";
-import { Bell, Search, User, LogOut, Settings, Shield } from "lucide-react";
+import { Bell, Search, User, LogOut, Settings, Shield, Sun, Moon } from "lucide-react";
+import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -25,6 +26,7 @@ interface HeaderProps {
 export function Header({ title, subtitle, headerActions }: HeaderProps) {
   const { user, profile, roles, signOut } = useAuth();
   const navigate = useNavigate();
+  const { theme, setTheme } = useTheme();
 
   const handleSignOut = async () => {
     await signOut();
@@ -83,6 +85,18 @@ export function Header({ title, subtitle, headerActions }: HeaderProps) {
             className="w-64 pl-9 h-9 bg-secondary border-border"
           />
         </div>
+
+        {/* Theme Toggle */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9"
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+        >
+          <Sun className="w-4 h-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+          <Moon className="absolute w-4 h-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+          <span className="sr-only">Toggle theme</span>
+        </Button>
 
         {/* Notifications */}
         <Button variant="ghost" size="icon" className="relative h-9 w-9">

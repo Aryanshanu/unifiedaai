@@ -15,7 +15,7 @@ export function GlobalBanner() {
     )}>
       <Globe className="w-4 h-4 animate-pulse" />
       <span className="text-sm font-medium">
-        Fractal Unified-OS — Autonomous Governance Platform
+        Fractal Unified Autonomous Governance Platform
       </span>
       <Button
         variant="ghost"
