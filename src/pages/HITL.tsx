@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, Clock, AlertTriangle, CheckCircle, ChevronRight, RefreshCw, Bot, ListChecks } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useReviewQueue, useReviewQueueStats, ReviewItem } from "@/hooks/useReviewQueue";
+import { useReviewQueue, useReviewQueueStats, useDecisions, ReviewItem } from "@/hooks/useReviewQueue";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
 import { ReviewDecisionDialog } from "@/components/hitl/ReviewDecisionDialog";
@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { EnforcementBadge } from "@/components/shared/EnforcementBadge";
 import { RiskIndicator } from "@/components/fractal";
 import { FRACTAL_RISK, normalizeRiskLevel } from "@/lib/fractal-theme";
+import { useQuery } from "@tanstack/react-query";
 
 export default function HITL() {
   const { data: reviews, isLoading, refetch } = useReviewQueue();
@@ -64,7 +65,29 @@ export default function HITL() {
   }, [refetch, refetchStats]);
 
   const pendingReviews = reviews?.filter(r => r.status === 'pending' || r.status === 'in_progress') || [];
-  const recentDecisions = reviews?.filter(r => r.status === 'approved' || r.status === 'rejected').slice(0, 3) || [];
+  
+  // Query actual decisions table for Recent Decisions panel
+  const { data: recentDecisionsData } = useQuery({
+    queryKey: ['decisions', 'recent'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('decisions')
+        .select('*, review:review_id(id, title, review_type, status)')
+        .order('decided_at', { ascending: false })
+        .limit(5);
+      if (error) throw error;
+      return data as Array<{
+        id: string;
+        review_id: string;
+        decision: string;
+        rationale: string | null;
+        conditions: string | null;
+        reviewer_id: string;
+        decided_at: string;
+        review: { id: string; title: string; review_type: string; status: string } | null;
+      }>;
+    },
+  });
   
   const handleReviewClick = (review: ReviewItem) => {
     setSelectedReview(review);
@@ -195,24 +218,29 @@ export default function HITL() {
               </h2>
 
               <div className="bg-card border border-border rounded-xl p-4 mb-6">
-                {recentDecisions.length > 0 ? (
+                {recentDecisionsData && recentDecisionsData.length > 0 ? (
                   <div className="space-y-4">
-                    {recentDecisions.map((decision) => (
+                    {recentDecisionsData.map((decision) => (
                       <div key={decision.id} className="pb-4 border-b border-border last:border-0 last:pb-0">
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-mono text-muted-foreground">{decision.id.slice(0, 8)}</span>
+                          <span className="text-xs font-mono text-muted-foreground">{decision.review_id.slice(0, 8)}</span>
                           <span className={cn(
                             "text-xs font-medium",
-                            decision.status === "approved" ? "text-success" : "text-risk-critical"
+                            decision.decision === "approve" ? "text-success" : 
+                            decision.decision === "escalate" ? "text-warning" : "text-risk-critical"
                           )}>
-                            {decision.status === "approved" ? "Authorized" : "Denied"}
+                            {decision.decision === "approve" ? "Authorized" : 
+                             decision.decision === "escalate" ? "Escalated" : "Denied"}
                           </span>
                         </div>
-                        <p className="text-sm font-medium text-foreground">{decision.title}</p>
+                        <p className="text-sm font-medium text-foreground">{decision.review?.title || 'Review'}</p>
+                        {decision.rationale && (
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2 italic">"{decision.rationale}"</p>
+                        )}
                         <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                          <span>{decision.review_type}</span>
+                          <span>{decision.review?.review_type || 'unknown'}</span>
                           <span>•</span>
-                          <span>{formatDistanceToNow(new Date(decision.updated_at), { addSuffix: true })}</span>
+                          <span>{formatDistanceToNow(new Date(decision.decided_at), { addSuffix: true })}</span>
                         </div>
                       </div>
                     ))}

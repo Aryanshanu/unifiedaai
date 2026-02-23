@@ -11,9 +11,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { ReviewItem, useCreateDecision, useUpdateReview } from "@/hooks/useReviewQueue";
+import { ReviewItem, useCreateDecision } from "@/hooks/useReviewQueue";
 import { toast } from "sonner";
-import { CheckCircle, XCircle, ArrowUpCircle, Loader2, Bell, Clock } from "lucide-react";
+import { CheckCircle, XCircle, ArrowUpCircle, Loader2, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,7 +31,6 @@ export function ReviewDecisionDialog({ review, open, onOpenChange }: ReviewDecis
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const createDecision = useCreateDecision();
-  const updateReview = useUpdateReview();
 
   if (!review) return null;
 
@@ -53,15 +52,15 @@ export function ReviewDecisionDialog({ review, open, onOpenChange }: ReviewDecis
       });
       
       // If there's a linked incident, resolve it on approval
-      if (decision === 'approve' && review.model_id) {
+      const linkedIncidentId = review.incident_id || (review.context as any)?.incident_id;
+      if (decision === 'approve' && linkedIncidentId) {
         await supabase
           .from('incidents')
           .update({ 
             status: 'resolved',
             resolved_at: new Date().toISOString()
           })
-          .eq('model_id', review.model_id)
-          .eq('status', 'open');
+          .eq('id', linkedIncidentId);
       }
       
       // Add KG edge for decision
@@ -90,14 +89,6 @@ export function ReviewDecisionDialog({ review, open, onOpenChange }: ReviewDecis
           ? "Escalated to senior reviewers"
           : `Decision recorded with rationale`
       });
-      
-      // Fake Slack notification
-      setTimeout(() => {
-        toast("✓ Notification sent to #rai-alerts on Slack", {
-          icon: <Bell className="w-4 h-4 text-primary" />,
-          duration: 4000
-        });
-      }, 500);
       
       onOpenChange(false);
       setRationale("");

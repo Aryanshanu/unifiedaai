@@ -4152,6 +4152,7 @@ export type Database = {
           created_by: string | null
           description: string | null
           id: string
+          incident_id: string | null
           model_id: string | null
           review_type: string
           severity: Database["public"]["Enums"]["severity_level"]
@@ -4167,6 +4168,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
+          incident_id?: string | null
           model_id?: string | null
           review_type: string
           severity?: Database["public"]["Enums"]["severity_level"]
@@ -4182,6 +4184,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
+          incident_id?: string | null
           model_id?: string | null
           review_type?: string
           severity?: Database["public"]["Enums"]["severity_level"]
@@ -4191,6 +4194,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "review_queue_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "review_queue_model_id_fkey"
             columns: ["model_id"]

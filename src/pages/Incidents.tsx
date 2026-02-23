@@ -95,7 +95,7 @@ export default function Incidents() {
         (payload) => {
           setRealtimeCount(prev => prev + 1);
           queryClient.invalidateQueries({ queryKey: ['incidents'] });
-          queryClient.invalidateQueries({ queryKey: ['incident-stats'] });
+          queryClient.invalidateQueries({ queryKey: ['incidents'] });
           
           if (payload.eventType === 'INSERT') {
             const newIncident = payload.new as any;
@@ -151,7 +151,7 @@ export default function Incidents() {
       if (error) throw error;
       toast.success("Lifecycle check complete");
       queryClient.invalidateQueries({ queryKey: ['incidents'] });
-      queryClient.invalidateQueries({ queryKey: ['incident-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['incidents'] });
     } catch (error) {
       toast.error("Lifecycle check failed");
     } finally {

@@ -445,26 +445,52 @@ serve(async (req) => {
     });
 
     if (autoEscalate && !isCompliant) {
-      await serviceClient.from("review_queue").insert({
-        title: `Explainability NON-COMPLIANT: ${overallScore}%`,
-        description: `Model endpoint ${endpoint} fails transparency requirements.`,
-        review_type: "explainability_flag",
-        severity: overallScore < 50 ? "critical" : "high",
-        status: "pending",
-        model_id: modelId,
-        sla_deadline: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
-        created_by: user?.id,
-      });
+      // Dedup: check for existing open incident
+      const { data: existingIncident } = await serviceClient
+        .from("incidents")
+        .select("id")
+        .eq("model_id", modelId)
+        .eq("incident_type", "rai_violation")
+        .eq("status", "open")
+        .maybeSingle();
 
-      // Create incident for visibility
-      await serviceClient.from("incidents").insert({
-        title: `Explainability NON-COMPLIANT: ${overallScore}%`,
-        description: `Model fails transparency requirements. Score: ${overallScore}%`,
-        severity: overallScore < 50 ? "critical" : "high",
-        status: "open",
-        incident_type: "rai_violation",
-        model_id: modelId,
-      });
+      let incidentId = existingIncident?.id;
+
+      if (!incidentId) {
+        const { data: newIncident } = await serviceClient.from("incidents").insert({
+          title: `Explainability NON-COMPLIANT: ${overallScore}%`,
+          description: `Model fails transparency requirements. Score: ${overallScore}%`,
+          severity: overallScore < 50 ? "critical" : "high",
+          status: "open",
+          incident_type: "rai_violation",
+          model_id: modelId,
+        }).select("id").single();
+        incidentId = newIncident?.id;
+      }
+
+      // Dedup: check for existing pending review
+      const { data: existingReview } = await serviceClient
+        .from("review_queue")
+        .select("id")
+        .eq("model_id", modelId)
+        .eq("review_type", "explainability_flag")
+        .eq("status", "pending")
+        .maybeSingle();
+
+      if (!existingReview) {
+        await serviceClient.from("review_queue").insert({
+          title: `Explainability NON-COMPLIANT: ${overallScore}%`,
+          description: `Model endpoint ${endpoint} fails transparency requirements.`,
+          review_type: "explainability_flag",
+          severity: overallScore < 50 ? "critical" : "high",
+          status: "pending",
+          model_id: modelId,
+          incident_id: incidentId || null,
+          sla_deadline: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
+          created_by: user?.id,
+          context: { incident_id: incidentId },
+        });
+      }
 
       // Create drift alert for Alerts page
       await serviceClient.from("drift_alerts").insert({
