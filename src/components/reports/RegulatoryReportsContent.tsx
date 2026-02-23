@@ -81,8 +81,8 @@ export default function RegulatoryReportsContent() {
           system_id: params.systemId,
           report_type: params.reportType,
           status: 'draft',
-          content: data,
-          content_hash: data.content_hash
+          report_content: data,
+          document_hash: data.content_hash || null
         });
 
       if (insertError) throw insertError;

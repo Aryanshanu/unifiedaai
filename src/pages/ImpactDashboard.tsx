@@ -83,8 +83,17 @@ export default function ImpactDashboard() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast.success("Population impact metrics computed");
+      if (data?.groups) {
+        setComputedGroups(data.groups);
+      }
+      if (data?.overall) {
+        setComputedOverall(data.overall);
+      }
+      if (data?.alerts) {
+        setComputedAlerts(data.alerts);
+      }
       refetch();
     },
     onError: (error) => {
@@ -92,10 +101,14 @@ export default function ImpactDashboard() {
     }
   });
 
-  // Process metrics
-  const groups: Array<{ group: string; positiveRate: number; harmRate: number; decisionCount: number; appealRate: number; metrics: { disparateImpact: number } }> = [];
-  const alerts: Array<{ type: string; message: string; severity: string }> = [];
-  const overall = { totalDecisions: 0, harmfulOutcomes: 0, positiveDecisions: 0, appealedDecisions: 0 };
+  const [computedGroups, setComputedGroups] = useState<Array<{ group: string; attribute?: string; positiveRate: number; harmRate: number; decisionCount: number; appealRate: number; sampleSize?: number; metrics: { disparateImpactRatio?: number; disparateImpact?: number; demographicParity?: number; equalizedOdds?: number; calibration?: number } }>>([]);
+  const [computedAlerts, setComputedAlerts] = useState<Array<{ type: string; message: string; severity: string }>>([]);
+  const [computedOverall, setComputedOverall] = useState<{ totalDecisions: number; harmfulOutcomes: number; positiveDecisions: number; appealedDecisions: number; decisionsWithDemographics?: number; demographicCoverage?: number }>({ totalDecisions: 0, harmfulOutcomes: 0, positiveDecisions: 0, appealedDecisions: 0 });
+
+  // Use computed data
+  const groups = computedGroups;
+  const alerts = computedAlerts;
+  const overall = computedOverall;
 
   // Harm category breakdown
   const harmByCategory = harmOutcomes?.reduce((acc, h) => {
@@ -309,14 +322,7 @@ export default function ImpactDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(groups as Array<{
-                      group: string;
-                      decisionCount: number;
-                      positiveRate: number;
-                      harmRate: number;
-                      appealRate: number;
-                      metrics: { disparateImpact: number };
-                    }>).map((group) => (
+                    {groups.map((group) => (
                       <tr key={group.group} className="border-b hover:bg-muted/50">
                         <td className="py-3 px-4 font-medium capitalize">{group.group.replace('_', ' ')}</td>
                         <td className="py-3 px-4 text-right">{group.decisionCount}</td>
@@ -332,8 +338,8 @@ export default function ImpactDashboard() {
                         </td>
                         <td className="py-3 px-4 text-right">{(group.appealRate * 100).toFixed(1)}%</td>
                         <td className="py-3 px-4 text-right">
-                          <Badge variant={group.metrics.disparateImpact < 0.8 ? 'destructive' : 'outline'}>
-                            {(group.metrics.disparateImpact * 100).toFixed(0)}%
+                          <Badge variant={(group.metrics.disparateImpactRatio ?? group.metrics.disparateImpact ?? 1) < 0.8 ? 'destructive' : 'outline'}>
+                            {((group.metrics.disparateImpactRatio ?? group.metrics.disparateImpact ?? 1) * 100).toFixed(0)}%
                           </Badge>
                         </td>
                       </tr>

@@ -61,7 +61,7 @@ import {
 
 const Documentation = () => {
   return (
-    <MainLayout title="Documentation" subtitle="Complete Cookbook Guide to Fractal RAI-OS">
+    <MainLayout title="Documentation" subtitle="Complete Cookbook Guide to Fractal Unified Autonomous Governance Platform">
       <div className="min-h-screen bg-background">
         <ScrollArea className="h-[calc(100vh-4rem)]">
           <div className="max-w-5xl mx-auto px-6 py-12">
@@ -73,7 +73,7 @@ const Documentation = () => {
                 <span className="text-sm font-medium text-primary">Complete Cookbook</span>
               </div>
               <h1 className="text-4xl font-bold tracking-tight mb-4">
-                Fractal RAI-OS
+                Fractal Unified Autonomous Governance Platform
               </h1>
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-4">
                 The World's First End-to-End Responsible AI Operating System
@@ -100,7 +100,7 @@ const Documentation = () => {
               </h2>
               <div className="grid md:grid-cols-3 gap-4 text-sm">
                 <div className="space-y-2">
-                  <a href="#what-is-this" className="block p-2 rounded hover:bg-muted transition-colors">1. What is Fractal RAI-OS?</a>
+                  <a href="#what-is-this" className="block p-2 rounded hover:bg-muted transition-colors">1. What is Fractal?</a>
                   <a href="#getting-started" className="block p-2 rounded hover:bg-muted transition-colors">2. Getting Started (Step-by-Step)</a>
                   <a href="#architecture" className="block p-2 rounded hover:bg-muted transition-colors">3. Understanding the Architecture</a>
                   <a href="#projects" className="block p-2 rounded hover:bg-muted transition-colors">4. Projects (Complete Guide)</a>
@@ -128,7 +128,7 @@ const Documentation = () => {
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <span className="text-primary font-bold">1</span>
                 </div>
-                What is Fractal RAI-OS?
+                What is Fractal?
               </h2>
 
               <div className="space-y-6">
@@ -164,7 +164,7 @@ const Documentation = () => {
                 <div className="p-6 rounded-xl border bg-card">
                   <h3 className="text-lg font-semibold mb-4">Our Solution</h3>
                   <p className="text-muted-foreground mb-4">
-                    Fractal RAI-OS provides a complete platform to:
+                    Fractal provides a complete platform to:
                   </p>
                   <ul className="space-y-2 text-sm">
                     <li className="flex items-start gap-2">
@@ -651,7 +651,7 @@ const Documentation = () => {
                 <div className="p-6 rounded-xl border bg-card">
                   <h3 className="text-lg font-semibold mb-4">The Hierarchy: Project → System → Model</h3>
                   <p className="text-muted-foreground mb-4">
-                    Everything in Fractal RAI-OS is organized in a 3-level hierarchy:
+                    Everything in the platform is organized in a 3-level hierarchy:
                   </p>
 
                   <div className="p-4 rounded-lg bg-muted/30 font-mono text-sm mb-6">
@@ -974,7 +974,7 @@ const Documentation = () => {
 
               <div className="space-y-6">
                 <div className="p-6 rounded-xl border bg-card">
-                  <h3 className="text-lg font-semibold mb-4">What is a Model in Fractal RAI-OS?</h3>
+                  <h3 className="text-lg font-semibold mb-4">What is a Model in Fractal?</h3>
                   <p className="text-muted-foreground mb-4">
                     A Model represents any AI/ML model that you want to evaluate, monitor, and govern. 
                     This can be an LLM (like GPT-4), a classification model (like XGBoost), 
@@ -2375,7 +2375,7 @@ const Documentation = () => {
                 You're Ready!
               </h3>
               <p className="text-muted-foreground mb-4">
-                You now have a complete understanding of Fractal RAI-OS. Here's a quick summary of the most important paths:
+                You now have a complete understanding of the platform. Here's a quick summary of the most important paths:
               </p>
               <div className="grid md:grid-cols-2 gap-4 text-sm">
                 <div className="p-3 rounded bg-background">
@@ -2399,7 +2399,7 @@ const Documentation = () => {
 
             {/* Footer */}
             <div className="text-center text-sm text-muted-foreground">
-              <p>Fractal RAI-OS Documentation • Version 1.0.0 • MIT License</p>
+              <p>Fractal Unified Autonomous Governance Platform Documentation • Version 1.0.0 • MIT License</p>
               <p className="mt-2">
                 Built with transparency, honesty, and passion. 🚀
               </p>

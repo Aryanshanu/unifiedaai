@@ -26,7 +26,7 @@ import {
   Play,
   BarChart3,
   FileCheck,
-  Sliders,
+  
   BookMarked,
   ScanSearch,
   FlaskConical,
@@ -67,7 +67,7 @@ const navItems = [
   { divider: true, label: "Configure" },
   { path: "/projects", icon: FolderOpen, label: "Projects" },
   { path: "/models", icon: Database, label: "Models" },
-  { path: "/configuration", icon: Sliders, label: "Configuration" },
+  
   { path: "/runbooks", icon: BookMarked, label: "Runbooks" },
   { path: "/settings", icon: Settings, label: "Settings" },
   { path: "/docs", icon: BookOpen, label: "Documentation" },
