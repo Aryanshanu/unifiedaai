@@ -72,7 +72,7 @@ async function sendSlackNotification(
         },
         {
           type: "context",
-          text: { type: "mrkdwn", text: `_Sent from Fractal Unified-OS at ${new Date().toISOString()}_` }
+          text: { type: "mrkdwn", text: `_Sent from Fractal Unified Autonomous Governance Platform at ${new Date().toISOString()}_` }
         }
       ]
     };
@@ -127,7 +127,7 @@ async function sendEmailWithResend(
 
   try {
     const config = SEVERITY_CONFIG[payload.severity || 'medium'];
-    const fromEmail = Deno.env.get("NOTIFICATION_FROM_EMAIL") || "Fractal Unified-OS <notifications@resend.dev>";
+    const fromEmail = Deno.env.get("NOTIFICATION_FROM_EMAIL") || "Fractal Unified <notifications@resend.dev>";
 
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -163,7 +163,7 @@ async function sendEmailWithResend(
               </div>
               <div style="border-top: 1px solid #eee; padding: 16px 24px; background: #fafafa;">
                 <p style="margin: 0; font-size: 12px; color: #888;">
-                  Sent from Fractal Unified-OS at ${new Date().toISOString()}<br>
+                  Sent from Fractal Unified Autonomous Governance Platform at ${new Date().toISOString()}<br>
                   This is an automated notification. Do not reply to this email.
                 </p>
               </div>

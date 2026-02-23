@@ -9,6 +9,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ErrorBoundary } from "@/components/error/ErrorBoundary";
 import { GlobalBanner } from "@/components/layout/GlobalBanner";
 import { SidebarProvider } from "@/contexts/SidebarContext";
+import { ThemeProvider } from "next-themes";
 import { Loader2 } from "lucide-react";
 
 // Lazy-loaded pages
@@ -71,10 +72,11 @@ function PageFallback() {
 
 const App = () => (
   <ErrorBoundary>
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <SidebarProvider>
-          <TooltipProvider>
+    <ThemeProvider attribute="class" defaultTheme="dark" storageKey="fractal-theme">
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <SidebarProvider>
+            <TooltipProvider>
             <Toaster />
             <Sonner />
             <BrowserRouter>
@@ -143,10 +145,11 @@ const App = () => (
               </Routes>
               </Suspense>
             </BrowserRouter>
-          </TooltipProvider>
-        </SidebarProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+            </TooltipProvider>
+          </SidebarProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   </ErrorBoundary>
 );
 
