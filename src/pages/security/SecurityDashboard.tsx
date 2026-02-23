@@ -1,11 +1,10 @@
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useSecurityStats, useSecurityTestRuns } from '@/hooks/useSecurityScans';
 import { SecurityScoreGauge } from '@/components/security/SecurityScoreGauge';
 import { useNavigate } from 'react-router-dom';
-import { Shield, ScanSearch, FlaskConical, Target, ArrowRight, AlertTriangle, Clock } from 'lucide-react';
+import { ScanSearch, FlaskConical, Target, ArrowRight, AlertTriangle, Clock } from 'lucide-react';
 import { ComponentErrorBoundary } from '@/components/error/ErrorBoundary';
 import { HealthIndicator } from '@/components/shared/HealthIndicator';
 import { useDataHealth } from '@/components/shared/DataHealthWrapper';
@@ -55,19 +54,23 @@ function SecurityDashboardContent() {
         <h3 className="font-semibold mb-4 flex items-center gap-2"><Clock className="w-4 h-4" />Recent Scans</h3>
         {recentRuns && recentRuns.length > 0 ? (
           <div className="space-y-2">
-            {recentRuns.slice(0, 10).map((run: any) => (
-              <div key={run.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                <div className="flex items-center gap-3">
-                  <Badge variant="outline" className="capitalize text-xs">{run.test_type?.replace('_', ' ')}</Badge>
-                  <span className="text-sm">{run.model_id?.substring(0, 8)}...</span>
-                  <span className="text-xs text-muted-foreground">{new Date(run.created_at).toLocaleDateString()}</span>
+            {recentRuns.slice(0, 10).map((run: any) => {
+              const riskLevel = run.summary?.risk_level;
+              const overallScore = run.summary?.overall_score;
+              return (
+                <div key={run.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                  <div className="flex items-center gap-3">
+                    <Badge variant="outline" className="capitalize text-xs">{run.test_type?.replace('_', ' ')}</Badge>
+                    <span className="text-sm">{(run.summary?.model_id || run.system_id || '').substring(0, 8)}...</span>
+                    <span className="text-xs text-muted-foreground">{new Date(run.created_at).toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {riskLevel && <Badge variant={riskLevel === 'low' ? 'secondary' : 'destructive'} className="text-xs capitalize">{riskLevel}</Badge>}
+                    <span className="text-sm font-mono">{overallScore != null ? `${(overallScore * 100).toFixed(0)}%` : '—'}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {run.risk_level && <Badge variant={run.risk_level === 'low' ? 'secondary' : 'destructive'} className="text-xs capitalize">{run.risk_level}</Badge>}
-                  <span className="text-sm font-mono">{run.overall_score != null ? `${(run.overall_score * 100).toFixed(0)}%` : '—'}</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="text-center py-8 text-muted-foreground">

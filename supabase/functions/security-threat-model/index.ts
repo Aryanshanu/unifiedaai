@@ -94,7 +94,7 @@ async function generateThreats(modelName: string, modelType: string, framework: 
 }
 
 function generateFallbackThreats(framework: Framework): any[] {
-  const base = [
+  return [
     { title: "Prompt Injection Attack", description: "Adversary crafts input to override system instructions", likelihood: 4, impact: 4, category: "Input Manipulation", mitigation_checklist: ["Input sanitization", "Prompt hardening", "Output filtering"] },
     { title: "Training Data Poisoning", description: "Malicious data injected into training pipeline", likelihood: 2, impact: 5, category: "Data Integrity", mitigation_checklist: ["Data provenance tracking", "Anomaly detection on training data", "Periodic retraining audits"] },
     { title: "Model Theft via API", description: "Model weights extracted through repeated API queries", likelihood: 3, impact: 4, category: "IP Protection", mitigation_checklist: ["Rate limiting", "Query logging", "Watermarking outputs"] },
@@ -102,7 +102,17 @@ function generateFallbackThreats(framework: Framework): any[] {
     { title: "Denial of Service via Resource Exhaustion", description: "Crafted inputs causing excessive compute consumption", likelihood: 3, impact: 3, category: "Availability", mitigation_checklist: ["Input length limits", "Timeout enforcement", "Resource quotas"] },
     { title: "Excessive Agency / Autonomous Actions", description: "Model takes actions beyond intended scope", likelihood: 2, impact: 5, category: "Control", mitigation_checklist: ["Human-in-the-loop gates", "Action whitelisting", "Rollback mechanisms"] },
   ];
-  return base;
+}
+
+/** Map category to the correct framework-specific column */
+function mapCategoryToFrameworkField(framework: Framework, category: string): Record<string, string> {
+  switch (framework) {
+    case "OWASP_LLM": return { owasp_category: category };
+    case "ATLAS": return { atlas_tactic: category };
+    case "MAESTRO": return { maestro_layer: category };
+    case "STRIDE":
+    default: return { owasp_category: category };
+  }
 }
 
 serve(async (req) => {
@@ -129,7 +139,7 @@ serve(async (req) => {
     const framework: Framework = FRAMEWORKS.includes(rawBody.framework) ? rawBody.framework : "STRIDE";
     console.log(`[security-threat-model] Generating ${framework} threat model for: ${modelId}`);
 
-    // Fetch model info
+    // Fetch model info (includes system)
     const { data: model, error: modelError } = await serviceClient
       .from("models")
       .select("*, system:systems(*)")
@@ -138,6 +148,11 @@ serve(async (req) => {
 
     if (modelError || !model) {
       return errorResponse("Model not found", 404);
+    }
+
+    const systemId = model.system_id;
+    if (!systemId) {
+      return errorResponse("Model has no linked system. Register the model under a system first.", 400);
     }
 
     const systemDetails = model.system
@@ -185,64 +200,74 @@ serve(async (req) => {
       threshold: 0.5,
     });
 
-    // Save threat model
+    // Save threat model (correct schema)
     const { data: threatModel, error: tmError } = await serviceClient
       .from("threat_models")
       .insert({
-        model_id: modelId,
+        system_id: systemId,
+        name: `${framework} Threat Model: ${model.name}`,
         framework,
         risk_score: riskScore,
-        status: "completed",
-        threat_count: threats.length,
+        description: `${framework} threat analysis for ${model.name}. ${threats.length} threats identified. Risk: ${(riskScore * 100).toFixed(0)}%`,
+        architecture_graph: { computationSteps, overallScore, model_id: modelId },
         created_by: user!.id,
-        metadata: { computationSteps, overallScore },
       })
       .select("id")
       .single();
 
     if (tmError) console.error("[security-threat-model] Failed to save threat model:", tmError);
 
-    // Save individual threat vectors
+    // Save individual threat vectors (correct schema)
     if (threatModel) {
       for (const threat of threats) {
+        const frameworkField = mapCategoryToFrameworkField(framework, threat.category);
         await serviceClient.from("threat_vectors").insert({
           threat_model_id: threatModel.id,
           title: threat.title,
           description: threat.description,
           likelihood: threat.likelihood,
           impact: threat.impact,
-          risk_score: threat.riskScore,
-          category: threat.category,
-          mitigation_status: "pending",
-          mitigations: threat.mitigation_checklist,
+          mitigation_checklist: threat.mitigation_checklist,
+          ...frameworkField,
         });
       }
     }
 
-    // Save test run for dashboard consistency
+    // Save test run for dashboard consistency (correct schema)
+    const riskLevel = riskScore > 0.5 ? "high" : riskScore > 0.3 ? "medium" : "low";
     await serviceClient.from("security_test_runs").insert({
       test_type: "threat_model",
-      model_id: modelId,
+      system_id: systemId,
       status: "completed",
-      overall_score: 1 - riskScore,
-      risk_level: riskScore > 0.5 ? "high" : riskScore > 0.3 ? "medium" : "low",
-      results: { framework, threats, riskScore, computationSteps, overallScore },
+      summary: {
+        overall_score: 1 - riskScore,
+        risk_level: riskLevel,
+        framework,
+        threats,
+        risk_score: riskScore,
+        computation_steps: computationSteps,
+        overall_score_pct: overallScore,
+        model_id: modelId,
+      },
+      tests_total: threats.length,
+      tests_passed: threats.filter(t => t.riskScore <= 0.3).length,
+      tests_failed: threats.filter(t => t.riskScore > 0.3).length,
+      coverage_percentage: (1 - riskScore) * 100,
       started_at: new Date(startTime).toISOString(),
       completed_at: new Date().toISOString(),
-      initiated_by: user!.id,
+      triggered_by: user!.id,
     });
 
     // Auto-escalation if high risk
     if (riskScore > 0.5) {
       await serviceClient.from("review_queue").insert({
         review_type: "security_threat_model",
-        entity_type: "model",
-        entity_id: modelId,
+        model_id: modelId,
         severity: riskScore > 0.7 ? "critical" : "high",
         status: "pending",
         title: `Threat Model HIGH RISK: ${framework} analysis for ${model.name}`,
         description: `${threats.length} threats identified. Aggregate risk: ${(riskScore * 100).toFixed(0)}%. HITL review required.`,
-        metadata: { framework, riskScore, threatCount: threats.length, threatModelId: threatModel?.id },
+        context: { framework, riskScore, threatCount: threats.length, threatModelId: threatModel?.id },
       });
     }
 
