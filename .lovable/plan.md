@@ -1,107 +1,130 @@
 
 
-# Fix Project Deletion -- Foreign Key Cascade Failure
+# Theme Toggle + Branding Unification
 
-## Problem
+## Two Changes
 
-When you try to delete a project, it fails with error:
-> "update or delete on table 'systems' violates foreign key constraint 'regulatory_reports_system_id_fkey'"
+### 1. Dark/Light Theme Toggle
 
-The delete function in `useDeleteProject` only cleans up 5 child tables before deleting systems, but there are actually **15 tables** that reference `systems` via foreign keys. The missing ones block the delete.
+The app currently only has a dark theme (CSS variables in `:root`). The `next-themes` package is already installed but no `ThemeProvider` wraps the app. The Sonner toaster already imports `useTheme` from `next-themes` but it always falls back to "system" since there's no provider.
 
-## Root Cause
+**What will change:**
 
-The `useDeleteProject` hook in `src/hooks/useProjects.ts` manually cascades deletes in this order:
+- **`src/index.css`**: Add a full `.light` (or just use `:root` for light, `.dark` for dark) theme block with professional light-mode CSS variables (white/slate backgrounds, same indigo primary, adjusted shadows and glows)
+- **`index.html`**: Add `class="dark"` to `<html>` tag so the default remains dark
+- **`src/App.tsx`**: Wrap everything in `<ThemeProvider>` from `next-themes` with `attribute="class"`, `defaultTheme="dark"`, `storageKey="fractal-theme"`
+- **`src/components/layout/Header.tsx`**: Add a Sun/Moon toggle button next to the notification bell that calls `setTheme()` from `useTheme()`
+- **`src/components/layout/Sidebar.tsx`**: Add a small theme toggle icon at the bottom (next to the collapse button)
 
-1. models (by system_id) -- handled
-2. models (by project_id) -- handled
-3. risk_assessments -- handled
-4. impact_assessments -- handled
-5. system_documents -- handled
-6. system_approvals -- handled
-7. systems -- **FAILS here** because these are NOT cleaned up:
-   - `regulatory_reports`
-   - `security_test_runs`
-   - `security_findings`
-   - `threat_models`
-   - `risk_metrics`
-   - `evaluation_requirements`
-   - `deployment_attestations`
-   - `mlops_governance_events`
-   - `request_logs`
-   - `events_raw`
+**Light theme palette:**
+- Background: clean white (#fafbfc)
+- Card: white with subtle gray borders
+- Sidebar: light slate (#f1f5f9)
+- Primary: same deep indigo (works on both)
+- Text: dark slate
+- Risk colors: same hues, slightly adjusted for contrast on light backgrounds
 
-## Fix
+### 2. Branding: "Fractal Unified Autonomous Governance Platform"
 
-Update `src/hooks/useProjects.ts` to delete ALL referencing tables before deleting systems. The full cascade order will be:
+Replace ALL instances of "Fractal Unified-OS" and "Autonomous Governance Platform" with the unified name across **9 files**:
 
-### Step 1: Get system IDs (already done)
-### Step 2: Delete models (already done)
-### Step 3: Delete ALL system-referencing tables (expanded)
+| File | Old Text | New Text |
+|------|----------|----------|
+| `index.html` (title, og:title, twitter:title) | "Fractal Unified-OS -- Autonomous Governance Platform" | "Fractal Unified Autonomous Governance Platform" |
+| `src/components/layout/GlobalBanner.tsx` | "Fractal Unified-OS -- Autonomous Governance Platform" | "Fractal Unified Autonomous Governance Platform" |
+| `src/components/layout/Footer.tsx` | "Fractal Unified-OS" + "Autonomous Governance Platform" | "Fractal Unified Autonomous Governance Platform" |
+| `src/components/layout/Sidebar.tsx` | "Fractal Unified Governance" | "Fractal Unified Autonomous Governance" |
+| `src/pages/Auth.tsx` | "Fractal Unified-OS" + "Autonomous Governance Platform" | "Fractal Unified Autonomous Governance Platform" |
+| `src/components/error/ErrorBoundary.tsx` | "Fractal Unified-OS . Autonomous Governance Platform" | "Fractal Unified Autonomous Governance Platform" |
+| `src/components/governance/AttestationSigner.tsx` | "FRACTAL UNIFIED-OS" | "FRACTAL UNIFIED AUTONOMOUS GOVERNANCE" |
+| `supabase/functions/rai-assistant/index.ts` | Multiple "Fractal Unified-OS" references | "Fractal Unified Autonomous Governance Platform" |
+| `supabase/functions/send-notification/index.ts` | "Fractal Unified-OS" | "Fractal Unified Autonomous Governance Platform" |
+| `supabase/functions/generate-audit-report/index.ts` | "FRACTAL UNIFIED-OS" | "FRACTAL UNIFIED AUTONOMOUS GOVERNANCE" |
 
-Add deletes for these 10 missing tables (in addition to the 4 already handled):
-- `regulatory_reports` (system_id)
-- `security_test_runs` (system_id)
-- `security_findings` (system_id)
-- `threat_models` (system_id) -- must also delete `threat_vectors` first since they reference threat_models
-- `risk_metrics` (system_id)
-- `evaluation_requirements` (system_id)
-- `deployment_attestations` (system_id)
-- `mlops_governance_events` (system_id)
-- `request_logs` (system_id)
-- `events_raw` (source_system_id)
-
-### Step 4: Delete project-referencing tables
-Also clean up tables referencing `projects` directly:
-- `request_logs` (project_id)
-- `risk_assessments` (project_id)
-- `impact_assessments` (project_id)
-
-### Step 5: Delete systems (already done)
-### Step 6: Delete project (already done)
+---
 
 ## Technical Details
 
-### File: `src/hooks/useProjects.ts`
+### Light Theme CSS Variables (added to `src/index.css`)
 
-In the `useDeleteProject` mutation function, add delete calls for all missing tables between the existing model deletes and the system deletes. Each uses `.delete().in("system_id", systemIds)` pattern, with warnings logged on failure (non-blocking for non-critical tables).
+```css
+:root {
+  /* Light theme by default for :root, overridden by .dark */
+  --background: 220 20% 97%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --primary: 232 47% 48%;
+  --primary-foreground: 210 40% 98%;
+  --primary-glow: 232 47% 58%;
+  --secondary: 220 14% 92%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 220 14% 94%;
+  --muted-foreground: 220 8% 46%;
+  --accent: 232 40% 92%;
+  --accent-foreground: 232 47% 30%;
+  --destructive: 0 72% 48%;
+  --destructive-foreground: 210 40% 98%;
+  --success: 152 55% 42%;
+  --warning: 38 80% 48%;
+  --danger: 0 65% 48%;
+  --risk-critical: 0 72% 48%;
+  --risk-high: 38 80% 48%;
+  --risk-medium: 45 70% 50%;
+  --risk-low: 215 20% 55%;
+  --border: 220 13% 87%;
+  --input: 220 13% 91%;
+  --ring: 232 47% 48%;
+  --sidebar-background: 220 14% 96%;
+  --sidebar-foreground: 222 47% 20%;
+  /* ... remaining sidebar vars */
+}
 
-Special case: `threat_vectors` must be deleted before `threat_models` since threat_vectors references threat_models. This requires fetching threat_model IDs first, then deleting threat_vectors by `threat_model_id`.
-
-Special case: `events_raw` uses `source_system_id` instead of `system_id`.
-
-### Ordering within the mutation:
-
-```text
-1. Fetch system IDs for project
-2. Fetch threat_model IDs for those systems
-3. Delete threat_vectors (by threat_model_id)
-4. Delete models (by system_id + project_id)
-5. Delete risk_assessments (by system_id)
-6. Delete impact_assessments (by system_id)
-7. Delete system_documents (by system_id)
-8. Delete system_approvals (by system_id)
-9. Delete regulatory_reports (by system_id)
-10. Delete security_test_runs (by system_id)
-11. Delete security_findings (by system_id)
-12. Delete threat_models (by system_id)
-13. Delete risk_metrics (by system_id)
-14. Delete evaluation_requirements (by system_id)
-15. Delete deployment_attestations (by system_id)
-16. Delete mlops_governance_events (by system_id)
-17. Delete request_logs (by system_id)
-18. Delete events_raw (by source_system_id)
-19. Delete systems (by id)
-20. Delete request_logs (by project_id) -- direct project ref
-21. Delete project
+.dark {
+  /* Current dark theme values moved here */
+  --background: 222 47% 7%;
+  --foreground: 210 40% 96%;
+  /* ... all existing dark values */
+}
 ```
 
-## Summary
+### ThemeProvider Setup (`src/App.tsx`)
 
-| What | Change |
-|------|--------|
-| File | `src/hooks/useProjects.ts` |
-| Issue | 10 foreign-key tables not cleaned up before system deletion |
-| Fix | Add delete calls for all 15 referencing tables in correct order |
-| Risk | Low -- all deletes use `.in("system_id", systemIds)` which is safe |
+```tsx
+import { ThemeProvider } from "next-themes";
+
+const App = () => (
+  <ErrorBoundary>
+    <ThemeProvider attribute="class" defaultTheme="dark" storageKey="fractal-theme">
+      <QueryClientProvider client={queryClient}>
+        ...
+      </QueryClientProvider>
+    </ThemeProvider>
+  </ErrorBoundary>
+);
+```
+
+### Theme Toggle Button (`src/components/layout/Header.tsx`)
+
+Add a Sun/Moon icon button between the notification bell and user menu that toggles between light and dark themes using `useTheme()` from `next-themes`.
+
+### Files Modified (Total: 13)
+
+| # | File | Change |
+|---|------|--------|
+| 1 | `src/index.css` | Move dark vars to `.dark`, add light vars to `:root` |
+| 2 | `index.html` | Add `class="dark"` to html tag, update title/meta branding |
+| 3 | `src/App.tsx` | Wrap in `ThemeProvider` |
+| 4 | `src/components/layout/Header.tsx` | Add theme toggle button |
+| 5 | `src/components/layout/GlobalBanner.tsx` | Update branding text |
+| 6 | `src/components/layout/Footer.tsx` | Update branding text |
+| 7 | `src/components/layout/Sidebar.tsx` | Update branding text |
+| 8 | `src/pages/Auth.tsx` | Update branding text |
+| 9 | `src/components/error/ErrorBoundary.tsx` | Update branding text |
+| 10 | `src/components/governance/AttestationSigner.tsx` | Update branding text |
+| 11 | `supabase/functions/rai-assistant/index.ts` | Update branding text |
+| 12 | `supabase/functions/send-notification/index.ts` | Update branding text |
+| 13 | `supabase/functions/generate-audit-report/index.ts` | Update branding text |
 
