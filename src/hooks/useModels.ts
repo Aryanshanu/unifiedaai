@@ -175,7 +175,22 @@ export function useCreateModel() {
       const apiToken = input.api_token || input.huggingface_api_token || null;
       
       // Determine the endpoint to use
-      const systemEndpoint = input.endpoint || input.huggingface_endpoint || null;
+      let systemEndpoint = input.endpoint || input.huggingface_endpoint || null;
+      let resolvedProvider = input.provider || 'Custom';
+      let resolvedModelName = input.huggingface_model_id || input.name;
+
+      // Normalize OpenRouter model page URLs at registration time
+      if (systemEndpoint && systemEndpoint.includes('openrouter.ai') && !systemEndpoint.includes('/api/v1/')) {
+        try {
+          const url = new URL(systemEndpoint);
+          const pathParts = url.pathname.split('/').filter(Boolean);
+          if (pathParts.length >= 2) {
+            resolvedModelName = pathParts.join('/');
+          }
+          systemEndpoint = 'https://openrouter.ai/api/v1/chat/completions';
+          resolvedProvider = 'OpenRouter';
+        } catch { /* keep original if URL parsing fails */ }
+      }
       
       // Step 1: Create the System first
       const { data: systemData, error: systemError } = await supabase
@@ -183,9 +198,9 @@ export function useCreateModel() {
         .insert({
           project_id: input.project_id,
           name: input.name,
-          provider: input.provider || 'Custom',
+          provider: resolvedProvider,
           system_type: 'model',
-          model_name: input.huggingface_model_id || input.name,
+          model_name: resolvedModelName,
           endpoint: systemEndpoint,
           api_token_encrypted: apiToken, // Store API token in system
           use_case: input.use_case || null,

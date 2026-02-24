@@ -3,6 +3,45 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
+/**
+ * Normalize OpenRouter model page URLs to the correct API endpoint.
+ * Detects URLs like `openrouter.ai/{org}/{model}` (without `/api/v1/`)
+ * and converts them to `https://openrouter.ai/api/v1/chat/completions`,
+ * extracting the model ID from the path.
+ */
+function normalizeOpenRouterUrl(
+  endpoint: string,
+  fallbackModelName: string | null
+): { endpoint: string; modelName: string | null; isOpenRouter: boolean } {
+  if (!endpoint.includes("openrouter.ai")) {
+    return { endpoint, modelName: fallbackModelName, isOpenRouter: false };
+  }
+
+  // Already a correct API URL
+  if (endpoint.includes("/api/v1/")) {
+    return { endpoint, modelName: fallbackModelName, isOpenRouter: true };
+  }
+
+  // It's a model page URL like https://openrouter.ai/openai/gpt-oss-120b:free
+  // Extract the model ID from the path
+  try {
+    const url = new URL(endpoint);
+    const pathParts = url.pathname.split("/").filter(Boolean);
+    // Expected: ["openai", "gpt-oss-120b:free"] or ["google", "gemma-3n-e4b-it"]
+    const extractedModel = pathParts.length >= 2 ? pathParts.join("/") : fallbackModelName;
+
+    console.log(`[call-user-model] Normalized OpenRouter URL: ${endpoint} → API endpoint, model=${extractedModel}`);
+
+    return {
+      endpoint: "https://openrouter.ai/api/v1/chat/completions",
+      modelName: extractedModel,
+      isOpenRouter: true,
+    };
+  } catch {
+    return { endpoint, modelName: fallbackModelName, isOpenRouter: false };
+  }
+}
+
 export interface ModelEndpointConfig {
   endpoint: string;
   apiToken: string | null;

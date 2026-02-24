@@ -493,7 +493,6 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                             const result = validateEndpoint(e.target.value, formValues.provider);
                             if (!result.isValid && result.error) {
                               setEndpointWarning(result.warning || result.error);
-                              // Store suggested correction if available
                               if (result.normalizedEndpoint) {
                                 setSuggestedEndpoint(result.normalizedEndpoint);
                               } else {
@@ -502,6 +501,10 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                             } else {
                               setEndpointWarning(null);
                               setSuggestedEndpoint(null);
+                            }
+                            // Auto-detect provider from endpoint
+                            if (result.detectedProvider && !formValues.provider) {
+                              form.setValue('provider', result.detectedProvider);
                             }
                           }}
                         />
