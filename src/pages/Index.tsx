@@ -147,6 +147,13 @@ export default function Index() {
           queryClient.invalidateQueries({ queryKey: ['pending-reviews-count'] });
         }
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'semantic_drift_alerts' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['semantic-summary'] });
+        }
+      )
       .subscribe();
 
     return () => {
