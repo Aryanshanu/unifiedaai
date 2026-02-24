@@ -101,7 +101,7 @@ export default function Index() {
     refetchInterval: 60000,
   });
   
-  // Realtime subscription for dashboard data
+  // Realtime subscription - reduced to 2 critical tables only
   useEffect(() => {
     const channel = supabase
       .channel('dashboard-realtime')
@@ -123,24 +123,9 @@ export default function Index() {
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'dq_incidents' },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['dq-summary'] });
-        }
-      )
-      .on(
-        'postgres_changes',
         { event: '*', schema: 'public', table: 'review_queue' },
         () => {
-          queryClient.invalidateQueries({ queryKey: ['review-queue'] });
-          queryClient.invalidateQueries({ queryKey: ['pending-reviews-count'] });
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'semantic_drift_alerts' },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['semantic-summary'] });
+          queryClient.invalidateQueries({ queryKey: ['platform-metrics'] });
         }
       )
       .subscribe();
