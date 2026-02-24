@@ -190,7 +190,7 @@ export default function Observability() {
     }
   };
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'oversight' | 'realtime' | 'drift' | 'assistant'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'oversight' | 'realtime' | 'drift' | 'assistant' | 'semantic-drift'>('dashboard');
 
   return (
     <MainLayout 
