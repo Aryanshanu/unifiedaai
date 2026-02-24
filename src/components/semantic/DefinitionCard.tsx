@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DriftScoreIndicator } from './DriftScoreIndicator';
-import { Pencil, Trash2, Hash, Clock } from 'lucide-react';
+import { Pencil, Trash2, Hash, Clock, Search, Layers } from 'lucide-react';
 import type { SemanticDefinition } from '@/hooks/useSemanticDefinitions';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -19,7 +19,7 @@ const statusColors: Record<string, string> = {
 };
 
 export function DefinitionCard({ definition, onEdit, onDelete }: DefinitionCardProps) {
-  // Simulate drift score from metadata or default to 0
+  // Real drift score from metadata or open alerts count
   const driftScore = (definition.metadata as any)?.drift_score ?? 0;
 
   return (
@@ -49,6 +49,27 @@ export function DefinitionCard({ definition, onEdit, onDelete }: DefinitionCardP
           {definition.synonyms?.map((s) => (
             <Badge key={s} variant="outline" className="text-xs">{s}</Badge>
           ))}
+        </div>
+
+        {/* Query & consumer stats */}
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          {definition.query_count > 0 && (
+            <span className="flex items-center gap-1">
+              <Search className="w-3 h-3" />
+              {definition.query_count} queries
+            </span>
+          )}
+          {definition.deployment_count > 0 && (
+            <span className="flex items-center gap-1">
+              <Layers className="w-3 h-3" />
+              {definition.deployment_count} consumers
+            </span>
+          )}
+          {definition.last_queried_at && (
+            <span className="flex items-center gap-1">
+              last queried {formatDistanceToNow(new Date(definition.last_queried_at), { addSuffix: true })}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center justify-between text-xs text-muted-foreground">

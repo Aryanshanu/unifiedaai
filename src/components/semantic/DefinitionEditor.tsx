@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Save, AlertTriangle, CheckCircle2, X } from 'lucide-react';
+import { Loader2, Save, AlertTriangle, CheckCircle2, X, ShieldAlert } from 'lucide-react';
 import type { SemanticDefinition, CreateDefinitionInput } from '@/hooks/useSemanticDefinitions';
+import { validateMetricYaml } from '@/lib/semantic-validator';
+import type { ValidationError } from '@/lib/semantic-validator';
 
 const DEFAULT_YAML = `metric:
   name: my_metric
@@ -35,78 +36,9 @@ interface DefinitionEditorProps {
   saving: boolean;
 }
 
-interface ParsedYaml {
-  name?: string;
-  display_name?: string;
-  description?: string;
-  owner?: string;
-  grain?: string;
-  sql?: string;
-  synonyms?: string[];
-  ai_context?: string;
-}
-
-function parseSimpleYaml(yaml: string): { parsed: ParsedYaml; errors: string[] } {
-  const errors: string[] = [];
-  const parsed: ParsedYaml = {};
-
-  try {
-    // Basic YAML-like parsing for the metric block
-    const lines = yaml.split('\n');
-    let inSql = false;
-    let sqlLines: string[] = [];
-    let inSynonyms = false;
-    const synonyms: string[] = [];
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-
-      if (inSql) {
-        if (trimmed && !trimmed.startsWith('-') && !trimmed.includes(':') || line.startsWith('    ')) {
-          if (line.startsWith('    ') || line.startsWith('\t\t')) {
-            sqlLines.push(trimmed);
-            continue;
-          }
-        }
-        inSql = false;
-        parsed.sql = sqlLines.join('\n');
-      }
-
-      if (inSynonyms) {
-        if (trimmed.startsWith('- ')) {
-          synonyms.push(trimmed.slice(2).trim().replace(/^["']|["']$/g, ''));
-          continue;
-        }
-        inSynonyms = false;
-        parsed.synonyms = synonyms;
-      }
-
-      if (trimmed.startsWith('name:')) parsed.name = trimmed.split(':').slice(1).join(':').trim().replace(/^["']|["']$/g, '');
-      else if (trimmed.startsWith('display_name:')) parsed.display_name = trimmed.split(':').slice(1).join(':').trim().replace(/^["']|["']$/g, '');
-      else if (trimmed.startsWith('description:')) parsed.description = trimmed.split(':').slice(1).join(':').trim().replace(/^["']|["']$/g, '');
-      else if (trimmed.startsWith('owner:')) parsed.owner = trimmed.split(':').slice(1).join(':').trim();
-      else if (trimmed.startsWith('grain:')) parsed.grain = trimmed.split(':').slice(1).join(':').trim();
-      else if (trimmed.startsWith('ai_context:')) parsed.ai_context = trimmed.split(':').slice(1).join(':').trim().replace(/^["']|["']$/g, '');
-      else if (trimmed === 'sql: |') { inSql = true; sqlLines = []; }
-      else if (trimmed === 'synonyms:') { inSynonyms = true; }
-    }
-
-    if (inSql && sqlLines.length > 0) parsed.sql = sqlLines.join('\n');
-    if (inSynonyms && synonyms.length > 0) parsed.synonyms = synonyms;
-
-    if (!parsed.name) errors.push('Missing required field: name');
-  } catch {
-    errors.push('Failed to parse YAML structure');
-  }
-
-  return { parsed, errors };
-}
-
 export function DefinitionEditor({ definition, onSave, onCancel, saving }: DefinitionEditorProps) {
   const [yaml, setYaml] = useState(definition?.definition_yaml || DEFAULT_YAML);
   const [status, setStatus] = useState<'draft' | 'active' | 'deprecated'>(definition?.status || 'draft');
-  const [validationErrors, setValidationErrors] = useState<string[]>([]);
-  const [validationOk, setValidationOk] = useState(false);
 
   useEffect(() => {
     if (definition) {
@@ -115,16 +47,14 @@ export function DefinitionEditor({ definition, onSave, onCancel, saving }: Defin
     }
   }, [definition]);
 
-  const validate = () => {
-    const { parsed, errors } = parseSimpleYaml(yaml);
-    setValidationErrors(errors);
-    setValidationOk(errors.length === 0);
-    return { parsed, errors };
-  };
+  // Live validation as user types
+  const { parsed, errors } = useMemo(() => validateMetricYaml(yaml), [yaml]);
+  const criticalErrors = errors.filter((e: ValidationError) => e.severity === 'error');
+  const warnings = errors.filter((e: ValidationError) => e.severity === 'warning');
+  const isValid = criticalErrors.length === 0;
 
   const handleSave = async () => {
-    const { parsed, errors } = validate();
-    if (errors.length > 0) return;
+    if (!isValid) return;
 
     await onSave({
       id: definition?.id,
@@ -172,41 +102,64 @@ export function DefinitionEditor({ definition, onSave, onCancel, saving }: Defin
             <Badge variant="outline" className="block mt-1 text-center">v{definition.version}</Badge>
           </div>
         )}
+        <div>
+          <Label className="text-xs text-muted-foreground">Schema</Label>
+          <Badge variant={isValid ? 'default' : 'destructive'} className="block mt-1 text-center">
+            {isValid ? 'Valid' : `${criticalErrors.length} error${criticalErrors.length !== 1 ? 's' : ''}`}
+          </Badge>
+        </div>
       </div>
 
       <div>
-        <Label className="text-xs text-muted-foreground mb-1 block">Definition YAML</Label>
+        <Label className="text-xs text-muted-foreground mb-1 block">Definition YAML (OSI v1.0 Schema)</Label>
         <Textarea
           value={yaml}
-          onChange={(e) => { setYaml(e.target.value); setValidationOk(false); setValidationErrors([]); }}
+          onChange={(e) => setYaml(e.target.value)}
           className="font-mono text-sm min-h-[350px] bg-secondary/50"
           spellCheck={false}
         />
       </div>
 
-      {validationErrors.length > 0 && (
+      {/* Live validation errors */}
+      {criticalErrors.length > 0 && (
         <Alert className="bg-destructive/10 border-destructive/20">
           <AlertTriangle className="w-4 h-4 text-destructive" />
           <AlertDescription className="text-destructive">
-            {validationErrors.map((e, i) => <div key={i}>{e}</div>)}
+            {criticalErrors.map((e, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <code className="text-xs bg-destructive/10 px-1 rounded">{e.field}</code>
+                <span>{e.message}</span>
+              </div>
+            ))}
           </AlertDescription>
         </Alert>
       )}
 
-      {validationOk && (
+      {warnings.length > 0 && (
+        <Alert className="bg-warning/10 border-warning/20">
+          <ShieldAlert className="w-4 h-4 text-yellow-500" />
+          <AlertDescription className="text-yellow-600 dark:text-yellow-400">
+            {warnings.map((e, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <code className="text-xs bg-yellow-500/10 px-1 rounded">{e.field}</code>
+                <span>{e.message}</span>
+              </div>
+            ))}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {isValid && warnings.length === 0 && yaml !== DEFAULT_YAML && (
         <Alert className="bg-success/10 border-success/20">
           <CheckCircle2 className="w-4 h-4 text-success" />
           <AlertDescription className="text-success">
-            YAML is valid. Ready to save.
+            YAML is valid against OSI v1.0 schema. Ready to save.
           </AlertDescription>
         </Alert>
       )}
 
       <div className="flex items-center gap-3">
-        <Button variant="outline" onClick={validate} type="button">
-          Validate
-        </Button>
-        <Button onClick={handleSave} disabled={saving} className="bg-gradient-primary">
+        <Button onClick={handleSave} disabled={saving || !isValid} className="bg-gradient-primary">
           {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
           {definition ? 'Update Definition' : 'Create Definition'}
         </Button>
