@@ -1,185 +1,209 @@
 
-# Sidebar Cleanup + Semantic Layer ("Definition IS the Code") + Model Registration Fix
 
-## Part 1: Remove Sidebar Segments and Routes
+# Semantic Layer V2: Production-Grade "Definition IS the Code" Architecture
 
-### What Gets Removed
+## Overview
 
-| Segment | Items Removed |
-|---------|--------------|
-| **Impact** | Impact Dashboard, Regulatory Reports (entire segment) |
-| **Respond** | Policy Studio, Golden Demo (entire segment) |
-| **Configure** | Runbooks |
-
-### Files Modified
-
-**`src/components/layout/Sidebar.tsx`** -- Remove lines 61-66 (Respond + Impact segments) and line 71 (Runbooks) from `navItems` array.
-
-**`src/App.tsx`** -- Remove routes and lazy imports for:
-- `/impact-dashboard` (ImpactDashboard)
-- `/regulatory-reports` (RegulatoryReports)
-- `/policy` (Policy)
-- `/golden` (GoldenDemoV2)
-- `/runbooks` (Runbooks)
-
-No pages will be deleted (they stay in the codebase for future use), just disconnected from routing and navigation.
+Transform the current basic YAML editor into a full production-grade semantic layer with version history, vector sync for AI agent consumption, a semantic proxy API, drift detection, and an observer dashboard -- all following the GitOps-for-data philosophy.
 
 ---
 
-## Part 2: "Definition IS the Code" -- Semantic Layer Implementation
+## Part 1: Database Schema Additions
 
-### Concept
+### New Tables
 
-Build a **Semantic Definitions** module where business metric definitions are written once in declarative YAML and become the executable specification. This replaces the traditional split between "governance catalog definition" and "code implementation."
+**`semantic_definition_versions`** -- Immutable version history (Git-like snapshots)
+- `id` (uuid PK)
+- `definition_id` (uuid FK -> semantic_definitions)
+- `version` (integer)
+- `definition_yaml` (text -- frozen snapshot)
+- `definition_hash` (text -- SHA-256)
+- `change_summary` (text -- what changed)
+- `promoted_by` (uuid -- who approved promotion to active)
+- `created_by` (uuid)
+- `created_at` (timestamptz)
 
-### New Page: `/semantic-definitions`
+**`semantic_query_log`** -- Tracks every query executed through the semantic proxy
+- `id` (uuid PK)
+- `definition_id` (uuid FK)
+- `metric_name` (text)
+- `consumer_type` (text: 'ai_agent', 'bi_tool', 'api', 'manual')
+- `query_latency_ms` (integer)
+- `row_count` (integer)
+- `status` (text: 'success', 'error')
+- `error_message` (text nullable)
+- `queried_by` (uuid)
+- `queried_at` (timestamptz)
 
-A full-featured semantic layer editor with:
+**`semantic_drift_alerts`** -- Drift detection results
+- `id` (uuid PK)
+- `definition_id` (uuid FK)
+- `drift_type` (text: 'synonym_conflict', 'logic_deviation', 'stale_definition', 'schema_mismatch')
+- `severity` (text: 'low', 'medium', 'high', 'critical')
+- `details` (jsonb)
+- `status` (text: 'open', 'acknowledged', 'resolved')
+- `detected_at` (timestamptz)
+- `resolved_at` (timestamptz nullable)
 
-1. **Definition Editor** -- YAML-based editor where users declare metrics with:
-   - Business name and description
-   - SQL/computation logic
-   - Grain (what entity the metric measures)
-   - Synonyms (alternative names AI agents should recognize)
-   - AI context (how AI agents should interpret this metric)
-   - Owner and governance metadata
+### Schema Changes to Existing `semantic_definitions`
 
-2. **Definition Registry** -- List of all semantic definitions with:
-   - Status badges (draft, active, deprecated)
-   - Version history
-   - Consumption tracking (which tools/agents use this definition)
+Add columns:
+- `upstream_dependencies` (jsonb -- array of table/metric names this depends on)
+- `test_suite` (jsonb -- expectations like `value > 0`, `no_nulls`)
+- `deployment_count` (integer default 0 -- how many consumers use this)
+- `last_queried_at` (timestamptz nullable)
+- `query_count` (integer default 0)
+- `embedding` (vector(768) nullable -- pgvector embedding for semantic search)
 
-3. **Validation Engine** -- When a definition is saved:
-   - Parse YAML for syntax errors
-   - Validate SQL logic references
-   - Check for semantic conflicts (duplicate metric names, conflicting synonyms)
-   - Generate a SHA-256 hash of the definition (immutable versioning)
+### Triggers
 
-4. **Drift Detection** -- Compare definitions against actual usage:
-   - Flag when a BI tool or AI agent computes a metric differently than the definition
-   - Show "semantic drift score" per definition
-
-### Example YAML Definition
-
-```text
-metric:
-  name: monthly_recurring_revenue
-  display_name: "Monthly Recurring Revenue"
-  description: "Sum of all active subscription revenues normalized to monthly"
-  owner: finance-team@company.com
-  grain: customer
-  sql: |
-    SELECT SUM(amount / billing_interval_months)
-    FROM subscriptions
-    WHERE status = 'active'
-  synonyms:
-    - MRR
-    - recurring revenue
-    - monthly revenue
-  ai_context: "Use this metric when users ask about recurring revenue. Never compute revenue differently."
-  governance:
-    eu_ai_act_article: "Article 13"
-    sensitivity: "business-critical"
-    refresh_cadence: "daily"
-```
-
-### Database Table
-
-New `semantic_definitions` table:
-- `id` (uuid, PK)
-- `name` (text, unique, not null)
-- `display_name` (text)
-- `description` (text)
-- `definition_yaml` (text, the full YAML source)
-- `owner_email` (text)
-- `status` (enum: draft, active, deprecated)
-- `version` (integer, auto-increment per name)
-- `definition_hash` (text, SHA-256 of the YAML content)
-- `grain` (text)
-- `sql_logic` (text)
-- `synonyms` (text array)
-- `ai_context` (text)
-- `metadata` (jsonb)
-- `created_by` (uuid, references auth.users)
-- `created_at`, `updated_at` (timestamptz)
-
-RLS: Users can read all, create/update their own.
-
-### Sidebar Addition
-
-Under **DATA GOVERNANCE** section, add:
-- "Semantic Layer" with a `BookOpen` icon, pointing to `/semantic-definitions`
-
-### New Files
-
-| File | Purpose |
-|------|---------|
-| `src/pages/SemanticDefinitions.tsx` | Main page with definition list + YAML editor |
-| `src/hooks/useSemanticDefinitions.ts` | CRUD hooks for semantic_definitions table |
-| `src/components/semantic/DefinitionEditor.tsx` | YAML editor with syntax highlighting and validation |
-| `src/components/semantic/DefinitionCard.tsx` | Card showing a single definition with status/version |
-| `src/components/semantic/DriftScoreIndicator.tsx` | Visual indicator for semantic drift |
+- `on_definition_update` -- Auto-insert into `semantic_definition_versions` whenever `definition_yaml` changes
+- `compute_version_hash` -- SHA-256 hash on version snapshots
 
 ---
 
-## Part 3: Fix Model Registration Flow (End-to-End)
+## Part 2: Enhanced YAML Validation Engine
 
-### Current Problem
+Replace the basic `parseSimpleYaml` with a proper JSON-Schema-based validator in the `DefinitionEditor`:
 
-The model registration form asks users to enter:
-- Provider (OpenAI, Anthropic, HuggingFace, Azure, Custom)
-- Endpoint URL
-- API Key
+**Validation Rules (enforced client-side):**
+1. `name` -- Required, must be snake_case (`^[a-z0-9_]+$`)
+2. `display_name` -- Required
+3. `sql` -- Required, minimum 10 characters
+4. `grain` -- Required, must be one of: `customer`, `transaction`, `daily`, `monthly`, `entity`
+5. `owner` -- Required, must be valid email format
+6. `synonyms` -- Must be unique items
+7. `governance.sensitivity` -- Must be one of: `public`, `internal`, `confidential`, `business-critical`
 
-This is **dead code** -- the platform routes ALL inference through the Lovable AI Gateway (`google/gemini-3-flash-preview`). The endpoint and API key fields are never used. Users fill them in, the values get stored in the DB, and then get ignored by every edge function.
+**Live Validation:** Errors appear inline as the user types, not just on button click.
 
-### Fix: Simplify to Reality
+---
 
-**Remove from ModelRegistrationForm:**
-- Step 3 "Provider" -- Remove the provider selection grid (OpenAI, Anthropic, Google, etc.)
-- Step 4 "Configuration" -- Remove endpoint URL and API key fields
+## Part 3: Version History & Promotion Workflow
 
-**Replace with:**
-- Auto-set provider to "Lovable" and endpoint to the gateway URL
-- Show an informational banner: "This model will be evaluated using the Fractal AI Gateway (Gemini 3 Flash Preview). No API key configuration needed."
+### UI Addition: Version History Panel
 
-**Reduce steps from 6 to 4:**
-1. Project Selection
-2. Basic Info (name, type, description)
-3. Governance (license, access tier, SLA, risk classification, training dataset)
-4. Review and Submit
+When viewing/editing a definition, show a collapsible "Version History" section:
+- Timeline of all versions with hash, author, timestamp
+- Diff view between any two versions (YAML text diff)
+- "Rollback to this version" button
 
-**Also fix `ConnectModelForm.tsx`:**
-- Remove entirely or replace with a read-only status card showing the current gateway configuration
-- The form currently lets users enter endpoints/keys that are never used
+### Promotion Workflow
 
-**Also fix `Models.tsx`:**
-- Remove the HuggingFace Settings tab (dead code, all inference goes through Lovable AI Gateway)
+- New definitions start as `draft`
+- Moving to `active` requires clicking "Promote to Production"
+- This creates a version snapshot and updates the main record
+- Deprecation marks the definition as no longer authoritative
 
-**`useCreateModel` hook changes:**
-- Auto-populate `endpoint` with `https://ai.gateway.lovable.dev/v1/chat/completions`
-- Auto-populate `provider` with `Lovable`
-- Remove `api_token` from the insert (not needed, LOVABLE_API_KEY is a backend secret)
-- System creation auto-sets `model_name` to `google/gemini-3-flash-preview`
+---
 
-### Files Modified
+## Part 4: Vector Sync Service (AI Agent Consumption)
 
-| File | Change |
+### Edge Function: `semantic-compiler`
+
+Triggered when a definition is saved. It:
+1. Generates a vector embedding of `name + display_name + description + synonyms + ai_context` using the Lovable AI Gateway
+2. Stores the embedding in the `embedding` column on `semantic_definitions`
+3. This enables AI agents to find the right metric via semantic similarity (e.g., "What was the revenue last month?" matches `monthly_recurring_revenue`)
+
+### Semantic Search Hook: `useSemanticSearch`
+
+New hook that calls `match_nodes`-style vector similarity search against the `semantic_definitions` table, allowing natural language metric discovery.
+
+---
+
+## Part 5: Semantic Proxy Edge Function
+
+### Edge Function: `semantic-query`
+
+This is the "SQL Gatekeeper" -- AI agents and BI tools query metrics through this proxy instead of writing raw SQL.
+
+**Request:** `POST /semantic-query` with `{ metric_name: "mrr", filters: { region: "US" }, grain: "monthly" }`
+
+**Flow:**
+1. Look up `metric_name` in `semantic_definitions` (or fuzzy match via synonyms/embedding)
+2. Retrieve `sql_logic` from the definition
+3. Log the query in `semantic_query_log`
+4. Return the metric definition + SQL logic (not execute -- we don't have warehouse access)
+5. Update `query_count` and `last_queried_at` on the definition
+
+This ensures every consumer uses the same computation logic.
+
+---
+
+## Part 6: Drift Detection
+
+### Edge Function: `semantic-drift-check`
+
+Analyzes definitions for potential drift:
+1. **Synonym Conflicts** -- Two definitions sharing the same synonym
+2. **Stale Definitions** -- Active definitions not queried in 30+ days
+3. **Schema Issues** -- Definitions referencing tables/columns that may not exist
+4. **Duplicate Logic** -- Two definitions with very similar SQL but different names
+
+Results stored in `semantic_drift_alerts` and displayed on definition cards.
+
+### UI: Drift Score on Cards
+
+The `DriftScoreIndicator` component already exists. It will now be wired to real data from `semantic_drift_alerts` count per definition instead of the current hardcoded `0`.
+
+---
+
+## Part 7: Observer Dashboard (Metric Health)
+
+### New Tab System on Semantic Definitions Page
+
+Convert the page from a simple card grid to a tabbed layout:
+
+**Tab 1: Registry** (current card grid)
+**Tab 2: Health Dashboard** -- New component showing:
+- Total definitions (active/draft/deprecated breakdown)
+- Query volume chart (queries per day from `semantic_query_log`)
+- Most queried metrics (top 10)
+- Least queried metrics (potential deprecation candidates)
+- Open drift alerts feed
+- Consumer breakdown pie chart (ai_agent vs bi_tool vs api vs manual)
+
+**Tab 3: Drift Alerts** -- Table of all drift alerts with severity badges, status, and resolution actions.
+
+---
+
+## Part 8: Enhanced Definition Card
+
+Update `DefinitionCard` to show:
+- Real drift score from `semantic_drift_alerts` count
+- Query count badge (e.g., "142 queries")
+- Last queried timestamp
+- Consumer count
+- Upstream dependency badges
+
+---
+
+## Files Modified / Created
+
+| File | Action |
 |------|--------|
-| `src/components/models/ModelRegistrationForm.tsx` | Remove steps 3-4, reduce to 4-step flow, auto-set provider/endpoint |
-| `src/components/settings/ConnectModelForm.tsx` | Replace with gateway status card |
-| `src/pages/Models.tsx` | Remove HuggingFace Settings tab |
-| `src/hooks/useModels.ts` | Auto-set provider/endpoint in useCreateModel |
+| **Database Migration** | Add 3 new tables + alter `semantic_definitions` with new columns + triggers |
+| `src/pages/SemanticDefinitions.tsx` | Add tabbed layout (Registry, Health, Drift Alerts) |
+| `src/components/semantic/DefinitionEditor.tsx` | Replace parser with JSON-Schema validator, add live validation |
+| `src/components/semantic/DefinitionCard.tsx` | Wire real drift/query data |
+| `src/components/semantic/VersionHistoryPanel.tsx` | **New** -- Version timeline with diff view |
+| `src/components/semantic/SemanticHealthDashboard.tsx` | **New** -- Observer dashboard with charts |
+| `src/components/semantic/DriftAlertsTable.tsx` | **New** -- Drift alert management table |
+| `src/components/semantic/SemanticSearchBar.tsx` | **New** -- Natural language metric search |
+| `src/hooks/useSemanticDefinitions.ts` | Add version history hooks, query log hooks, drift alert hooks |
+| `src/hooks/useSemanticSearch.ts` | **New** -- Vector similarity search hook |
+| `supabase/functions/semantic-compiler/index.ts` | **New** -- Vector embedding generation on save |
+| `supabase/functions/semantic-query/index.ts` | **New** -- Semantic proxy / SQL gatekeeper |
+| `supabase/functions/semantic-drift-check/index.ts` | **New** -- Drift detection engine |
 
 ---
 
-## Summary of All Changes
+## Technical Notes
 
-| Area | Action |
-|------|--------|
-| Sidebar | Remove Impact, Respond, Runbooks segments |
-| Routes | Remove 5 routes (impact-dashboard, regulatory-reports, policy, golden, runbooks) |
-| Semantic Layer | New page, DB table, hooks, components for "Definition IS the Code" |
-| Model Registration | Simplify from 6 steps to 4, auto-configure Lovable AI Gateway |
-| ConnectModelForm | Replace fake endpoint/key form with gateway status display |
-| Models page | Remove dead HuggingFace tab |
+- Vector embeddings use pgvector (already installed in the project) with the Lovable AI Gateway to generate embeddings
+- All new tables get RLS policies scoped to authenticated users
+- Version history is append-only (no deletes) for audit compliance
+- The semantic proxy does NOT execute SQL against a warehouse (no warehouse connected) -- it returns the governed SQL logic for the consumer to execute
+- Drift detection runs on-demand via the UI, not as a background cron (keeping it user-triggered per the platform's real-data philosophy)
+
