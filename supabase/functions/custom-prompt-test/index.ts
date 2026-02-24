@@ -433,7 +433,7 @@ serve(async (req) => {
     
     let modelResponse: string;
     try {
-      modelResponse = await callTargetModel(endpoint, apiToken, customPrompt, systemModelName);
+      modelResponse = await callTargetModel("", "", customPrompt, systemModelName);
       console.log("Model response received:", modelResponse.substring(0, 200) + "...");
     } catch (error: any) {
       const errorMsg = error.message || "Unknown error";
