@@ -76,6 +76,26 @@ export default function Index() {
     refetchInterval: 60000,
   });
 
+  // Semantic Layer metrics
+  const { data: semanticMetrics } = useQuery({
+    queryKey: ['semantic-summary'],
+    queryFn: async () => {
+      const [activeRes, draftRes, deprecatedRes, driftRes] = await Promise.all([
+        (supabase as any).from('semantic_definitions').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+        (supabase as any).from('semantic_definitions').select('*', { count: 'exact', head: true }).eq('status', 'draft'),
+        (supabase as any).from('semantic_definitions').select('*', { count: 'exact', head: true }).eq('status', 'deprecated'),
+        (supabase as any).from('semantic_drift_alerts').select('*', { count: 'exact', head: true }).eq('status', 'open'),
+      ]);
+      return {
+        active: activeRes.count || 0,
+        draft: draftRes.count || 0,
+        deprecated: deprecatedRes.count || 0,
+        openDrift: driftRes.count || 0,
+      };
+    },
+    refetchInterval: 60000,
+  });
+
 
   // Recent incidents for activity log
   const { data: recentIncidents } = useQuery({
