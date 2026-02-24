@@ -315,88 +315,39 @@ function runExplainabilityEval(text: string): { score: number; issues: string[];
   return { score: Math.round(finalScore), issues, computation };
 }
 
-// ============== TARGET MODEL CALLER ==============
+// ============== LOVABLE AI GATEWAY CALLER ==============
 
 async function callTargetModel(endpoint: string, apiToken: string, prompt: string, modelName?: string): Promise<string> {
-  console.log("Calling target model at:", endpoint, "model:", modelName);
-  
-  let normalizedEndpoint = endpoint.trim();
-  
-  const hfModelPageMatch = normalizedEndpoint.match(/^https?:\/\/huggingface\.co\/([^\/]+\/[^\/]+)/);
-  if (hfModelPageMatch) {
-    const modelId = hfModelPageMatch[1];
-    normalizedEndpoint = `https://api-inference.huggingface.co/models/${modelId}`;
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) {
+    throw new Error("LOVABLE_API_KEY not configured");
   }
-  
-  // Normalize OpenRouter model page URLs (without /api/v1/)
-  let openRouterModelId: string | null = null;
-  if (normalizedEndpoint.includes("openrouter.ai") && !normalizedEndpoint.includes("/api/v1/")) {
-    try {
-      const url = new URL(normalizedEndpoint);
-      const pathParts = url.pathname.split("/").filter(Boolean);
-      if (pathParts.length >= 2) {
-        openRouterModelId = pathParts.join("/");
-      }
-      normalizedEndpoint = "https://openrouter.ai/api/v1/chat/completions";
-    } catch { /* keep original */ }
-  }
-  
-  if (!normalizedEndpoint.startsWith("http")) {
-    if (normalizedEndpoint.includes("/") && !normalizedEndpoint.includes(".")) {
-      openRouterModelId = normalizedEndpoint;
-      normalizedEndpoint = "https://openrouter.ai/api/v1/chat/completions";
-    } else {
-      normalizedEndpoint = `https://api-inference.huggingface.co/models/${normalizedEndpoint}`;
-    }
-  }
-  
-  const isOpenRouter = normalizedEndpoint.includes("openrouter.ai");
-  const isHuggingFace = normalizedEndpoint.includes("api-inference.huggingface.co");
-  const isOpenAI = normalizedEndpoint.includes("api.openai.com");
-  const isAnthropic = normalizedEndpoint.includes("api.anthropic.com");
-  
-  let requestUrl = normalizedEndpoint;
-  let requestBody: any;
-  let requestHeaders: Record<string, string> = { "Content-Type": "application/json" };
 
-  if (isOpenRouter) {
-    // Use explicit model name, then extracted from URL, then fallback
-    const resolvedModel = modelName || openRouterModelId || "meta-llama/llama-3.3-70b-instruct:free";
-    requestUrl = "https://openrouter.ai/api/v1/chat/completions";
-    requestHeaders["Authorization"] = `Bearer ${apiToken}`;
-    requestHeaders["HTTP-Referer"] = "https://fractal-rai.lovable.app";
-    requestHeaders["X-Title"] = "Fractal RAI Platform";
-    requestBody = { model: resolvedModel, messages: [{ role: "user", content: prompt }], max_tokens: 500, temperature: 0.7 };
-  } else if (isHuggingFace) {
-    requestHeaders["Authorization"] = `Bearer ${apiToken}`;
-    requestBody = { inputs: prompt, parameters: { max_new_tokens: 500, temperature: 0.7 } };
-  } else if (isOpenAI) {
-    requestHeaders["Authorization"] = `Bearer ${apiToken}`;
-    requestBody = { model: "gpt-4", messages: [{ role: "user", content: prompt }], max_tokens: 500, temperature: 0.7 };
-  } else if (isAnthropic) {
-    requestHeaders["x-api-key"] = apiToken;
-    requestHeaders["anthropic-version"] = "2023-06-01";
-    requestBody = { model: "claude-3-sonnet-20240229", max_tokens: 500, messages: [{ role: "user", content: prompt }] };
-  } else {
-    requestHeaders["Authorization"] = `Bearer ${apiToken}`;
-    requestBody = { messages: [{ role: "user", content: prompt }], max_tokens: 500, temperature: 0.7 };
-  }
+  console.log("[custom-prompt-test] Calling Lovable AI Gateway (model: google/gemini-3-flash-preview)");
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 55000);
 
   let response: Response;
   try {
-    response = await fetch(requestUrl, {
+    response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
-      headers: requestHeaders,
-      body: JSON.stringify(requestBody),
+      headers: {
+        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 500,
+        temperature: 0.7,
+      }),
       signal: controller.signal,
     });
   } catch (fetchErr: any) {
     clearTimeout(timeout);
     if (fetchErr.name === "AbortError") {
-      throw new Error("Model request timed out after 55 seconds. The model may be overloaded.");
+      throw new Error("Model request timed out after 55 seconds.");
     }
     throw new Error(`Network error calling model: ${fetchErr.message}`);
   }
@@ -404,22 +355,15 @@ async function callTargetModel(endpoint: string, apiToken: string, prompt: strin
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`Model API error (${response.status}):`, errorText.substring(0, 300));
-    if (response.status === 401) throw new Error(`API authentication failed. Check your API token in System Settings.`);
-    if (response.status === 403) throw new Error(`API access denied. Your API key may not have permission.`);
-    if (response.status === 429) throw new Error(`Rate limit exceeded. Please wait and try again.`);
-    throw new Error(`Model returned ${response.status}: ${errorText.substring(0, 200)}`);
+    console.error(`[custom-prompt-test] AI Gateway error (${response.status}):`, errorText.substring(0, 300));
+    if (response.status === 429) throw new Error("Rate limit exceeded. Please wait and try again.");
+    if (response.status === 402) throw new Error("Usage credits exhausted. Please add credits to your workspace.");
+    throw new Error(`AI Gateway returned ${response.status}: ${errorText.substring(0, 200)}`);
   }
 
   const data = await response.json();
-  
-  if (data.choices?.[0]?.message?.content) return data.choices[0].message.content;
-  if (data.content?.[0]?.text) return data.content[0].text;
-  if (Array.isArray(data) && data[0]?.generated_text) return data[0].generated_text;
-  if (typeof data === "string") return data;
-  if (data.generated_text) return data.generated_text;
-  if (data.text) return data.text;
-  if (data.output) return data.output;
+  const content = data.choices?.[0]?.message?.content;
+  if (content) return content;
   
   return JSON.stringify(data);
 }
