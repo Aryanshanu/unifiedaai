@@ -1,209 +1,161 @@
 
 
-# Semantic Layer V2: Production-Grade "Definition IS the Code" Architecture
+# Semantic Layer Full Integration Across Platform
 
 ## Overview
 
-Transform the current basic YAML editor into a full production-grade semantic layer with version history, vector sync for AI agent consumption, a semantic proxy API, drift detection, and an observer dashboard -- all following the GitOps-for-data philosophy.
+The Semantic Layer currently lives as a standalone page at `/semantic-definitions`. This plan wires it into every relevant part of the platform workflow: Command Center, Data Quality Engine, Data Contracts, Knowledge Graph, RAI Engines, Model Registration, Copilot/Assistant, and Observability.
 
 ---
 
-## Part 1: Database Schema Additions
+## Integration Point 1: Command Center Dashboard
 
-### New Tables
+**Location:** `src/pages/Index.tsx`
 
-**`semantic_definition_versions`** -- Immutable version history (Git-like snapshots)
-- `id` (uuid PK)
-- `definition_id` (uuid FK -> semantic_definitions)
-- `version` (integer)
-- `definition_yaml` (text -- frozen snapshot)
-- `definition_hash` (text -- SHA-256)
-- `change_summary` (text -- what changed)
-- `promoted_by` (uuid -- who approved promotion to active)
-- `created_by` (uuid)
-- `created_at` (timestamptz)
+**What:** Add a "Semantic Layer" summary card under the Data Governance section (alongside Data Quality Engine and Data Contracts).
 
-**`semantic_query_log`** -- Tracks every query executed through the semantic proxy
-- `id` (uuid PK)
-- `definition_id` (uuid FK)
-- `metric_name` (text)
-- `consumer_type` (text: 'ai_agent', 'bi_tool', 'api', 'manual')
-- `query_latency_ms` (integer)
-- `row_count` (integer)
-- `status` (text: 'success', 'error')
-- `error_message` (text nullable)
-- `queried_by` (uuid)
-- `queried_at` (timestamptz)
+**Details:**
+- Query `semantic_definitions` for counts: total active, total draft, total deprecated
+- Query `semantic_drift_alerts` for open drift alert count
+- Display card with BookOpen icon, definition counts, and open drift alerts
+- Click navigates to `/semantic-definitions`
+- Add realtime subscription for `semantic_drift_alerts` table changes
 
-**`semantic_drift_alerts`** -- Drift detection results
-- `id` (uuid PK)
-- `definition_id` (uuid FK)
-- `drift_type` (text: 'synonym_conflict', 'logic_deviation', 'stale_definition', 'schema_mismatch')
-- `severity` (text: 'low', 'medium', 'high', 'critical')
-- `details` (jsonb)
-- `status` (text: 'open', 'acknowledged', 'resolved')
-- `detected_at` (timestamptz)
-- `resolved_at` (timestamptz nullable)
-
-### Schema Changes to Existing `semantic_definitions`
-
-Add columns:
-- `upstream_dependencies` (jsonb -- array of table/metric names this depends on)
-- `test_suite` (jsonb -- expectations like `value > 0`, `no_nulls`)
-- `deployment_count` (integer default 0 -- how many consumers use this)
-- `last_queried_at` (timestamptz nullable)
-- `query_count` (integer default 0)
-- `embedding` (vector(768) nullable -- pgvector embedding for semantic search)
-
-### Triggers
-
-- `on_definition_update` -- Auto-insert into `semantic_definition_versions` whenever `definition_yaml` changes
-- `compute_version_hash` -- SHA-256 hash on version snapshots
+**Priority:** HIGH -- Command Center should surface semantic health at a glance.
 
 ---
 
-## Part 2: Enhanced YAML Validation Engine
+## Integration Point 2: Data Quality Engine
 
-Replace the basic `parseSimpleYaml` with a proper JSON-Schema-based validator in the `DefinitionEditor`:
+**Location:** `src/pages/engines/DataQualityEngine.tsx`
 
-**Validation Rules (enforced client-side):**
-1. `name` -- Required, must be snake_case (`^[a-z0-9_]+$`)
-2. `display_name` -- Required
-3. `sql` -- Required, minimum 10 characters
-4. `grain` -- Required, must be one of: `customer`, `transaction`, `daily`, `monthly`, `entity`
-5. `owner` -- Required, must be valid email format
-6. `synonyms` -- Must be unique items
-7. `governance.sensitivity` -- Must be one of: `public`, `internal`, `confidential`, `business-critical`
+**What:** When profiling or validating a dataset, show which semantic definitions reference that dataset's tables/columns.
 
-**Live Validation:** Errors appear inline as the user types, not just on button click.
+**Details:**
+- After profiling completes, query `semantic_definitions` where `sql_logic` contains the dataset name or column names (text search)
+- Show a small "Linked Semantic Definitions" badge/panel in the profiling results
+- If a column is referenced by a semantic definition, show a BookOpen icon next to it in the column analysis grid
+- Clicking the badge navigates to the definition editor
 
----
-
-## Part 3: Version History & Promotion Workflow
-
-### UI Addition: Version History Panel
-
-When viewing/editing a definition, show a collapsible "Version History" section:
-- Timeline of all versions with hash, author, timestamp
-- Diff view between any two versions (YAML text diff)
-- "Rollback to this version" button
-
-### Promotion Workflow
-
-- New definitions start as `draft`
-- Moving to `active` requires clicking "Promote to Production"
-- This creates a version snapshot and updates the main record
-- Deprecation marks the definition as no longer authoritative
+**Priority:** MEDIUM -- Helps users understand which metrics depend on their data.
 
 ---
 
-## Part 4: Vector Sync Service (AI Agent Consumption)
+## Integration Point 3: Data Contracts
 
-### Edge Function: `semantic-compiler`
+**Location:** `src/pages/DataContracts.tsx`
 
-Triggered when a definition is saved. It:
-1. Generates a vector embedding of `name + display_name + description + synonyms + ai_context` using the Lovable AI Gateway
-2. Stores the embedding in the `embedding` column on `semantic_definitions`
-3. This enables AI agents to find the right metric via semantic similarity (e.g., "What was the revenue last month?" matches `monthly_recurring_revenue`)
+**What:** Link data contracts to semantic definitions that consume the contracted dataset.
 
-### Semantic Search Hook: `useSemanticSearch`
+**Details:**
+- When viewing a data contract, show "Consuming Definitions" section listing semantic definitions whose `upstream_dependencies` or `sql_logic` references the contracted dataset
+- When a contract violation occurs, show which semantic definitions are impacted
+- Add a "Create Definition" quick action from the contract view
 
-New hook that calls `match_nodes`-style vector similarity search against the `semantic_definitions` table, allowing natural language metric discovery.
-
----
-
-## Part 5: Semantic Proxy Edge Function
-
-### Edge Function: `semantic-query`
-
-This is the "SQL Gatekeeper" -- AI agents and BI tools query metrics through this proxy instead of writing raw SQL.
-
-**Request:** `POST /semantic-query` with `{ metric_name: "mrr", filters: { region: "US" }, grain: "monthly" }`
-
-**Flow:**
-1. Look up `metric_name` in `semantic_definitions` (or fuzzy match via synonyms/embedding)
-2. Retrieve `sql_logic` from the definition
-3. Log the query in `semantic_query_log`
-4. Return the metric definition + SQL logic (not execute -- we don't have warehouse access)
-5. Update `query_count` and `last_queried_at` on the definition
-
-This ensures every consumer uses the same computation logic.
+**Priority:** MEDIUM -- Contracts protect datasets; definitions consume them.
 
 ---
 
-## Part 6: Drift Detection
+## Integration Point 4: Knowledge Graph
 
-### Edge Function: `semantic-drift-check`
+**Location:** `src/pages/Lineage.tsx` + database triggers
 
-Analyzes definitions for potential drift:
-1. **Synonym Conflicts** -- Two definitions sharing the same synonym
-2. **Stale Definitions** -- Active definitions not queried in 30+ days
-3. **Schema Issues** -- Definitions referencing tables/columns that may not exist
-4. **Duplicate Logic** -- Two definitions with very similar SQL but different names
+**What:** Sync semantic definitions to the Knowledge Graph as `semantic_definition` node type.
 
-Results stored in `semantic_drift_alerts` and displayed on definition cards.
+**Details:**
+- New database trigger: `sync_semantic_definition_to_kg` -- on INSERT/UPDATE to `semantic_definitions`, upsert a KG node with `entity_type = 'semantic_definition'`
+- Create edges: `semantic_definition` -> `depends_on` -> `dataset` (based on `upstream_dependencies`)
+- Add `semantic_definition` to the node color map in `Lineage.tsx` (e.g., teal/BookOpen)
+- This makes definitions visible in the lineage graph alongside models, datasets, and evaluations
 
-### UI: Drift Score on Cards
-
-The `DriftScoreIndicator` component already exists. It will now be wired to real data from `semantic_drift_alerts` count per definition instead of the current hardcoded `0`.
+**Priority:** HIGH -- The KG is the governance backbone; definitions must appear in it.
 
 ---
 
-## Part 7: Observer Dashboard (Metric Health)
+## Integration Point 5: RAI Engine Evaluation Context
 
-### New Tab System on Semantic Definitions Page
+**Location:** All 5 engine pages (`FairnessEngine.tsx`, etc.)
 
-Convert the page from a simple card grid to a tabbed layout:
+**What:** When running an evaluation, pass relevant semantic definitions as context to the AI judge.
 
-**Tab 1: Registry** (current card grid)
-**Tab 2: Health Dashboard** -- New component showing:
-- Total definitions (active/draft/deprecated breakdown)
-- Query volume chart (queries per day from `semantic_query_log`)
-- Most queried metrics (top 10)
-- Least queried metrics (potential deprecation candidates)
-- Open drift alerts feed
-- Consumer breakdown pie chart (ai_agent vs bi_tool vs api vs manual)
+**Details:**
+- Before evaluation, check if the selected model has related semantic definitions (via system -> project -> definitions)
+- If definitions exist, include their `ai_context` field in the evaluation prompt sent to the AI gateway
+- This makes the AI judge aware of the business metric semantics when scoring
+- Show a small "Semantic Context" indicator (BookOpen badge) on the engine page when definitions are being used
 
-**Tab 3: Drift Alerts** -- Table of all drift alerts with severity badges, status, and resolution actions.
+**Priority:** LOW -- Enhancement for AI judge accuracy; not blocking.
 
 ---
 
-## Part 8: Enhanced Definition Card
+## Integration Point 6: Model Registration
 
-Update `DefinitionCard` to show:
-- Real drift score from `semantic_drift_alerts` count
-- Query count badge (e.g., "142 queries")
-- Last queried timestamp
-- Consumer count
-- Upstream dependency badges
+**Location:** `src/components/models/ModelRegistrationForm.tsx`
+
+**What:** During model registration (Step 3: Governance), allow linking semantic definitions to the model.
+
+**Details:**
+- Add an optional "Linked Semantic Definitions" multi-select field in the Governance step
+- Query active definitions from `semantic_definitions` for the dropdown
+- Store selected definition IDs in the model's `metadata` JSONB field (key: `semantic_definitions`)
+- This establishes a formal link between models and the metrics they compute
+
+**Priority:** MEDIUM -- Governance traceability.
 
 ---
 
-## Files Modified / Created
+## Integration Point 7: Copilot / RAI Assistant
 
-| File | Action |
-|------|--------|
-| **Database Migration** | Add 3 new tables + alter `semantic_definitions` with new columns + triggers |
-| `src/pages/SemanticDefinitions.tsx` | Add tabbed layout (Registry, Health, Drift Alerts) |
-| `src/components/semantic/DefinitionEditor.tsx` | Replace parser with JSON-Schema validator, add live validation |
-| `src/components/semantic/DefinitionCard.tsx` | Wire real drift/query data |
-| `src/components/semantic/VersionHistoryPanel.tsx` | **New** -- Version timeline with diff view |
-| `src/components/semantic/SemanticHealthDashboard.tsx` | **New** -- Observer dashboard with charts |
-| `src/components/semantic/DriftAlertsTable.tsx` | **New** -- Drift alert management table |
-| `src/components/semantic/SemanticSearchBar.tsx` | **New** -- Natural language metric search |
-| `src/hooks/useSemanticDefinitions.ts` | Add version history hooks, query log hooks, drift alert hooks |
-| `src/hooks/useSemanticSearch.ts` | **New** -- Vector similarity search hook |
-| `supabase/functions/semantic-compiler/index.ts` | **New** -- Vector embedding generation on save |
-| `supabase/functions/semantic-query/index.ts` | **New** -- Semantic proxy / SQL gatekeeper |
-| `supabase/functions/semantic-drift-check/index.ts` | **New** -- Drift detection engine |
+**Location:** `src/components/copilot/CopilotDrawer.tsx` + `src/components/assistant/RAIAssistant.tsx` + `supabase/functions/copilot/index.ts` + `supabase/functions/rai-assistant/index.ts`
+
+**What:** Make the AI assistants aware of semantic definitions so they can answer metric questions accurately.
+
+**Details:**
+- In the `copilot` and `rai-assistant` edge functions, before generating a response, query `semantic_definitions` for active definitions
+- Include definition names, descriptions, SQL logic, and AI context in the system prompt
+- This prevents the AI from hallucinating metric definitions -- it uses the governed semantic contract
+- Add suggested questions: "What semantic definitions are active?", "How is MRR calculated?"
+
+**Priority:** HIGH -- This is the core "Definition IS the Code" value: AI agents consume the semantic contract.
+
+---
+
+## Integration Point 8: Drift Alerts on Observability
+
+**Location:** `src/pages/Observability.tsx`
+
+**What:** Surface semantic drift alerts alongside data drift alerts.
+
+**Details:**
+- Add a "Semantic Drift" section or tab showing open `semantic_drift_alerts`
+- Reuse the `DriftAlertsTable` component already built
+- This gives operators a single pane of glass for all drift types
+
+**Priority:** LOW -- Nice consolidation but the dedicated Drift tab on Semantic page already covers this.
+
+---
+
+## Summary of Changes by File
+
+| File | Change | Priority |
+|------|--------|----------|
+| `src/pages/Index.tsx` | Add Semantic Layer summary card + realtime subscription | HIGH |
+| `src/pages/Lineage.tsx` | Add `semantic_definition` node color | HIGH |
+| Database migration | KG sync trigger for semantic definitions | HIGH |
+| `supabase/functions/copilot/index.ts` | Include semantic definitions in system prompt | HIGH |
+| `supabase/functions/rai-assistant/index.ts` | Include semantic definitions in system prompt | HIGH |
+| `src/pages/DataContracts.tsx` | Add "Consuming Definitions" section | MEDIUM |
+| `src/components/models/ModelRegistrationForm.tsx` | Add linked definitions multi-select | MEDIUM |
+| `src/pages/engines/DataQualityEngine.tsx` | Show linked definitions in profiling | MEDIUM |
+| `src/pages/engines/FairnessEngine.tsx` (and 4 others) | Semantic context indicator | LOW |
+| `src/pages/Observability.tsx` | Semantic drift section | LOW |
 
 ---
 
 ## Technical Notes
 
-- Vector embeddings use pgvector (already installed in the project) with the Lovable AI Gateway to generate embeddings
-- All new tables get RLS policies scoped to authenticated users
-- Version history is append-only (no deletes) for audit compliance
-- The semantic proxy does NOT execute SQL against a warehouse (no warehouse connected) -- it returns the governed SQL logic for the consumer to execute
-- Drift detection runs on-demand via the UI, not as a background cron (keeping it user-triggered per the platform's real-data philosophy)
-
+- All new queries use `(supabase as any)` pattern consistent with existing semantic hooks
+- KG sync trigger follows the exact pattern of `sync_model_to_kg`, `sync_evaluation_to_kg`, etc.
+- No new tables needed -- all integration uses existing `semantic_definitions`, `semantic_drift_alerts`, and `kg_nodes`/`kg_edges`
+- Copilot/Assistant integration queries definitions at request time (not cached) to always use the latest active definitions
+- Priority ordering: HIGH items first (Command Center, KG, Copilot), then MEDIUM (Contracts, Models, DQ), then LOW (Engines, Observability)
