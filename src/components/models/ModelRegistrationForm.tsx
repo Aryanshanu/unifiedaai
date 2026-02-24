@@ -610,6 +610,9 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                     </FormItem>
                   )}
                 />
+
+                {/* Linked Semantic Definitions */}
+                <LinkedSemanticDefinitions />
               </div>
             )}
 
