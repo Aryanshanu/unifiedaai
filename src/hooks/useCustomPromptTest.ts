@@ -49,18 +49,29 @@ export function useCustomPromptTest() {
         body: { modelId, engineType, customPrompt },
       });
 
-      const payload = data as any;
-
+      // On non-2xx, supabase SDK sets error but data may contain the response body
       if (error) {
-        const maybeMessage =
-          payload && typeof payload === "object" && "error" in payload
-            ? String(payload.error)
-            : error.message;
-        throw new Error(maybeMessage || "Custom test could not be completed");
+        // Try to extract the actual error message from the response body
+        let friendlyMessage = "Custom test could not be completed";
+        
+        if (data && typeof data === "object" && "error" in data) {
+          friendlyMessage = String(data.error);
+        } else if (data && typeof data === "object" && "message" in data) {
+          friendlyMessage = String(data.message);
+        } else if (typeof data === "string") {
+          try {
+            const parsed = JSON.parse(data);
+            friendlyMessage = parsed.error || parsed.message || friendlyMessage;
+          } catch {
+            if (data.length > 0 && data.length < 300) friendlyMessage = data;
+          }
+        }
+        
+        throw new Error(friendlyMessage);
       }
 
-      if (!payload?.success) {
-        throw new Error(payload?.error || "Custom test could not be completed");
+      if (!data?.success) {
+        throw new Error(data?.error || "Custom test could not be completed");
       }
 
       const result = data as CustomTestResult;
