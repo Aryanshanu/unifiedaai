@@ -317,8 +317,8 @@ function runExplainabilityEval(text: string): { score: number; issues: string[];
 
 // ============== TARGET MODEL CALLER ==============
 
-async function callTargetModel(endpoint: string, apiToken: string, prompt: string): Promise<string> {
-  console.log("Calling target model at:", endpoint);
+async function callTargetModel(endpoint: string, apiToken: string, prompt: string, modelName?: string): Promise<string> {
+  console.log("Calling target model at:", endpoint, "model:", modelName);
   
   let normalizedEndpoint = endpoint.trim();
   
@@ -328,15 +328,29 @@ async function callTargetModel(endpoint: string, apiToken: string, prompt: strin
     normalizedEndpoint = `https://api-inference.huggingface.co/models/${modelId}`;
   }
   
+  // Normalize OpenRouter model page URLs (without /api/v1/)
+  let openRouterModelId: string | null = null;
+  if (normalizedEndpoint.includes("openrouter.ai") && !normalizedEndpoint.includes("/api/v1/")) {
+    try {
+      const url = new URL(normalizedEndpoint);
+      const pathParts = url.pathname.split("/").filter(Boolean);
+      if (pathParts.length >= 2) {
+        openRouterModelId = pathParts.join("/");
+      }
+      normalizedEndpoint = "https://openrouter.ai/api/v1/chat/completions";
+    } catch { /* keep original */ }
+  }
+  
   if (!normalizedEndpoint.startsWith("http")) {
     if (normalizedEndpoint.includes("/") && !normalizedEndpoint.includes(".")) {
-      normalizedEndpoint = `openrouter:${normalizedEndpoint}`;
+      openRouterModelId = normalizedEndpoint;
+      normalizedEndpoint = "https://openrouter.ai/api/v1/chat/completions";
     } else {
       normalizedEndpoint = `https://api-inference.huggingface.co/models/${normalizedEndpoint}`;
     }
   }
   
-  const isOpenRouter = normalizedEndpoint.includes("openrouter.ai") || normalizedEndpoint.startsWith("openrouter:");
+  const isOpenRouter = normalizedEndpoint.includes("openrouter.ai");
   const isHuggingFace = normalizedEndpoint.includes("api-inference.huggingface.co");
   const isOpenAI = normalizedEndpoint.includes("api.openai.com");
   const isAnthropic = normalizedEndpoint.includes("api.anthropic.com");
@@ -345,19 +359,14 @@ async function callTargetModel(endpoint: string, apiToken: string, prompt: strin
   let requestBody: any;
   let requestHeaders: Record<string, string> = { "Content-Type": "application/json" };
 
-  if (isOpenRouter || normalizedEndpoint.startsWith("openrouter:")) {
-    let modelId: string;
-    if (normalizedEndpoint.startsWith("openrouter:")) {
-      modelId = normalizedEndpoint.replace("openrouter:", "");
-    } else {
-      const modelMatch = normalizedEndpoint.match(/openrouter\.ai\/(.+)$/);
-      modelId = modelMatch ? modelMatch[1] : "meta-llama/llama-3.3-70b-instruct:free";
-    }
+  if (isOpenRouter) {
+    // Use explicit model name, then extracted from URL, then fallback
+    const resolvedModel = modelName || openRouterModelId || "meta-llama/llama-3.3-70b-instruct:free";
     requestUrl = "https://openrouter.ai/api/v1/chat/completions";
     requestHeaders["Authorization"] = `Bearer ${apiToken}`;
     requestHeaders["HTTP-Referer"] = "https://fractal-rai.lovable.app";
     requestHeaders["X-Title"] = "Fractal RAI Platform";
-    requestBody = { model: modelId, messages: [{ role: "user", content: prompt }], max_tokens: 500, temperature: 0.7 };
+    requestBody = { model: resolvedModel, messages: [{ role: "user", content: prompt }], max_tokens: 500, temperature: 0.7 };
   } else if (isHuggingFace) {
     requestHeaders["Authorization"] = `Bearer ${apiToken}`;
     requestBody = { inputs: prompt, parameters: { max_new_tokens: 500, temperature: 0.7 } };
