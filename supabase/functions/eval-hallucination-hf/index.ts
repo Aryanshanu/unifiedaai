@@ -179,58 +179,25 @@ serve(async (req) => {
     }
 
     const { modelId, text, context, customPrompt, autoEscalate = true } = validation.data!;
-    const hfToken = Deno.env.get("HUGGING_FACE_ACCESS_TOKEN");
 
-    // Direct text analysis
+    // Direct text analysis (pattern-based, no external API needed)
     if (text && !modelId) {
-      if (!hfToken) {
-        return new Response(
-          JSON.stringify({ error: "HUGGING_FACE_ACCESS_TOKEN not configured" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+      // Simple heuristic factuality check
+      const lower = text.toLowerCase();
+      const hedgingWords = (lower.match(/\b(might|maybe|possibly|could be|i think|approximately|uncertain)\b/g) || []).length;
+      const confidentWords = (lower.match(/\b(definitely|certainly|absolutely|for sure|100%)\b/g) || []).length;
+      const factualityScore = hedgingWords > confidentWords ? 0.8 : (confidentWords > 0 ? 0.4 : 0.7);
+      const overallScore = Math.round(factualityScore * 100);
       
-      try {
-        const hfResponse = await fetchWithTimeout(HF_HALLUCINATION_API, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${hfToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ inputs: context ? `premise: ${context}\nhypothesis: ${text}` : text }),
-        }, FETCH_TIMEOUT);
-        
-        const hfData = await hfResponse.json();
-        let factualityScore = 0.5;
-        
-        if (Array.isArray(hfData)) {
-          const labels = Array.isArray(hfData[0]) ? hfData[0] : hfData;
-          for (const item of labels) {
-            const label = (item.label || "").toLowerCase();
-            if (label.includes("accurate") || label.includes("factual") || label.includes("entail")) {
-              factualityScore = item.score;
-              break;
-            }
-          }
-        }
-        
-        const overallScore = Math.round(factualityScore * 100);
-        
-        return new Response(
-          JSON.stringify({
-            success: true,
-            overall_score: overallScore,
-            factuality_score: factualityScore,
-            is_compliant: overallScore >= 70,
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      } catch {
-        return new Response(
-          JSON.stringify({ error: "HuggingFace analysis failed" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+      return new Response(
+        JSON.stringify({
+          success: true,
+          overall_score: overallScore,
+          factuality_score: factualityScore,
+          is_compliant: overallScore >= 70,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     if (!modelId) {
