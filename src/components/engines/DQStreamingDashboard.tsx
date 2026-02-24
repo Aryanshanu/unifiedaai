@@ -274,12 +274,29 @@ export function DQStreamingDashboard({ datasetId, executionId, isActive = true }
           const failed = summary.failed || 0;
           const total = passed + failed;
 
+          // REAL COMPUTATION: Derive nullRate from completeness rules, duplicateRate from uniqueness rules
+          const completenessRules = metricsData.filter((m: Record<string, unknown>) => 
+            (m.dimension as string)?.toLowerCase() === 'completeness'
+          );
+          const uniquenessRules = metricsData.filter((m: Record<string, unknown>) => 
+            (m.dimension as string)?.toLowerCase() === 'uniqueness'
+          );
+          
+          const computedNullRate = completenessRules.length > 0
+            ? completenessRules.reduce((sum: number, m: Record<string, unknown>) => 
+                sum + (1 - ((m.success_rate as number) || 0)), 0) / completenessRules.length * 100
+            : 0;
+          
+          const computedDuplicateRate = uniquenessRules.length > 0
+            ? uniquenessRules.reduce((sum: number, m: Record<string, unknown>) => 
+                sum + (1 - ((m.success_rate as number) || 0)), 0) / uniquenessRules.length * 100
+            : 0;
+
           setMetrics({
             overallScore: total > 0 ? (passed / total) * 100 : 0,
             errorRate: summary.error_rate || (total > 0 ? (failed / total) * 100 : 0),
-            // GOVERNANCE FIX: Remove Math.random() - use 0 for unavailable data
-            nullRate: summary.null_rate ?? 0,
-            duplicateRate: summary.duplicate_rate ?? 0,
+            nullRate: computedNullRate,
+            duplicateRate: computedDuplicateRate,
             rulesExecuted: total,
             rulesPassed: passed,
             rulesFailed: failed,
