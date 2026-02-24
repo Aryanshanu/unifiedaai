@@ -21,6 +21,7 @@ import {
   ScanSearch,
   FlaskConical,
   Target,
+  BookOpen,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { HealthIndicator } from "@/components/shared/HealthIndicator";
