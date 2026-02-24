@@ -1,39 +1,79 @@
 
 
-# Integrate 3 New OpenRouter Models into AI Project
+# Replace All External Model Calls with Lovable AI Gateway
 
-## What Will Happen
+## The Problem
 
-Three new models will be registered in your "AI" project with the correct OpenRouter API endpoint and your provided API key:
+Every evaluation engine and the custom prompt test function currently calls external providers (OpenRouter, HuggingFace) which are unreliable -- rate limits, 404 errors, 429 errors, timeouts, privacy policy blocks. This has been causing constant failures across all core RAI features.
 
-| Model | ID |
-|-------|-----|
-| Mistral Small 3.1 24B | `mistralai/mistral-small-3.1-24b-instruct:free` |
-| Qwen3 Next 80B | `qwen/qwen3-next-80b-a3b-instruct:free` |
-| Llama 3.3 70B | `meta-llama/llama-3.3-70b-instruct:free` |
+## The Solution
 
-All three will use:
-- **Endpoint:** `https://openrouter.ai/api/v1/chat/completions`
-- **Provider:** OpenRouter
-- **API Key:** Your provided key (stored in the systems table alongside each model)
+Replace ALL external model calls with the **Lovable AI Gateway** (`https://ai.gateway.lovable.dev/v1/chat/completions`), which:
+- Uses the pre-configured `LOVABLE_API_KEY` (already available)
+- No external API keys needed
+- No rate limit issues from free-tier models
+- Reliable, fast, production-grade
 
-## Steps
+**Default model:** `google/gemini-3-flash-preview`
 
-### 1. Database Inserts (3 systems + 3 models)
+---
 
-For each model, create a `systems` row with the correct endpoint, model_name, and API token, then a linked `models` row. This mirrors the existing pattern used by your `openai/gpt-oss-120b:free` and `deepseek/deepseek-r1-0528:free` models.
+## Files to Modify
 
-### 2. Verify Connectivity
+### 1. Edge Functions (6 files) -- Replace `callUserModel` / `callTargetModel`
 
-After inserting, test one of the models using the `custom-prompt-test` edge function to confirm it responds correctly.
+Each of these functions has a `callUserModel` (or `callTargetModel`) function that routes to OpenRouter/HuggingFace/OpenAI based on endpoint URL. **All will be replaced** with a single unified call to Lovable AI Gateway.
 
-## Important Note
+| File | Current Behavior |
+|------|-----------------|
+| `supabase/functions/custom-prompt-test/index.ts` | Uses `callTargetModel` with OpenRouter/HF routing |
+| `supabase/functions/eval-fairness/index.ts` | Uses `callUserModel` with OpenRouter/HF routing |
+| `supabase/functions/eval-toxicity-hf/index.ts` | Uses `callUserModel` with OpenRouter/HF routing |
+| `supabase/functions/eval-hallucination-hf/index.ts` | Uses `callUserModel` with OpenRouter/HF routing |
+| `supabase/functions/eval-privacy-hf/index.ts` | Uses `callUserModel` with OpenRouter/HF routing |
+| `supabase/functions/eval-explainability-hf/index.ts` | Uses `callUserModel` with OpenRouter/HF routing |
 
-Your API key will be stored in the `systems.api_token_encrypted` column (same as your other OpenRouter models). Since these are `:free` models, make sure your OpenRouter privacy settings allow "Free model publication" at [openrouter.ai/settings/privacy](https://openrouter.ai/settings/privacy) -- otherwise you'll get the same 404 error as before.
+**New `callUserModel` pattern (same for all 6):**
 
-## Technical Details
+```text
+async function callUserModel(prompt, modelName?):
+  1. Read LOVABLE_API_KEY from Deno.env
+  2. POST to https://ai.gateway.lovable.dev/v1/chat/completions
+     - model: "google/gemini-3-flash-preview"
+     - messages: [{ role: "user", content: prompt }]
+     - Authorization: Bearer LOVABLE_API_KEY
+  3. Parse response.choices[0].message.content
+  4. Handle 429 (rate limit) and 402 (payment required) errors
+  5. Return output string
+```
 
-- **Project ID:** `954496e7-9525-4891-aabb-2ba8cb4c27aa`
-- No code changes needed -- the existing registration flow, evaluation engines, and `custom-prompt-test` already support OpenRouter models with the normalization fixes applied earlier
-- Each model gets `status: 'draft'` and `deployment_status: 'draft'` initially
+The function will **ignore** the model's stored endpoint/apiToken entirely -- it always goes through Lovable AI. The stored model metadata is still used for display/audit purposes, but the actual inference call goes to Lovable.
+
+### 2. Database Update -- Register a Lovable AI Built-in System
+
+Update the existing model system records to point to the Lovable AI gateway so the UI reflects the correct configuration:
+- Endpoint: `https://ai.gateway.lovable.dev/v1/chat/completions`
+- Provider: `lovable`
+- Model name: `google/gemini-3-flash-preview`
+
+### 3. Frontend -- No Changes Needed
+
+The frontend hooks (`useCustomPromptTest`, engine pages) already work correctly. They pass `modelId` to the edge functions, and the edge functions handle the rest. Since we're only changing the backend call target, no frontend changes are required.
+
+---
+
+## What Changes for Users
+
+- All 5 evaluation engines (Fairness, Toxicity, Privacy, Hallucination, Explainability) will use Google Gemini via Lovable AI
+- Custom prompt tests will use the same gateway
+- No more 429, 404, 502 errors from free-tier OpenRouter models
+- All existing evaluation math, scoring formulas, transparency components remain exactly the same
+- Evaluation results will show "Lovable AI Gateway" as the endpoint in audit logs
+
+## Edge Cases Handled
+
+- **429 Too Many Requests**: Surface "Rate limited, try again" message
+- **402 Payment Required**: Surface "Add credits to your workspace" message  
+- **Timeout**: 55-second AbortController timeout preserved
+- **HuggingFace toxicity classifier** (`analyzeWithHuggingFace` in eval-toxicity-hf): This secondary classifier for analyzing model output toxicity will be replaced with pattern-based analysis (already implemented in `custom-prompt-test`), removing the HuggingFace dependency entirely
 
