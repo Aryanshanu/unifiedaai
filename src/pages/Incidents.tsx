@@ -95,7 +95,6 @@ export default function Incidents() {
         (payload) => {
           setRealtimeCount(prev => prev + 1);
           queryClient.invalidateQueries({ queryKey: ['incidents'] });
-          queryClient.invalidateQueries({ queryKey: ['incidents'] });
           
           if (payload.eventType === 'INSERT') {
             const newIncident = payload.new as any;
@@ -135,12 +134,7 @@ export default function Incidents() {
     setShowArchiveDialog(false);
   };
 
-  const handleQuickResolveAll = () => {
-    const openCritical = filteredIncidents.filter(i => i.status === 'open' && i.severity === 'critical');
-    if (openCritical.length > 0) {
-      bulkResolve.mutate(openCritical.map(i => i.id));
-    }
-  };
+  // Removed dangerous bulk resolve all critical - should be done individually
 
   const handleRunLifecycleCheck = async () => {
     setRunningLifecycle(true);
@@ -150,7 +144,6 @@ export default function Incidents() {
       });
       if (error) throw error;
       toast.success("Lifecycle check complete");
-      queryClient.invalidateQueries({ queryKey: ['incidents'] });
       queryClient.invalidateQueries({ queryKey: ['incidents'] });
     } catch (error) {
       toast.error("Lifecycle check failed");
@@ -264,18 +257,7 @@ export default function Incidents() {
             <Archive className="w-4 h-4" />
             Bulk Archive
           </Button>
-          {stats && stats.critical > 0 && (
-            <Button 
-              variant="destructive" 
-              size="sm"
-              onClick={handleQuickResolveAll}
-              className="gap-1.5"
-              disabled={bulkResolve.isPending}
-            >
-              <CheckCircle className="w-4 h-4" />
-              Resolve Open Critical ({stats.critical})
-            </Button>
-          )}
+          {/* Bulk critical resolve removed - use individual actions */}
         </div>
       </div>
 

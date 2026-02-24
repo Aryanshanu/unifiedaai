@@ -42,19 +42,8 @@ export default function Index() {
   const isError = modelsError || metricsError;
   const { status, lastUpdated } = useDataHealth(isLoading, isError);
   
-  // Pending reviews count for prominent display
-  const { data: pendingReviewsCount } = useQuery({
-    queryKey: ['pending-reviews-count'],
-    queryFn: async () => {
-      const { count, error } = await supabase
-        .from('review_queue')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
-      if (error) return 0;
-      return count || 0;
-    },
-    refetchInterval: 30000,
-  });
+  // Use metrics from usePlatformMetrics instead of separate queries
+  const pendingReviewsCount = metrics?.pendingApprovals || 0;
 
   // Data Quality metrics
   const { data: dqMetrics } = useQuery({
@@ -97,7 +86,7 @@ export default function Index() {
   });
 
 
-  // Recent incidents for activity log
+  // Recent incidents - keep but with longer interval
   const { data: recentIncidents } = useQuery({
     queryKey: ['recent-incidents'],
     queryFn: async () => {
@@ -109,10 +98,10 @@ export default function Index() {
       if (error) return [];
       return data || [];
     },
-    refetchInterval: 30000,
+    refetchInterval: 60000,
   });
   
-  // Realtime subscription for dashboard data
+  // Realtime subscription - reduced to 2 critical tables only
   useEffect(() => {
     const channel = supabase
       .channel('dashboard-realtime')
@@ -134,24 +123,9 @@ export default function Index() {
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'dq_incidents' },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['dq-summary'] });
-        }
-      )
-      .on(
-        'postgres_changes',
         { event: '*', schema: 'public', table: 'review_queue' },
         () => {
-          queryClient.invalidateQueries({ queryKey: ['review-queue'] });
-          queryClient.invalidateQueries({ queryKey: ['pending-reviews-count'] });
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'semantic_drift_alerts' },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['semantic-summary'] });
+          queryClient.invalidateQueries({ queryKey: ['platform-metrics'] });
         }
       )
       .subscribe();
@@ -495,14 +469,14 @@ export default function Index() {
             </CardContent>
           </Card>
 
-          <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate("/alerts")}>
+          <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate("/incidents")}>
             <CardContent className="pt-6 flex items-center gap-4">
               <div className="p-3 rounded-lg bg-muted">
                 <AlertTriangle className="h-6 w-6 text-muted-foreground" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{metrics?.recentIncidents || 0}</p>
-                <p className="text-sm text-muted-foreground">Open Alerts</p>
+                <p className="text-sm text-muted-foreground">Open Incidents</p>
               </div>
             </CardContent>
           </Card>

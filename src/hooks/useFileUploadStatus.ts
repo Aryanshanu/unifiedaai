@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface AISummary {
@@ -239,54 +240,36 @@ export function useAllUploads() {
 }
 
 export function useQualityStats() {
-  const [stats, setStats] = useState({
-    totalFiles: 0,
-    processing: 0,
-    avgScore: 0,
-    criticalIssues: 0
+  const { data: stats = { totalFiles: 0, processing: 0, avgScore: 0, criticalIssues: 0 }, isLoading: loading } = useQuery({
+    queryKey: ['quality-stats'],
+    queryFn: async () => {
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      
+      const [uploadsResult, issuesResult] = await Promise.all([
+        supabase.from('data_uploads').select('status, quality_score'),
+        supabase
+          .from('quality_issues')
+          .select('*', { count: 'exact', head: true })
+          .eq('severity', 'critical')
+          .eq('status', 'open')
+          .gte('created_at', thirtyDaysAgo),
+      ]);
+
+      const uploads = uploadsResult.data || [];
+      const completed = uploads.filter(u => u.status === 'completed' && u.quality_score !== null);
+      
+      return {
+        totalFiles: uploads.length,
+        processing: uploads.filter(u => ['pending', 'processing', 'analyzing'].includes(u.status || '')).length,
+        avgScore: completed.length > 0 
+          ? Math.round(completed.reduce((sum, u) => sum + (u.quality_score || 0), 0) / completed.length)
+          : 0,
+        criticalIssues: issuesResult.count || 0,
+      };
+    },
+    staleTime: 60_000,
+    refetchInterval: 60000,
   });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      setLoading(true);
-      try {
-        const [uploadsResult, issuesResult] = await Promise.all([
-          supabase.from('data_uploads').select('status, quality_score'),
-          supabase.from('quality_issues').select('severity').eq('severity', 'critical').eq('status', 'open')
-        ]);
-
-        if (uploadsResult.data) {
-          const uploads = uploadsResult.data;
-          const completed = uploads.filter(u => u.status === 'completed' && u.quality_score !== null);
-          
-          setStats({
-            totalFiles: uploads.length,
-            processing: uploads.filter(u => ['pending', 'processing', 'analyzing'].includes(u.status)).length,
-            avgScore: completed.length > 0 
-              ? Math.round(completed.reduce((sum, u) => sum + (u.quality_score || 0), 0) / completed.length)
-              : 0,
-            criticalIssues: issuesResult.data?.length || 0
-          });
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStats();
-
-    // Subscribe to changes
-    const channel = supabase
-      .channel('quality-stats')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'data_uploads' }, fetchStats)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'quality_issues' }, fetchStats)
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
 
   return { stats, loading };
 }
