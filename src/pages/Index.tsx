@@ -42,19 +42,8 @@ export default function Index() {
   const isError = modelsError || metricsError;
   const { status, lastUpdated } = useDataHealth(isLoading, isError);
   
-  // Pending reviews count for prominent display
-  const { data: pendingReviewsCount } = useQuery({
-    queryKey: ['pending-reviews-count'],
-    queryFn: async () => {
-      const { count, error } = await supabase
-        .from('review_queue')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
-      if (error) return 0;
-      return count || 0;
-    },
-    refetchInterval: 30000,
-  });
+  // Use metrics from usePlatformMetrics instead of separate queries
+  const pendingReviewsCount = metrics?.pendingApprovals || 0;
 
   // Data Quality metrics
   const { data: dqMetrics } = useQuery({
