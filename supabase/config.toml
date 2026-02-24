@@ -143,3 +143,12 @@ verify_jwt = false
 
 [functions.target-executor]
 verify_jwt = false
+
+[functions.semantic-compiler]
+verify_jwt = false
+
+[functions.semantic-query]
+verify_jwt = false
+
+[functions.semantic-drift-check]
+verify_jwt = false
