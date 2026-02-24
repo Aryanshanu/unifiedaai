@@ -19,54 +19,77 @@ export function usePlatformMetrics() {
     queryFn: async () => {
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-      // Fetch all data in parallel
-      const [logsRes, systemsRes, approvalsRes, incidentsRes] = await Promise.all([
+      // Use count queries instead of fetching all rows
+      const [
+        totalLogsRes,
+        blockedLogsRes,
+        warnedLogsRes,
+        errorLogsRes,
+        latencyLogsRes,
+        systemsRes,
+        approvalsRes,
+        incidentsRes,
+      ] = await Promise.all([
         supabase
           .from("request_logs")
-          .select("decision, latency_ms, status_code")
+          .select("*", { count: "exact", head: true })
           .gte("created_at", twentyFourHoursAgo),
         supabase
+          .from("request_logs")
+          .select("*", { count: "exact", head: true })
+          .gte("created_at", twentyFourHoursAgo)
+          .eq("decision", "BLOCK"),
+        supabase
+          .from("request_logs")
+          .select("*", { count: "exact", head: true })
+          .gte("created_at", twentyFourHoursAgo)
+          .eq("decision", "WARN"),
+        supabase
+          .from("request_logs")
+          .select("*", { count: "exact", head: true })
+          .gte("created_at", twentyFourHoursAgo)
+          .gte("status_code", 500),
+        // Only fetch latest 100 logs for avg latency calculation
+        supabase
+          .from("request_logs")
+          .select("latency_ms")
+          .gte("created_at", twentyFourHoursAgo)
+          .order("created_at", { ascending: false })
+          .limit(100),
+        supabase
           .from("systems")
-          .select("id, uri_score, deployment_status, requires_approval"),
+          .select("id, uri_score"),
         supabase
           .from("system_approvals")
-          .select("id")
+          .select("*", { count: "exact", head: true })
           .eq("status", "pending"),
         supabase
           .from("incidents")
-          .select("id")
+          .select("*", { count: "exact", head: true })
           .eq("status", "open"),
       ]);
 
-      const logs = logsRes.data || [];
+      const latencyLogs = latencyLogsRes.data || [];
       const systems = systemsRes.data || [];
-      const pendingApprovals = approvalsRes.data?.length || 0;
-      const recentIncidents = incidentsRes.data?.length || 0;
-
-      const totalRequests = logs.length;
-      const blockedRequests = logs.filter(l => l.decision === "BLOCK").length;
-      const warnedRequests = logs.filter(l => l.decision === "WARN").length;
-      const errorCount = logs.filter(l => (l.status_code || 0) >= 500).length;
-      const avgLatency = totalRequests > 0
-        ? Math.round(logs.reduce((sum, l) => sum + (l.latency_ms || 0), 0) / totalRequests)
+      const totalRequests = totalLogsRes.count || 0;
+      const avgLatency = latencyLogs.length > 0
+        ? Math.round(latencyLogs.reduce((sum, l) => sum + (l.latency_ms || 0), 0) / latencyLogs.length)
         : 0;
-
-      const systemsCount = systems.length;
-      const highRiskSystems = systems.filter(s => (s.uri_score || 0) > 60).length;
 
       return {
         totalRequests,
-        blockedRequests,
-        warnedRequests,
+        blockedRequests: blockedLogsRes.count || 0,
+        warnedRequests: warnedLogsRes.count || 0,
         avgLatency,
-        errorCount,
-        systemsCount,
-        highRiskSystems,
-        pendingApprovals,
-        recentIncidents,
+        errorCount: errorLogsRes.count || 0,
+        systemsCount: systems.length,
+        highRiskSystems: systems.filter(s => (s.uri_score || 0) > 60).length,
+        pendingApprovals: approvalsRes.count || 0,
+        recentIncidents: incidentsRes.count || 0,
       } as PlatformMetrics;
     },
-    refetchInterval: 30000, // Refresh every 30 seconds
+    staleTime: 60_000,
+    refetchInterval: 60000,
   });
 }
 
@@ -91,31 +114,41 @@ export function useSystemHealthSummary() {
     queryFn: async () => {
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-      const { data: systems, error: systemsError } = await supabase
-        .from("systems")
-        .select("id, name, provider, system_type, deployment_status, requires_approval, uri_score, runtime_risk_score");
-
-      if (systemsError) throw systemsError;
-
-      const summaries: SystemHealthSummary[] = [];
-
-      for (const system of systems || []) {
-        const { data: logs } = await supabase
+      // Fetch systems and ALL recent logs in parallel (no N+1)
+      const [systemsRes, logsRes] = await Promise.all([
+        supabase
+          .from("systems")
+          .select("id, name, provider, system_type, deployment_status, requires_approval, uri_score, runtime_risk_score"),
+        supabase
           .from("request_logs")
-          .select("decision, latency_ms")
-          .eq("system_id", system.id)
-          .gte("created_at", twentyFourHoursAgo);
+          .select("system_id, decision, latency_ms")
+          .gte("created_at", twentyFourHoursAgo),
+      ]);
 
-        const totalRequests = logs?.length || 0;
-        const blockedRequests = logs?.filter(l => l.decision === "BLOCK").length || 0;
+      if (systemsRes.error) throw systemsRes.error;
+
+      const logs = logsRes.data || [];
+      // Group logs by system_id client-side
+      const logsBySystem = new Map<string, typeof logs>();
+      for (const log of logs) {
+        if (!log.system_id) continue;
+        if (!logsBySystem.has(log.system_id)) {
+          logsBySystem.set(log.system_id, []);
+        }
+        logsBySystem.get(log.system_id)!.push(log);
+      }
+
+      const summaries: SystemHealthSummary[] = (systemsRes.data || []).map((system) => {
+        const systemLogs = logsBySystem.get(system.id) || [];
+        const totalRequests = systemLogs.length;
+        const blockedRequests = systemLogs.filter(l => l.decision === "BLOCK").length;
         const avgLatency = totalRequests > 0
-          ? Math.round(logs!.reduce((sum, l) => sum + (l.latency_ms || 0), 0) / totalRequests)
+          ? Math.round(systemLogs.reduce((sum, l) => sum + (l.latency_ms || 0), 0) / totalRequests)
           : 0;
 
-        // Determine health status
         const uriScore = system.uri_score || 0;
         const blockRate = totalRequests > 0 ? blockedRequests / totalRequests : 0;
-        
+
         let healthStatus: "healthy" | "warning" | "critical" = "healthy";
         if (uriScore > 80 || blockRate > 0.2) {
           healthStatus = "critical";
@@ -123,7 +156,7 @@ export function useSystemHealthSummary() {
           healthStatus = "warning";
         }
 
-        summaries.push({
+        return {
           id: system.id,
           name: system.name,
           provider: system.provider,
@@ -136,12 +169,13 @@ export function useSystemHealthSummary() {
           blockedRequests,
           avgLatency,
           healthStatus,
-        });
-      }
+        };
+      });
 
       return summaries;
     },
-    refetchInterval: 60000, // Refresh every minute
+    staleTime: 60_000,
+    refetchInterval: 60000,
   });
 }
 
@@ -151,7 +185,6 @@ export function useUnsafeDeployments() {
     queryFn: async () => {
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-      // Get systems that require approval but aren't approved
       const { data: unapprovedSystems, error: systemsError } = await supabase
         .from("systems")
         .select("id, name, project_id, uri_score, deployment_status")
@@ -160,9 +193,8 @@ export function useUnsafeDeployments() {
 
       if (systemsError) throw systemsError;
 
-      // Check which have live traffic
       const unsafeDeployments = [];
-      
+
       for (const system of unapprovedSystems || []) {
         const { count } = await supabase
           .from("request_logs")
@@ -180,6 +212,7 @@ export function useUnsafeDeployments() {
 
       return unsafeDeployments;
     },
-    refetchInterval: 30000,
+    staleTime: 60_000,
+    refetchInterval: 60000,
   });
 }

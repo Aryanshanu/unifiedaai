@@ -469,14 +469,14 @@ export default function Index() {
             </CardContent>
           </Card>
 
-          <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate("/alerts")}>
+          <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate("/incidents")}>
             <CardContent className="pt-6 flex items-center gap-4">
               <div className="p-3 rounded-lg bg-muted">
                 <AlertTriangle className="h-6 w-6 text-muted-foreground" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{metrics?.recentIncidents || 0}</p>
-                <p className="text-sm text-muted-foreground">Open Alerts</p>
+                <p className="text-sm text-muted-foreground">Open Incidents</p>
               </div>
             </CardContent>
           </Card>

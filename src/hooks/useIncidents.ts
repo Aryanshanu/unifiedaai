@@ -54,19 +54,37 @@ export function useIncidentStats() {
   return useQuery({
     queryKey: ['incidents', 'stats'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('incidents')
-        .select('status, severity')
-        .is('archived_at', null); // Exclude archived
+      // Use count queries instead of fetching all rows
+      const [totalRes, openRes, criticalRes, highRes] = await Promise.all([
+        supabase
+          .from('incidents')
+          .select('*', { count: 'exact', head: true })
+          .is('archived_at', null),
+        supabase
+          .from('incidents')
+          .select('*', { count: 'exact', head: true })
+          .is('archived_at', null)
+          .eq('status', 'open'),
+        supabase
+          .from('incidents')
+          .select('*', { count: 'exact', head: true })
+          .is('archived_at', null)
+          .eq('severity', 'critical')
+          .neq('status', 'resolved'),
+        supabase
+          .from('incidents')
+          .select('*', { count: 'exact', head: true })
+          .is('archived_at', null)
+          .eq('severity', 'high')
+          .neq('status', 'resolved'),
+      ]);
       
-      if (error) throw error;
-      
-      const total = data.length;
-      const open = data.filter(i => i.status === 'open').length;
-      const critical = data.filter(i => i.severity === 'critical' && i.status !== 'resolved').length;
-      const high = data.filter(i => i.severity === 'high' && i.status !== 'resolved').length;
-      
-      return { total, open, critical, high };
+      return {
+        total: totalRes.count || 0,
+        open: openRes.count || 0,
+        critical: criticalRes.count || 0,
+        high: highRes.count || 0,
+      };
     },
   });
 }

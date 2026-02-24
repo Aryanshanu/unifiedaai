@@ -257,18 +257,7 @@ export default function Incidents() {
             <Archive className="w-4 h-4" />
             Bulk Archive
           </Button>
-          {stats && stats.critical > 0 && (
-            <Button 
-              variant="destructive" 
-              size="sm"
-              onClick={handleQuickResolveAll}
-              className="gap-1.5"
-              disabled={bulkResolve.isPending}
-            >
-              <CheckCircle className="w-4 h-4" />
-              Resolve Open Critical ({stats.critical})
-            </Button>
-          )}
+          {/* Bulk critical resolve removed - use individual actions */}
         </div>
       </div>
 

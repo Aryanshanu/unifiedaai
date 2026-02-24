@@ -778,14 +778,10 @@ function DataQualityEngineContent() {
         <QualityStatsCards />
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-7 max-w-4xl">
+          <TabsList className="grid w-full grid-cols-5 max-w-3xl">
             <TabsTrigger value="control-plane" className="flex items-center gap-2">
               <Zap className="h-4 w-4" />
               Control Plane
-            </TabsTrigger>
-            <TabsTrigger value="sources" className="flex items-center gap-2">
-              <Database className="h-4 w-4" />
-              Data Sources
             </TabsTrigger>
             <TabsTrigger value="import" className="flex items-center gap-2">
               <Upload className="h-4 w-4" />
@@ -794,10 +790,6 @@ function DataQualityEngineContent() {
             <TabsTrigger value="evaluate" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Evaluate
-            </TabsTrigger>
-            <TabsTrigger value="readiness" className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4" />
-              AI Readiness
             </TabsTrigger>
             <TabsTrigger value="bias" className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" />
@@ -813,20 +805,18 @@ function DataQualityEngineContent() {
             <ControlPlaneTab />
           </TabsContent>
 
-          <TabsContent value="sources" className="mt-6">
-            <DataSourceConnectors />
-          </TabsContent>
-
           <TabsContent value="import" className="mt-6">
-            <ImportTab />
+            <div className="space-y-6">
+              <DataSourceConnectors />
+              <ImportTab />
+            </div>
           </TabsContent>
 
           <TabsContent value="evaluate" className="mt-6">
-            <EvaluateTab />
-          </TabsContent>
-
-          <TabsContent value="readiness" className="mt-6">
-            <ReadyDatasetsList />
+            <div className="space-y-6">
+              <EvaluateTab />
+              <ReadyDatasetsList />
+            </div>
           </TabsContent>
 
           <TabsContent value="bias" className="mt-6">
