@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { FileText, Plus, AlertTriangle, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { FileText, Plus, AlertTriangle, CheckCircle2, XCircle, AlertCircle, BookOpen } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ErrorBoundary } from '@/components/error/ErrorBoundary';
