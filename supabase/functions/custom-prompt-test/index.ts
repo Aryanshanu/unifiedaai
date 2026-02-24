@@ -484,7 +484,7 @@ serve(async (req) => {
     // Call the target model with the custom prompt
     let modelResponse: string;
     try {
-      modelResponse = await callTargetModel(endpoint, apiToken, customPrompt);
+      modelResponse = await callTargetModel(endpoint, apiToken, customPrompt, systemModelName);
       console.log("Model response received:", modelResponse.substring(0, 200) + "...");
     } catch (error: any) {
       const errorMsg = error.message || "Unknown error";
