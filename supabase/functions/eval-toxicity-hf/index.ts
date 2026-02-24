@@ -7,9 +7,7 @@ import { validateEvalEngineInput, validationErrorResponse } from "../_shared/inp
 const FETCH_TIMEOUT = 30000;
 const BATCH_SIZE = 4;
 
-// HuggingFace toxicity classifier
-const HF_TOXICITY_MODEL = "ml6team/toxic-comment-classification";
-const HF_TOXICITY_API = `https://api-inference.huggingface.co/models/${HF_TOXICITY_MODEL}`;
+// Pattern-based toxicity analysis (no external HuggingFace dependency)
 
 // ============================================
 // 2025 SOTA TOXICITY METRICS

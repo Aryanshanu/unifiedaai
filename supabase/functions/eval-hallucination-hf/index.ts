@@ -7,9 +7,7 @@ import { validateEvalEngineInput, validationErrorResponse } from "../_shared/inp
 const FETCH_TIMEOUT = 30000;
 const BATCH_SIZE = 4;
 
-// HuggingFace NLI model for hallucination detection
-const HF_HALLUCINATION_MODEL = "vectara/hallucination_evaluation_model";
-const HF_HALLUCINATION_API = `https://api-inference.huggingface.co/models/${HF_HALLUCINATION_MODEL}`;
+// Lovable AI Gateway-powered hallucination evaluation (no external HuggingFace dependency)
 
 // ============================================
 // 2025 SOTA HALLUCINATION METRICS
