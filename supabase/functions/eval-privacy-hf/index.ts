@@ -115,67 +115,40 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeout: numb
 }
 
 async function callUserModel(
-  endpoint: string, 
-  apiToken: string | null, 
+  _endpoint: string, 
+  _apiToken: string | null, 
   prompt: string,
-  modelName?: string
+  _modelName?: string
 ): Promise<{ output: string; success: boolean; error?: string; errorType?: string }> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) {
+    return { output: "", success: false, error: "LOVABLE_API_KEY not configured", errorType: "config_error" };
+  }
+
   try {
-    let response: Response;
-    
-    if (endpoint.includes("api-inference.huggingface.co")) {
-      response = await fetchWithTimeout(endpoint, {
-        method: "POST",
-        headers: {
-          "Authorization": apiToken ? `Bearer ${apiToken}` : "",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ inputs: prompt }),
-      }, FETCH_TIMEOUT);
-    } else if (endpoint.includes("openrouter.ai")) {
-      const modelId = modelName || "openai/gpt-3.5-turbo";
-      response = await fetchWithTimeout("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiToken}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://fractal-rai-os.lovable.app",
-        },
-        body: JSON.stringify({
-          model: modelId,
-          messages: [{ role: "user", content: prompt }],
-        }),
-      }, FETCH_TIMEOUT);
-    } else {
-      response = await fetchWithTimeout(endpoint, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: modelName || undefined,
-          messages: [{ role: "user", content: prompt }],
-          max_tokens: 500,
-        }),
-      }, FETCH_TIMEOUT);
-    }
+    const response = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 500,
+        temperature: 0.7,
+      }),
+    }, FETCH_TIMEOUT);
 
     if (!response.ok) {
       const error = await response.text();
       const errorType = response.status === 429 ? "rate_limit" : 
-                       response.status === 401 ? "auth_error" : "api_error";
+                       response.status === 402 ? "payment_required" : "api_error";
       return { output: "", success: false, error: `HTTP ${response.status}: ${error.substring(0, 200)}`, errorType };
     }
 
     const data = await response.json();
-    let output = "";
-    
-    if (data.choices?.[0]?.message?.content) output = data.choices[0].message.content;
-    else if (Array.isArray(data) && data[0]?.generated_text) output = data[0].generated_text;
-    else if (typeof data === "string") output = data;
-    else output = JSON.stringify(data);
-    
+    const output = data.choices?.[0]?.message?.content || JSON.stringify(data);
     return { output, success: true };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
