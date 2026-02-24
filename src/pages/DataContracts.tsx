@@ -58,6 +58,21 @@ function DataContractsContent() {
     }
   });
 
+  // Consuming semantic definitions - definitions that reference datasets used by contracts
+  const { data: consumingDefinitions } = useQuery({
+    queryKey: ['consuming-semantic-definitions', contracts],
+    queryFn: async () => {
+      if (!contracts || contracts.length === 0) return [];
+      const { data, error } = await (supabase as any)
+        .from('semantic_definitions')
+        .select('id, name, display_name, status, sql_logic, upstream_dependencies')
+        .eq('status', 'active');
+      if (error) return [];
+      return data || [];
+    },
+    enabled: !!contracts && contracts.length > 0,
+  });
+
   const createContractMutation = useMutation({
     mutationFn: async () => {
       if (!selectedDataset || !newContract.name) throw new Error('Dataset and name required');
