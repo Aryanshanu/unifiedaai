@@ -130,8 +130,7 @@ const App = () => (
                 {/* Audit */}
                 {/* Audit */}
                 <Route path="/audit-center" element={<ProtectedRoute><AuditCenter /></ProtectedRoute>} />
-                {/* Demo */}
-                <Route path="/golden" element={<ProtectedRoute><GoldenDemoV2 /></ProtectedRoute>} />
+                {/* Catch-all */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
               </Suspense>

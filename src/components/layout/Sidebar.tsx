@@ -59,17 +59,9 @@ const navItems = [
   { path: "/security/pentest", icon: ScanSearch, label: "AI Pentesting" },
   { path: "/security/jailbreak", icon: FlaskConical, label: "Jailbreak Lab" },
   { path: "/security/threats", icon: Target, label: "Threat Modeling" },
-  { divider: true, label: "Respond" },
-  { path: "/policy", icon: FileText, label: "Policy Studio" },
-  { path: "/golden", icon: Play, label: "Golden Demo" },
-  { divider: true, label: "Impact" },
-  { path: "/impact-dashboard", icon: BarChart3, label: "Impact Dashboard" },
-  { path: "/regulatory-reports", icon: FileCheck, label: "Regulatory Reports" },
   { divider: true, label: "Configure" },
   { path: "/projects", icon: FolderOpen, label: "Projects" },
   { path: "/models", icon: Database, label: "Models" },
-  
-  { path: "/runbooks", icon: BookMarked, label: "Runbooks" },
   { path: "/settings", icon: Settings, label: "Settings" },
   { path: "/docs", icon: BookOpen, label: "Documentation" },
 ];
