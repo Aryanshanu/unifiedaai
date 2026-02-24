@@ -47,6 +47,7 @@ const navItems = [
   { divider: true, label: "DATA GOVERNANCE" },
   { path: "/engine/data-quality", icon: Database, label: "Data Quality Engine" },
   { path: "/data-contracts", icon: FileText, label: "Data Contracts" },
+  { path: "/semantic-definitions", icon: BookOpen, label: "Semantic Layer" },
   { divider: true, label: "CORE RAI" },
   { path: "/engine/fairness", icon: Scale, label: "Fairness Engine" },
   { path: "/engine/hallucination", icon: AlertCircle, label: "Hallucination Engine" },
