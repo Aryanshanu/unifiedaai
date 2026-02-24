@@ -49,11 +49,14 @@ export async function getModelConfig(modelId: string): Promise<ModelEndpointConf
     return null;
   }
 
+  // Normalize OpenRouter model page URLs to API endpoint
+  const normalized = normalizeOpenRouterUrl(endpoint, modelName);
+
   return {
-    endpoint,
+    endpoint: normalized.endpoint,
     apiToken,
-    provider,
-    modelName,
+    provider: normalized.isOpenRouter ? "openrouter" : provider,
+    modelName: normalized.modelName || modelName,
   };
 }
 
