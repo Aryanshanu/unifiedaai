@@ -227,18 +227,13 @@ function determineVerdict(score: number): 'PASS' | 'WARN' | 'FAIL' {
   return 'FAIL';
 }
 
-function generateEvidenceHash(metrics: QualityMetrics, timestamp: string): string {
+async function generateEvidenceHash(metrics: QualityMetrics, timestamp: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(JSON.stringify({ metrics, timestamp }));
-  
-  // Simple hash for evidence (in production, use crypto.subtle.digest)
-  let hash = 0;
-  for (let i = 0; i < data.length; i++) {
-    const char = data[i];
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return Math.abs(hash).toString(16).padStart(16, '0');
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 serve(async (req) => {
@@ -343,7 +338,7 @@ serve(async (req) => {
 
     const verdict = determineVerdict(metrics.overall);
     const timestamp = new Date().toISOString();
-    const evidenceHash = generateEvidenceHash(metrics, timestamp);
+    const evidenceHash = await generateEvidenceHash(metrics, timestamp);
 
     // Get user from auth header
     const authHeader = req.headers.get('Authorization');

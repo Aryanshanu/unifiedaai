@@ -243,9 +243,11 @@ export function DQStreamingDashboard({ datasetId, executionId, isActive = true }
           .limit(1)
           .single();
 
+        let metricsData: Record<string, unknown>[] = [];
+        
         if (execution) {
           const summary = execution.summary as Record<string, number> || {};
-          const metricsData = execution.metrics as Record<string, unknown>[] || [];
+          metricsData = execution.metrics as Record<string, unknown>[] || [];
 
           // Calculate dimension scores from metrics
           const dimensionScores: Record<string, number[]> = {};
@@ -258,10 +260,9 @@ export function DQStreamingDashboard({ datasetId, executionId, isActive = true }
 
           setDimensions(prev => prev.map(d => {
             const scores = dimensionScores[d.name.toLowerCase()] || [];
-            // GOVERNANCE FIX: Remove Math.random() - use null for unavailable data
             const newScore = scores.length > 0 
               ? scores.reduce((a, b) => a + b, 0) / scores.length 
-              : 0; // Default to 0 instead of fabricated value
+              : 0;
             return {
               ...d,
               previousScore: d.score,
@@ -274,12 +275,29 @@ export function DQStreamingDashboard({ datasetId, executionId, isActive = true }
           const failed = summary.failed || 0;
           const total = passed + failed;
 
+          // REAL COMPUTATION: Derive nullRate from completeness rules, duplicateRate from uniqueness rules
+          const completenessRules = metricsData.filter((m: Record<string, unknown>) => 
+            (m.dimension as string)?.toLowerCase() === 'completeness'
+          );
+          const uniquenessRules = metricsData.filter((m: Record<string, unknown>) => 
+            (m.dimension as string)?.toLowerCase() === 'uniqueness'
+          );
+          
+          const computedNullRate = completenessRules.length > 0
+            ? completenessRules.reduce((sum: number, m: Record<string, unknown>) => 
+                sum + (1 - ((m.success_rate as number) || 0)), 0) / completenessRules.length * 100
+            : 0;
+          
+          const computedDuplicateRate = uniquenessRules.length > 0
+            ? uniquenessRules.reduce((sum: number, m: Record<string, unknown>) => 
+                sum + (1 - ((m.success_rate as number) || 0)), 0) / uniquenessRules.length * 100
+            : 0;
+
           setMetrics({
             overallScore: total > 0 ? (passed / total) * 100 : 0,
             errorRate: summary.error_rate || (total > 0 ? (failed / total) * 100 : 0),
-            // GOVERNANCE FIX: Remove Math.random() - use 0 for unavailable data
-            nullRate: summary.null_rate ?? 0,
-            duplicateRate: summary.duplicate_rate ?? 0,
+            nullRate: computedNullRate,
+            duplicateRate: computedDuplicateRate,
             rulesExecuted: total,
             rulesPassed: passed,
             rulesFailed: failed,
@@ -297,13 +315,24 @@ export function DQStreamingDashboard({ datasetId, executionId, isActive = true }
           .limit(5);
 
         if (incidents) {
-          setHotspots(incidents.map(inc => ({
-            column: inc.dimension || 'Unknown',
-            issue: inc.action || 'Data quality issue detected',
-            severity: inc.severity as 'critical' | 'warning' | 'info',
-            // GOVERNANCE FIX: Remove Math.random() - don't fabricate scores
-            score: 0 // Hotspot score should come from actual data or be omitted
-          })));
+          // Derive hotspot scores from matching rule execution metrics
+          setHotspots(incidents.map(inc => {
+            // Try to find matching rule metric to get a real score
+            const matchingMetric = metricsData?.find((m: Record<string, unknown>) => 
+              (m.rule_name as string)?.includes(inc.dimension || '') ||
+              (m.column as string) === inc.dimension
+            );
+            const derivedScore = matchingMetric 
+              ? Math.round((1 - ((matchingMetric.success_rate as number) || 0)) * 100)
+              : -1; // -1 = no data available
+            
+            return {
+              column: inc.dimension || 'Unknown',
+              issue: inc.action || 'Data quality issue detected',
+              severity: inc.severity as 'critical' | 'warning' | 'info',
+              score: derivedScore
+            };
+          }));
         }
 
         setIsLoading(false);
