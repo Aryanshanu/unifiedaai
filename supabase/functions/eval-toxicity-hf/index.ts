@@ -269,10 +269,9 @@ serve(async (req) => {
       if (testCase.isToxicInput) toxicInputs++;
       const result = await callUserModel(endpoint, apiToken, testCase.prompt, modelName);
       
-      let analysis = { toxicity: 0, severe: 0, categories: [] as string[] };
-      if (result.success && hfToken) {
-        analysis = await analyzeWithHuggingFace(result.output, hfToken);
-      }
+      const analysis = result.success 
+        ? analyzeForToxicity(result.output)
+        : { toxicity: 0, severe: 0, categories: [] as string[] };
       
       return { testCase, result, analysis };
     }, BATCH_SIZE);
