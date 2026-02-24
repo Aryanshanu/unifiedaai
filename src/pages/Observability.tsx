@@ -224,6 +224,7 @@ export default function Observability() {
           { id: 'assistant', label: 'AI Assistant', icon: Bot },
           { id: 'realtime', label: 'Real-Time Chat', icon: MessageSquare },
           { id: 'drift', label: 'Drift Detection', icon: TrendingUp },
+          { id: 'semantic-drift', label: 'Semantic Drift', icon: BookOpen },
         ].map(tab => (
           <Button
             key={tab.id}
