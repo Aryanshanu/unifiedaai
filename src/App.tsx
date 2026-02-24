@@ -127,9 +127,7 @@ const App = () => (
                   </ProtectedRoute>
                 } />
                 <Route path="/docs" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
-                {/* Configuration & Runbooks */}
-                
-                <Route path="/runbooks" element={<ProtectedRoute><Runbooks /></ProtectedRoute>} />
+                {/* Audit */}
                 {/* Audit */}
                 <Route path="/audit-center" element={<ProtectedRoute><AuditCenter /></ProtectedRoute>} />
                 {/* Demo */}
