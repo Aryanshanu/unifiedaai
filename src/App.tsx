@@ -27,7 +27,7 @@ const Incidents = lazy(() => import("./pages/Incidents"));
 const Lineage = lazy(() => import("./pages/Lineage"));
 const Observability = lazy(() => import("./pages/Observability"));
 const Alerts = lazy(() => import("./pages/Alerts"));
-const Policy = lazy(() => import("./pages/Policy"));
+
 const FairnessEngine = lazy(() => import("./pages/engines/FairnessEngine"));
 const HallucinationEngine = lazy(() => import("./pages/engines/HallucinationEngine"));
 const ToxicityEngine = lazy(() => import("./pages/engines/ToxicityEngine"));
@@ -35,6 +35,7 @@ const PrivacyEngine = lazy(() => import("./pages/engines/PrivacyEngine"));
 const ExplainabilityEngine = lazy(() => import("./pages/engines/ExplainabilityEngine"));
 const DataQualityEngine = lazy(() => import("./pages/engines/DataQualityEngine"));
 const DataContracts = lazy(() => import("./pages/DataContracts"));
+const SemanticDefinitions = lazy(() => import("./pages/SemanticDefinitions"));
 const SecurityDashboard = lazy(() => import("./pages/security/SecurityDashboard"));
 const SecurityPentest = lazy(() => import("./pages/security/SecurityPentest"));
 const SecurityJailbreak = lazy(() => import("./pages/security/SecurityJailbreak"));
@@ -43,12 +44,7 @@ const Settings = lazy(() => import("./pages/Settings"));
 const Documentation = lazy(() => import("./pages/Documentation"));
 const Governance = lazy(() => import("./pages/Governance"));
 const Evaluation = lazy(() => import("./pages/Evaluation"));
-const GoldenDemoV2 = lazy(() => import("./pages/GoldenDemoV2"));
 const DecisionLedger = lazy(() => import("./pages/DecisionLedger"));
-const ImpactDashboard = lazy(() => import("./pages/ImpactDashboard"));
-const RegulatoryReports = lazy(() => import("./pages/RegulatoryReports"));
-
-const Runbooks = lazy(() => import("./pages/Runbooks"));
 const AuditCenter = lazy(() => import("./pages/AuditCenter"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -108,9 +104,8 @@ const App = () => (
                 <Route path="/observability" element={<ProtectedRoute><Observability /></ProtectedRoute>} />
                 <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
                 <Route path="/evaluation" element={<ProtectedRoute><Evaluation /></ProtectedRoute>} />
-                {/* Impact */}
-                <Route path="/impact-dashboard" element={<ProtectedRoute><ImpactDashboard /></ProtectedRoute>} />
-                <Route path="/regulatory-reports" element={<ProtectedRoute><RegulatoryReports /></ProtectedRoute>} />
+                {/* Semantic Layer */}
+                <Route path="/semantic-definitions" element={<ProtectedRoute><SemanticDefinitions /></ProtectedRoute>} />
                 {/* Core RAI Engines */}
                 <Route path="/engine/fairness" element={<ProtectedRoute><FairnessEngine /></ProtectedRoute>} />
                 <Route path="/engine/hallucination" element={<ProtectedRoute><HallucinationEngine /></ProtectedRoute>} />
@@ -125,8 +120,6 @@ const App = () => (
                 <Route path="/security/threats" element={<ProtectedRoute><SecurityThreatModel /></ProtectedRoute>} />
                 {/* Data Governance */}
                 <Route path="/data-contracts" element={<ProtectedRoute><DataContracts /></ProtectedRoute>} />
-                {/* Policy */}
-                <Route path="/policy" element={<ProtectedRoute><Policy /></ProtectedRoute>} />
                 {/* Settings & Docs */}
                 <Route path="/settings" element={
                   <ProtectedRoute requiredRoles={['admin']}>
@@ -134,13 +127,10 @@ const App = () => (
                   </ProtectedRoute>
                 } />
                 <Route path="/docs" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
-                {/* Configuration & Runbooks */}
-                
-                <Route path="/runbooks" element={<ProtectedRoute><Runbooks /></ProtectedRoute>} />
+                {/* Audit */}
                 {/* Audit */}
                 <Route path="/audit-center" element={<ProtectedRoute><AuditCenter /></ProtectedRoute>} />
-                {/* Demo */}
-                <Route path="/golden" element={<ProtectedRoute><GoldenDemoV2 /></ProtectedRoute>} />
+                {/* Catch-all */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
               </Suspense>

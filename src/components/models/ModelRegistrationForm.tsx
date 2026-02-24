@@ -11,23 +11,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useCreateModel } from "@/hooks/useModels";
 import { useProjects } from "@/hooks/useProjects";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, ChevronRight, ChevronLeft, Check, Brain, Server, Settings, FileCheck, FolderOpen, Shield, Scale, ExternalLink, Eye, EyeOff, AlertTriangle, Database } from "lucide-react";
+import { Loader2, ChevronRight, ChevronLeft, Check, Brain, Shield, FileCheck, FolderOpen, Scale, ExternalLink, AlertTriangle, Database, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { validateEndpoint, validateApiKey, getEndpointHint, getApiKeyHint } from "@/lib/endpoint-validation";
 
 const modelSchema = z.object({
   name: z.string().min(2, "Model name must be at least 2 characters"),
   description: z.string().min(10, "Description must be at least 10 characters").max(500),
   model_type: z.enum(["LLM", "ML", "NLP", "Computer Vision", "Recommendation", "Other"]),
-  provider: z.string().optional(),
   version: z.string().regex(/^\d+\.\d+\.\d+$/, "Version must be in semver format (e.g., 1.0.0)").default("1.0.0"),
   use_case: z.string().optional(),
-  endpoint: z.string().url("Must be a valid URL").optional().or(z.literal("")),
-  api_token: z.string().optional(),
   project_id: z.string().min(1, "Project is required"),
   // Governance fields
   business_owner_email: z.string().email("Must be a valid email").optional().or(z.literal("")),
@@ -36,7 +33,6 @@ const modelSchema = z.object({
   model_card_url: z.string().url("Must be a valid URL").optional().or(z.literal("")),
   access_tier: z.enum(["internal-only", "partner", "customer", "public"]).default("internal-only"),
   sla_tier: z.enum(["best-effort", "standard", "premium", "mission-critical"]).default("best-effort"),
-  // New traceability fields
   training_dataset_id: z.string().optional(),
   limitations: z.string().optional(),
   intended_use: z.string().optional(),
@@ -54,10 +50,8 @@ interface ModelRegistrationFormProps {
 const steps = [
   { id: 1, name: "Project", icon: FolderOpen },
   { id: 2, name: "Basic Info", icon: Brain },
-  { id: 3, name: "Provider", icon: Server },
-  { id: 4, name: "Configuration", icon: Settings },
-  { id: 5, name: "Governance", icon: Shield },
-  { id: 6, name: "Review", icon: FileCheck },
+  { id: 3, name: "Governance", icon: Shield },
+  { id: 4, name: "Review", icon: FileCheck },
 ];
 
 const modelTypes = [
@@ -67,16 +61,6 @@ const modelTypes = [
   { value: "Computer Vision", label: "Computer Vision", description: "Image Classification, Detection" },
   { value: "Recommendation", label: "Recommendation", description: "Personalization, Suggestions" },
   { value: "Other", label: "Other", description: "Custom model type" },
-];
-
-const providers = [
-  { value: "OpenAI", label: "OpenAI", description: "GPT-4, GPT-3.5, DALL-E" },
-  { value: "Anthropic", label: "Anthropic", description: "Claude models" },
-  { value: "Google", label: "Google", description: "Gemini, PaLM" },
-  { value: "Hugging Face", label: "Hugging Face", description: "Open source models" },
-  { value: "Azure", label: "Azure ML", description: "Microsoft Azure models" },
-  { value: "AWS", label: "AWS SageMaker", description: "Amazon ML services" },
-  { value: "Custom", label: "Custom/Self-hosted", description: "Your own infrastructure" },
 ];
 
 const useCases = [
@@ -95,15 +79,10 @@ const useCases = [
 
 export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: ModelRegistrationFormProps) {
   const [step, setStep] = useState(defaultProjectId ? 2 : 1);
-  const [showApiToken, setShowApiToken] = useState(false);
-  const [endpointWarning, setEndpointWarning] = useState<string | null>(null);
-  const [apiKeyWarning, setApiKeyWarning] = useState<string | null>(null);
-  const [suggestedEndpoint, setSuggestedEndpoint] = useState<string | null>(null);
   const navigate = useNavigate();
   const createModel = useCreateModel();
   const { data: projects, isLoading: projectsLoading } = useProjects();
 
-  // Fetch AI-approved datasets for training data linking
   const { data: approvedDatasets } = useQuery({
     queryKey: ["approved-datasets-for-models"],
     queryFn: async () => {
@@ -123,20 +102,15 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
       name: "",
       description: "",
       model_type: "LLM",
-      provider: "",
       version: "1.0.0",
       use_case: "",
-      endpoint: "",
-      api_token: "",
       project_id: defaultProjectId || "",
-      // Governance defaults
       business_owner_email: "",
       license: "",
       base_model: "",
       model_card_url: "",
       access_tier: "internal-only",
       sla_tier: "best-effort",
-      // Traceability defaults
       training_dataset_id: "",
       limitations: "",
       intended_use: "",
@@ -150,12 +124,12 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
         name: data.name,
         description: data.description || undefined,
         model_type: data.model_type,
-        provider: data.provider || undefined,
         version: data.version,
         use_case: data.use_case || undefined,
-        endpoint: data.endpoint || undefined,
-        api_token: data.api_token || undefined,
         project_id: data.project_id,
+        // Auto-configured gateway
+        provider: 'Lovable',
+        endpoint: 'https://ai.gateway.lovable.dev/v1/chat/completions',
         // Governance fields
         business_owner_email: data.business_owner_email || undefined,
         license: data.license || undefined,
@@ -163,7 +137,6 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
         model_card_url: data.model_card_url || undefined,
         access_tier: data.access_tier,
         sla_tier: data.sla_tier,
-        // Traceability fields
         training_dataset_id: data.training_dataset_id || undefined,
         limitations: data.limitations || undefined,
         intended_use: data.intended_use || undefined,
@@ -176,7 +149,6 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
       onOpenChange(false);
       form.reset();
       setStep(defaultProjectId ? 2 : 1);
-      // Navigate to the system detail page for governance
       navigate(`/systems/${result.system.id}`);
     } catch (error: any) {
       toast.error(error.message || "Failed to register model");
@@ -192,7 +164,7 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
       const valid = await form.trigger(["name", "model_type", "description"]);
       if (!valid) return;
     }
-    if (step < 6) setStep(step + 1);
+    if (step < 4) setStep(step + 1);
   };
 
   const prevStep = () => {
@@ -230,7 +202,7 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
               </div>
               {i < steps.length - 1 && (
                 <div className={cn(
-                  "w-8 md:w-12 h-0.5 mx-1",
+                  "w-12 md:w-20 h-0.5 mx-1",
                   step > s.id ? "bg-primary" : "bg-border"
                 )} />
               )}
@@ -323,6 +295,15 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                     </span>
                   </div>
                 )}
+
+                {/* AI Gateway Banner */}
+                <Alert className="bg-primary/5 border-primary/20">
+                  <Zap className="w-4 h-4 text-primary" />
+                  <AlertDescription className="text-foreground text-sm">
+                    This model will be evaluated using the <strong>Fractal AI Gateway</strong> (Gemini 3 Flash Preview). 
+                    No API key or endpoint configuration needed — all inference is routed automatically.
+                  </AlertDescription>
+                </Alert>
                 
                 <FormField
                   control={form.control}
@@ -374,7 +355,7 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                   name="description"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Description</FormLabel>
+                      <FormLabel>Description *</FormLabel>
                       <FormControl>
                         <Textarea 
                           placeholder="Describe what this model does and its intended purpose..." 
@@ -386,219 +367,50 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                     </FormItem>
                   )}
                 />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="version"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Version</FormLabel>
+                        <FormControl>
+                          <Input placeholder="1.0.0" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="use_case"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Use Case</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select use case" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {useCases.map((uc) => (
+                              <SelectItem key={uc} value={uc}>{uc}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
             )}
 
-            {/* Step 3: Provider */}
+            {/* Step 3: Governance */}
             {step === 3 && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-foreground">Model Provider</h3>
-                <p className="text-sm text-muted-foreground">
-                  Select the provider or platform hosting this model.
-                </p>
-
-                <FormField
-                  control={form.control}
-                  name="provider"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Provider</FormLabel>
-                      <div className="grid grid-cols-2 gap-3">
-                        {providers.map((provider) => (
-                          <div
-                            key={provider.value}
-                            onClick={() => field.onChange(provider.value)}
-                            className={cn(
-                              "p-4 rounded-xl border-2 cursor-pointer transition-all",
-                              field.value === provider.value
-                                ? "border-primary bg-primary/10"
-                                : "border-border hover:border-primary/50"
-                            )}
-                          >
-                            <p className="font-medium text-foreground">{provider.label}</p>
-                            <p className="text-xs text-muted-foreground">{provider.description}</p>
-                          </div>
-                        ))}
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            )}
-
-            {/* Step 4: Configuration */}
-            {step === 4 && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-foreground">Configuration</h3>
-                <p className="text-sm text-muted-foreground">
-                  Configure version, use case, and endpoint details.
-                </p>
-
-                <FormField
-                  control={form.control}
-                  name="version"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Version</FormLabel>
-                      <FormControl>
-                        <Input placeholder="1.0.0" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        Semantic version number (e.g., 1.0.0, 2.1.0)
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="use_case"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Use Case</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select primary use case" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {useCases.map((uc) => (
-                            <SelectItem key={uc} value={uc}>{uc}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormDescription>
-                        The primary use case helps determine risk classification.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="endpoint"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>API Endpoint</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder={getEndpointHint(formValues.provider || "")} 
-                          {...field}
-                          onBlur={(e) => {
-                            field.onBlur();
-                            const result = validateEndpoint(e.target.value, formValues.provider);
-                            if (!result.isValid && result.error) {
-                              setEndpointWarning(result.warning || result.error);
-                              if (result.normalizedEndpoint) {
-                                setSuggestedEndpoint(result.normalizedEndpoint);
-                              } else {
-                                setSuggestedEndpoint(null);
-                              }
-                            } else {
-                              setEndpointWarning(null);
-                              setSuggestedEndpoint(null);
-                            }
-                            // Auto-detect provider from endpoint
-                            if (result.detectedProvider && !formValues.provider) {
-                              form.setValue('provider', result.detectedProvider);
-                            }
-                          }}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        The API endpoint for running evaluations. 
-                        {formValues.provider === "Hugging Face" && " Use the Inference API URL, not the model page URL."}
-                      </FormDescription>
-                      {endpointWarning && (
-                        <div className="flex flex-col gap-2 p-3 bg-warning/10 border border-warning/20 rounded text-sm">
-                          <div className="flex items-start gap-2">
-                            <AlertTriangle className="w-4 h-4 text-warning mt-0.5 flex-shrink-0" />
-                            <span className="text-warning">{endpointWarning}</span>
-                          </div>
-                          {suggestedEndpoint && (
-                            <div className="flex items-center gap-2 mt-1">
-                              <code className="text-xs bg-background/50 px-2 py-1 rounded border border-border flex-1 truncate">
-                                {suggestedEndpoint}
-                              </code>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="shrink-0 text-xs h-7"
-                                onClick={() => {
-                                  field.onChange(suggestedEndpoint);
-                                  setEndpointWarning(null);
-                                  setSuggestedEndpoint(null);
-                                  toast.success("Endpoint auto-corrected");
-                                }}
-                              >
-                                Auto-correct
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="api_token"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>API Token</FormLabel>
-                      <div className="relative">
-                        <FormControl>
-                          <Input 
-                            type={showApiToken ? "text" : "password"}
-                            placeholder={getApiKeyHint(formValues.provider || "")}
-                            className="pr-10"
-                            {...field}
-                            onBlur={(e) => {
-                              field.onBlur();
-                              const result = validateApiKey(e.target.value, formValues.provider);
-                              if (!result.isValid && result.error) {
-                                setApiKeyWarning(result.warning || result.error);
-                              } else {
-                                setApiKeyWarning(null);
-                              }
-                            }}
-                          />
-                        </FormControl>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground"
-                          onClick={() => setShowApiToken(!showApiToken)}
-                        >
-                          {showApiToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </Button>
-                      </div>
-                      <FormDescription>
-                        Authentication token for the API endpoint. Required if your endpoint needs authentication.
-                      </FormDescription>
-                      {apiKeyWarning && (
-                        <div className="flex items-start gap-2 p-2 bg-warning/10 border border-warning/20 rounded text-sm">
-                          <AlertTriangle className="w-4 h-4 text-warning mt-0.5 flex-shrink-0" />
-                          <span className="text-warning">{apiKeyWarning}</span>
-                        </div>
-                      )}
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            )}
-
-            {/* Step 5: Governance */}
-            {step === 5 && (
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-foreground">Governance & Compliance</h3>
                 <p className="text-sm text-muted-foreground">
@@ -615,9 +427,6 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                         <FormControl>
                           <Input placeholder="owner@company.com" type="email" {...field} />
                         </FormControl>
-                        <FormDescription>
-                          Accountable person for governance decisions.
-                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -650,43 +459,6 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                   />
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="base_model"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Base Model / Provenance</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., meta-llama/Llama-2-7b, gpt-4-base" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        If fine-tuned, specify the base model for traceability.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="model_card_url"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-1">
-                        Model Card URL
-                        <ExternalLink className="w-3 h-3 text-muted-foreground" />
-                      </FormLabel>
-                      <FormControl>
-                        <Input placeholder="https://huggingface.co/..." {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        Link to model documentation for transparency.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -694,8 +466,7 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="flex items-center gap-1">
-                          <Shield className="w-4 h-4" />
-                          Access Tier
+                          <Shield className="w-4 h-4" /> Access Tier
                         </FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
@@ -721,8 +492,7 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="flex items-center gap-1">
-                          <Scale className="w-4 h-4" />
-                          SLA Tier
+                          <Scale className="w-4 h-4" /> SLA Tier
                         </FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
@@ -743,15 +513,13 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                   />
                 </div>
 
-                {/* Training Dataset Traceability */}
                 <FormField
                   control={form.control}
                   name="training_dataset_id"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="flex items-center gap-1">
-                        <Database className="w-4 h-4" />
-                        Training Dataset
+                        <Database className="w-4 h-4" /> Training Dataset
                       </FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
@@ -778,23 +546,18 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                           )}
                         </SelectContent>
                       </Select>
-                      <FormDescription>
-                        Link to an AI-approved dataset for traceability.
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                {/* Risk Classification */}
                 <FormField
                   control={form.control}
                   name="risk_classification"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="flex items-center gap-1">
-                        <AlertTriangle className="w-4 h-4" />
-                        EU AI Act Risk Classification
+                        <AlertTriangle className="w-4 h-4" /> EU AI Act Risk Classification
                       </FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
@@ -806,38 +569,34 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                           <SelectItem value="minimal">
                             <div className="flex items-center gap-2">
                               <Badge variant="outline" className="bg-success/10 text-success border-success/20">Minimal</Badge>
-                              <span className="text-muted-foreground text-xs">Low risk, minimal obligations</span>
+                              <span className="text-muted-foreground text-xs">Low risk</span>
                             </div>
                           </SelectItem>
                           <SelectItem value="limited">
                             <div className="flex items-center gap-2">
                               <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">Limited</Badge>
-                              <span className="text-muted-foreground text-xs">Transparency obligations</span>
+                              <span className="text-muted-foreground text-xs">Transparency required</span>
                             </div>
                           </SelectItem>
                           <SelectItem value="high">
                             <div className="flex items-center gap-2">
                               <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">High</Badge>
-                              <span className="text-muted-foreground text-xs">Strict compliance required</span>
+                              <span className="text-muted-foreground text-xs">Strict compliance</span>
                             </div>
                           </SelectItem>
                           <SelectItem value="unacceptable">
                             <div className="flex items-center gap-2">
                               <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">Unacceptable</Badge>
-                              <span className="text-muted-foreground text-xs">Prohibited use case</span>
+                              <span className="text-muted-foreground text-xs">Prohibited</span>
                             </div>
                           </SelectItem>
                         </SelectContent>
                       </Select>
-                      <FormDescription>
-                        Based on EU AI Act Article 6 risk categorization.
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                {/* Limitations */}
                 <FormField
                   control={form.control}
                   name="limitations"
@@ -845,30 +604,7 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                     <FormItem>
                       <FormLabel>Known Limitations</FormLabel>
                       <FormControl>
-                        <Textarea 
-                          placeholder="Document known limitations, failure modes, or edge cases..."
-                          className="min-h-[80px]"
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Intended Use */}
-                <FormField
-                  control={form.control}
-                  name="intended_use"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Intended Use Statement</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          placeholder="Describe the intended use cases and target population..."
-                          className="min-h-[80px]"
-                          {...field} 
-                        />
+                        <Textarea placeholder="Document known limitations..." className="min-h-[60px]" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -877,13 +613,10 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
               </div>
             )}
 
-            {/* Step 6: Review */}
-            {step === 6 && (
+            {/* Step 4: Review */}
+            {step === 4 && (
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-foreground">Review & Submit</h3>
-                <p className="text-sm text-muted-foreground">
-                  Review your model configuration before registering.
-                </p>
 
                 <div className="bg-secondary/50 rounded-xl p-5 space-y-4">
                   <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Basic Info</h4>
@@ -901,31 +634,23 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                       <p className="font-medium text-foreground">{formValues.model_type}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">Provider</p>
-                      <p className="font-medium text-foreground">{formValues.provider || "Not specified"}</p>
-                    </div>
-                    <div>
                       <p className="text-xs text-muted-foreground">Version</p>
                       <p className="font-medium text-foreground">{formValues.version}</p>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Use Case</p>
-                      <p className="font-medium text-foreground">{formValues.use_case || "Not specified"}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">API Token</p>
-                      <p className="font-medium text-foreground">{formValues.api_token ? "••••••••" : "Not provided"}</p>
+                  </div>
+
+                  <div className="border-t border-border pt-4">
+                    <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">AI Gateway</h4>
+                    <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                      <Zap className="w-4 h-4 text-primary" />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">Fractal AI Gateway</p>
+                        <p className="text-xs text-muted-foreground">google/gemini-3-flash-preview • Auto-configured</p>
+                      </div>
                     </div>
                   </div>
-                  
-                  {formValues.description && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Description</p>
-                      <p className="text-sm text-foreground">{formValues.description}</p>
-                    </div>
-                  )}
 
-                  <div className="border-t border-border pt-4 mt-4">
+                  <div className="border-t border-border pt-4">
                     <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">Governance</h4>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -937,20 +662,16 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                         <p className="font-medium text-foreground">{formValues.license || "Not specified"}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground">Base Model</p>
-                        <p className="font-medium text-foreground">{formValues.base_model || "Not specified"}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Model Card</p>
-                        <p className="font-medium text-foreground truncate">{formValues.model_card_url || "Not provided"}</p>
-                      </div>
-                      <div>
                         <p className="text-xs text-muted-foreground">Access Tier</p>
                         <p className="font-medium text-foreground capitalize">{formValues.access_tier?.replace("-", " ") || "Internal only"}</p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">SLA Tier</p>
                         <p className="font-medium text-foreground capitalize">{formValues.sla_tier?.replace("-", " ") || "Best effort"}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Risk Classification</p>
+                        <p className="font-medium text-foreground capitalize">{formValues.risk_classification || "Not specified"}</p>
                       </div>
                     </div>
                   </div>
@@ -971,13 +692,13 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                 type="button"
                 variant="outline"
                 onClick={prevStep}
-                disabled={step === 1 || (defaultProjectId && step === 2)}
+                disabled={step === 1 || (!!defaultProjectId && step === 2)}
               >
                 <ChevronLeft className="w-4 h-4 mr-2" />
                 Back
               </Button>
 
-              {step < 6 ? (
+              {step < 4 ? (
                 <Button type="button" onClick={nextStep}>
                   Next
                   <ChevronRight className="w-4 h-4 ml-2" />

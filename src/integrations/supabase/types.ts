@@ -4478,6 +4478,66 @@ export type Database = {
           },
         ]
       }
+      semantic_definitions: {
+        Row: {
+          ai_context: string | null
+          created_at: string
+          created_by: string | null
+          definition_hash: string | null
+          definition_yaml: string
+          description: string | null
+          display_name: string | null
+          grain: string | null
+          id: string
+          metadata: Json | null
+          name: string
+          owner_email: string | null
+          sql_logic: string | null
+          status: string
+          synonyms: string[] | null
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          ai_context?: string | null
+          created_at?: string
+          created_by?: string | null
+          definition_hash?: string | null
+          definition_yaml: string
+          description?: string | null
+          display_name?: string | null
+          grain?: string | null
+          id?: string
+          metadata?: Json | null
+          name: string
+          owner_email?: string | null
+          sql_logic?: string | null
+          status?: string
+          synonyms?: string[] | null
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          ai_context?: string | null
+          created_at?: string
+          created_by?: string | null
+          definition_hash?: string | null
+          definition_yaml?: string
+          description?: string | null
+          display_name?: string | null
+          grain?: string | null
+          id?: string
+          metadata?: Json | null
+          name?: string
+          owner_email?: string | null
+          sql_logic?: string | null
+          status?: string
+          synonyms?: string[] | null
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
+      }
       silver_data: {
         Row: {
           bronze_id: string
