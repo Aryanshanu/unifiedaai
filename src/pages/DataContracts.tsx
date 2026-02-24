@@ -161,6 +161,34 @@ function DataContractsContent() {
 
         {openViolationsCount > 0 && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertTitle>Violations</AlertTitle><AlertDescription>{openViolationsCount} require attention</AlertDescription></Alert>}
 
+        {/* Consuming Semantic Definitions */}
+        {consumingDefinitions && consumingDefinitions.length > 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <BookOpen className="h-4 w-4 text-cyan-500" />
+                Consuming Semantic Definitions
+              </CardTitle>
+              <CardDescription>Metric definitions that depend on contracted datasets</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {consumingDefinitions.map((def: any) => (
+                  <Badge 
+                    key={def.id} 
+                    variant="outline" 
+                    className="cursor-pointer hover:bg-primary/10 transition-colors"
+                    onClick={() => navigate('/semantic-definitions')}
+                  >
+                    <BookOpen className="h-3 w-3 mr-1" />
+                    {def.display_name || def.name}
+                  </Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Tabs defaultValue="contracts">
           <TabsList><TabsTrigger value="contracts">Contracts</TabsTrigger><TabsTrigger value="violations">Violations {openViolationsCount > 0 && <Badge className="ml-2" variant="destructive">{openViolationsCount}</Badge>}</TabsTrigger></TabsList>
           <TabsContent value="contracts" className="mt-4">

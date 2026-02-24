@@ -279,6 +279,15 @@ export default function Observability() {
       {activeTab === 'assistant' && <RAIAssistant currentPage="Observability" />}
       {activeTab === 'realtime' && <RealtimeChatDemo />}
       {activeTab === 'drift' && <DriftDetector />}
+      {activeTab === 'semantic-drift' && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <BookOpen className="w-5 h-5 text-cyan-500" />
+            <h2 className="text-lg font-semibold">Semantic Drift Alerts</h2>
+          </div>
+          <DriftAlertsTable />
+        </div>
+      )}
       
       {activeTab === 'dashboard' && (
         <>

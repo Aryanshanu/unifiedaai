@@ -16,7 +16,7 @@ import { useCreateModel } from "@/hooks/useModels";
 import { useProjects } from "@/hooks/useProjects";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, ChevronRight, ChevronLeft, Check, Brain, Shield, FileCheck, FolderOpen, Scale, ExternalLink, AlertTriangle, Database, Zap } from "lucide-react";
+import { Loader2, ChevronRight, ChevronLeft, Check, Brain, Shield, FileCheck, FolderOpen, Scale, ExternalLink, AlertTriangle, Database, Zap, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const modelSchema = z.object({

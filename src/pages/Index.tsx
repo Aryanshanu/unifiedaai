@@ -313,6 +313,43 @@ export default function Index() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Semantic Layer Card */}
+          <Card 
+            className="cursor-pointer hover:border-primary/50 transition-colors"
+            onClick={() => navigate("/semantic-definitions")}
+          >
+            <CardContent className="pt-6">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-4">
+                  <div className="p-3 rounded-lg bg-cyan-500/10">
+                    <BookOpen className="h-6 w-6 text-cyan-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground">Semantic Layer</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Governed metric definitions &amp; semantic contracts
+                    </p>
+                  </div>
+                </div>
+                <ArrowRight className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t">
+                <div>
+                  <p className="text-2xl font-bold">{semanticMetrics?.active || 0}</p>
+                  <p className="text-xs text-muted-foreground">Active</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-muted-foreground">{semanticMetrics?.draft || 0}</p>
+                  <p className="text-xs text-muted-foreground">Draft</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-warning">{semanticMetrics?.openDrift || 0}</p>
+                  <p className="text-xs text-muted-foreground">Drift Alerts</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 

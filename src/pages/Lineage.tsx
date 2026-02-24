@@ -70,6 +70,7 @@ const ENTITY_TYPE_OPTIONS = [
 function layoutNodes(nodes: any[]) {
   const typeColumns: Record<string, number> = {
     dataset: 0,
+    semantic_definition: 0.5,
     feature: 1,
     model: 2,
     evaluation: 3,
