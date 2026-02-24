@@ -1,91 +1,173 @@
 
 
-# Command Center, Data Quality & Incidents -- Deep Fix
+# Data Quality Engine -- Deep Root-Level Audit & Fix
 
-## Problems Identified
+## Critical Issues Found
 
-### 1. Command Center (Index.tsx) Issues
-- **Duplicate data fetching**: `usePlatformMetrics` fetches open incidents and pending approvals, then `Index.tsx` independently fetches the exact same counts again (`pending-reviews-count`, `recent-incidents`, `dq-summary`). This means 8+ parallel DB queries on every page load, most of them redundant.
-- **"Open Alerts" card on right sidebar links to `/alerts` but shows `metrics?.recentIncidents`** -- this is the open incidents count, not alerts. Misleading label.
-- **The `usePlatformMetrics` hook fetches ALL `request_logs` rows for the last 24 hours** (not `count: 'exact', head: true`) -- it pulls every row into memory to count them. With any real traffic this becomes extremely slow and is the primary latency source.
-- **`useSystemHealthSummary` has an N+1 query problem**: it loops over each system and makes a separate DB call for request_logs per system. This is never called on Index but it's imported via `usePlatformMetrics.ts` and could be triggered elsewhere.
-- **Realtime channel subscribes to 4 tables** (`incidents`, `dq_incidents`, `review_queue`, `semantic_drift_alerts`), creating 4 postgres_changes listeners on every mount.
+### Issue 1: Profiling Validity Score is HARDCODED (Lines 356-366 of `dq-profile-dataset`)
 
-### 2. Data Quality Engine Issues
-- **`useQualityStats` uses `useEffect` + `useState` instead of `useQuery`** -- no caching, no deduplication, no staleTime. Every mount re-fetches. Also subscribes to realtime changes on `data_uploads` AND `quality_issues` which triggers full re-fetches on every change.
-- **Critical Issues count (showing 58)** comes from `quality_issues` table with `severity = 'critical'` and `status = 'open'`. This queries ALL critical issues across ALL datasets ever -- it should only count issues for the user's current context or recent uploads.
-- **7 tabs** is excessive -- Control Plane, Sources, Import, Evaluate, AI Readiness, Bias Scan, History. "Sources" and "Import" overlap. "AI Readiness" and "Bias Scan" are disconnected features.
+**Location:** `supabase/functions/dq-profile-dataset/index.ts` lines 346-367
 
-### 3. Incidents Page Issues
-- **Double invalidation**: Line 97-98 in `Incidents.tsx` calls `queryClient.invalidateQueries({ queryKey: ['incidents'] })` TWICE in the same callback. Same at lines 153-154.
-- **`useIncidents` returns `{ data, totalCount, hasMore }`** but `Incidents.tsx` accesses `incidents?.data` -- the hook wraps data in an object with pagination info that's never used (no pagination UI).
-- **Incident stats (`useIncidentStats`) makes a separate full-table scan** of all non-archived incidents just to compute counts -- could be combined with the main incidents query.
+**Problem:** The validity dimension score uses hardcoded magic numbers instead of computing from actual data:
+- Numeric columns: `const validScore = 0.95` -- hardcoded, always returns 95%
+- Datetime columns: `validityScores[col.column_name] = 0.98` -- hardcoded, always returns 98%
+- String columns: uses completeness as a proxy instead of actual format validation
 
-### 4. Latency Issues (Cross-Cutting)
-- **`usePlatformMetrics` fetches full rows** instead of using `count: 'exact', head: true` for counts and aggregations. This is the #1 latency problem.
-- **30-second `refetchInterval` on 12+ hooks** means the app is making dozens of background queries every 30 seconds across every page.
-- **`staleTime: 30_000`** in QueryClient but `refetchInterval: 30000` on many hooks -- these cancel each other out. Data is always considered stale by the time refetch fires.
-- **`useAllUploads` and `useQualityStats` don't use `useQuery`** -- they bypass React Query's deduplication and caching entirely.
+**Fix:** Actually compute validity by checking:
+- Numeric columns: count values within 3 standard deviations of mean
+- Datetime columns: count values that successfully parse as valid dates
+- String columns: check for empty strings, whitespace-only values, and common garbage patterns
+
+### Issue 2: Accuracy Dimension is FABRICATED (Lines 377-393)
+
+**Location:** `supabase/functions/dq-profile-dataset/index.ts` lines 377-393
+
+**Problem:** Accuracy is marked `computed: true` but is actually just `(validity * 0.7 + completeness * 0.3)` -- this is a synthetic formula, not a real accuracy measurement. Without ground-truth data to compare against, accuracy CANNOT be computed. The score is misleading.
+
+**Fix:** Mark accuracy as `computed: false` with `reason: "Requires ground-truth reference data"` and set `score: null`. This is honest -- accuracy requires external validation data that we don't have.
+
+### Issue 3: Timeliness Score Defaults to 1.0 (Perfect) When No Date Columns Exist (Line 397)
+
+**Location:** `supabase/functions/dq-profile-dataset/index.ts` line 397
+
+**Problem:** `let timelinessScore = 1.0; // Default to fresh if no date columns` -- this gives a perfect 100% timeliness score when there are NO date columns. This is dishonest. If there's no temporal data, timeliness is not measurable.
+
+**Fix:** When no date columns exist, set `computed: false`, `score: null`, `reason: "No datetime columns found"`.
+
+### Issue 4: Timeliness Fallback on Parse Failure (Line 412)
+
+**Location:** `supabase/functions/dq-profile-dataset/index.ts` line 412
+
+**Problem:** `timelinessDetails[col.column_name] = 0.8; // Default if date parsing fails` -- fabricated score.
+
+**Fix:** Set to `0` with a logged warning, or skip the column from the average.
+
+### Issue 5: Consistency Score Formula is Arbitrary (Lines 428-455)
+
+**Location:** `supabase/functions/dq-profile-dataset/index.ts` lines 428-455
+
+**Problem:** The consistency calculation uses `Math.max(0.5, ...)` which means the minimum possible consistency score is 50% -- this floor masks real data problems. The formula `1 - (patternScore * 0.5)` is arbitrary and not based on any data quality standard.
+
+**Fix:** Remove the 0.5 floor. Use a proper entropy-based consistency measure: `1 - (distinct_count / row_count)` for categorical columns, and coefficient of variation for numeric columns. Or mark as `computed: false` if the approach can't reliably measure consistency.
+
+### Issue 6: Evidence Hash Uses Weak Non-Crypto Hash (Lines 230-242 of `eval-data-quality`)
+
+**Location:** `supabase/functions/eval-data-quality/index.ts` lines 230-242
+
+**Problem:** `generateEvidenceHash` uses a simple bitwise hash (djb2-style), not SHA-256. The comment says "in production, use crypto.subtle.digest" but it's still using the weak hash. This violates the project's cryptographic integrity requirements.
+
+**Fix:** Replace with `crypto.subtle.digest('SHA-256', data)` which is available in Deno.
+
+### Issue 7: Streaming Dashboard `nullRate` and `duplicateRate` Always Show 0 (Lines 279-282 of `DQStreamingDashboard`)
+
+**Location:** `src/components/engines/DQStreamingDashboard.tsx` lines 279-282
+
+**Problem:** The execution summary from the backend never includes `null_rate` or `duplicate_rate` fields, so these always display `0`. The `?? 0` fallback hides the fact that this data doesn't exist.
+
+**Fix:** Compute null rate from completeness dimension metrics and duplicate rate from uniqueness dimension metrics in the dashboard component itself, since the raw data IS available in the execution metrics.
+
+### Issue 8: Hotspot Score Always 0 (Line 305 of `DQStreamingDashboard`)
+
+**Location:** `src/components/engines/DQStreamingDashboard.tsx` line 305
+
+**Problem:** `score: 0 // Hotspot score should come from actual data or be omitted` -- this is the comment but the value is hardcoded to 0.
+
+**Fix:** Remove the `score` field from hotspots entirely since incidents don't have scores, or derive it from the related rule's `success_rate` by looking up the incident's `rule_id` in the execution metrics.
+
+### Issue 9: Profiling Completeness/Uniqueness Are in PERCENTAGE Space But Stored Ambiguously
+
+**Location:** `supabase/functions/dq-profile-dataset/index.ts` lines 292-293, 330-343
+
+**Problem:** Column-level `completeness` and `uniqueness` are computed as percentages (0-100) at lines 292-293, then divided by 100 to convert to ratio (0-1) at lines 330-343 for dimension scores. However, the column_profiles themselves store the PERCENTAGE values. The `DQProfilingReport` component displays these as `(col.completeness * 100).toFixed(1)%` -- but they're ALREADY percentages! This means 95% completeness displays as **9500%**.
+
+Wait -- checking `DQProfilingReport.tsx` line 186: `{(col.completeness * 100).toFixed(1)}%` -- if `col.completeness` is already a percentage (e.g., 95), this displays as `9500.0%`. This is a critical display bug.
+
+**Fix:** Either:
+- Store column-level completeness/uniqueness as ratios (0-1) in the profiler, OR
+- Fix the display to not multiply by 100
+
+After rechecking: The profiler stores completeness as a percentage (0-100 range). The `DQProfilingReportTabular` component likely handles this differently than `DQProfilingReport`. Need to verify which component is actually rendered.
+
+Actually, looking at `DataQualityEngine.tsx` line 677, it uses `DQProfilingReportTabular`, not `DQProfilingReport`. Let me note this needs verification during implementation.
 
 ---
 
 ## Fix Plan
 
-### Fix 1: Rewrite `usePlatformMetrics` to Use Count Queries
+### Fix A: Rewrite Validity Dimension -- Real Computation
 
-Replace full-row fetches with `count: 'exact', head: true` queries. This reduces data transfer from potentially thousands of rows to just integer counts.
+**File: `supabase/functions/dq-profile-dataset/index.ts`**
 
-**File: `src/hooks/usePlatformMetrics.ts`**
-- Change `request_logs` query from `select("decision, latency_ms, status_code")` to 3 separate count queries: total, blocked, error
-- For `avgLatency`, use a database function or accept a simpler approach (latest 100 logs only)
-- Remove the N+1 loop in `useSystemHealthSummary` -- fetch all request_logs in one query and group client-side
-- Increase `staleTime` to 60_000 to reduce redundant fetches
+Replace the hardcoded validity scores with actual data validation:
+- Numeric columns: iterate ALL values, count how many are within `mean +/- 3*stdDev`
+- Datetime columns: iterate ALL values, count how many successfully parse to valid dates
+- String columns: count non-empty, non-whitespace-only values as valid
 
-### Fix 2: Consolidate Command Center Queries
+### Fix B: Mark Accuracy as Non-Computable
 
-**File: `src/pages/Index.tsx`**
-- Remove the standalone `pending-reviews-count` query -- use `metrics?.pendingApprovals` from `usePlatformMetrics` instead (already fetched)
-- Remove the standalone `recent-incidents` query count -- use `metrics?.recentIncidents` instead
-- Keep `dq-summary` and `semantic-summary` as they query different tables
-- Fix "Open Alerts" label to "Open Incidents" and link to `/incidents` not `/alerts`
-- Reduce realtime subscriptions from 4 tables to 2 (incidents + review_queue only, the important ones)
+**File: `supabase/functions/dq-profile-dataset/index.ts`**
 
-### Fix 3: Fix `useQualityStats` to Use React Query
+Change accuracy to:
+```
+{
+  dimension: "accuracy",
+  score: null,
+  computed: false,
+  reason: "Requires ground-truth reference data for comparison",
+  weight: 0,
+  details: {}
+}
+```
 
-**File: `src/hooks/useFileUploadStatus.ts`**
-- Convert `useQualityStats` from `useState + useEffect` to `useQuery` with proper caching
-- Remove the realtime subscription that triggers full re-fetches (rely on React Query's `refetchInterval` instead)
-- Scope `criticalIssues` to recent uploads only (last 30 days) to avoid showing stale historical counts
+### Fix C: Fix Timeliness When No Date Columns
 
-### Fix 4: Fix Incident Double-Invalidation and Data Access
+**File: `supabase/functions/dq-profile-dataset/index.ts`**
 
-**File: `src/pages/Incidents.tsx`**
-- Remove duplicate `queryClient.invalidateQueries` calls (lines 97-98 and 153-154)
-- Fix data access pattern: `incidents?.data` is correct but add null safety
-- Remove the `handleQuickResolveAll` function that bulk-resolves ALL critical incidents with one click (dangerous -- should resolve individually)
+- No date columns: `score: null, computed: false, reason: "No datetime columns in dataset"`
+- Date parse failure: skip column from average instead of defaulting to 0.8
 
-### Fix 5: Merge Incident Stats Into Main Query
+### Fix D: Fix Consistency Floor
 
-**File: `src/hooks/useIncidents.ts`**
-- Combine `useIncidentStats` computation into the main `useIncidents` query to avoid a second full-table scan
-- Or convert `useIncidentStats` to use `count: 'exact', head: true` queries instead of fetching all rows
+**File: `supabase/functions/dq-profile-dataset/index.ts`**
 
-### Fix 6: Reduce Global Refetch Intervals
+Remove `Math.max(0.5, ...)` floor. Use proper formula:
+- Categorical columns: `1 - (distinct_count / row_count)` (higher = more consistent)
+- Clamp between 0 and 1, no artificial floor
 
-**File: `src/App.tsx`**
-- Increase global `staleTime` from `30_000` to `60_000`
-- This means data is considered fresh for 60 seconds, reducing redundant refetches
+### Fix E: Replace Weak Hash with SHA-256
 
-**Files: Multiple hooks**
-- Change `refetchInterval: 30000` to `refetchInterval: 60000` on non-critical hooks (platform metrics, DQ stats)
-- Keep `refetchInterval: 30000` only on actively-monitored data (incidents, review queue)
+**File: `supabase/functions/eval-data-quality/index.ts`**
 
-### Fix 7: Data Quality Engine Tab Cleanup
+Replace `generateEvidenceHash` with:
+```typescript
+async function generateEvidenceHash(metrics, timestamp) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(JSON.stringify({ metrics, timestamp }));
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+```
+Also make the calling function `async` if not already.
 
-**File: `src/pages/engines/DataQualityEngine.tsx`**
-- Merge "Sources" and "Import" tabs into "Import" (data sources are connectors that produce imports)
-- Reduce from 7 tabs to 5: Control Plane, Import, Evaluate, Bias Scan, History
-- Remove standalone "AI Readiness" tab (its content -- ReadyDatasetsList -- is a simple list that can live under History or Evaluate)
+### Fix F: Compute nullRate/duplicateRate from Real Metrics
+
+**File: `src/components/engines/DQStreamingDashboard.tsx`**
+
+Replace the `?? 0` fallbacks with actual computation from the execution metrics array:
+- `nullRate`: average `(1 - success_rate)` of all completeness-dimension rules
+- `duplicateRate`: average `(1 - success_rate)` of all uniqueness-dimension rules
+
+### Fix G: Fix or Remove Hotspot Score
+
+**File: `src/components/engines/DQStreamingDashboard.tsx`**
+
+Remove `score` property from hotspots entirely since incidents don't carry a numeric score, or compute from the linked rule's success_rate if `rule_id` is available on the incident.
+
+### Fix H: Fix Profiling Report Display Units
+
+**File: `src/components/engines/DQProfilingReportTabular.tsx`** (verify)
+
+Ensure completeness/uniqueness values from the profiler (which are 0-100 percentages) are displayed correctly without double-multiplication. If the tabular report already handles this, no change needed. If it uses `* 100`, fix it.
 
 ---
 
@@ -93,11 +175,17 @@ Replace full-row fetches with `count: 'exact', head: true` queries. This reduces
 
 | File | Change |
 |------|--------|
-| `src/hooks/usePlatformMetrics.ts` | Rewrite to use count queries; fix N+1 in system health |
-| `src/pages/Index.tsx` | Remove 2 redundant queries; fix labels; reduce realtime channels |
-| `src/hooks/useFileUploadStatus.ts` | Convert `useQualityStats` to `useQuery`; scope critical issues |
-| `src/pages/Incidents.tsx` | Remove double invalidation; remove dangerous bulk resolve |
-| `src/hooks/useIncidents.ts` | Convert `useIncidentStats` to count queries |
-| `src/App.tsx` | Increase staleTime to 60s |
-| `src/pages/engines/DataQualityEngine.tsx` | Merge tabs from 7 to 5 |
+| `supabase/functions/dq-profile-dataset/index.ts` | Fix validity (real computation), accuracy (non-computable), timeliness (no date columns), consistency (remove floor) |
+| `supabase/functions/eval-data-quality/index.ts` | Replace weak hash with SHA-256 |
+| `src/components/engines/DQStreamingDashboard.tsx` | Compute nullRate/duplicateRate from real metrics; fix hotspot scores |
+| `src/components/engines/DQProfilingReportTabular.tsx` | Verify and fix unit display if needed |
 
+---
+
+## Technical Notes
+
+- Accuracy dimension becomes `computed: false` -- this is the HONEST approach. Accuracy requires external ground-truth data (e.g., "this address is the correct address") which the DQ engine does not have access to. Fabricating it from validity+completeness is misleading.
+- Timeliness becomes `computed: false` when datasets have no datetime columns. A dataset of product SKUs has no temporal dimension -- saying it's "100% timely" is wrong.
+- The consistency floor of 0.5 means the lowest possible consistency score was 50%. Real data with high cardinality in categorical columns could genuinely have low consistency. Removing the floor exposes the truth.
+- SHA-256 via `crypto.subtle.digest` is available natively in Deno -- no library needed.
+- The Streaming Dashboard `nullRate` and `duplicateRate` were previously cleaned of `Math.random()` but replaced with `?? 0` which always resolves to 0 since the backend never sends those fields. Computing from dimension metrics is the correct approach.
