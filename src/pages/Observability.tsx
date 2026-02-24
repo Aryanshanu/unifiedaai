@@ -5,7 +5,7 @@ import { LiveMetrics } from "@/components/dashboard/LiveMetrics";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Activity, AlertTriangle, TrendingUp, Clock, RefreshCw, Bell, Zap, MessageSquare, Bot, Cpu } from "lucide-react";
+import { Activity, AlertTriangle, TrendingUp, Clock, RefreshCw, Bell, Zap, MessageSquare, Bot, Cpu, BookOpen } from "lucide-react";
 import { SimulationController } from "@/components/oversight/SimulationController";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,7 @@ import { formatDistanceToNow } from "date-fns";
 import { RealtimeChatDemo } from "@/components/observability/RealtimeChatDemo";
 import { RAIAssistant } from "@/components/assistant/RAIAssistant";
 import { DriftDetector } from "@/components/observability/DriftDetector";
+import { DriftAlertsTable } from "@/components/semantic/DriftAlertsTable";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -189,7 +190,7 @@ export default function Observability() {
     }
   };
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'oversight' | 'realtime' | 'drift' | 'assistant'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'oversight' | 'realtime' | 'drift' | 'assistant' | 'semantic-drift'>('dashboard');
 
   return (
     <MainLayout 
@@ -223,6 +224,7 @@ export default function Observability() {
           { id: 'assistant', label: 'AI Assistant', icon: Bot },
           { id: 'realtime', label: 'Real-Time Chat', icon: MessageSquare },
           { id: 'drift', label: 'Drift Detection', icon: TrendingUp },
+          { id: 'semantic-drift', label: 'Semantic Drift', icon: BookOpen },
         ].map(tab => (
           <Button
             key={tab.id}
@@ -277,6 +279,15 @@ export default function Observability() {
       {activeTab === 'assistant' && <RAIAssistant currentPage="Observability" />}
       {activeTab === 'realtime' && <RealtimeChatDemo />}
       {activeTab === 'drift' && <DriftDetector />}
+      {activeTab === 'semantic-drift' && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <BookOpen className="w-5 h-5 text-cyan-500" />
+            <h2 className="text-lg font-semibold">Semantic Drift Alerts</h2>
+          </div>
+          <DriftAlertsTable />
+        </div>
+      )}
       
       {activeTab === 'dashboard' && (
         <>

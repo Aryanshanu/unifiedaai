@@ -181,12 +181,13 @@ serve(async (req) => {
     }
 
     // Fetch recent platform stats
-    const [systemsRes, modelsRes, incidentsRes, evaluationsRes, alertsRes] = await Promise.all([
+    const [systemsRes, modelsRes, incidentsRes, evaluationsRes, alertsRes, semanticRes] = await Promise.all([
       supabase.from("systems").select("id, name, status, deployment_status, provider, system_type").limit(20),
       supabase.from("models").select("id, name, status, fairness_score, toxicity_score, privacy_score, overall_score").limit(20),
       supabase.from("incidents").select("id, title, severity, status, created_at").eq("status", "open").limit(10),
       supabase.from("evaluation_runs").select("id, engine_type, status, overall_score, created_at, model_id").order("created_at", { ascending: false }).limit(20),
       supabase.from("drift_alerts").select("id, drift_type, severity, status, feature").eq("status", "open").limit(10),
+      supabase.from("semantic_definitions").select("name, display_name, description, sql_logic, ai_context, grain, status").eq("status", "active").limit(50),
     ]);
 
     // Build live context
@@ -220,6 +221,15 @@ serve(async (req) => {
       contextParts.push(`\n## Active Drift Alerts (${alertsRes.data.length})`);
       alertsRes.data.forEach((a: any) => {
         contextParts.push(`- [${a.severity}] ${a.drift_type} drift on ${a.feature}`);
+      });
+    }
+
+    // Add semantic definitions context
+    if (semanticRes.data && semanticRes.data.length > 0) {
+      contextParts.push(`\n## Semantic Layer (${semanticRes.data.length} active definitions)`);
+      contextParts.push(`Use these governed definitions when answering metric questions:`);
+      semanticRes.data.forEach((d: any) => {
+        contextParts.push(`- **${d.display_name || d.name}** (${d.name}): ${d.description || 'No description'}${d.sql_logic ? ` | SQL: \`${d.sql_logic}\`` : ''}${d.ai_context ? ` | Context: ${d.ai_context}` : ''}`);
       });
     }
 
@@ -264,6 +274,7 @@ Your role:
 3. Suggest improvements to increase RAI scores
 4. Explain governance workflows and compliance requirements
 5. Provide guidance on EU AI Act and regulatory compliance
+6. Answer questions about business metrics using the governed Semantic Layer definitions
 
 Guidelines:
 - Be concise and technical when appropriate

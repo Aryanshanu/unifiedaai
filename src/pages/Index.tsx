@@ -21,6 +21,7 @@ import {
   ScanSearch,
   FlaskConical,
   Target,
+  BookOpen,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { HealthIndicator } from "@/components/shared/HealthIndicator";
@@ -75,6 +76,26 @@ export default function Index() {
     refetchInterval: 60000,
   });
 
+  // Semantic Layer metrics
+  const { data: semanticMetrics } = useQuery({
+    queryKey: ['semantic-summary'],
+    queryFn: async () => {
+      const [activeRes, draftRes, deprecatedRes, driftRes] = await Promise.all([
+        (supabase as any).from('semantic_definitions').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+        (supabase as any).from('semantic_definitions').select('*', { count: 'exact', head: true }).eq('status', 'draft'),
+        (supabase as any).from('semantic_definitions').select('*', { count: 'exact', head: true }).eq('status', 'deprecated'),
+        (supabase as any).from('semantic_drift_alerts').select('*', { count: 'exact', head: true }).eq('status', 'open'),
+      ]);
+      return {
+        active: activeRes.count || 0,
+        draft: draftRes.count || 0,
+        deprecated: deprecatedRes.count || 0,
+        openDrift: driftRes.count || 0,
+      };
+    },
+    refetchInterval: 60000,
+  });
+
 
   // Recent incidents for activity log
   const { data: recentIncidents } = useQuery({
@@ -124,6 +145,13 @@ export default function Index() {
         () => {
           queryClient.invalidateQueries({ queryKey: ['review-queue'] });
           queryClient.invalidateQueries({ queryKey: ['pending-reviews-count'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'semantic_drift_alerts' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['semantic-summary'] });
         }
       )
       .subscribe();
@@ -281,6 +309,43 @@ export default function Index() {
                 <div>
                   <p className="text-2xl font-bold text-destructive">{dqMetrics?.openViolations || 0}</p>
                   <p className="text-xs text-muted-foreground">Open Violations</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Semantic Layer Card */}
+          <Card 
+            className="cursor-pointer hover:border-primary/50 transition-colors"
+            onClick={() => navigate("/semantic-definitions")}
+          >
+            <CardContent className="pt-6">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-4">
+                  <div className="p-3 rounded-lg bg-cyan-500/10">
+                    <BookOpen className="h-6 w-6 text-cyan-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground">Semantic Layer</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Governed metric definitions &amp; semantic contracts
+                    </p>
+                  </div>
+                </div>
+                <ArrowRight className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t">
+                <div>
+                  <p className="text-2xl font-bold">{semanticMetrics?.active || 0}</p>
+                  <p className="text-xs text-muted-foreground">Active</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-muted-foreground">{semanticMetrics?.draft || 0}</p>
+                  <p className="text-xs text-muted-foreground">Draft</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-warning">{semanticMetrics?.openDrift || 0}</p>
+                  <p className="text-xs text-muted-foreground">Drift Alerts</p>
                 </div>
               </div>
             </CardContent>

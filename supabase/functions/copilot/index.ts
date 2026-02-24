@@ -53,11 +53,12 @@ serve(async (req) => {
     }
 
     // Fetch context data (user is now authorized, using user client for RLS)
-    const [riskRes, impactRes, logsRes, metricsRes] = await Promise.all([
+    const [riskRes, impactRes, logsRes, metricsRes, semanticRes] = await Promise.all([
       supabase.from("risk_assessments").select("*").eq("system_id", systemId).order("created_at", { ascending: false }).limit(1),
       supabase.from("impact_assessments").select("*").eq("system_id", systemId).order("created_at", { ascending: false }).limit(1),
       supabase.from("request_logs").select("*").eq("system_id", systemId).order("created_at", { ascending: false }).limit(20),
       supabase.from("risk_metrics").select("*").eq("system_id", systemId).order("recorded_at", { ascending: false }).limit(50),
+      serviceClient.from("semantic_definitions").select("name, display_name, description, sql_logic, ai_context, grain, status").eq("status", "active").limit(50),
     ]);
 
     const riskAssessment = riskRes.data?.[0];
@@ -129,6 +130,19 @@ serve(async (req) => {
       );
     }
 
+    // Add semantic definitions context
+    const semanticDefs = semanticRes.data || [];
+    if (semanticDefs.length > 0) {
+      contextParts.push(
+        `## Semantic Layer (${semanticDefs.length} active definitions)`,
+        `These are the governed metric definitions. Always use these when answering metric questions:`,
+        ...semanticDefs.map((d: any) => 
+          `- **${d.display_name || d.name}** (${d.name}): ${d.description || 'No description'}${d.sql_logic ? ` | SQL: \`${d.sql_logic}\`` : ''}${d.ai_context ? ` | Context: ${d.ai_context}` : ''}${d.grain ? ` | Grain: ${d.grain}` : ''}`
+        ),
+        ``
+      );
+    }
+
     const systemPrompt = `You are the UnifiedAI Governance Copilot, an expert AI assistant for enterprise AI governance platforms.
 
 Your role is to help users understand:
@@ -136,8 +150,10 @@ Your role is to help users understand:
 2. What actions they should take to improve governance posture
 3. How to interpret runtime metrics and incidents
 4. Best practices for AI safety, privacy, and compliance
+5. How business metrics are defined and calculated (using the Semantic Layer definitions)
 
 Be concise, actionable, and specific. Reference the actual data when explaining.
+When a user asks about a metric (e.g., "How is MRR calculated?"), ALWAYS reference the Semantic Layer definition if one exists.
 
 When providing recommendations:
 - Prioritize the most impactful changes

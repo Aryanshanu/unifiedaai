@@ -16,7 +16,7 @@ import { useCreateModel } from "@/hooks/useModels";
 import { useProjects } from "@/hooks/useProjects";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, ChevronRight, ChevronLeft, Check, Brain, Shield, FileCheck, FolderOpen, Scale, ExternalLink, AlertTriangle, Database, Zap } from "lucide-react";
+import { Loader2, ChevronRight, ChevronLeft, Check, Brain, Shield, FileCheck, FolderOpen, Scale, ExternalLink, AlertTriangle, Database, Zap, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const modelSchema = z.object({
@@ -76,6 +76,42 @@ const useCases = [
   "Summarization",
   "Other",
 ];
+
+function LinkedSemanticDefinitions() {
+  const { data: definitions } = useQuery({
+    queryKey: ['active-semantic-definitions'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('semantic_definitions')
+        .select('id, name, display_name')
+        .eq('status', 'active')
+        .order('name');
+      if (error) return [];
+      return data || [];
+    },
+  });
+
+  if (!definitions || definitions.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      <label className="text-sm font-medium flex items-center gap-1">
+        <BookOpen className="w-4 h-4" /> Linked Semantic Definitions
+      </label>
+      <p className="text-xs text-muted-foreground">
+        Active metric definitions that this model computes or depends on.
+      </p>
+      <div className="flex flex-wrap gap-2 p-3 rounded-lg border border-border bg-secondary/30">
+        {definitions.map((def: any) => (
+          <Badge key={def.id} variant="outline" className="text-xs">
+            <BookOpen className="w-3 h-3 mr-1" />
+            {def.display_name || def.name}
+          </Badge>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: ModelRegistrationFormProps) {
   const [step, setStep] = useState(defaultProjectId ? 2 : 1);
@@ -610,6 +646,9 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                     </FormItem>
                   )}
                 />
+
+                {/* Linked Semantic Definitions */}
+                <LinkedSemanticDefinitions />
               </div>
             )}
 
