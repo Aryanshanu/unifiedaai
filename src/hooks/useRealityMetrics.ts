@@ -35,6 +35,7 @@ export function useRealityMetrics() {
         legacyDataCount: 0,
       };
     },
-    refetchInterval: 30000, // Refresh every 30 seconds
+    staleTime: 60_000,
+    refetchInterval: 120_000, // Refresh every 2 minutes
   });
 }

@@ -63,7 +63,8 @@ export function RuntimeRiskOverlay({ systemId }: RuntimeRiskOverlayProps) {
         errorRate: totalRequests > 0 ? (errorRequests / totalRequests) * 100 : 0,
       };
     },
-    refetchInterval: 30000,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
     enabled: !!systemId,
   });
 

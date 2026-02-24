@@ -67,7 +67,8 @@ export function useGovernanceFlowMetrics(): GovernanceFlowData {
         openIncidentsCount,
       };
     },
-    refetchInterval: 30000, // Refresh every 30 seconds
+    staleTime: 60_000,
+    refetchInterval: 120_000, // Refresh every 2 minutes
   });
 
   // Calculate stage statuses based on metrics

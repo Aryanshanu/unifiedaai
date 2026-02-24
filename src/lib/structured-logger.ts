@@ -83,31 +83,26 @@ class StructuredLogger {
   }
 
   private formatForConsole(log: StructuredLog): void {
-    if (!this.config.enableConsole) return;
+    // Console output disabled for performance -- console.group/log calls
+    // are synchronous and block the main thread. Logs are kept in-memory
+    // and accessible via the observability page / useStructuredLogs hook.
+    // To re-enable for debugging, uncomment the block below.
+    return;
 
+    /*
+    if (!this.config.enableConsole) return;
     const style = `color: ${LOG_LEVEL_COLORS[log.level]}; font-weight: bold;`;
     const date = new Date(log.timestamp);
     const ms = date.getMilliseconds().toString().padStart(3, '0');
     const timestamp = date.toLocaleTimeString('en-US', {
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
+      hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit',
     }) + `.${ms}`;
-
-    console.groupCollapsed(
-      `%c[${log.level}]%c ${timestamp} | ${log.category} | ${log.message}`,
-      style,
-      'color: inherit;'
-    );
+    console.groupCollapsed(`%c[${log.level}]%c ${timestamp} | ${log.category} | ${log.message}`, style, 'color: inherit;');
     console.log('📋 Full Log:', log);
-    if (Object.keys(log.metadata).length > 0) {
-      console.log('📦 Metadata:', log.metadata);
-    }
-    if (log.tags.length > 0) {
-      console.log('🏷️ Tags:', log.tags);
-    }
+    if (Object.keys(log.metadata).length > 0) console.log('📦 Metadata:', log.metadata);
+    if (log.tags.length > 0) console.log('🏷️ Tags:', log.tags);
     console.groupEnd();
+    */
   }
 
   private interceptFetch(): void {

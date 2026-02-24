@@ -33,7 +33,8 @@ export function usePredictiveGovernance(entityType?: string, limit = 20) {
       if (error) throw error;
       return data as PredictiveRisk[];
     },
-    refetchInterval: 60000, // Refresh every minute
+    staleTime: 60_000,
+    refetchInterval: 120_000, // Refresh every 2 minutes
   });
 }
 
@@ -51,7 +52,8 @@ export function useHighRiskPredictions(minRiskScore = 40) {
       if (error) throw error;
       return data as PredictiveRisk[];
     },
-    refetchInterval: 30000,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
   });
 }
 

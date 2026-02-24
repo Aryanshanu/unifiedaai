@@ -107,6 +107,7 @@ export function useActivityMetrics(systemId: string) {
       } as ActivityMetrics;
     },
     enabled: !!systemId,
-    refetchInterval: 30000, // Refresh every 30 seconds
+    staleTime: 60_000,
+    refetchInterval: 60_000, // Refresh every 60 seconds
   });
 }
