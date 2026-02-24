@@ -482,12 +482,15 @@ serve(async (req) => {
     console.log("Custom prompt:", customPrompt.substring(0, 100) + "...");
 
     // Call the target model with the custom prompt
+    console.log(`Calling target model at: ${endpoint} model: ${systemModelName}`);
+    
     let modelResponse: string;
     try {
       modelResponse = await callTargetModel(endpoint, apiToken, customPrompt, systemModelName);
       console.log("Model response received:", modelResponse.substring(0, 200) + "...");
     } catch (error: any) {
       const errorMsg = error.message || "Unknown error";
+      console.error("Model call failed:", errorMsg);
       
       if (errorMsg.includes("Rate limit") || errorMsg.includes("429")) {
         return errorResponse("The model is busy. Please wait a moment and try again.", 429);
@@ -499,7 +502,7 @@ serve(async (req) => {
         return errorResponse("Access denied. Your API key may not have the required permissions.", 403);
       }
       
-      return errorResponse("Unable to reach the model. Please check your endpoint configuration and try again.", 502);
+      return errorResponse(`Model call failed: ${errorMsg.substring(0, 200)}`, 502);
     }
 
     // Run REAL mathematical evaluation based on engine type
