@@ -224,6 +224,15 @@ serve(async (req) => {
       });
     }
 
+    // Add semantic definitions context
+    if (semanticRes.data && semanticRes.data.length > 0) {
+      contextParts.push(`\n## Semantic Layer (${semanticRes.data.length} active definitions)`);
+      contextParts.push(`Use these governed definitions when answering metric questions:`);
+      semanticRes.data.forEach((d: any) => {
+        contextParts.push(`- **${d.display_name || d.name}** (${d.name}): ${d.description || 'No description'}${d.sql_logic ? ` | SQL: \`${d.sql_logic}\`` : ''}${d.ai_context ? ` | Context: ${d.ai_context}` : ''}`);
+      });
+    }
+
     if (evaluationsRes.data && evaluationsRes.data.length > 0) {
       contextParts.push(`\n## Recent Evaluations (last ${evaluationsRes.data.length})`);
       const byEngine: Record<string, any[]> = {};
