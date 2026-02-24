@@ -27,7 +27,7 @@ const Incidents = lazy(() => import("./pages/Incidents"));
 const Lineage = lazy(() => import("./pages/Lineage"));
 const Observability = lazy(() => import("./pages/Observability"));
 const Alerts = lazy(() => import("./pages/Alerts"));
-const Policy = lazy(() => import("./pages/Policy"));
+
 const FairnessEngine = lazy(() => import("./pages/engines/FairnessEngine"));
 const HallucinationEngine = lazy(() => import("./pages/engines/HallucinationEngine"));
 const ToxicityEngine = lazy(() => import("./pages/engines/ToxicityEngine"));

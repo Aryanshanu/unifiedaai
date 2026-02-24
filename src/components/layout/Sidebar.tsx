@@ -24,10 +24,7 @@ import {
   Bell,
   BookOpen,
   Play,
-  BarChart3,
-  FileCheck,
-  
-  BookMarked,
+  BookOpen,
   ScanSearch,
   FlaskConical,
   Target,
