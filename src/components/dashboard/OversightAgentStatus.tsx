@@ -90,7 +90,8 @@ export function OversightAgentStatus() {
         agentStatus,
       };
     },
-    refetchInterval: 10000, // Refresh every 10 seconds
+    staleTime: 60_000,
+    refetchInterval: 120_000, // Refresh every 2 minutes
   });
 
   const triggerProcessing = useMutation({

@@ -145,7 +145,8 @@ export function SLODashboard() {
 
       return metrics;
     },
-    refetchInterval: 30000, // Refresh every 30 seconds
+    staleTime: 60_000,
+    refetchInterval: 120_000, // Refresh every 2 minutes
   });
 
   if (isLoading) {

@@ -52,7 +52,8 @@ export function useHighRiskPredictions(minRiskScore = 40) {
       if (error) throw error;
       return data as PredictiveRisk[];
     },
-    refetchInterval: 30000,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
   });
 }
 
