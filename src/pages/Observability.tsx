@@ -5,7 +5,7 @@ import { LiveMetrics } from "@/components/dashboard/LiveMetrics";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Activity, AlertTriangle, TrendingUp, Clock, RefreshCw, Bell, Zap, MessageSquare, Bot, Cpu } from "lucide-react";
+import { Activity, AlertTriangle, TrendingUp, Clock, RefreshCw, Bell, Zap, MessageSquare, Bot, Cpu, BookOpen } from "lucide-react";
 import { SimulationController } from "@/components/oversight/SimulationController";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
