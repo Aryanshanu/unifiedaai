@@ -243,9 +243,11 @@ export function DQStreamingDashboard({ datasetId, executionId, isActive = true }
           .limit(1)
           .single();
 
+        let metricsData: Record<string, unknown>[] = [];
+        
         if (execution) {
           const summary = execution.summary as Record<string, number> || {};
-          const metricsData = execution.metrics as Record<string, unknown>[] || [];
+          metricsData = execution.metrics as Record<string, unknown>[] || [];
 
           // Calculate dimension scores from metrics
           const dimensionScores: Record<string, number[]> = {};
@@ -258,10 +260,9 @@ export function DQStreamingDashboard({ datasetId, executionId, isActive = true }
 
           setDimensions(prev => prev.map(d => {
             const scores = dimensionScores[d.name.toLowerCase()] || [];
-            // GOVERNANCE FIX: Remove Math.random() - use null for unavailable data
             const newScore = scores.length > 0 
               ? scores.reduce((a, b) => a + b, 0) / scores.length 
-              : 0; // Default to 0 instead of fabricated value
+              : 0;
             return {
               ...d,
               previousScore: d.score,
