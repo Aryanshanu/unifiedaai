@@ -4478,6 +4478,50 @@ export type Database = {
           },
         ]
       }
+      semantic_definition_versions: {
+        Row: {
+          change_summary: string | null
+          created_at: string
+          created_by: string | null
+          definition_hash: string | null
+          definition_id: string
+          definition_yaml: string
+          id: string
+          promoted_by: string | null
+          version: number
+        }
+        Insert: {
+          change_summary?: string | null
+          created_at?: string
+          created_by?: string | null
+          definition_hash?: string | null
+          definition_id: string
+          definition_yaml: string
+          id?: string
+          promoted_by?: string | null
+          version: number
+        }
+        Update: {
+          change_summary?: string | null
+          created_at?: string
+          created_by?: string | null
+          definition_hash?: string | null
+          definition_id?: string
+          definition_yaml?: string
+          id?: string
+          promoted_by?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "semantic_definition_versions_definition_id_fkey"
+            columns: ["definition_id"]
+            isOneToOne: false
+            referencedRelation: "semantic_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       semantic_definitions: {
         Row: {
           ai_context: string | null
@@ -4485,17 +4529,23 @@ export type Database = {
           created_by: string | null
           definition_hash: string | null
           definition_yaml: string
+          deployment_count: number
           description: string | null
           display_name: string | null
+          embedding: string | null
           grain: string | null
           id: string
+          last_queried_at: string | null
           metadata: Json | null
           name: string
           owner_email: string | null
+          query_count: number
           sql_logic: string | null
           status: string
           synonyms: string[] | null
+          test_suite: Json | null
           updated_at: string
+          upstream_dependencies: Json | null
           version: number
         }
         Insert: {
@@ -4504,17 +4554,23 @@ export type Database = {
           created_by?: string | null
           definition_hash?: string | null
           definition_yaml: string
+          deployment_count?: number
           description?: string | null
           display_name?: string | null
+          embedding?: string | null
           grain?: string | null
           id?: string
+          last_queried_at?: string | null
           metadata?: Json | null
           name: string
           owner_email?: string | null
+          query_count?: number
           sql_logic?: string | null
           status?: string
           synonyms?: string[] | null
+          test_suite?: Json | null
           updated_at?: string
+          upstream_dependencies?: Json | null
           version?: number
         }
         Update: {
@@ -4523,20 +4579,114 @@ export type Database = {
           created_by?: string | null
           definition_hash?: string | null
           definition_yaml?: string
+          deployment_count?: number
           description?: string | null
           display_name?: string | null
+          embedding?: string | null
           grain?: string | null
           id?: string
+          last_queried_at?: string | null
           metadata?: Json | null
           name?: string
           owner_email?: string | null
+          query_count?: number
           sql_logic?: string | null
           status?: string
           synonyms?: string[] | null
+          test_suite?: Json | null
           updated_at?: string
+          upstream_dependencies?: Json | null
           version?: number
         }
         Relationships: []
+      }
+      semantic_drift_alerts: {
+        Row: {
+          definition_id: string
+          details: Json | null
+          detected_at: string
+          drift_type: string
+          id: string
+          resolved_at: string | null
+          severity: string
+          status: string
+        }
+        Insert: {
+          definition_id: string
+          details?: Json | null
+          detected_at?: string
+          drift_type: string
+          id?: string
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+        }
+        Update: {
+          definition_id?: string
+          details?: Json | null
+          detected_at?: string
+          drift_type?: string
+          id?: string
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "semantic_drift_alerts_definition_id_fkey"
+            columns: ["definition_id"]
+            isOneToOne: false
+            referencedRelation: "semantic_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      semantic_query_log: {
+        Row: {
+          consumer_type: string
+          definition_id: string | null
+          error_message: string | null
+          id: string
+          metric_name: string
+          queried_at: string
+          queried_by: string | null
+          query_latency_ms: number | null
+          row_count: number | null
+          status: string
+        }
+        Insert: {
+          consumer_type?: string
+          definition_id?: string | null
+          error_message?: string | null
+          id?: string
+          metric_name: string
+          queried_at?: string
+          queried_by?: string | null
+          query_latency_ms?: number | null
+          row_count?: number | null
+          status?: string
+        }
+        Update: {
+          consumer_type?: string
+          definition_id?: string | null
+          error_message?: string | null
+          id?: string
+          metric_name?: string
+          queried_at?: string
+          queried_by?: string | null
+          query_latency_ms?: number | null
+          row_count?: number | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "semantic_query_log_definition_id_fkey"
+            columns: ["definition_id"]
+            isOneToOne: false
+            referencedRelation: "semantic_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       silver_data: {
         Row: {
@@ -5267,6 +5417,25 @@ export type Database = {
           metadata: Json
           properties: Json
           similarity: number
+        }[]
+      }
+      match_semantic_definitions: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          ai_context: string
+          description: string
+          display_name: string
+          grain: string
+          id: string
+          name: string
+          similarity: number
+          sql_logic: string
+          status: string
+          synonyms: string[]
         }[]
       }
       unlock_system: {
