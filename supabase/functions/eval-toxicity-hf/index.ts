@@ -197,18 +197,10 @@ serve(async (req) => {
     }
 
     const { modelId, text, customPrompt, autoEscalate = true } = validation.data!;
-    const hfToken = Deno.env.get("HUGGING_FACE_ACCESS_TOKEN");
 
-    // Direct text analysis
+    // Direct text analysis (pattern-based, no external API needed)
     if (text && !modelId) {
-      if (!hfToken) {
-        return new Response(
-          JSON.stringify({ error: "HUGGING_FACE_ACCESS_TOKEN not configured" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      
-      const analysis = await analyzeWithHuggingFace(text, hfToken);
+      const analysis = analyzeForToxicity(text);
       const overallScore = Math.round((1 - analysis.toxicity) * 100);
       
       return new Response(
