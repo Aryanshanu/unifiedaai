@@ -1,75 +1,39 @@
 
 
-# Fix: OpenRouter/OpenAI Model API Endpoint Issues
+# Integrate 3 New OpenRouter Models into AI Project
 
-## Root Cause
+## What Will Happen
 
-When you register a model, the system stores two endpoints:
-- `models.endpoint` (what you typed)
-- `systems.endpoint` (copied from your input)
+Three new models will be registered in your "AI" project with the correct OpenRouter API endpoint and your provided API key:
 
-The problem is that `systems.endpoint` for your "openai/gpt-oss-120b:free" model is stored as `https://openrouter.ai/openai/gpt-oss-120b:free` -- this is a **model page URL**, not an API endpoint. When evaluation engines try to call this URL, they get an HTML page back instead of JSON, causing errors.
+| Model | ID |
+|-------|-----|
+| Mistral Small 3.1 24B | `mistralai/mistral-small-3.1-24b-instruct:free` |
+| Qwen3 Next 80B | `qwen/qwen3-next-80b-a3b-instruct:free` |
+| Llama 3.3 70B | `meta-llama/llama-3.3-70b-instruct:free` |
 
-Additionally, the shared `call-user-model.ts` function (used by all 5 evaluation engines and security tests) lacks the smart URL normalization that `target-executor` already has.
+All three will use:
+- **Endpoint:** `https://openrouter.ai/api/v1/chat/completions`
+- **Provider:** OpenRouter
+- **API Key:** Your provided key (stored in the systems table alongside each model)
 
-## Database Fix
+## Steps
 
-Update the broken system endpoints directly:
+### 1. Database Inserts (3 systems + 3 models)
 
-```sql
--- Fix the openai/gpt-oss-120b:free model's system endpoint
-UPDATE systems 
-SET endpoint = 'https://openrouter.ai/api/v1/chat/completions'
-WHERE endpoint = 'https://openrouter.ai/openai/gpt-oss-120b:free';
+For each model, create a `systems` row with the correct endpoint, model_name, and API token, then a linked `models` row. This mirrors the existing pattern used by your `openai/gpt-oss-120b:free` and `deepseek/deepseek-r1-0528:free` models.
 
--- Fix the Gemma model's system endpoint  
-UPDATE systems 
-SET endpoint = 'https://openrouter.ai/api/v1/chat/completions'
-WHERE endpoint = 'https://openrouter.ai/google/gemma-3n-e4b-it';
-```
+### 2. Verify Connectivity
 
-## Code Fixes (3 files)
+After inserting, test one of the models using the `custom-prompt-test` edge function to confirm it responds correctly.
 
-### 1. `supabase/functions/_shared/call-user-model.ts`
+## Important Note
 
-Add OpenRouter URL normalization and model extraction (same logic `target-executor` already uses):
+Your API key will be stored in the `systems.api_token_encrypted` column (same as your other OpenRouter models). Since these are `:free` models, make sure your OpenRouter privacy settings allow "Free model publication" at [openrouter.ai/settings/privacy](https://openrouter.ai/settings/privacy) -- otherwise you'll get the same 404 error as before.
 
-- Detect when endpoint is an OpenRouter model page URL (e.g., `openrouter.ai/{org}/{model}` without `/api/v1/`)
-- Extract the model ID from the URL path
-- Replace endpoint with `https://openrouter.ai/api/v1/chat/completions`
-- Use the extracted model ID in the request body
-- Add proper `HTTP-Referer` and `X-Title` headers for OpenRouter
+## Technical Details
 
-### 2. `src/hooks/useModels.ts` (useCreateModel)
-
-Add endpoint normalization at registration time so bad URLs never get stored:
-
-- Before inserting into `systems`, detect OpenRouter model page URLs
-- Auto-correct to `https://openrouter.ai/api/v1/chat/completions`
-- Extract model ID from the URL and store it as `model_name`
-- Auto-detect provider as "openrouter" when URL contains `openrouter.ai`
-
-### 3. `src/components/models/ModelRegistrationForm.tsx`
-
-Improve the endpoint validation on the Configuration step:
-
-- When the endpoint field loses focus, check if it's an OpenRouter model page URL
-- Show a warning with auto-correct button (already partially built but needs the OpenRouter case)
-- Pre-fill the provider as "OpenRouter" when an OpenRouter URL is detected
-
-## Files Modified
-
-| # | File | Change |
-|---|------|--------|
-| 1 | Database migration | Fix existing broken system endpoints |
-| 2 | `supabase/functions/_shared/call-user-model.ts` | Add OpenRouter URL normalization + model extraction |
-| 3 | `src/hooks/useModels.ts` | Normalize endpoint at registration time |
-| 4 | `src/components/models/ModelRegistrationForm.tsx` | Better endpoint validation for OpenRouter URLs |
-
-## What This Fixes
-
-- Evaluation engines (Fairness, Toxicity, Privacy, Hallucination, Explainability) will correctly call OpenRouter API
-- Security tests (Pentest, Jailbreak) will correctly call OpenRouter API
-- Future model registrations with OpenRouter URLs will be auto-corrected
-- The "HTML is not valid JSON" errors in edge function logs will be eliminated
+- **Project ID:** `954496e7-9525-4891-aabb-2ba8cb4c27aa`
+- No code changes needed -- the existing registration flow, evaluation engines, and `custom-prompt-test` already support OpenRouter models with the normalization fixes applied earlier
+- Each model gets `status: 'draft'` and `deployment_status: 'draft'` initially
 
