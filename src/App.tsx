@@ -120,8 +120,6 @@ const App = () => (
                 <Route path="/security/threats" element={<ProtectedRoute><SecurityThreatModel /></ProtectedRoute>} />
                 {/* Data Governance */}
                 <Route path="/data-contracts" element={<ProtectedRoute><DataContracts /></ProtectedRoute>} />
-                {/* Policy */}
-                <Route path="/policy" element={<ProtectedRoute><Policy /></ProtectedRoute>} />
                 {/* Settings & Docs */}
                 <Route path="/settings" element={
                   <ProtectedRoute requiredRoles={['admin']}>
