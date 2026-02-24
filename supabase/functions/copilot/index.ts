@@ -53,11 +53,12 @@ serve(async (req) => {
     }
 
     // Fetch context data (user is now authorized, using user client for RLS)
-    const [riskRes, impactRes, logsRes, metricsRes] = await Promise.all([
+    const [riskRes, impactRes, logsRes, metricsRes, semanticRes] = await Promise.all([
       supabase.from("risk_assessments").select("*").eq("system_id", systemId).order("created_at", { ascending: false }).limit(1),
       supabase.from("impact_assessments").select("*").eq("system_id", systemId).order("created_at", { ascending: false }).limit(1),
       supabase.from("request_logs").select("*").eq("system_id", systemId).order("created_at", { ascending: false }).limit(20),
       supabase.from("risk_metrics").select("*").eq("system_id", systemId).order("recorded_at", { ascending: false }).limit(50),
+      serviceClient.from("semantic_definitions").select("name, display_name, description, sql_logic, ai_context, grain, status").eq("status", "active").limit(50),
     ]);
 
     const riskAssessment = riskRes.data?.[0];
