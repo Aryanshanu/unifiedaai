@@ -95,7 +95,6 @@ export default function Incidents() {
         (payload) => {
           setRealtimeCount(prev => prev + 1);
           queryClient.invalidateQueries({ queryKey: ['incidents'] });
-          queryClient.invalidateQueries({ queryKey: ['incidents'] });
           
           if (payload.eventType === 'INSERT') {
             const newIncident = payload.new as any;
