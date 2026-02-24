@@ -150,7 +150,6 @@ export default function Incidents() {
       if (error) throw error;
       toast.success("Lifecycle check complete");
       queryClient.invalidateQueries({ queryKey: ['incidents'] });
-      queryClient.invalidateQueries({ queryKey: ['incidents'] });
     } catch (error) {
       toast.error("Lifecycle check failed");
     } finally {
