@@ -1,161 +1,103 @@
 
 
-# Semantic Layer Full Integration Across Platform
+# Command Center, Data Quality & Incidents -- Deep Fix
 
-## Overview
+## Problems Identified
 
-The Semantic Layer currently lives as a standalone page at `/semantic-definitions`. This plan wires it into every relevant part of the platform workflow: Command Center, Data Quality Engine, Data Contracts, Knowledge Graph, RAI Engines, Model Registration, Copilot/Assistant, and Observability.
+### 1. Command Center (Index.tsx) Issues
+- **Duplicate data fetching**: `usePlatformMetrics` fetches open incidents and pending approvals, then `Index.tsx` independently fetches the exact same counts again (`pending-reviews-count`, `recent-incidents`, `dq-summary`). This means 8+ parallel DB queries on every page load, most of them redundant.
+- **"Open Alerts" card on right sidebar links to `/alerts` but shows `metrics?.recentIncidents`** -- this is the open incidents count, not alerts. Misleading label.
+- **The `usePlatformMetrics` hook fetches ALL `request_logs` rows for the last 24 hours** (not `count: 'exact', head: true`) -- it pulls every row into memory to count them. With any real traffic this becomes extremely slow and is the primary latency source.
+- **`useSystemHealthSummary` has an N+1 query problem**: it loops over each system and makes a separate DB call for request_logs per system. This is never called on Index but it's imported via `usePlatformMetrics.ts` and could be triggered elsewhere.
+- **Realtime channel subscribes to 4 tables** (`incidents`, `dq_incidents`, `review_queue`, `semantic_drift_alerts`), creating 4 postgres_changes listeners on every mount.
 
----
+### 2. Data Quality Engine Issues
+- **`useQualityStats` uses `useEffect` + `useState` instead of `useQuery`** -- no caching, no deduplication, no staleTime. Every mount re-fetches. Also subscribes to realtime changes on `data_uploads` AND `quality_issues` which triggers full re-fetches on every change.
+- **Critical Issues count (showing 58)** comes from `quality_issues` table with `severity = 'critical'` and `status = 'open'`. This queries ALL critical issues across ALL datasets ever -- it should only count issues for the user's current context or recent uploads.
+- **7 tabs** is excessive -- Control Plane, Sources, Import, Evaluate, AI Readiness, Bias Scan, History. "Sources" and "Import" overlap. "AI Readiness" and "Bias Scan" are disconnected features.
 
-## Integration Point 1: Command Center Dashboard
+### 3. Incidents Page Issues
+- **Double invalidation**: Line 97-98 in `Incidents.tsx` calls `queryClient.invalidateQueries({ queryKey: ['incidents'] })` TWICE in the same callback. Same at lines 153-154.
+- **`useIncidents` returns `{ data, totalCount, hasMore }`** but `Incidents.tsx` accesses `incidents?.data` -- the hook wraps data in an object with pagination info that's never used (no pagination UI).
+- **Incident stats (`useIncidentStats`) makes a separate full-table scan** of all non-archived incidents just to compute counts -- could be combined with the main incidents query.
 
-**Location:** `src/pages/Index.tsx`
-
-**What:** Add a "Semantic Layer" summary card under the Data Governance section (alongside Data Quality Engine and Data Contracts).
-
-**Details:**
-- Query `semantic_definitions` for counts: total active, total draft, total deprecated
-- Query `semantic_drift_alerts` for open drift alert count
-- Display card with BookOpen icon, definition counts, and open drift alerts
-- Click navigates to `/semantic-definitions`
-- Add realtime subscription for `semantic_drift_alerts` table changes
-
-**Priority:** HIGH -- Command Center should surface semantic health at a glance.
-
----
-
-## Integration Point 2: Data Quality Engine
-
-**Location:** `src/pages/engines/DataQualityEngine.tsx`
-
-**What:** When profiling or validating a dataset, show which semantic definitions reference that dataset's tables/columns.
-
-**Details:**
-- After profiling completes, query `semantic_definitions` where `sql_logic` contains the dataset name or column names (text search)
-- Show a small "Linked Semantic Definitions" badge/panel in the profiling results
-- If a column is referenced by a semantic definition, show a BookOpen icon next to it in the column analysis grid
-- Clicking the badge navigates to the definition editor
-
-**Priority:** MEDIUM -- Helps users understand which metrics depend on their data.
+### 4. Latency Issues (Cross-Cutting)
+- **`usePlatformMetrics` fetches full rows** instead of using `count: 'exact', head: true` for counts and aggregations. This is the #1 latency problem.
+- **30-second `refetchInterval` on 12+ hooks** means the app is making dozens of background queries every 30 seconds across every page.
+- **`staleTime: 30_000`** in QueryClient but `refetchInterval: 30000` on many hooks -- these cancel each other out. Data is always considered stale by the time refetch fires.
+- **`useAllUploads` and `useQualityStats` don't use `useQuery`** -- they bypass React Query's deduplication and caching entirely.
 
 ---
 
-## Integration Point 3: Data Contracts
+## Fix Plan
 
-**Location:** `src/pages/DataContracts.tsx`
+### Fix 1: Rewrite `usePlatformMetrics` to Use Count Queries
 
-**What:** Link data contracts to semantic definitions that consume the contracted dataset.
+Replace full-row fetches with `count: 'exact', head: true` queries. This reduces data transfer from potentially thousands of rows to just integer counts.
 
-**Details:**
-- When viewing a data contract, show "Consuming Definitions" section listing semantic definitions whose `upstream_dependencies` or `sql_logic` references the contracted dataset
-- When a contract violation occurs, show which semantic definitions are impacted
-- Add a "Create Definition" quick action from the contract view
+**File: `src/hooks/usePlatformMetrics.ts`**
+- Change `request_logs` query from `select("decision, latency_ms, status_code")` to 3 separate count queries: total, blocked, error
+- For `avgLatency`, use a database function or accept a simpler approach (latest 100 logs only)
+- Remove the N+1 loop in `useSystemHealthSummary` -- fetch all request_logs in one query and group client-side
+- Increase `staleTime` to 60_000 to reduce redundant fetches
 
-**Priority:** MEDIUM -- Contracts protect datasets; definitions consume them.
+### Fix 2: Consolidate Command Center Queries
 
----
+**File: `src/pages/Index.tsx`**
+- Remove the standalone `pending-reviews-count` query -- use `metrics?.pendingApprovals` from `usePlatformMetrics` instead (already fetched)
+- Remove the standalone `recent-incidents` query count -- use `metrics?.recentIncidents` instead
+- Keep `dq-summary` and `semantic-summary` as they query different tables
+- Fix "Open Alerts" label to "Open Incidents" and link to `/incidents` not `/alerts`
+- Reduce realtime subscriptions from 4 tables to 2 (incidents + review_queue only, the important ones)
 
-## Integration Point 4: Knowledge Graph
+### Fix 3: Fix `useQualityStats` to Use React Query
 
-**Location:** `src/pages/Lineage.tsx` + database triggers
+**File: `src/hooks/useFileUploadStatus.ts`**
+- Convert `useQualityStats` from `useState + useEffect` to `useQuery` with proper caching
+- Remove the realtime subscription that triggers full re-fetches (rely on React Query's `refetchInterval` instead)
+- Scope `criticalIssues` to recent uploads only (last 30 days) to avoid showing stale historical counts
 
-**What:** Sync semantic definitions to the Knowledge Graph as `semantic_definition` node type.
+### Fix 4: Fix Incident Double-Invalidation and Data Access
 
-**Details:**
-- New database trigger: `sync_semantic_definition_to_kg` -- on INSERT/UPDATE to `semantic_definitions`, upsert a KG node with `entity_type = 'semantic_definition'`
-- Create edges: `semantic_definition` -> `depends_on` -> `dataset` (based on `upstream_dependencies`)
-- Add `semantic_definition` to the node color map in `Lineage.tsx` (e.g., teal/BookOpen)
-- This makes definitions visible in the lineage graph alongside models, datasets, and evaluations
+**File: `src/pages/Incidents.tsx`**
+- Remove duplicate `queryClient.invalidateQueries` calls (lines 97-98 and 153-154)
+- Fix data access pattern: `incidents?.data` is correct but add null safety
+- Remove the `handleQuickResolveAll` function that bulk-resolves ALL critical incidents with one click (dangerous -- should resolve individually)
 
-**Priority:** HIGH -- The KG is the governance backbone; definitions must appear in it.
+### Fix 5: Merge Incident Stats Into Main Query
 
----
+**File: `src/hooks/useIncidents.ts`**
+- Combine `useIncidentStats` computation into the main `useIncidents` query to avoid a second full-table scan
+- Or convert `useIncidentStats` to use `count: 'exact', head: true` queries instead of fetching all rows
 
-## Integration Point 5: RAI Engine Evaluation Context
+### Fix 6: Reduce Global Refetch Intervals
 
-**Location:** All 5 engine pages (`FairnessEngine.tsx`, etc.)
+**File: `src/App.tsx`**
+- Increase global `staleTime` from `30_000` to `60_000`
+- This means data is considered fresh for 60 seconds, reducing redundant refetches
 
-**What:** When running an evaluation, pass relevant semantic definitions as context to the AI judge.
+**Files: Multiple hooks**
+- Change `refetchInterval: 30000` to `refetchInterval: 60000` on non-critical hooks (platform metrics, DQ stats)
+- Keep `refetchInterval: 30000` only on actively-monitored data (incidents, review queue)
 
-**Details:**
-- Before evaluation, check if the selected model has related semantic definitions (via system -> project -> definitions)
-- If definitions exist, include their `ai_context` field in the evaluation prompt sent to the AI gateway
-- This makes the AI judge aware of the business metric semantics when scoring
-- Show a small "Semantic Context" indicator (BookOpen badge) on the engine page when definitions are being used
+### Fix 7: Data Quality Engine Tab Cleanup
 
-**Priority:** LOW -- Enhancement for AI judge accuracy; not blocking.
-
----
-
-## Integration Point 6: Model Registration
-
-**Location:** `src/components/models/ModelRegistrationForm.tsx`
-
-**What:** During model registration (Step 3: Governance), allow linking semantic definitions to the model.
-
-**Details:**
-- Add an optional "Linked Semantic Definitions" multi-select field in the Governance step
-- Query active definitions from `semantic_definitions` for the dropdown
-- Store selected definition IDs in the model's `metadata` JSONB field (key: `semantic_definitions`)
-- This establishes a formal link between models and the metrics they compute
-
-**Priority:** MEDIUM -- Governance traceability.
+**File: `src/pages/engines/DataQualityEngine.tsx`**
+- Merge "Sources" and "Import" tabs into "Import" (data sources are connectors that produce imports)
+- Reduce from 7 tabs to 5: Control Plane, Import, Evaluate, Bias Scan, History
+- Remove standalone "AI Readiness" tab (its content -- ReadyDatasetsList -- is a simple list that can live under History or Evaluate)
 
 ---
 
-## Integration Point 7: Copilot / RAI Assistant
+## Summary of Files Changed
 
-**Location:** `src/components/copilot/CopilotDrawer.tsx` + `src/components/assistant/RAIAssistant.tsx` + `supabase/functions/copilot/index.ts` + `supabase/functions/rai-assistant/index.ts`
+| File | Change |
+|------|--------|
+| `src/hooks/usePlatformMetrics.ts` | Rewrite to use count queries; fix N+1 in system health |
+| `src/pages/Index.tsx` | Remove 2 redundant queries; fix labels; reduce realtime channels |
+| `src/hooks/useFileUploadStatus.ts` | Convert `useQualityStats` to `useQuery`; scope critical issues |
+| `src/pages/Incidents.tsx` | Remove double invalidation; remove dangerous bulk resolve |
+| `src/hooks/useIncidents.ts` | Convert `useIncidentStats` to count queries |
+| `src/App.tsx` | Increase staleTime to 60s |
+| `src/pages/engines/DataQualityEngine.tsx` | Merge tabs from 7 to 5 |
 
-**What:** Make the AI assistants aware of semantic definitions so they can answer metric questions accurately.
-
-**Details:**
-- In the `copilot` and `rai-assistant` edge functions, before generating a response, query `semantic_definitions` for active definitions
-- Include definition names, descriptions, SQL logic, and AI context in the system prompt
-- This prevents the AI from hallucinating metric definitions -- it uses the governed semantic contract
-- Add suggested questions: "What semantic definitions are active?", "How is MRR calculated?"
-
-**Priority:** HIGH -- This is the core "Definition IS the Code" value: AI agents consume the semantic contract.
-
----
-
-## Integration Point 8: Drift Alerts on Observability
-
-**Location:** `src/pages/Observability.tsx`
-
-**What:** Surface semantic drift alerts alongside data drift alerts.
-
-**Details:**
-- Add a "Semantic Drift" section or tab showing open `semantic_drift_alerts`
-- Reuse the `DriftAlertsTable` component already built
-- This gives operators a single pane of glass for all drift types
-
-**Priority:** LOW -- Nice consolidation but the dedicated Drift tab on Semantic page already covers this.
-
----
-
-## Summary of Changes by File
-
-| File | Change | Priority |
-|------|--------|----------|
-| `src/pages/Index.tsx` | Add Semantic Layer summary card + realtime subscription | HIGH |
-| `src/pages/Lineage.tsx` | Add `semantic_definition` node color | HIGH |
-| Database migration | KG sync trigger for semantic definitions | HIGH |
-| `supabase/functions/copilot/index.ts` | Include semantic definitions in system prompt | HIGH |
-| `supabase/functions/rai-assistant/index.ts` | Include semantic definitions in system prompt | HIGH |
-| `src/pages/DataContracts.tsx` | Add "Consuming Definitions" section | MEDIUM |
-| `src/components/models/ModelRegistrationForm.tsx` | Add linked definitions multi-select | MEDIUM |
-| `src/pages/engines/DataQualityEngine.tsx` | Show linked definitions in profiling | MEDIUM |
-| `src/pages/engines/FairnessEngine.tsx` (and 4 others) | Semantic context indicator | LOW |
-| `src/pages/Observability.tsx` | Semantic drift section | LOW |
-
----
-
-## Technical Notes
-
-- All new queries use `(supabase as any)` pattern consistent with existing semantic hooks
-- KG sync trigger follows the exact pattern of `sync_model_to_kg`, `sync_evaluation_to_kg`, etc.
-- No new tables needed -- all integration uses existing `semantic_definitions`, `semantic_drift_alerts`, and `kg_nodes`/`kg_edges`
-- Copilot/Assistant integration queries definitions at request time (not cached) to always use the latest active definitions
-- Priority ordering: HIGH items first (Command Center, KG, Copilot), then MEDIUM (Contracts, Models, DQ), then LOW (Engines, Observability)
