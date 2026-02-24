@@ -86,7 +86,7 @@ export default function Index() {
   });
 
 
-  // Recent incidents for activity log
+  // Recent incidents - keep but with longer interval
   const { data: recentIncidents } = useQuery({
     queryKey: ['recent-incidents'],
     queryFn: async () => {
@@ -98,7 +98,7 @@ export default function Index() {
       if (error) return [];
       return data || [];
     },
-    refetchInterval: 30000,
+    refetchInterval: 60000,
   });
   
   // Realtime subscription for dashboard data
