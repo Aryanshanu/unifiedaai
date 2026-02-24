@@ -426,27 +426,14 @@ serve(async (req) => {
       return errorResponse("Unauthorized access to this model", 403);
     }
 
-    const endpoint = model.huggingface_endpoint || systemData?.endpoint;
-    const apiToken = model.huggingface_api_token || systemData?.api_token_encrypted;
     const systemModelName = systemData?.model_name || model.huggingface_model_id || model.name;
-
-    if (!endpoint) {
-      return errorResponse("Model endpoint not configured", 400);
-    }
-
-    if (!apiToken) {
-      return errorResponse("Model API token not configured", 400);
-    }
 
     console.log(`Running REAL ${engineType} evaluation for model ${modelId}`);
     console.log("Custom prompt:", customPrompt.substring(0, 100) + "...");
-
-    // Call the target model with the custom prompt
-    console.log(`Calling target model at: ${endpoint} model: ${systemModelName}`);
     
     let modelResponse: string;
     try {
-      modelResponse = await callTargetModel(endpoint, apiToken, customPrompt, systemModelName);
+      modelResponse = await callTargetModel("", "", customPrompt, systemModelName);
       console.log("Model response received:", modelResponse.substring(0, 200) + "...");
     } catch (error: any) {
       const errorMsg = error.message || "Unknown error";
