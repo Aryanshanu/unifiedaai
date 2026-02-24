@@ -449,7 +449,7 @@ serve(async (req) => {
     // Fetch model with system info (uses RLS via user client)
     const { data: model, error: modelError } = await supabase
       .from("models")
-      .select(`*, system:systems(endpoint, api_token_encrypted, owner_id)`)
+      .select(`*, system:systems(endpoint, api_token_encrypted, owner_id, model_name)`)
       .eq("id", modelId)
       .single();
 
@@ -468,6 +468,7 @@ serve(async (req) => {
 
     const endpoint = model.huggingface_endpoint || systemData?.endpoint;
     const apiToken = model.huggingface_api_token || systemData?.api_token_encrypted;
+    const systemModelName = systemData?.model_name || model.huggingface_model_id || model.name;
 
     if (!endpoint) {
       return errorResponse("Model endpoint not configured", 400);
