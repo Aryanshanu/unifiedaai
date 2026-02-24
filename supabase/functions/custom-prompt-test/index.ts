@@ -382,23 +382,39 @@ async function callTargetModel(endpoint: string, apiToken: string, prompt: strin
     requestBody = { messages: [{ role: "user", content: prompt }], max_tokens: 500, temperature: 0.7 };
   }
 
-  const response = await fetch(requestUrl, {
-    method: "POST",
-    headers: requestHeaders,
-    body: JSON.stringify(requestBody),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 55000);
+
+  let response: Response;
+  try {
+    response = await fetch(requestUrl, {
+      method: "POST",
+      headers: requestHeaders,
+      body: JSON.stringify(requestBody),
+      signal: controller.signal,
+    });
+  } catch (fetchErr: any) {
+    clearTimeout(timeout);
+    if (fetchErr.name === "AbortError") {
+      throw new Error("Model request timed out after 55 seconds. The model may be overloaded.");
+    }
+    throw new Error(`Network error calling model: ${fetchErr.message}`);
+  }
+  clearTimeout(timeout);
 
   if (!response.ok) {
     const errorText = await response.text();
+    console.error(`Model API error (${response.status}):`, errorText.substring(0, 300));
     if (response.status === 401) throw new Error(`API authentication failed. Check your API token in System Settings.`);
     if (response.status === 403) throw new Error(`API access denied. Your API key may not have permission.`);
     if (response.status === 429) throw new Error(`Rate limit exceeded. Please wait and try again.`);
-    throw new Error(`Model call failed (${response.status}): ${errorText.substring(0, 100)}`);
+    throw new Error(`Model returned ${response.status}: ${errorText.substring(0, 200)}`);
   }
 
   const data = await response.json();
   
   if (data.choices?.[0]?.message?.content) return data.choices[0].message.content;
+  if (data.content?.[0]?.text) return data.content[0].text;
   if (Array.isArray(data) && data[0]?.generated_text) return data[0].generated_text;
   if (typeof data === "string") return data;
   if (data.generated_text) return data.generated_text;
