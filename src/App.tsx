@@ -104,9 +104,8 @@ const App = () => (
                 <Route path="/observability" element={<ProtectedRoute><Observability /></ProtectedRoute>} />
                 <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
                 <Route path="/evaluation" element={<ProtectedRoute><Evaluation /></ProtectedRoute>} />
-                {/* Impact */}
-                <Route path="/impact-dashboard" element={<ProtectedRoute><ImpactDashboard /></ProtectedRoute>} />
-                <Route path="/regulatory-reports" element={<ProtectedRoute><RegulatoryReports /></ProtectedRoute>} />
+                {/* Semantic Layer */}
+                <Route path="/semantic-definitions" element={<ProtectedRoute><SemanticDefinitions /></ProtectedRoute>} />
                 {/* Core RAI Engines */}
                 <Route path="/engine/fairness" element={<ProtectedRoute><FairnessEngine /></ProtectedRoute>} />
                 <Route path="/engine/hallucination" element={<ProtectedRoute><HallucinationEngine /></ProtectedRoute>} />
