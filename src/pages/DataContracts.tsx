@@ -20,6 +20,7 @@ import { ErrorBoundary } from '@/components/error/ErrorBoundary';
 function DataContractsContent() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedDataset, setSelectedDataset] = useState<string>('');
+  const navigate = useNavigate();
   const [newContract, setNewContract] = useState({
     name: '',
     freshness_sla_hours: 24,
