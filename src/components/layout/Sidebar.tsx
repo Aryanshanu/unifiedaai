@@ -23,8 +23,6 @@ import {
   FileText,
   Bell,
   BookOpen,
-  Play,
-  BookOpen,
   ScanSearch,
   FlaskConical,
   Target,
