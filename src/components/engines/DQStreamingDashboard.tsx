@@ -314,13 +314,24 @@ export function DQStreamingDashboard({ datasetId, executionId, isActive = true }
           .limit(5);
 
         if (incidents) {
-          setHotspots(incidents.map(inc => ({
-            column: inc.dimension || 'Unknown',
-            issue: inc.action || 'Data quality issue detected',
-            severity: inc.severity as 'critical' | 'warning' | 'info',
-            // GOVERNANCE FIX: Remove Math.random() - don't fabricate scores
-            score: 0 // Hotspot score should come from actual data or be omitted
-          })));
+          // Derive hotspot scores from matching rule execution metrics
+          setHotspots(incidents.map(inc => {
+            // Try to find matching rule metric to get a real score
+            const matchingMetric = metricsData?.find((m: Record<string, unknown>) => 
+              (m.rule_name as string)?.includes(inc.dimension || '') ||
+              (m.column as string) === inc.dimension
+            );
+            const derivedScore = matchingMetric 
+              ? Math.round((1 - ((matchingMetric.success_rate as number) || 0)) * 100)
+              : -1; // -1 = no data available
+            
+            return {
+              column: inc.dimension || 'Unknown',
+              issue: inc.action || 'Data quality issue detected',
+              severity: inc.severity as 'critical' | 'warning' | 'info',
+              score: derivedScore
+            };
+          }));
         }
 
         setIsLoading(false);

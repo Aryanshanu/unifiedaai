@@ -343,7 +343,7 @@ serve(async (req) => {
       details: Object.fromEntries(columnProfiles.map((p) => [p.column_name, p.uniqueness / 100])),
     });
 
-    // 3. VALIDITY - Compute from format checks and outlier detection
+    // 3. VALIDITY - REAL computation from actual data inspection
     const validityScores: Record<string, number> = {};
     for (const col of columnProfiles) {
       const nonNullCount = rowCount - col.null_count;
@@ -352,49 +352,72 @@ serve(async (req) => {
         continue;
       }
       
-      // For numeric columns, check if values are within reasonable range (not extreme outliers)
-      if (col.dtype === 'number' && col.mean_value !== null && col.std_dev !== null) {
-        // Consider values within 3 std devs as valid
-        const validScore = 0.95; // Most real data is valid by default
-        validityScores[col.column_name] = validScore;
+      if (col.dtype === 'number' && col.mean_value !== null && col.std_dev !== null && col.std_dev > 0) {
+        // REAL: Count values within 3 standard deviations of mean
+        const lowerBound = col.mean_value - 3 * col.std_dev;
+        const upperBound = col.mean_value + 3 * col.std_dev;
+        let validCount = 0;
+        for (const row of dqData!) {
+          const data = row.raw_data as Record<string, unknown>;
+          const value = data?.[col.column_name];
+          if (value === null || value === undefined || value === "") continue;
+          const numVal = parseFloat(String(value));
+          if (!isNaN(numVal) && numVal >= lowerBound && numVal <= upperBound) {
+            validCount++;
+          }
+        }
+        validityScores[col.column_name] = validCount / nonNullCount;
       } else if (col.dtype === 'datetime') {
-        // For dates, assume valid if they parsed correctly
-        validityScores[col.column_name] = 0.98;
+        // REAL: Count values that successfully parse as valid dates
+        let validCount = 0;
+        for (const row of dqData!) {
+          const data = row.raw_data as Record<string, unknown>;
+          const value = data?.[col.column_name];
+          if (value === null || value === undefined || value === "") continue;
+          const parsed = new Date(String(value));
+          if (!isNaN(parsed.getTime())) {
+            validCount++;
+          }
+        }
+        validityScores[col.column_name] = validCount / nonNullCount;
       } else {
-        // For strings, validity based on non-empty meaningful values
-        validityScores[col.column_name] = col.completeness / 100;
+        // REAL: For strings, count non-empty, non-whitespace-only values
+        let validCount = 0;
+        for (const row of dqData!) {
+          const data = row.raw_data as Record<string, unknown>;
+          const value = data?.[col.column_name];
+          if (value === null || value === undefined || value === "") continue;
+          const strVal = String(value).trim();
+          if (strVal.length > 0) {
+            validCount++;
+          }
+        }
+        validityScores[col.column_name] = validCount / nonNullCount;
       }
     }
-    const avgValidity = Object.values(validityScores).reduce((a, b) => a + b, 0) / Object.keys(validityScores).length;
+    const avgValidity = Object.keys(validityScores).length > 0
+      ? Object.values(validityScores).reduce((a, b) => a + b, 0) / Object.keys(validityScores).length
+      : 0;
     dimensionScores.push({
       dimension: "validity",
       score: Math.round(avgValidity * 100) / 100,
       computed: true,
-      weight: 0.20,
+      weight: 0.25,
       details: validityScores,
     });
 
-    // 4. ACCURACY - Derived from validity and completeness combined
-    // Accuracy = how well data represents real-world values (approximated)
-    const accuracyScores: Record<string, number> = {};
-    for (const col of columnProfiles) {
-      const validityScore = validityScores[col.column_name] || 0;
-      const completenessScore = col.completeness / 100;
-      // Accuracy is approximated as combination of validity and completeness
-      accuracyScores[col.column_name] = (validityScore * 0.7 + completenessScore * 0.3);
-    }
-    const avgAccuracy = Object.values(accuracyScores).reduce((a, b) => a + b, 0) / Object.keys(accuracyScores).length;
+    // 4. ACCURACY - HONEST: Cannot be computed without ground-truth reference data
     dimensionScores.push({
       dimension: "accuracy",
-      score: Math.round(avgAccuracy * 100) / 100,
-      computed: true,
-      weight: 0.15,
-      details: accuracyScores,
+      score: null,
+      computed: false,
+      reason: "Requires ground-truth reference data for comparison",
+      weight: 0,
+      details: {},
     });
 
-    // 5. TIMELINESS - Check datetime columns for recency
+    // 5. TIMELINESS - Only computable if datetime columns exist
     const dateColumns = columnProfiles.filter(c => c.dtype === 'datetime');
-    let timelinessScore = 1.0; // Default to fresh if no date columns
     const timelinessDetails: Record<string, number> = {};
     
     if (dateColumns.length > 0) {
@@ -402,34 +425,45 @@ serve(async (req) => {
         if (col.max_value) {
           try {
             const maxDate = new Date(String(col.max_value));
+            if (isNaN(maxDate.getTime())) {
+              console.warn(`[DQ Profile] Skipping timeliness for ${col.column_name}: invalid date`);
+              continue; // Skip instead of fabricating 0.8
+            }
             const daysSinceUpdate = (Date.now() - maxDate.getTime()) / (1000 * 60 * 60 * 24);
-            // Score based on recency: <1 day = 1.0, <7 days = 0.9, <30 days = 0.7, else 0.5
-            const colScore = daysSinceUpdate < 1 ? 1.0 : 
-                            daysSinceUpdate < 7 ? 0.9 : 
-                            daysSinceUpdate < 30 ? 0.7 : 0.5;
-            timelinessDetails[col.column_name] = colScore;
+            // Linear decay: 100% at 0 days, 0% at 365 days
+            const colScore = Math.max(0, 1 - (daysSinceUpdate / 365));
+            timelinessDetails[col.column_name] = Math.round(colScore * 100) / 100;
           } catch {
-            timelinessDetails[col.column_name] = 0.8; // Default if date parsing fails
+            console.warn(`[DQ Profile] Skipping timeliness for ${col.column_name}: parse error`);
+            continue; // Skip column entirely
           }
         }
       }
-      if (Object.keys(timelinessDetails).length > 0) {
-        timelinessScore = Object.values(timelinessDetails).reduce((a, b) => a + b, 0) / Object.keys(timelinessDetails).length;
-      }
     }
+    
+    const hasTimelinessData = Object.keys(timelinessDetails).length > 0;
+    const timelinessScore = hasTimelinessData
+      ? Object.values(timelinessDetails).reduce((a, b) => a + b, 0) / Object.keys(timelinessDetails).length
+      : null;
+    
     dimensionScores.push({
       dimension: "timeliness",
-      score: Math.round(timelinessScore * 100) / 100,
-      computed: true,
-      weight: 0.10,
+      score: timelinessScore !== null ? Math.round(timelinessScore * 100) / 100 : null,
+      computed: hasTimelinessData,
+      reason: hasTimelinessData ? undefined : "No datetime columns found in dataset",
+      weight: hasTimelinessData ? 0.10 : 0,
       details: timelinessDetails,
     });
 
-    // 6. CONSISTENCY - Check for consistent patterns within columns
+    // 6. CONSISTENCY - Real computation, no artificial floor
     const consistencyScores: Record<string, number> = {};
     for (const col of columnProfiles) {
-      // High uniqueness ratio indicates less consistency (more variation)
-      // But for IDs, high uniqueness is expected (good consistency)
+      const nonNullCount = rowCount - col.null_count;
+      if (nonNullCount === 0) {
+        consistencyScores[col.column_name] = 0;
+        continue;
+      }
+      
       const isLikelyId = col.column_name.toLowerCase().includes('id') || 
                          col.column_name.toLowerCase().includes('key') ||
                          col.uniqueness > 95;
@@ -438,14 +472,14 @@ serve(async (req) => {
         // For IDs, consistency = high uniqueness is good
         consistencyScores[col.column_name] = col.uniqueness / 100;
       } else {
-        // For non-IDs, consistency based on having expected patterns
-        // Lower uniqueness suggests more consistent/standardized values
-        const patternScore = col.distinct_count > 1 ? 
-          Math.min(1, col.distinct_count / (rowCount * 0.1)) : 1;
-        consistencyScores[col.column_name] = Math.max(0.5, 1 - (patternScore * 0.5));
+        // For categorical/non-ID columns: 1 - (distinct / total)
+        // Higher = more consistent (fewer distinct values relative to total)
+        consistencyScores[col.column_name] = Math.max(0, 1 - (col.distinct_count / nonNullCount));
       }
     }
-    const avgConsistency = Object.values(consistencyScores).reduce((a, b) => a + b, 0) / Object.keys(consistencyScores).length;
+    const avgConsistency = Object.keys(consistencyScores).length > 0
+      ? Object.values(consistencyScores).reduce((a, b) => a + b, 0) / Object.keys(consistencyScores).length
+      : 0;
     dimensionScores.push({
       dimension: "consistency",
       score: Math.round(avgConsistency * 100) / 100,

@@ -338,7 +338,7 @@ serve(async (req) => {
 
     const verdict = determineVerdict(metrics.overall);
     const timestamp = new Date().toISOString();
-    const evidenceHash = generateEvidenceHash(metrics, timestamp);
+    const evidenceHash = await generateEvidenceHash(metrics, timestamp);
 
     // Get user from auth header
     const authHeader = req.headers.get('Authorization');
