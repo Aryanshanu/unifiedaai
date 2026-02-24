@@ -49,6 +49,7 @@ const nodeColors: Record<string, string> = {
   decision: "bg-cyan-500/20 border-cyan-500/50 text-cyan-400",
   outcome: "bg-emerald-500/20 border-emerald-500/50 text-emerald-400",
   policy: "bg-pink-500/20 border-pink-500/50 text-pink-400",
+  semantic_definition: "bg-teal-500/20 border-teal-500/50 text-teal-400",
 };
 
 // Entity type filter options
