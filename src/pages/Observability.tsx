@@ -18,6 +18,7 @@ import { formatDistanceToNow } from "date-fns";
 import { RealtimeChatDemo } from "@/components/observability/RealtimeChatDemo";
 import { RAIAssistant } from "@/components/assistant/RAIAssistant";
 import { DriftDetector } from "@/components/observability/DriftDetector";
+import { DriftAlertsTable } from "@/components/semantic/DriftAlertsTable";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
