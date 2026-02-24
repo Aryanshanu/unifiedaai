@@ -134,12 +134,7 @@ export default function Incidents() {
     setShowArchiveDialog(false);
   };
 
-  const handleQuickResolveAll = () => {
-    const openCritical = filteredIncidents.filter(i => i.status === 'open' && i.severity === 'critical');
-    if (openCritical.length > 0) {
-      bulkResolve.mutate(openCritical.map(i => i.id));
-    }
-  };
+  // Removed dangerous bulk resolve all critical - should be done individually
 
   const handleRunLifecycleCheck = async () => {
     setRunningLifecycle(true);
