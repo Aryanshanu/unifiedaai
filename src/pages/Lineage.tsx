@@ -63,6 +63,7 @@ const ENTITY_TYPE_OPTIONS = [
   { value: 'decision', label: 'Decision' },
   { value: 'risk', label: 'Risk' },
   { value: 'deployment', label: 'Deployment' },
+  { value: 'semantic_definition', label: 'Semantic Definition' },
 ];
 
 // Improved layout algorithm - 420px spacing with 5-pass collision detection
