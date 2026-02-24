@@ -225,12 +225,7 @@ serve(async (req) => {
     const apiToken = model.system?.api_token_encrypted || model.huggingface_api_token;
     const modelName = model.system?.model_name || model.huggingface_model_id || model.name;
 
-    if (!endpoint) {
-      return new Response(
-        JSON.stringify({ error: "No endpoint configured" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // endpoint is read for logging only; all calls go through Lovable AI Gateway
 
     console.log(`[eval-hallucination] Running evaluation on endpoint: ${endpoint}`);
 
