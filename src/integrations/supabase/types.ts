@@ -2432,6 +2432,104 @@ export type Database = {
           },
         ]
       }
+      feature_registry: {
+        Row: {
+          computation_sql: string | null
+          created_at: string
+          created_by: string | null
+          data_type: string
+          definition_hash: string | null
+          description: string | null
+          display_name: string
+          grain: string
+          id: string
+          name: string
+          owner: string | null
+          quality_score: number | null
+          refresh_cadence: string | null
+          source_system: string | null
+          status: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          computation_sql?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_type?: string
+          definition_hash?: string | null
+          description?: string | null
+          display_name: string
+          grain?: string
+          id?: string
+          name: string
+          owner?: string | null
+          quality_score?: number | null
+          refresh_cadence?: string | null
+          source_system?: string | null
+          status?: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          computation_sql?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_type?: string
+          definition_hash?: string | null
+          description?: string | null
+          display_name?: string
+          grain?: string
+          id?: string
+          name?: string
+          owner?: string | null
+          quality_score?: number | null
+          refresh_cadence?: string | null
+          source_system?: string | null
+          status?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
+      }
+      feature_values: {
+        Row: {
+          computed_at: string
+          entity_id: string
+          feature_id: string
+          id: string
+          source_hash: string | null
+          value: Json
+          version: number
+        }
+        Insert: {
+          computed_at?: string
+          entity_id: string
+          feature_id: string
+          id?: string
+          source_hash?: string | null
+          value: Json
+          version?: number
+        }
+        Update: {
+          computed_at?: string
+          entity_id?: string
+          feature_id?: string
+          id?: string
+          source_hash?: string | null
+          value?: Json
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feature_values_feature_id_fkey"
+            columns: ["feature_id"]
+            isOneToOne: false
+            referencedRelation: "feature_registry"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       function_metrics: {
         Row: {
           cold_start_count: number | null
