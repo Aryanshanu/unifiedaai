@@ -46,6 +46,8 @@ const Governance = lazy(() => import("./pages/Governance"));
 const Evaluation = lazy(() => import("./pages/Evaluation"));
 const DecisionLedger = lazy(() => import("./pages/DecisionLedger"));
 const AuditCenter = lazy(() => import("./pages/AuditCenter"));
+const GovernanceFramework = lazy(() => import("./pages/GovernanceFramework"));
+const SemanticLayerHub = lazy(() => import("./pages/SemanticLayerHub"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -130,6 +132,8 @@ const App = () => (
                 {/* Audit */}
                 {/* Audit */}
                 <Route path="/audit-center" element={<ProtectedRoute><AuditCenter /></ProtectedRoute>} />
+                <Route path="/governance-framework" element={<ProtectedRoute><GovernanceFramework /></ProtectedRoute>} />
+                <Route path="/semantic-hub" element={<ProtectedRoute><SemanticLayerHub /></ProtectedRoute>} />
                 {/* Catch-all */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

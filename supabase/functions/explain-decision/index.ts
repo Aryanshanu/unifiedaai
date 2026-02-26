@@ -25,29 +25,62 @@ interface FeatureInfluence {
  * Simulates SHAP-like feature importance calculation
  * In production, this would call a real ML explainability service
  */
-function computeFeatureImportance(featureData: Record<string, unknown>): FeatureInfluence[] {
-  const influences: FeatureInfluence[] = [];
+async function computeFeatureImportance(
+  featureData: Record<string, unknown>,
+  decisionValue: string,
+  modelName: string
+): Promise<FeatureInfluence[]> {
+  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+  
+  if (lovableKey && Object.keys(featureData).length > 0) {
+    try {
+      const prompt = `Analyze these input features for an AI decision and compute realistic feature importance scores.
+
+Decision outcome: ${decisionValue}
+Model: ${modelName}
+Input features: ${JSON.stringify(featureData)}
+
+Return ONLY a JSON array of objects with: {"feature": string, "value": the_value, "contribution": number_0_to_1, "direction": "positive"|"negative"|"neutral"}
+- Contributions must sum to 1.0
+- Base importance on logical reasoning about which features most influence this decision type
+- Return valid JSON array only, no markdown.`;
+
+      const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            { role: "system", content: "You are a feature importance analysis engine. Return valid JSON only." },
+            { role: "user", content: prompt },
+          ],
+          temperature: 0.2,
+          max_tokens: 600,
+        }),
+      });
+
+      if (resp.ok) {
+        const result = await resp.json();
+        const content = result.choices?.[0]?.message?.content || "";
+        const jsonMatch = content.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          return JSON.parse(jsonMatch[0]) as FeatureInfluence[];
+        }
+      }
+    } catch (e) {
+      console.error("AI feature importance error:", e);
+    }
+  }
+
+  // Deterministic fallback (no Math.random) — equal distribution
   const features = Object.entries(featureData);
-  
-  // Simulate importance scores (in production, use actual SHAP values)
-  const totalFeatures = features.length;
-  let remainingWeight = 1.0;
-  
-  features.forEach(([feature, value], index) => {
-    const isLast = index === totalFeatures - 1;
-    const contribution = isLast ? remainingWeight : Math.random() * remainingWeight * 0.5;
-    remainingWeight -= contribution;
-    
-    influences.push({
-      feature,
-      value,
-      contribution: Number(contribution.toFixed(4)),
-      direction: contribution > 0.1 ? "positive" : contribution < -0.1 ? "negative" : "neutral",
-    });
-  });
-  
-  // Sort by absolute contribution
-  return influences.sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution));
+  const equalWeight = features.length > 0 ? 1.0 / features.length : 0;
+  return features.map(([feature, value]) => ({
+    feature,
+    value,
+    contribution: Number(equalWeight.toFixed(4)),
+    direction: "neutral" as const,
+  }));
 }
 
 /**
@@ -224,14 +257,14 @@ serve(async (req) => {
     let naturalLanguage: string | null = null;
     
     if (Object.keys(features).length > 0) {
-      featureInfluences = computeFeatureImportance(features);
+      const modelName = (decision.models as any)?.name || "AI Model";
+      featureInfluences = await computeFeatureImportance(features, decision.decision_value, modelName);
       
       if (explanationType === "counterfactual") {
         counterfactual = generateCounterfactual(features, decision.decision_value);
       }
       
       if (generateNaturalLanguage) {
-        const modelName = (decision.models as any)?.name || "AI Model";
         naturalLanguage = await generateNaturalLanguageExplanation(
           decision.decision_value,
           featureInfluences,
