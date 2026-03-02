@@ -220,7 +220,7 @@ function VendorTab() {
 
 export default function Discovery() {
   return (
-    <MainLayout>
+    <MainLayout title="AI Discovery & Inventory">
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">AI Discovery & Inventory</h1>

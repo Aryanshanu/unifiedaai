@@ -218,7 +218,7 @@ function AgentTracesTab() {
 
 export default function AgentGovernance() {
   return (
-    <MainLayout>
+    <MainLayout title="Agent Governance">
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Agent Governance</h1>

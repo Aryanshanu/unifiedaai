@@ -58,7 +58,7 @@ export default function ContinuousEvaluation() {
   };
 
   return (
-    <MainLayout>
+    <MainLayout title="Continuous Evaluation">
       <div className="space-y-6">
         <div className="flex justify-between items-start">
           <div>
