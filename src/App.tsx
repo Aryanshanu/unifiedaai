@@ -48,6 +48,10 @@ const DecisionLedger = lazy(() => import("./pages/DecisionLedger"));
 const AuditCenter = lazy(() => import("./pages/AuditCenter"));
 const GovernanceFramework = lazy(() => import("./pages/GovernanceFramework"));
 const SemanticLayerHub = lazy(() => import("./pages/SemanticLayerHub"));
+const Discovery = lazy(() => import("./pages/Discovery"));
+const AgentGovernance = lazy(() => import("./pages/AgentGovernance"));
+const ContinuousEvaluation = lazy(() => import("./pages/ContinuousEvaluation"));
+const EnvironmentManagement = lazy(() => import("./pages/EnvironmentManagement"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -134,7 +138,10 @@ const App = () => (
                 <Route path="/audit-center" element={<ProtectedRoute><AuditCenter /></ProtectedRoute>} />
                 <Route path="/governance-framework" element={<ProtectedRoute><GovernanceFramework /></ProtectedRoute>} />
                 <Route path="/semantic-hub" element={<ProtectedRoute><SemanticLayerHub /></ProtectedRoute>} />
-                {/* Catch-all */}
+                <Route path="/discovery" element={<ProtectedRoute><Discovery /></ProtectedRoute>} />
+                <Route path="/agents" element={<ProtectedRoute><AgentGovernance /></ProtectedRoute>} />
+                <Route path="/continuous-evaluation" element={<ProtectedRoute><ContinuousEvaluation /></ProtectedRoute>} />
+                <Route path="/environments" element={<ProtectedRoute><EnvironmentManagement /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
               </Suspense>

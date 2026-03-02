@@ -65,6 +65,199 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_traces: {
+        Row: {
+          agent_id: string
+          created_at: string | null
+          duration_ms: number | null
+          id: string
+          input_data: Json | null
+          metadata: Json | null
+          output_data: Json | null
+          parent_trace_id: string | null
+          policy_violations: string[] | null
+          status: string | null
+          trace_type: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string | null
+          duration_ms?: number | null
+          id?: string
+          input_data?: Json | null
+          metadata?: Json | null
+          output_data?: Json | null
+          parent_trace_id?: string | null
+          policy_violations?: string[] | null
+          status?: string | null
+          trace_type?: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string | null
+          duration_ms?: number | null
+          id?: string
+          input_data?: Json | null
+          metadata?: Json | null
+          output_data?: Json | null
+          parent_trace_id?: string | null
+          policy_violations?: string[] | null
+          status?: string | null
+          trace_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_traces_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_traces_parent_trace_id_fkey"
+            columns: ["parent_trace_id"]
+            isOneToOne: false
+            referencedRelation: "agent_traces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agents: {
+        Row: {
+          agent_type: string
+          capabilities: string[] | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          environment: string | null
+          id: string
+          last_activity_at: string | null
+          max_autonomy_level: string | null
+          model_id: string | null
+          name: string
+          permissions: string[] | null
+          risk_tier: string | null
+          status: string | null
+          system_id: string | null
+          trace_enabled: boolean | null
+          updated_at: string | null
+          vendor_id: string | null
+        }
+        Insert: {
+          agent_type?: string
+          capabilities?: string[] | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          environment?: string | null
+          id?: string
+          last_activity_at?: string | null
+          max_autonomy_level?: string | null
+          model_id?: string | null
+          name: string
+          permissions?: string[] | null
+          risk_tier?: string | null
+          status?: string | null
+          system_id?: string | null
+          trace_enabled?: boolean | null
+          updated_at?: string | null
+          vendor_id?: string | null
+        }
+        Update: {
+          agent_type?: string
+          capabilities?: string[] | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          environment?: string | null
+          id?: string
+          last_activity_at?: string | null
+          max_autonomy_level?: string | null
+          model_id?: string | null
+          name?: string
+          permissions?: string[] | null
+          risk_tier?: string | null
+          status?: string | null
+          system_id?: string | null
+          trace_enabled?: boolean | null
+          updated_at?: string | null
+          vendor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agents_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "models"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agents_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agents_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "ai_vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_vendors: {
+        Row: {
+          ai_services: Json | null
+          compliance_certifications: string[] | null
+          contact_email: string | null
+          contract_status: string | null
+          created_at: string | null
+          created_by: string | null
+          data_processing_location: string | null
+          id: string
+          last_assessment_at: string | null
+          name: string
+          risk_tier: string | null
+          updated_at: string | null
+          vendor_type: string
+          website: string | null
+        }
+        Insert: {
+          ai_services?: Json | null
+          compliance_certifications?: string[] | null
+          contact_email?: string | null
+          contract_status?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          data_processing_location?: string | null
+          id?: string
+          last_assessment_at?: string | null
+          name: string
+          risk_tier?: string | null
+          updated_at?: string | null
+          vendor_type?: string
+          website?: string | null
+        }
+        Update: {
+          ai_services?: Json | null
+          compliance_certifications?: string[] | null
+          contact_email?: string | null
+          contract_status?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          data_processing_location?: string | null
+          id?: string
+          last_assessment_at?: string | null
+          name?: string
+          risk_tier?: string | null
+          updated_at?: string | null
+          vendor_type?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
       app_errors: {
         Row: {
           component_name: string | null
@@ -1745,6 +1938,48 @@ export type Database = {
           },
         ]
       }
+      deployment_environments: {
+        Row: {
+          approval_required: boolean | null
+          auto_monitoring: boolean | null
+          created_at: string | null
+          description: string | null
+          display_name: string
+          id: string
+          is_production: boolean | null
+          max_risk_tier: string | null
+          name: string
+          notification_channels: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          approval_required?: boolean | null
+          auto_monitoring?: boolean | null
+          created_at?: string | null
+          description?: string | null
+          display_name: string
+          id?: string
+          is_production?: boolean | null
+          max_risk_tier?: string | null
+          name: string
+          notification_channels?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          approval_required?: boolean | null
+          auto_monitoring?: boolean | null
+          created_at?: string | null
+          description?: string | null
+          display_name?: string
+          id?: string
+          is_production?: boolean | null
+          max_risk_tier?: string | null
+          name?: string
+          notification_channels?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       dq_dashboard_assets: {
         Row: {
           dataset_id: string
@@ -2344,6 +2579,65 @@ export type Database = {
             columns: ["suite_id"]
             isOneToOne: false
             referencedRelation: "evaluation_suites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      evaluation_schedules: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          cron_expression: string
+          engine_types: string[]
+          failure_count: number | null
+          id: string
+          is_active: boolean | null
+          last_run_at: string | null
+          model_id: string
+          name: string
+          next_run_at: string | null
+          notification_emails: string[] | null
+          run_count: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          cron_expression?: string
+          engine_types?: string[]
+          failure_count?: number | null
+          id?: string
+          is_active?: boolean | null
+          last_run_at?: string | null
+          model_id: string
+          name: string
+          next_run_at?: string | null
+          notification_emails?: string[] | null
+          run_count?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          cron_expression?: string
+          engine_types?: string[]
+          failure_count?: number | null
+          id?: string
+          is_active?: boolean | null
+          last_run_at?: string | null
+          model_id?: string
+          name?: string
+          next_run_at?: string | null
+          notification_emails?: string[] | null
+          run_count?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evaluation_schedules_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "models"
             referencedColumns: ["id"]
           },
         ]
@@ -4782,6 +5076,72 @@ export type Database = {
             columns: ["definition_id"]
             isOneToOne: false
             referencedRelation: "semantic_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shadow_ai_discoveries: {
+        Row: {
+          ai_system_name: string
+          ai_system_type: string
+          created_at: string | null
+          department: string | null
+          discovered_by: string | null
+          discovery_method: string
+          evidence: Json | null
+          id: string
+          registered_as_agent_id: string | null
+          registered_as_system_id: string | null
+          remediation_notes: string | null
+          resolved_at: string | null
+          risk_assessment: string | null
+          status: string | null
+        }
+        Insert: {
+          ai_system_name: string
+          ai_system_type?: string
+          created_at?: string | null
+          department?: string | null
+          discovered_by?: string | null
+          discovery_method?: string
+          evidence?: Json | null
+          id?: string
+          registered_as_agent_id?: string | null
+          registered_as_system_id?: string | null
+          remediation_notes?: string | null
+          resolved_at?: string | null
+          risk_assessment?: string | null
+          status?: string | null
+        }
+        Update: {
+          ai_system_name?: string
+          ai_system_type?: string
+          created_at?: string | null
+          department?: string | null
+          discovered_by?: string | null
+          discovery_method?: string
+          evidence?: Json | null
+          id?: string
+          registered_as_agent_id?: string | null
+          registered_as_system_id?: string | null
+          remediation_notes?: string | null
+          resolved_at?: string | null
+          risk_assessment?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shadow_ai_discoveries_registered_as_agent_id_fkey"
+            columns: ["registered_as_agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shadow_ai_discoveries_registered_as_system_id_fkey"
+            columns: ["registered_as_system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
             referencedColumns: ["id"]
           },
         ]
