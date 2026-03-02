@@ -26,13 +26,21 @@ import {
   ScanSearch,
   FlaskConical,
   Target,
+  Bot,
+  Building2,
+  Clock,
+  Server,
 } from "lucide-react";
 
 const navItems = [
   { path: "/", icon: LayoutDashboard, label: "Command Center" },
+  { divider: true, label: "DISCOVER" },
+  { path: "/discovery", icon: ScanSearch, label: "AI Discovery" },
+  { path: "/agents", icon: Bot, label: "Agent Governance" },
   { divider: true, label: "Monitor" },
   { path: "/observability", icon: Activity, label: "Observability" },
   { path: "/alerts", icon: Bell, label: "Alerts" },
+  { path: "/continuous-evaluation", icon: Clock, label: "Continuous Eval" },
   { divider: true, label: "Govern" },
   { path: "/governance/approvals", icon: Shield, label: "Approvals", showBadge: true },
   { path: "/decision-ledger", icon: FileText, label: "Decision Ledger" },
@@ -59,6 +67,7 @@ const navItems = [
   { divider: true, label: "Configure" },
   { path: "/projects", icon: FolderOpen, label: "Projects" },
   { path: "/models", icon: Database, label: "Models" },
+  { path: "/environments", icon: Server, label: "Environments" },
   { path: "/settings", icon: Settings, label: "Settings" },
   { path: "/docs", icon: BookOpen, label: "Documentation" },
 ];
