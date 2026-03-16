@@ -28,6 +28,7 @@ export function useIncidents(filters?: { status?: IncidentStatus; severity?: Sev
 
   return useQuery({
     queryKey: ['incidents', filters],
+    staleTime: 120_000,
     queryFn: async () => {
       const start = (page - 1) * pageSize;
       let query = supabase
