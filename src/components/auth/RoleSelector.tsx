@@ -1,41 +1,9 @@
-import { Crown, ShieldCheck, Wrench, FileCheck, LucideIcon, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import type { AppRole } from '@/lib/role-personas';
+import { PERSONA_MAP, type AppRole } from '@/lib/role-personas';
 
-interface RoleOption {
-  role: AppRole;
-  displayName: string;
-  description: string;
-  icon: LucideIcon;
-}
-
-const roleOptions: RoleOption[] = [
-  {
-    role: 'admin',
-    displayName: 'Chief Data & AI Officer',
-    description: 'Executive oversight of AI governance, risk posture, and compliance',
-    icon: Crown,
-  },
-  {
-    role: 'reviewer',
-    displayName: 'AI Steward',
-    description: 'Policy enforcement, HITL reviews, incident management, and approvals',
-    icon: ShieldCheck,
-  },
-  {
-    role: 'analyst',
-    displayName: 'Agent Engineer',
-    description: 'Model evaluation, security testing, data quality, and technical config',
-    icon: Wrench,
-  },
-  {
-    role: 'viewer',
-    displayName: 'Compliance Auditor',
-    description: 'Audit trails, attestations, regulatory reports, and evidence packages',
-    icon: FileCheck,
-  },
-];
+const roleOptions = Object.values(PERSONA_MAP);
 
 interface RoleSelectorProps {
   onSelect: (role: AppRole) => void;
@@ -52,35 +20,35 @@ export function RoleSelector({ onSelect, loadingRole }: RoleSelectorProps) {
 
       <div className="grid grid-cols-1 gap-3">
         {roleOptions.map((option) => {
-          const Icon = option.icon;
           const isLoading = loadingRole === option.role;
           const isDisabled = loadingRole !== null;
           return (
             <Card
               key={option.role}
               className={cn(
-                'cursor-pointer transition-all duration-200 hover:border-primary/50 hover:bg-primary/5',
-                isLoading && 'border-primary ring-1 ring-primary/30 bg-primary/5',
+                'cursor-pointer transition-all duration-200 border-l-4 hover:scale-[1.02] hover:shadow-lg',
+                option.borderColor,
+                isLoading && 'ring-2 ring-primary/40 shadow-lg scale-[1.02]',
                 isDisabled && !isLoading && 'opacity-50 cursor-not-allowed'
               )}
               onClick={() => !isDisabled && onSelect(option.role)}
             >
               <CardContent className="pt-4 pb-4 flex items-center gap-4">
                 <div className={cn(
-                  'p-2.5 rounded-lg shrink-0',
-                  isLoading ? 'bg-primary/15' : 'bg-muted'
+                  'w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-gradient-to-br text-2xl shadow-md',
+                  option.avatarGradient
                 )}>
                   {isLoading ? (
-                    <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                    <Loader2 className="w-6 h-6 text-white animate-spin" />
                   ) : (
-                    <Icon className="w-5 h-5 text-muted-foreground" />
+                    <span role="img" aria-label={option.displayName}>{option.avatarEmoji}</span>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className={cn('text-sm font-semibold', isLoading && 'text-primary')}>
                     {option.displayName}
                   </p>
-                  <p className="text-xs text-muted-foreground line-clamp-1">{option.description}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{option.description}</p>
                 </div>
               </CardContent>
             </Card>

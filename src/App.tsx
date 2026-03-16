@@ -125,11 +125,7 @@ const App = () => (
                 {/* Data Governance */}
                 <Route path="/data-contracts" element={<ProtectedRoute><DataContracts /></ProtectedRoute>} />
                 {/* Settings & Docs */}
-                <Route path="/settings" element={
-                  <ProtectedRoute requiredRoles={['admin']}>
-                    <Settings />
-                  </ProtectedRoute>
-                } />
+                <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 <Route path="/docs" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
                 {/* Audit */}
                 {/* Audit */}
