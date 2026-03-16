@@ -32,7 +32,6 @@ import { formatDistanceToNow, format } from "date-fns";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 const severityColors = {
