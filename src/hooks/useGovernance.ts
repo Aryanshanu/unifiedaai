@@ -111,6 +111,7 @@ export function useControlAssessments(modelId?: string) {
 export function useComplianceStats() {
   return useQuery({
     queryKey: ['compliance', 'stats'],
+    staleTime: 120_000,
     queryFn: async () => {
       const [frameworksRes, assessmentsRes, attestationsRes] = await Promise.all([
         supabase.from('control_frameworks').select('id, name, total_controls'),
