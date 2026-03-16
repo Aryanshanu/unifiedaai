@@ -82,31 +82,6 @@ export default function Incidents() {
     }
   }, [searchParams]);
 
-  // Realtime subscription for incidents
-  useEffect(() => {
-    const channel = supabase
-      .channel('incidents-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'incidents' },
-        (payload) => {
-          setRealtimeCount(prev => prev + 1);
-          queryClient.invalidateQueries({ queryKey: ['incidents'] });
-          
-          if (payload.eventType === 'INSERT') {
-            const newIncident = payload.new as any;
-            toast.warning(`New Incident: ${newIncident.title}`, {
-              description: `Severity: ${newIncident.severity}`,
-            });
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
 
   const filteredIncidents = incidents?.data?.filter(incident => {
     const matchesStatus = statusFilter === 'all' || incident.status === statusFilter;
