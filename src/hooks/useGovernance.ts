@@ -91,6 +91,7 @@ export function useControls(frameworkId?: string) {
 export function useControlAssessments(modelId?: string) {
   return useQuery({
     queryKey: ['control-assessments', modelId],
+    staleTime: 120_000,
     queryFn: async () => {
       let query = supabase
         .from('control_assessments')
