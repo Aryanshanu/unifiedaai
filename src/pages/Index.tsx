@@ -54,6 +54,7 @@ export default function Index() {
   // Data Quality metrics
   const { data: dqMetrics } = useQuery({
     queryKey: ['dq-summary'],
+    staleTime: 120_000,
     queryFn: async () => {
       const [datasetsRes, incidentsRes, contractsRes, violationsRes] = await Promise.all([
         supabase.from('datasets').select('*', { count: 'exact', head: true }),
