@@ -59,12 +59,10 @@ export default function Incidents() {
   const [searchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState("");
-  const [realtimeCount, setRealtimeCount] = useState(0);
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [showArchiveDialog, setShowArchiveDialog] = useState(false);
   const [archiveOptions, setArchiveOptions] = useState({ olderThanDays: 30, status: 'open' as const });
   const [runningLifecycle, setRunningLifecycle] = useState(false);
-  const queryClient = useQueryClient();
   
   const { data: incidents, isLoading } = useIncidents();
   const { data: stats } = useIncidentStats();
