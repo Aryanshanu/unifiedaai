@@ -101,45 +101,6 @@ export default function Approvals() {
     queryClient.invalidateQueries({ queryKey: ["system-approvals"] });
   };
 
-  // Realtime subscription for approvals
-  useEffect(() => {
-    const channel = supabase
-      .channel('approvals-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'system_approvals' },
-        (payload) => {
-          setRealtimeCount(prev => prev + 1);
-          queryClient.invalidateQueries({ queryKey: ['pending-approvals'] });
-          queryClient.invalidateQueries({ queryKey: ['system-approvals'] });
-          queryClient.invalidateQueries({ queryKey: ['unsafe-deployments'] });
-          
-          if (payload.eventType === 'INSERT') {
-            toast.info('New approval request received');
-          } else if (payload.eventType === 'UPDATE') {
-            const approval = payload.new as any;
-            if (approval.status === 'approved') {
-              toast.success('System approved');
-            } else if (approval.status === 'rejected') {
-              toast.error('System rejected');
-            }
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'systems' },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['pending-approvals'] });
-          queryClient.invalidateQueries({ queryKey: ['unsafe-deployments'] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
 
   return (
     <MainLayout 
