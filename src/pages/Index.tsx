@@ -161,9 +161,6 @@ export default function Index() {
         subtitle={persona.displayName}
         headerActions={
           <div className="flex items-center gap-3">
-            {realtimeActive && (
-              <span className="w-2 h-2 rounded-full bg-success animate-pulse" title="Realtime active" />
-            )}
             <HealthIndicator 
               status={status} 
               lastUpdated={lastUpdated} 
@@ -184,10 +181,7 @@ export default function Index() {
       subtitle="Chief Data & AI Officer — Executive View"
       headerActions={
         <div className="flex items-center gap-3">
-          {realtimeActive && (
-            <span className="w-2 h-2 rounded-full bg-success animate-pulse" title="Realtime active" />
-          )}
-          <HealthIndicator 
+          <HealthIndicator
             status={status} 
             lastUpdated={lastUpdated} 
             onRetry={handleRetry}

@@ -23,45 +23,6 @@ export default function HITL() {
   const [selectedReview, setSelectedReview] = useState<ReviewItem | null>(null);
   const [decisionDialogOpen, setDecisionDialogOpen] = useState(false);
 
-  // Supabase Realtime subscriptions for HITL
-  useEffect(() => {
-    const channel = supabase
-      .channel('hitl-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'review_queue' },
-        (payload) => {
-          refetch();
-          refetchStats();
-          if (payload.eventType === 'INSERT') {
-            const newReview = payload.new as any;
-            toast.warning("New Review Queued", {
-              description: newReview?.title || "Review requires attention",
-              action: {
-                label: "View",
-                onClick: () => {}
-              }
-            });
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'decisions' },
-        () => {
-          refetch();
-          refetchStats();
-          toast.success("Decision Recorded", {
-            description: "Audit trail updated"
-          });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [refetch, refetchStats]);
 
   const pendingReviews = reviews?.filter(r => r.status === 'pending' || r.status === 'in_progress') || [];
   

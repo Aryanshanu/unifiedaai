@@ -147,6 +147,7 @@ export function useComplianceStats() {
 export function useAttestations() {
   return useQuery({
     queryKey: ['attestations'],
+    staleTime: 120_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('attestations')

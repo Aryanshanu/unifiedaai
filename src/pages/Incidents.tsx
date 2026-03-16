@@ -144,15 +144,6 @@ export default function Incidents() {
             )}
             Run Lifecycle Check
           </Button>
-          <Badge variant="outline" className="bg-success/10 text-success border-success/30 gap-1.5">
-            <Radio className="w-3 h-3 animate-pulse" />
-            Realtime Active
-          </Badge>
-          {realtimeCount > 0 && (
-            <Badge variant="secondary" className="text-xs">
-              {realtimeCount} updates
-            </Badge>
-          )}
         </div>
       }
     >

@@ -67,6 +67,7 @@ export function usePendingApprovals() {
 export function useLatestApproval(systemId: string) {
   return useQuery({
     queryKey: ["system-approvals", systemId, "latest"],
+    staleTime: 120_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("system_approvals")

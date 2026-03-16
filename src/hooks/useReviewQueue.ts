@@ -56,6 +56,7 @@ export function useReviewQueue(filters?: { status?: ReviewStatus }) {
 export function useReviewQueueStats() {
   return useQuery({
     queryKey: ['review-queue', 'stats'],
+    staleTime: 120_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('review_queue')

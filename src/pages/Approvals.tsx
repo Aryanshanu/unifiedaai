@@ -106,19 +106,7 @@ export default function Approvals() {
     <MainLayout 
       title="Governance & Approvals" 
       subtitle="Manage system deployment approvals and compliance"
-      headerActions={
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className="bg-success/10 text-success border-success/30 gap-1.5">
-            <Radio className="w-3 h-3 animate-pulse" />
-            Realtime Active
-          </Badge>
-          {realtimeCount > 0 && (
-            <Badge variant="secondary" className="text-xs">
-              {realtimeCount} updates
-            </Badge>
-          )}
-        </div>
-      }
+      headerActions={undefined}
     >
       <div className="space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>

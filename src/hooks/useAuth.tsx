@@ -82,8 +82,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (initialSessionHandled) return;
       
-      // If session is invalid (bad JWT), clear it
-      if (error || (!session && error)) {
+      // If session is invalid (bad JWT, missing sub claim), clear it
+      if (error) {
+        console.warn('Invalid session detected, clearing:', error.message);
+        supabase.auth.signOut().catch(() => {});
+        setSession(null);
+        setUser(null);
+        setRoles([]);
+        setLoading(false);
+        return;
+      }
+      
+      // Check for stale anonymous tokens without sub claim
+      if (session?.user && !session.user.id) {
+        console.warn('Session missing user id, clearing stale token');
         supabase.auth.signOut().catch(() => {});
         setSession(null);
         setUser(null);

@@ -136,15 +136,6 @@ export default function Governance() {
       subtitle="Regulatory controls, risk assessments, and compliance attestations"
       headerActions={
         <div className="flex items-center gap-3">
-          <Badge variant="outline" className="bg-success/10 text-success border-success/30 gap-1.5">
-            <Radio className="w-3 h-3 animate-pulse" />
-            Realtime
-          </Badge>
-          {realtimeCount > 0 && (
-            <Badge variant="secondary" className="text-xs">
-              {realtimeCount} updates
-            </Badge>
-          )}
           <EnforcementBadge level="advisory" />
           <HealthIndicator 
             status={status} 

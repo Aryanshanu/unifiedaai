@@ -54,6 +54,7 @@ export function useIncidents(filters?: { status?: IncidentStatus; severity?: Sev
 export function useIncidentStats() {
   return useQuery({
     queryKey: ['incidents', 'stats'],
+    staleTime: 120_000,
     queryFn: async () => {
       // Use count queries instead of fetching all rows
       const [totalRes, openRes, criticalRes, highRes] = await Promise.all([
