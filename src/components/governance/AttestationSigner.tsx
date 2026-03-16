@@ -39,7 +39,7 @@ export function AttestationSigner({ modelId, modelName, frameworkId }: Attestati
   const [title, setTitle] = useState(`RAI Compliance Attestation - ${modelName}`);
   const [notes, setNotes] = useState("");
   const [signedAttestation, setSignedAttestation] = useState<SignedAttestation | null>(null);
-  const { user, profile } = useAuth();
+  const { user, persona } = useAuth();
 
   const generateHash = (content: string): string => {
     // Demonstration SHA-256 hash - NOT cryptographically secure
