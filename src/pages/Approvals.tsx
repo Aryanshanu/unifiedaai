@@ -20,7 +20,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export default function Approvals() {
-  const [realtimeCount, setRealtimeCount] = useState(0);
   const [activeTab, setActiveTab] = useState("systems");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
