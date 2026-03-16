@@ -107,39 +107,6 @@ export default function Index() {
     refetchInterval: 60000,
   });
   
-  // Realtime subscription - reduced to 2 critical tables only
-  useEffect(() => {
-    const channel = supabase
-      .channel('dashboard-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'incidents' },
-        (payload) => {
-          setRealtimeActive(true);
-          queryClient.invalidateQueries({ queryKey: ['platform-metrics'] });
-          queryClient.invalidateQueries({ queryKey: ['recent-incidents'] });
-          
-          if (payload.eventType === 'INSERT') {
-            const incident = payload.new as any;
-            toast.warning(`New Incident: ${incident.title}`, {
-              description: `Severity: ${incident.severity}`,
-            });
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'review_queue' },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['platform-metrics'] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
 
   const handleRetry = () => {
     refetchModels();
