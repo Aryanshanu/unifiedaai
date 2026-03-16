@@ -14,6 +14,7 @@ export default function DecisionLedger() {
 
   const { data: decisions, isLoading } = useQuery({
     queryKey: ["decision-ledger", searchQuery],
+    staleTime: 120_000,
     queryFn: async () => {
       let query = supabase
         .from("decision_ledger")
