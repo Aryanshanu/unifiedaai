@@ -61,6 +61,7 @@ function TimelineTab() {
 
   const { data: events, isLoading } = useQuery({
     queryKey: ['audit-timeline', tableFilter],
+    staleTime: 120_000,
     queryFn: async () => {
       let query = supabase
         .from('admin_audit_log')
