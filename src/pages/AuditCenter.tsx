@@ -188,6 +188,7 @@ function TimelineTab() {
 function DataGovernanceTab() {
   const { data: qualityRuns, isLoading: loadingQuality } = useQuery({
     queryKey: ['audit-quality-runs'],
+    staleTime: 120_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('dataset_quality_runs')
