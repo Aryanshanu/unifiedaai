@@ -19,6 +19,7 @@ export interface SystemApproval {
 export function useSystemApprovals(systemId?: string) {
   return useQuery({
     queryKey: ["system-approvals", systemId],
+    staleTime: 120_000,
     queryFn: async () => {
       let query = supabase
         .from("system_approvals")
@@ -39,6 +40,7 @@ export function useSystemApprovals(systemId?: string) {
 export function usePendingApprovals() {
   return useQuery({
     queryKey: ["system-approvals", "pending"],
+    staleTime: 120_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("system_approvals")
@@ -65,6 +67,7 @@ export function usePendingApprovals() {
 export function useLatestApproval(systemId: string) {
   return useQuery({
     queryKey: ["system-approvals", systemId, "latest"],
+    staleTime: 120_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("system_approvals")

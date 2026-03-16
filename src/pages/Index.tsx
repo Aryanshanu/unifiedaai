@@ -26,9 +26,8 @@ import {
 import { useNavigate } from "react-router-dom";
 import { HealthIndicator } from "@/components/shared/HealthIndicator";
 import { useDataHealth } from "@/components/shared/DataHealthWrapper";
-import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { ExecutiveDashboard } from "@/components/dashboard/ExecutiveDashboard";
@@ -38,8 +37,6 @@ import { ComplianceDashboard } from "@/components/dashboard/ComplianceDashboard"
 
 export default function Index() {
   const { persona } = useAuth();
-  const [realtimeActive, setRealtimeActive] = useState(false);
-  const queryClient = useQueryClient();
   const { data: models, isLoading: modelsLoading, isError: modelsError, refetch: refetchModels } = useModels();
   const { data: metrics, isLoading: metricsLoading, isError: metricsError, refetch: refetchMetrics } = usePlatformMetrics();
   const navigate = useNavigate();
@@ -110,39 +107,6 @@ export default function Index() {
     refetchInterval: 60000,
   });
   
-  // Realtime subscription - reduced to 2 critical tables only
-  useEffect(() => {
-    const channel = supabase
-      .channel('dashboard-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'incidents' },
-        (payload) => {
-          setRealtimeActive(true);
-          queryClient.invalidateQueries({ queryKey: ['platform-metrics'] });
-          queryClient.invalidateQueries({ queryKey: ['recent-incidents'] });
-          
-          if (payload.eventType === 'INSERT') {
-            const incident = payload.new as any;
-            toast.warning(`New Incident: ${incident.title}`, {
-              description: `Severity: ${incident.severity}`,
-            });
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'review_queue' },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['platform-metrics'] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
 
   const handleRetry = () => {
     refetchModels();
@@ -197,9 +161,6 @@ export default function Index() {
         subtitle={persona.displayName}
         headerActions={
           <div className="flex items-center gap-3">
-            {realtimeActive && (
-              <span className="w-2 h-2 rounded-full bg-success animate-pulse" title="Realtime active" />
-            )}
             <HealthIndicator 
               status={status} 
               lastUpdated={lastUpdated} 
@@ -220,10 +181,7 @@ export default function Index() {
       subtitle="Chief Data & AI Officer — Executive View"
       headerActions={
         <div className="flex items-center gap-3">
-          {realtimeActive && (
-            <span className="w-2 h-2 rounded-full bg-success animate-pulse" title="Realtime active" />
-          )}
-          <HealthIndicator 
+          <HealthIndicator
             status={status} 
             lastUpdated={lastUpdated} 
             onRetry={handleRetry}

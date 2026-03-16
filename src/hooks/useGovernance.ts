@@ -54,6 +54,7 @@ export interface Attestation {
 export function useControlFrameworks() {
   return useQuery({
     queryKey: ['control-frameworks'],
+    staleTime: 120_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('control_frameworks')
@@ -69,6 +70,7 @@ export function useControlFrameworks() {
 export function useControls(frameworkId?: string) {
   return useQuery({
     queryKey: ['controls', frameworkId],
+    staleTime: 120_000,
     queryFn: async () => {
       let query = supabase
         .from('controls')
@@ -89,6 +91,7 @@ export function useControls(frameworkId?: string) {
 export function useControlAssessments(modelId?: string) {
   return useQuery({
     queryKey: ['control-assessments', modelId],
+    staleTime: 120_000,
     queryFn: async () => {
       let query = supabase
         .from('control_assessments')
@@ -108,6 +111,7 @@ export function useControlAssessments(modelId?: string) {
 export function useComplianceStats() {
   return useQuery({
     queryKey: ['compliance', 'stats'],
+    staleTime: 120_000,
     queryFn: async () => {
       const [frameworksRes, assessmentsRes, attestationsRes] = await Promise.all([
         supabase.from('control_frameworks').select('id, name, total_controls'),
@@ -143,6 +147,7 @@ export function useComplianceStats() {
 export function useAttestations() {
   return useQuery({
     queryKey: ['attestations'],
+    staleTime: 120_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('attestations')

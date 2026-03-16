@@ -35,6 +35,7 @@ export interface Decision {
 export function useReviewQueue(filters?: { status?: ReviewStatus }) {
   return useQuery({
     queryKey: ['review-queue', filters],
+    staleTime: 120_000,
     queryFn: async () => {
       let query = supabase
         .from('review_queue')
@@ -55,6 +56,7 @@ export function useReviewQueue(filters?: { status?: ReviewStatus }) {
 export function useReviewQueueStats() {
   return useQuery({
     queryKey: ['review-queue', 'stats'],
+    staleTime: 120_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('review_queue')

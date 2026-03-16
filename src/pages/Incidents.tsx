@@ -32,8 +32,8 @@ import { formatDistanceToNow, format } from "date-fns";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 const severityColors = {
   critical: "bg-danger/10 text-danger border-danger/30",
@@ -60,7 +60,6 @@ export default function Incidents() {
   const [searchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState("");
-  const [realtimeCount, setRealtimeCount] = useState(0);
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [showArchiveDialog, setShowArchiveDialog] = useState(false);
   const [archiveOptions, setArchiveOptions] = useState({ olderThanDays: 30, status: 'open' as const });
@@ -85,31 +84,6 @@ export default function Incidents() {
     }
   }, [searchParams]);
 
-  // Realtime subscription for incidents
-  useEffect(() => {
-    const channel = supabase
-      .channel('incidents-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'incidents' },
-        (payload) => {
-          setRealtimeCount(prev => prev + 1);
-          queryClient.invalidateQueries({ queryKey: ['incidents'] });
-          
-          if (payload.eventType === 'INSERT') {
-            const newIncident = payload.new as any;
-            toast.warning(`New Incident: ${newIncident.title}`, {
-              description: `Severity: ${newIncident.severity}`,
-            });
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
 
   const filteredIncidents = incidents?.data?.filter(incident => {
     const matchesStatus = statusFilter === 'all' || incident.status === statusFilter;
@@ -172,15 +146,6 @@ export default function Incidents() {
             )}
             Run Lifecycle Check
           </Button>
-          <Badge variant="outline" className="bg-success/10 text-success border-success/30 gap-1.5">
-            <Radio className="w-3 h-3 animate-pulse" />
-            Realtime Active
-          </Badge>
-          {realtimeCount > 0 && (
-            <Badge variant="secondary" className="text-xs">
-              {realtimeCount} updates
-            </Badge>
-          )}
         </div>
       }
     >

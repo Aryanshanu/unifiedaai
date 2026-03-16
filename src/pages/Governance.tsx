@@ -12,15 +12,10 @@ import { formatDistanceToNow } from "date-fns";
 import { HealthIndicator } from "@/components/shared/HealthIndicator";
 import { useDataHealth } from "@/components/shared/DataHealthWrapper";
 import { EnforcementBadge } from "@/components/shared/EnforcementBadge";
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 
 export default function Governance() {
-  const [realtimeCount, setRealtimeCount] = useState(0);
-  const queryClient = useQueryClient();
   const { data: frameworks, isLoading: frameworksLoading, isError: frameworksError, refetch: refetchFrameworks } = useControlFrameworks();
   const { data: controls, isLoading: controlsLoading, refetch: refetchControls } = useControls();
   const { data: complianceStats, isLoading: statsLoading, refetch: refetchStats } = useComplianceStats();
@@ -134,43 +129,6 @@ export default function Governance() {
     }
   };
 
-  // Realtime subscription for governance data
-  useEffect(() => {
-    const channel = supabase
-      .channel('governance-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'attestations' },
-        (payload) => {
-          setRealtimeCount(prev => prev + 1);
-          queryClient.invalidateQueries({ queryKey: ['attestations'] });
-          queryClient.invalidateQueries({ queryKey: ['compliance', 'stats'] });
-          
-          if (payload.eventType === 'INSERT') {
-            toast.info('New attestation created');
-          } else if (payload.eventType === 'UPDATE') {
-            const att = payload.new as any;
-            if (att.status === 'approved') {
-              toast.success('Attestation signed');
-            }
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'control_assessments' },
-        () => {
-          setRealtimeCount(prev => prev + 1);
-          queryClient.invalidateQueries({ queryKey: ['control-assessments'] });
-          queryClient.invalidateQueries({ queryKey: ['compliance', 'stats'] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
 
   return (
     <MainLayout 
@@ -178,15 +136,6 @@ export default function Governance() {
       subtitle="Regulatory controls, risk assessments, and compliance attestations"
       headerActions={
         <div className="flex items-center gap-3">
-          <Badge variant="outline" className="bg-success/10 text-success border-success/30 gap-1.5">
-            <Radio className="w-3 h-3 animate-pulse" />
-            Realtime
-          </Badge>
-          {realtimeCount > 0 && (
-            <Badge variant="secondary" className="text-xs">
-              {realtimeCount} updates
-            </Badge>
-          )}
           <EnforcementBadge level="advisory" />
           <HealthIndicator 
             status={status} 
