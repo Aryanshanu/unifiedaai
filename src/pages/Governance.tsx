@@ -16,8 +16,6 @@ import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 
 export default function Governance() {
-  const [realtimeCount, setRealtimeCount] = useState(0);
-  const queryClient = useQueryClient();
   const { data: frameworks, isLoading: frameworksLoading, isError: frameworksError, refetch: refetchFrameworks } = useControlFrameworks();
   const { data: controls, isLoading: controlsLoading, refetch: refetchControls } = useControls();
   const { data: complianceStats, isLoading: statsLoading, refetch: refetchStats } = useComplianceStats();
