@@ -98,11 +98,7 @@ const App = () => (
                 <Route path="/models/:id" element={<ProtectedRoute><ModelDetail /></ProtectedRoute>} />
                 {/* Governance */}
                 <Route path="/governance" element={<ProtectedRoute><Governance /></ProtectedRoute>} />
-                <Route path="/governance/approvals" element={
-                  <ProtectedRoute requiredRoles={['admin', 'reviewer']}>
-                    <Approvals />
-                  </ProtectedRoute>
-                } />
+                <Route path="/governance/approvals" element={<ProtectedRoute><Approvals /></ProtectedRoute>} />
                 <Route path="/hitl" element={<ProtectedRoute><HITL /></ProtectedRoute>} />
                 <Route path="/decision-ledger" element={<ProtectedRoute><DecisionLedger /></ProtectedRoute>} />
                 <Route path="/incidents" element={<ProtectedRoute><Incidents /></ProtectedRoute>} />
