@@ -4739,6 +4739,42 @@ export type Database = {
         }
         Relationships: []
       }
+      role_personas: {
+        Row: {
+          created_at: string
+          dashboard_layout: string
+          default_route: string
+          description: string | null
+          display_name: string
+          icon: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          sidebar_sections: Json
+        }
+        Insert: {
+          created_at?: string
+          dashboard_layout?: string
+          default_route?: string
+          description?: string | null
+          display_name: string
+          icon?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          sidebar_sections?: Json
+        }
+        Update: {
+          created_at?: string
+          dashboard_layout?: string
+          default_route?: string
+          description?: string | null
+          display_name?: string
+          icon?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          sidebar_sections?: Json
+        }
+        Relationships: []
+      }
       security_findings: {
         Row: {
           business_impact_score: number | null
