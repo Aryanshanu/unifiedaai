@@ -5,26 +5,16 @@ import { getPersona, type PersonaConfig, type AppRole } from '@/lib/role-persona
 
 export type { AppRole };
 
-interface Profile {
-  id: string;
-  user_id: string;
-  full_name: string | null;
-  avatar_url: string | null;
-}
-
 interface AuthContextType {
   user: User | null;
   session: Session | null;
-  profile: Profile | null;
   roles: AppRole[];
   persona: PersonaConfig;
   loading: boolean;
-  signUp: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signInAsRole: (role: AppRole) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   hasRole: (role: AppRole) => boolean;
   hasAnyRole: (roles: AppRole[]) => boolean;
-  assignRole: (role: AppRole) => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,21 +22,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const fetchUserProfile = async (userId: string) => {
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-    
-    if (profileData) {
-      setProfile(profileData);
-    }
-  };
 
   const fetchUserRoles = async (userId: string) => {
     const { data: rolesData } = await supabase
@@ -70,11 +47,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         if (session?.user) {
           setTimeout(() => {
-            fetchUserProfile(session.user.id);
             fetchUserRoles(session.user.id);
           }, 0);
         } else {
-          setProfile(null);
           setRoles([]);
         }
         
@@ -89,7 +64,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        fetchUserProfile(session.user.id);
         fetchUserRoles(session.user.id);
       }
       
@@ -99,53 +73,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = useCallback(async (email: string, password: string, fullName?: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          full_name: fullName,
-        },
-      },
-    });
-    
-    return { error };
-  }, []);
+  const signInAsRole = useCallback(async (role: AppRole) => {
+    try {
+      // Sign out any existing session first
+      await supabase.auth.signOut();
 
-  const signIn = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    
-    return { error };
+      // Create anonymous session
+      const { error: anonError } = await supabase.auth.signInAnonymously();
+      if (anonError) return { error: anonError };
+
+      // Assign role via SECURITY DEFINER function
+      const { error: roleError } = await supabase.rpc('assign_own_role', { p_role: role });
+      if (roleError) return { error: roleError };
+
+      // Update local roles state immediately
+      setRoles([role]);
+
+      return { error: null };
+    } catch (err) {
+      return { error: err instanceof Error ? err : new Error(String(err)) };
+    }
   }, []);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
-    setProfile(null);
     setRoles([]);
   }, []);
-
-  const assignRole = useCallback(async (role: AppRole) => {
-    if (!user) return { error: new Error('Not authenticated') };
-    
-    const { error } = await supabase
-      .from('user_roles')
-      .insert({ user_id: user.id, role });
-    
-    if (!error) {
-      setRoles(prev => [...prev, role]);
-    }
-    
-    return { error };
-  }, [user]);
 
   const hasRole = useCallback((role: AppRole) => roles.includes(role), [roles]);
   
@@ -160,17 +115,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo(() => ({
     user,
     session,
-    profile,
     roles,
     persona,
     loading,
-    signUp,
-    signIn,
+    signInAsRole,
     signOut,
     hasRole,
     hasAnyRole,
-    assignRole,
-  }), [user, session, profile, roles, persona, loading, signUp, signIn, signOut, hasRole, hasAnyRole, assignRole]);
+  }), [user, session, roles, persona, loading, signInAsRole, signOut, hasRole, hasAnyRole]);
 
   return (
     <AuthContext.Provider value={value}>
