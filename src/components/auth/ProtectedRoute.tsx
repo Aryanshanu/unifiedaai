@@ -1,19 +1,20 @@
 import { useState, useEffect } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { Loader2, ShieldAlert, RefreshCw } from 'lucide-react';
+import { Loader2, ShieldAlert, RefreshCw, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { canAccessRoute } from '@/lib/role-personas';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRoles?: ('admin' | 'reviewer' | 'analyst' | 'viewer')[];
 }
 
 const AUTH_TIMEOUT_MS = 10_000;
 
-export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps) {
-  const { user, roles, loading } = useAuth();
+export function ProtectedRoute({ children }: ProtectedRouteProps) {
+  const { user, roles, persona, loading } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
@@ -58,22 +59,23 @@ export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps)
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
-  if (requiredRoles && requiredRoles.length > 0) {
-    const hasRequiredRole = requiredRoles.some(role => roles.includes(role));
-    if (!hasRequiredRole) {
-      return (
-        <div className="min-h-screen bg-background flex items-center justify-center">
-          <div className="text-center max-w-md">
-            <ShieldAlert className="w-10 h-10 text-destructive mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-foreground mb-2">Access Denied</h1>
-            <p className="text-muted-foreground mb-1">You don't have permission to access this page.</p>
-            <p className="text-xs text-muted-foreground">
-              Required role(s): <span className="font-mono text-foreground">{requiredRoles.join(', ')}</span>
-            </p>
-          </div>
+  // Auto route-level access control
+  if (roles.length > 0 && !canAccessRoute(roles, location.pathname)) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <ShieldAlert className="w-10 h-10 text-destructive mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-foreground mb-2">Access Denied</h1>
+          <p className="text-muted-foreground mb-4">
+            Your role ({persona.displayName}) does not have access to this page.
+          </p>
+          <Button onClick={() => navigate(persona.defaultRoute)} className="gap-2">
+            <ArrowLeft className="w-4 h-4" />
+            Go to Dashboard
+          </Button>
         </div>
-      );
-    }
+      </div>
+    );
   }
 
   return <>{children}</>;

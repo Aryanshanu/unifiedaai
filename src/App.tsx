@@ -57,9 +57,11 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 60_000,
+      staleTime: 120_000,
+      gcTime: 300_000,
       retry: 2,
       refetchOnWindowFocus: false,
+      refetchOnMount: false,
     },
   },
 });
@@ -96,11 +98,7 @@ const App = () => (
                 <Route path="/models/:id" element={<ProtectedRoute><ModelDetail /></ProtectedRoute>} />
                 {/* Governance */}
                 <Route path="/governance" element={<ProtectedRoute><Governance /></ProtectedRoute>} />
-                <Route path="/governance/approvals" element={
-                  <ProtectedRoute requiredRoles={['admin', 'reviewer']}>
-                    <Approvals />
-                  </ProtectedRoute>
-                } />
+                <Route path="/governance/approvals" element={<ProtectedRoute><Approvals /></ProtectedRoute>} />
                 <Route path="/hitl" element={<ProtectedRoute><HITL /></ProtectedRoute>} />
                 <Route path="/decision-ledger" element={<ProtectedRoute><DecisionLedger /></ProtectedRoute>} />
                 <Route path="/incidents" element={<ProtectedRoute><Incidents /></ProtectedRoute>} />
@@ -127,11 +125,7 @@ const App = () => (
                 {/* Data Governance */}
                 <Route path="/data-contracts" element={<ProtectedRoute><DataContracts /></ProtectedRoute>} />
                 {/* Settings & Docs */}
-                <Route path="/settings" element={
-                  <ProtectedRoute requiredRoles={['admin']}>
-                    <Settings />
-                  </ProtectedRoute>
-                } />
+                <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 <Route path="/docs" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
                 {/* Audit */}
                 {/* Audit */}
