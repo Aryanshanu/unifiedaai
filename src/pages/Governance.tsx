@@ -129,43 +129,6 @@ export default function Governance() {
     }
   };
 
-  // Realtime subscription for governance data
-  useEffect(() => {
-    const channel = supabase
-      .channel('governance-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'attestations' },
-        (payload) => {
-          setRealtimeCount(prev => prev + 1);
-          queryClient.invalidateQueries({ queryKey: ['attestations'] });
-          queryClient.invalidateQueries({ queryKey: ['compliance', 'stats'] });
-          
-          if (payload.eventType === 'INSERT') {
-            toast.info('New attestation created');
-          } else if (payload.eventType === 'UPDATE') {
-            const att = payload.new as any;
-            if (att.status === 'approved') {
-              toast.success('Attestation signed');
-            }
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'control_assessments' },
-        () => {
-          setRealtimeCount(prev => prev + 1);
-          queryClient.invalidateQueries({ queryKey: ['control-assessments'] });
-          queryClient.invalidateQueries({ queryKey: ['compliance', 'stats'] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
 
   return (
     <MainLayout 
