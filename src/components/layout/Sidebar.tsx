@@ -1,38 +1,28 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { FractalBadge } from "@/components/fractal";
 import { usePlatformMetrics } from "@/hooks/usePlatformMetrics";
 import { useSidebarContext } from "@/contexts/SidebarContext";
+import { useAuth } from "@/hooks/useAuth";
+import { canAccessSection } from "@/lib/role-personas";
 import {
-  LayoutDashboard,
-  FolderOpen,
-  Database,
-  Scale,
-  AlertCircle,
-  ShieldAlert,
-  Lock,
-  Eye,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
-  Shield,
-  GitBranch,
-  Users,
-  Activity,
-  FileText,
-  Bell,
-  BookOpen,
-  ScanSearch,
-  FlaskConical,
-  Target,
-  Bot,
-  Building2,
-  Clock,
-  Server,
+  LayoutDashboard, FolderOpen, Database, Scale, AlertCircle,
+  ShieldAlert, Lock, Eye, Settings, ChevronLeft, ChevronRight,
+  Shield, GitBranch, Users, Activity, FileText, Bell, BookOpen,
+  ScanSearch, FlaskConical, Target, Bot, Clock, Server,
 } from "lucide-react";
 
-const navItems = [
+interface NavItem {
+  path?: string;
+  icon?: any;
+  label: string;
+  divider?: boolean;
+  showBadge?: boolean;
+}
+
+const navItems: NavItem[] = [
   { path: "/", icon: LayoutDashboard, label: "Command Center" },
   { divider: true, label: "DISCOVER" },
   { path: "/discovery", icon: ScanSearch, label: "AI Discovery" },
@@ -76,8 +66,13 @@ export function Sidebar() {
   const { collapsed, toggle } = useSidebarContext();
   const location = useLocation();
   const { data: metrics } = usePlatformMetrics();
+  const { persona } = useAuth();
 
   const pendingApprovals = metrics?.pendingApprovals || 0;
+  const sidebarSections = persona.sidebarSections;
+
+  // Filter nav items based on role's allowed sections
+  const filteredItems = filterNavItems(navItems, sidebarSections);
 
   return (
     <aside
@@ -94,7 +89,10 @@ export function Sidebar() {
           </div>
           {!collapsed && (
             <div className="flex flex-col">
-              <span className="font-bold text-foreground text-base tracking-tight">Fractal Unified Autonomous Governance</span>
+              <span className="font-bold text-foreground text-sm tracking-tight">Fractal RAI-OS</span>
+              <Badge variant="outline" className="text-[9px] h-4 px-1.5 w-fit capitalize mt-0.5">
+                {persona.displayName}
+              </Badge>
             </div>
           )}
         </div>
@@ -102,7 +100,7 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-2 px-2">
-        {navItems.map((item, index) => {
+        {filteredItems.map((item, index) => {
           if (item.divider) {
             if (collapsed) return null;
             return (
@@ -168,4 +166,33 @@ export function Sidebar() {
       </div>
     </aside>
   );
+}
+
+/** Filters nav items to only show sections allowed for the role */
+function filterNavItems(items: NavItem[], sidebarSections: string[]): NavItem[] {
+  if (sidebarSections.includes('all')) return items;
+
+  const result: NavItem[] = [];
+  let currentSectionAllowed = true; // Command Center (before first divider) is always allowed
+
+  for (const item of items) {
+    if (item.divider) {
+      currentSectionAllowed = canAccessSection(sidebarSections, item.label);
+      if (currentSectionAllowed) {
+        result.push(item);
+      }
+    } else if (item.path === '/') {
+      // Command Center always visible
+      result.push(item);
+    } else if (item.path === '/docs') {
+      // Docs visible for roles with 'docs' section
+      if (sidebarSections.includes('docs') || currentSectionAllowed) {
+        result.push(item);
+      }
+    } else if (currentSectionAllowed) {
+      result.push(item);
+    }
+  }
+
+  return result;
 }

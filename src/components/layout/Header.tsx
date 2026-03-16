@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useState } from "react";
-import { Bell, Search, User, LogOut, Settings, Shield, Sun, Moon } from "lucide-react";
+import { Bell, Search, User, LogOut, Settings, Sun, Moon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,7 @@ interface HeaderProps {
 }
 
 export function Header({ title, subtitle, headerActions }: HeaderProps) {
-  const { user, profile, roles, signOut } = useAuth();
+  const { user, profile, persona, signOut } = useAuth();
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
 
@@ -38,7 +38,7 @@ export function Header({ title, subtitle, headerActions }: HeaderProps) {
     : user?.email?.[0].toUpperCase() || 'U';
 
   const displayName = profile?.full_name || user?.email || 'User';
-  const primaryRole = roles[0] || 'viewer';
+  const PersonaIcon = persona.icon;
 
   // Real notification count from open incidents and drift alerts
   const [notificationCount, setNotificationCount] = useState(0);
@@ -54,7 +54,6 @@ export function Header({ title, subtitle, headerActions }: HeaderProps) {
     
     fetchCounts();
     
-    // Subscribe to realtime changes
     const channel = supabase
       .channel('header-notifications')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'incidents' }, fetchCounts)
@@ -74,7 +73,6 @@ export function Header({ title, subtitle, headerActions }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-4">
-        {/* Header Actions (Health Indicators, etc.) */}
         {headerActions}
         
         {/* Search */}
@@ -118,8 +116,8 @@ export function Header({ title, subtitle, headerActions }: HeaderProps) {
               </Avatar>
               <div className="hidden md:flex flex-col items-start">
                 <span className="text-xs font-medium text-foreground">{displayName}</span>
-                <Badge variant="outline" className="h-4 px-1 text-[10px] capitalize">
-                  {primaryRole}
+                <Badge variant="outline" className="h-4 px-1 text-[10px]">
+                  {persona.displayName}
                 </Badge>
               </div>
             </Button>
@@ -137,11 +135,8 @@ export function Header({ title, subtitle, headerActions }: HeaderProps) {
               Settings
             </DropdownMenuItem>
             <DropdownMenuItem>
-              <Shield className="mr-2 h-4 w-4" />
-              <span>Roles: </span>
-              <span className="ml-1 capitalize text-muted-foreground">
-                {roles.join(', ') || 'viewer'}
-              </span>
+              <PersonaIcon className="mr-2 h-4 w-4" />
+              <span className="text-muted-foreground">{persona.displayName}</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">

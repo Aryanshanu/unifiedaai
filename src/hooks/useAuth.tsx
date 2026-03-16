@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { getPersona, type PersonaConfig, type AppRole } from '@/lib/role-personas';
 
-type AppRole = 'admin' | 'reviewer' | 'analyst' | 'viewer';
+export type { AppRole };
 
 interface Profile {
   id: string;
@@ -16,12 +17,14 @@ interface AuthContextType {
   session: Session | null;
   profile: Profile | null;
   roles: AppRole[];
+  persona: PersonaConfig;
   loading: boolean;
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   hasRole: (role: AppRole) => boolean;
   hasAnyRole: (roles: AppRole[]) => boolean;
+  assignRole: (role: AppRole) => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -59,14 +62,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let initialSessionHandled = false;
 
-    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         initialSessionHandled = true;
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Defer Supabase calls with setTimeout to prevent deadlock
         if (session?.user) {
           setTimeout(() => {
             fetchUserProfile(session.user.id);
@@ -81,9 +82,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    // THEN check for existing session - only if listener hasn't fired yet
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (initialSessionHandled) return; // Listener already handled it
+      if (initialSessionHandled) return;
       
       setSession(session);
       setUser(session?.user ?? null);
@@ -133,23 +133,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRoles([]);
   }, []);
 
+  const assignRole = useCallback(async (role: AppRole) => {
+    if (!user) return { error: new Error('Not authenticated') };
+    
+    const { error } = await supabase
+      .from('user_roles')
+      .insert({ user_id: user.id, role });
+    
+    if (!error) {
+      setRoles(prev => [...prev, role]);
+    }
+    
+    return { error };
+  }, [user]);
+
   const hasRole = useCallback((role: AppRole) => roles.includes(role), [roles]);
   
   const hasAnyRole = useCallback((checkRoles: AppRole[]) => 
     checkRoles.some(role => roles.includes(role)), [roles]);
+
+  const persona = useMemo(() => {
+    const primaryRole = roles[0] || 'viewer';
+    return getPersona(primaryRole);
+  }, [roles]);
 
   const value = useMemo(() => ({
     user,
     session,
     profile,
     roles,
+    persona,
     loading,
     signUp,
     signIn,
     signOut,
     hasRole,
     hasAnyRole,
-  }), [user, session, profile, roles, loading, signUp, signIn, signOut, hasRole, hasAnyRole]);
+    assignRole,
+  }), [user, session, profile, roles, persona, loading, signUp, signIn, signOut, hasRole, hasAnyRole, assignRole]);
 
   return (
     <AuthContext.Provider value={value}>
