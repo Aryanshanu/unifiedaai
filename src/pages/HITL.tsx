@@ -12,6 +12,7 @@ import { ReviewDecisionDialog } from "@/components/hitl/ReviewDecisionDialog";
 import { SLACountdown } from "@/components/hitl/SLACountdown";
 import { BulkTriagePanel } from "@/components/hitl/BulkTriagePanel";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { EnforcementBadge } from "@/components/shared/EnforcementBadge";
 import { RiskIndicator } from "@/components/fractal";
 import { FRACTAL_RISK, normalizeRiskLevel } from "@/lib/fractal-theme";
