@@ -75,6 +75,7 @@ export default function Index() {
   // Semantic Layer metrics
   const { data: semanticMetrics } = useQuery({
     queryKey: ['semantic-summary'],
+    staleTime: 120_000,
     queryFn: async () => {
       const [activeRes, draftRes, deprecatedRes, driftRes] = await Promise.all([
         (supabase as any).from('semantic_definitions').select('*', { count: 'exact', head: true }).eq('status', 'active'),
