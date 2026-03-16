@@ -44,7 +44,7 @@ export function useSelfHealing<T>(
   });
 
   const abortControllerRef = useRef<AbortController | null>(null);
-  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearRetryTimeout = useCallback(() => {
     if (retryTimeoutRef.current) {
