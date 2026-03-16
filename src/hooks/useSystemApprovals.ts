@@ -40,6 +40,7 @@ export function useSystemApprovals(systemId?: string) {
 export function usePendingApprovals() {
   return useQuery({
     queryKey: ["system-approvals", "pending"],
+    staleTime: 120_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("system_approvals")
