@@ -54,6 +54,7 @@ export interface Attestation {
 export function useControlFrameworks() {
   return useQuery({
     queryKey: ['control-frameworks'],
+    staleTime: 120_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('control_frameworks')
