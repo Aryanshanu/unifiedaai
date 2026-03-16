@@ -70,6 +70,7 @@ export function useControlFrameworks() {
 export function useControls(frameworkId?: string) {
   return useQuery({
     queryKey: ['controls', frameworkId],
+    staleTime: 120_000,
     queryFn: async () => {
       let query = supabase
         .from('controls')
