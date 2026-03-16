@@ -2,8 +2,6 @@ import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { FractalBadge } from "@/components/fractal";
-import { usePlatformMetrics } from "@/hooks/usePlatformMetrics";
 import { useSidebarContext } from "@/contexts/SidebarContext";
 import { useAuth } from "@/hooks/useAuth";
 import { canAccessSection } from "@/lib/role-personas";
@@ -19,7 +17,6 @@ interface NavItem {
   icon?: any;
   label: string;
   divider?: boolean;
-  showBadge?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -32,7 +29,7 @@ const navItems: NavItem[] = [
   { path: "/alerts", icon: Bell, label: "Alerts" },
   { path: "/continuous-evaluation", icon: Clock, label: "Continuous Eval" },
   { divider: true, label: "Govern" },
-  { path: "/governance/approvals", icon: Shield, label: "Approvals", showBadge: true },
+  { path: "/governance/approvals", icon: Shield, label: "Approvals" },
   { path: "/decision-ledger", icon: FileText, label: "Decision Ledger" },
   { path: "/governance-framework", icon: Shield, label: "Governance API" },
   { path: "/hitl", icon: Users, label: "HITL Console" },
@@ -65,10 +62,8 @@ const navItems: NavItem[] = [
 export function Sidebar() {
   const { collapsed, toggle } = useSidebarContext();
   const location = useLocation();
-  const { data: metrics } = usePlatformMetrics();
   const { persona } = useAuth();
 
-  const pendingApprovals = metrics?.pendingApprovals || 0;
   const sidebarSections = persona.sidebarSections;
 
   // Filter nav items based on role's allowed sections
@@ -130,15 +125,6 @@ export function Sidebar() {
                 <Icon className={cn("w-4 h-4 shrink-0", isActive && "text-primary")} />
                 {!collapsed && (
                   <span className="truncate flex-1">{item.label}</span>
-                )}
-                {!collapsed && item.showBadge && pendingApprovals > 0 && (
-                  <FractalBadge 
-                    type="risk" 
-                    severity="high" 
-                    label={pendingApprovals.toString()} 
-                    size="sm"
-                    showIcon={false}
-                  />
                 )}
               </div>
             </NavLink>

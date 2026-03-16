@@ -97,6 +97,7 @@ export default function Index() {
   // Recent incidents - keep but with longer interval
   const { data: recentIncidents } = useQuery({
     queryKey: ['recent-incidents'],
+    staleTime: 120_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('incidents')
