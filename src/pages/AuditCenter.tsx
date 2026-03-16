@@ -405,6 +405,7 @@ function ModelGovernanceTab() {
 function IncidentsTab() {
   const { data: incidents, isLoading } = useQuery({
     queryKey: ['audit-incidents'],
+    staleTime: 120_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('incidents')
