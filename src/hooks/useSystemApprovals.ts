@@ -19,6 +19,7 @@ export interface SystemApproval {
 export function useSystemApprovals(systemId?: string) {
   return useQuery({
     queryKey: ["system-approvals", systemId],
+    staleTime: 120_000,
     queryFn: async () => {
       let query = supabase
         .from("system_approvals")
