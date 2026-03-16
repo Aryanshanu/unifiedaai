@@ -11,7 +11,6 @@ import { formatDistanceToNow } from "date-fns";
 import { ReviewDecisionDialog } from "@/components/hitl/ReviewDecisionDialog";
 import { SLACountdown } from "@/components/hitl/SLACountdown";
 import { BulkTriagePanel } from "@/components/hitl/BulkTriagePanel";
-import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { EnforcementBadge } from "@/components/shared/EnforcementBadge";
 import { RiskIndicator } from "@/components/fractal";
