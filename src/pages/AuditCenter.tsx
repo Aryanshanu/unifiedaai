@@ -202,6 +202,7 @@ function DataGovernanceTab() {
 
   const { data: approvals, isLoading: loadingApprovals } = useQuery({
     queryKey: ['audit-dataset-approvals'],
+    staleTime: 120_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('datasets')
