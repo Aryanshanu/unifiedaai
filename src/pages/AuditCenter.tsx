@@ -61,6 +61,7 @@ function TimelineTab() {
 
   const { data: events, isLoading } = useQuery({
     queryKey: ['audit-timeline', tableFilter],
+    staleTime: 120_000,
     queryFn: async () => {
       let query = supabase
         .from('admin_audit_log')
@@ -187,6 +188,7 @@ function TimelineTab() {
 function DataGovernanceTab() {
   const { data: qualityRuns, isLoading: loadingQuality } = useQuery({
     queryKey: ['audit-quality-runs'],
+    staleTime: 120_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('dataset_quality_runs')
@@ -200,6 +202,7 @@ function DataGovernanceTab() {
 
   const { data: approvals, isLoading: loadingApprovals } = useQuery({
     queryKey: ['audit-dataset-approvals'],
+    staleTime: 120_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('datasets')
@@ -294,6 +297,7 @@ function DataGovernanceTab() {
 function ModelGovernanceTab() {
   const { data: models, isLoading } = useQuery({
     queryKey: ['audit-models'],
+    staleTime: 120_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('models')
@@ -307,6 +311,7 @@ function ModelGovernanceTab() {
 
   const { data: evaluations, isLoading: loadingEvals } = useQuery({
     queryKey: ['audit-evaluations'],
+    staleTime: 120_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('evaluation_runs')
@@ -400,6 +405,7 @@ function ModelGovernanceTab() {
 function IncidentsTab() {
   const { data: incidents, isLoading } = useQuery({
     queryKey: ['audit-incidents'],
+    staleTime: 120_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('incidents')

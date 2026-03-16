@@ -14,6 +14,7 @@ export default function DecisionLedger() {
 
   const { data: decisions, isLoading } = useQuery({
     queryKey: ["decision-ledger", searchQuery],
+    staleTime: 120_000,
     queryFn: async () => {
       let query = supabase
         .from("decision_ledger")
@@ -33,6 +34,7 @@ export default function DecisionLedger() {
 
   const { data: stats } = useQuery({
     queryKey: ["decision-stats"],
+    staleTime: 120_000,
     queryFn: async () => {
       const { count: total } = await supabase.from("decision_ledger").select("*", { count: "exact", head: true });
       const { count: today } = await supabase

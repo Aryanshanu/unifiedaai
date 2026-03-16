@@ -33,6 +33,7 @@ export default function Approvals() {
   // Get approved and rejected systems
   const { data: approvedSystems, isLoading: approvedLoading } = useQuery({
     queryKey: ["system-approvals", "approved"],
+    staleTime: 120_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("system_approvals")
@@ -58,6 +59,7 @@ export default function Approvals() {
 
   const { data: rejectedSystems, isLoading: rejectedLoading } = useQuery({
     queryKey: ["system-approvals", "rejected"],
+    staleTime: 120_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("system_approvals")

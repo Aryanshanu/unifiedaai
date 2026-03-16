@@ -69,6 +69,7 @@ export default function HITL() {
   // Query actual decisions table for Recent Decisions panel
   const { data: recentDecisionsData } = useQuery({
     queryKey: ['decisions', 'recent'],
+    staleTime: 120_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('decisions')

@@ -26,13 +26,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchUserRoles = async (userId: string) => {
-    const { data: rolesData } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId);
-    
-    if (rolesData) {
-      setRoles(rolesData.map(r => r.role as AppRole));
+    try {
+      const { data: rolesData, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId);
+      
+      if (error) {
+        console.warn('Failed to fetch roles:', error.message);
+        // Don't leave app broken - set empty roles so user can still navigate
+        setRoles([]);
+        return;
+      }
+      
+      if (rolesData) {
+        setRoles(rolesData.map(r => r.role as AppRole));
+      }
+    } catch (err) {
+      console.warn('Role fetch failed:', err);
+      setRoles([]);
     }
   };
 
@@ -42,6 +54,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         initialSessionHandled = true;
+        
+        // Handle token errors - clear stale session
+        if (event === 'TOKEN_REFRESHED' && !session) {
+          setSession(null);
+          setUser(null);
+          setRoles([]);
+          setLoading(false);
+          return;
+        }
+        
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -57,8 +79,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (initialSessionHandled) return;
+      
+      // If session is invalid (bad JWT), clear it
+      if (error || (!session && error)) {
+        supabase.auth.signOut().catch(() => {});
+        setSession(null);
+        setUser(null);
+        setRoles([]);
+        setLoading(false);
+        return;
+      }
       
       setSession(session);
       setUser(session?.user ?? null);
