@@ -5875,6 +5875,10 @@ export type Database = {
       }
     }
     Functions: {
+      assign_own_role: {
+        Args: { p_role: Database["public"]["Enums"]["app_role"] }
+        Returns: undefined
+      }
       can_manage_governance: { Args: never; Returns: boolean }
       cleanup_old_logs: { Args: never; Returns: undefined }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }

@@ -1,10 +1,7 @@
-import { Crown, ShieldCheck, Wrench, FileCheck, LucideIcon } from 'lucide-react';
+import { Crown, ShieldCheck, Wrench, FileCheck, LucideIcon, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
-
-type AppRole = 'admin' | 'reviewer' | 'analyst' | 'viewer';
+import type { AppRole } from '@/lib/role-personas';
 
 interface RoleOption {
   role: AppRole;
@@ -42,12 +39,10 @@ const roleOptions: RoleOption[] = [
 
 interface RoleSelectorProps {
   onSelect: (role: AppRole) => void;
-  isLoading?: boolean;
+  loadingRole?: AppRole | null;
 }
 
-export function RoleSelector({ onSelect, isLoading }: RoleSelectorProps) {
-  const [selected, setSelected] = useState<AppRole | null>(null);
-
+export function RoleSelector({ onSelect, loadingRole }: RoleSelectorProps) {
   return (
     <div className="space-y-4">
       <div className="text-center mb-2">
@@ -58,25 +53,31 @@ export function RoleSelector({ onSelect, isLoading }: RoleSelectorProps) {
       <div className="grid grid-cols-1 gap-3">
         {roleOptions.map((option) => {
           const Icon = option.icon;
-          const isActive = selected === option.role;
+          const isLoading = loadingRole === option.role;
+          const isDisabled = loadingRole !== null;
           return (
             <Card
               key={option.role}
               className={cn(
-                'cursor-pointer transition-all duration-200 hover:border-primary/50',
-                isActive && 'border-primary ring-1 ring-primary/30 bg-primary/5'
+                'cursor-pointer transition-all duration-200 hover:border-primary/50 hover:bg-primary/5',
+                isLoading && 'border-primary ring-1 ring-primary/30 bg-primary/5',
+                isDisabled && !isLoading && 'opacity-50 cursor-not-allowed'
               )}
-              onClick={() => setSelected(option.role)}
+              onClick={() => !isDisabled && onSelect(option.role)}
             >
               <CardContent className="pt-4 pb-4 flex items-center gap-4">
                 <div className={cn(
                   'p-2.5 rounded-lg shrink-0',
-                  isActive ? 'bg-primary/15' : 'bg-muted'
+                  isLoading ? 'bg-primary/15' : 'bg-muted'
                 )}>
-                  <Icon className={cn('w-5 h-5', isActive ? 'text-primary' : 'text-muted-foreground')} />
+                  {isLoading ? (
+                    <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                  ) : (
+                    <Icon className="w-5 h-5 text-muted-foreground" />
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={cn('text-sm font-semibold', isActive && 'text-primary')}>
+                  <p className={cn('text-sm font-semibold', isLoading && 'text-primary')}>
                     {option.displayName}
                   </p>
                   <p className="text-xs text-muted-foreground line-clamp-1">{option.description}</p>
@@ -86,14 +87,6 @@ export function RoleSelector({ onSelect, isLoading }: RoleSelectorProps) {
           );
         })}
       </div>
-
-      <Button
-        className="w-full bg-gradient-primary hover:opacity-90 text-primary-foreground"
-        disabled={!selected || isLoading}
-        onClick={() => selected && onSelect(selected)}
-      >
-        {isLoading ? 'Setting up...' : 'Continue'}
-      </Button>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useState } from "react";
-import { Bell, Search, User, LogOut, Settings, Sun, Moon } from "lucide-react";
+import { Bell, Search, Settings, Sun, Moon, ArrowLeftRight } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
@@ -24,21 +24,17 @@ interface HeaderProps {
 }
 
 export function Header({ title, subtitle, headerActions }: HeaderProps) {
-  const { user, profile, persona, signOut } = useAuth();
+  const { persona, signOut } = useAuth();
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
 
-  const handleSignOut = async () => {
+  const handleSwitchRole = async () => {
     await signOut();
     navigate('/auth');
   };
 
-  const initials = profile?.full_name
-    ? profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase()
-    : user?.email?.[0].toUpperCase() || 'U';
-
-  const displayName = profile?.full_name || user?.email || 'User';
   const PersonaIcon = persona.icon;
+  const initials = persona.displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
 
   // Real notification count from open incidents and drift alerts
   const [notificationCount, setNotificationCount] = useState(0);
@@ -109,15 +105,14 @@ export function Header({ title, subtitle, headerActions }: HeaderProps) {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="h-9 px-2 gap-2">
               <Avatar className="h-7 w-7">
-                <AvatarImage src={profile?.avatar_url || undefined} />
                 <AvatarFallback className="bg-primary/20 text-primary text-xs">
                   {initials}
                 </AvatarFallback>
               </Avatar>
               <div className="hidden md:flex flex-col items-start">
-                <span className="text-xs font-medium text-foreground">{displayName}</span>
+                <span className="text-xs font-medium text-foreground">{persona.displayName}</span>
                 <Badge variant="outline" className="h-4 px-1 text-[10px]">
-                  {persona.displayName}
+                  {persona.role}
                 </Badge>
               </div>
             </Button>
@@ -125,8 +120,8 @@ export function Header({ title, subtitle, headerActions }: HeaderProps) {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
               <div className="flex flex-col">
-                <span>{displayName}</span>
-                <span className="text-xs font-normal text-muted-foreground">{user?.email}</span>
+                <span>{persona.displayName}</span>
+                <span className="text-xs font-normal text-muted-foreground">{persona.description}</span>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -139,9 +134,9 @@ export function Header({ title, subtitle, headerActions }: HeaderProps) {
               <span className="text-muted-foreground">{persona.displayName}</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
-              <LogOut className="mr-2 h-4 w-4" />
-              Sign Out
+            <DropdownMenuItem onClick={handleSwitchRole}>
+              <ArrowLeftRight className="mr-2 h-4 w-4" />
+              Switch Role
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
