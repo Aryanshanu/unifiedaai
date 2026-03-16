@@ -12,9 +12,6 @@ import { formatDistanceToNow } from "date-fns";
 import { HealthIndicator } from "@/components/shared/HealthIndicator";
 import { useDataHealth } from "@/components/shared/DataHealthWrapper";
 import { EnforcementBadge } from "@/components/shared/EnforcementBadge";
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 
