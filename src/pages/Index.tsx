@@ -180,10 +180,41 @@ export default function Index() {
   ];
 
 
+  // For non-admin roles, render their specific dashboard
+  if (persona.dashboardLayout !== 'executive') {
+    const DashboardComponent = {
+      governance: GovernanceDashboard,
+      technical: TechnicalDashboard,
+      compliance: ComplianceDashboard,
+    }[persona.dashboardLayout];
+
+    return (
+      <MainLayout 
+        title="Command Center" 
+        subtitle={persona.displayName}
+        headerActions={
+          <div className="flex items-center gap-3">
+            {realtimeActive && (
+              <span className="w-2 h-2 rounded-full bg-success animate-pulse" title="Realtime active" />
+            )}
+            <HealthIndicator 
+              status={status} 
+              lastUpdated={lastUpdated} 
+              onRetry={handleRetry}
+              showLabel 
+            />
+          </div>
+        }
+      >
+        {DashboardComponent && <DashboardComponent />}
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout 
       title="Command Center" 
-      subtitle="Unified Data & AI Governance"
+      subtitle="Chief Data & AI Officer — Executive View"
       headerActions={
         <div className="flex items-center gap-3">
           {realtimeActive && (
