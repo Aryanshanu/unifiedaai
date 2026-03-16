@@ -72,7 +72,7 @@ export function AttestationSigner({ modelId, modelName, frameworkId }: Attestati
       const content = `${title}\n${modelId}\n${timestamp}\n${notes}`;
       const hash = generateHash(content);
       const signature = generateMinisignSignature();
-      const signedBy = profile?.full_name || user?.email || 'Unknown';
+      const signedBy = persona.displayName || user?.email || 'Unknown';
 
       // Create attestation in database
       const { data, error } = await supabase
