@@ -37,8 +37,6 @@ import { ComplianceDashboard } from "@/components/dashboard/ComplianceDashboard"
 
 export default function Index() {
   const { persona } = useAuth();
-  const [realtimeActive, setRealtimeActive] = useState(false);
-  const queryClient = useQueryClient();
   const { data: models, isLoading: modelsLoading, isError: modelsError, refetch: refetchModels } = useModels();
   const { data: metrics, isLoading: metricsLoading, isError: metricsError, refetch: refetchMetrics } = usePlatformMetrics();
   const navigate = useNavigate();
