@@ -209,7 +209,7 @@ export function useDQControlPlane(datasetId?: string): UseDQControlPlaneReturn {
   const [finalResponse, setFinalResponse] = useState<ControlPlaneResponse | null>(null);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
   
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeDatasetRef = useRef<string | null>(null);
 
   // Timer for elapsed time

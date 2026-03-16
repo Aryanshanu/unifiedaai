@@ -37,7 +37,7 @@ export function useRealtimeWithReconnect(
   const [retryCount, setRetryCount] = useState(0);
   
   const channelRef = useRef<RealtimeChannel | null>(null);
-  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cleanup = useCallback(() => {
     if (retryTimeoutRef.current) {
