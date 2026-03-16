@@ -182,7 +182,7 @@ export default function Lineage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
   // Debounce timer ref for auto-sync
-  const syncDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const syncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const DEBOUNCE_DELAY = 2000; // 2 seconds
 
   // Zoom handlers

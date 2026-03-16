@@ -117,7 +117,7 @@ export function useGoldenDemoOrchestrator() {
   const [elapsedTime, setElapsedTime] = useState(0);
   
   const abortRef = useRef<AbortController | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const optionsRef = useRef<OrchestratorOptions | null>(null);
   const navigate = useNavigate();
 
