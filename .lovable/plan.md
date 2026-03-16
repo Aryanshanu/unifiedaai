@@ -1,53 +1,72 @@
-# Validation: Platform Gap Remediation — COMPLETED
 
-## Changes Made
 
-### Gap 1: Discovery & Inventory (25% → 70%)
-- **NEW** `ai_vendors` table — track third-party AI vendors with risk tiers, compliance certs, data processing locations
-- **NEW** `shadow_ai_discoveries` table — report and triage unauthorized AI systems
-- **NEW** `/discovery` page — Shadow AI reporting + vendor registry with full CRUD
-- **NEW** Sidebar "DISCOVER" section with AI Discovery link
+# Plan: Remove Auth, Role-Only Login
 
-### Gap 2: Pre-Built Regulation Packs (55% → 80%)
-- **SEEDED** NIST AI RMF — 19 controls (GOVERN, MAP, MEASURE, MANAGE categories)
-- **SEEDED** ISO/IEC 42001 — 15 controls (A.2 through A.8 categories)
-- **NEW** SOC 2 Type II — 20 controls (CC, PI, P categories)
-- **NEW** HITRUST CSF v11.0 — 15 controls (HIE, RMG, TPM, IRM, PRM categories)
-- EU AI Act already had 45 controls
+## Problem
+Currently the login page requires email/password. User wants visitors to simply pick one of 4 role cards and enter immediately -- no credentials.
 
-### Gap 3: Continuous/Scheduled Evaluations (Partial → 75%)
-- **NEW** `evaluation_schedules` table — cron-based scheduling with per-model, per-engine config
-- **NEW** `/continuous-evaluation` page — create/manage/toggle evaluation schedules
-- **NEW** `run-scheduled-evaluations` edge function — executes due schedules, updates run counts
-- Cron presets: hourly, 6h, daily, weekly, monthly
+## Critical Challenge
+All database tables have RLS policies using `auth.uid()` and `has_role()`. Without a real session, every Supabase query returns empty. We must preserve a real session behind the scenes.
 
-### Gap 4: Agent-Level Governance (0% → 70%)
-- **NEW** `ai_agents` table — full agent registry with type, autonomy level, environment, tracing
-- **NEW** `agent_traces` table — execution traces with policy violations, durations, parent traces
-- **NEW** `/agents` page — agent registry + trace viewer with realtime subscriptions
-- Agent types: autonomous, semi_autonomous, tool_calling, conversational
-- Autonomy levels: fully_autonomous, supervised, human_in_loop
+## Solution: Anonymous Sign-In + Role Assignment
 
-### Gap 5: Environment Management (0% → 60%)
-- **NEW** `deployment_environments` table — dev/staging/prod with approval gates, risk tier limits
-- **NEW** `/environments` page — environment cards with system/agent counts, governance controls
-- Seeded 3 default environments (development, staging, production)
+When a user clicks a role card, we silently create an anonymous session (no email/password visible to the user) and assign the selected role via a secure database function. All existing RLS policies continue working unchanged.
 
-## Updated Scorecard
+### Step-by-step flow:
+1. User visits `/auth` → sees 4 persona cards (no email/password fields)
+2. User clicks e.g. "Chief Data & AI Officer"
+3. Behind the scenes: `signInAnonymously()` creates a session
+4. A SECURITY DEFINER function `assign_own_role(role)` sets their role (bypasses RLS safely)
+5. User is redirected to their role's default dashboard
+6. "Switch Role" in header → signs out and returns to role picker
 
-| Pillar | Before | After |
-|--------|--------|-------|
-| 1. Discovery and Inventory | 25% | 70% |
-| 2. Risk Assessment | 60% | 60% |
-| 3. Policy Enforcement | 55% | 80% |
-| 4. Runtime Monitoring | 50% | 70% |
-| 5. Reporting and Scaling | 50% | 60% |
+---
 
-## Overall Platform Readiness: ~68%
+## Changes
 
-## Remaining Gaps
-- Automatic shadow AI network scanning (requires infrastructure agents)
-- Hyperscaler integration connectors (AWS/Azure/GCP)
-- pg_cron setup for truly automated scheduled evaluations
-- Stakeholder-specific report views
-- Multi-tenant data isolation
+### 1. Database Migration
+- Create `assign_own_role(app_role)` SECURITY DEFINER function that deletes existing roles for the calling user and inserts the new one
+- Enable anonymous auth via configure_auth tool
+
+### 2. `src/pages/Auth.tsx` — Rewrite
+- Remove all email/password UI (SignInForm, SignUpForm, Tabs)
+- Show only the 4 RoleSelector cards
+- On role click: call `signInAnonymously()`, then invoke `assign_own_role` RPC, then navigate
+
+### 3. `src/hooks/useAuth.tsx` — Simplify
+- Remove `signUp` and `signIn` methods
+- Add `signInAsRole(role)` method that handles anonymous sign-in + role assignment
+- Keep `signOut`, `persona`, `roles`, `hasRole` unchanged
+- Keep `fetchUserRoles` unchanged (reads from `user_roles` table as before)
+
+### 4. `src/components/auth/RoleSelector.tsx` — Minor update
+- Remove the "Continue" button pattern; clicking a card directly triggers login
+- Add loading state per card
+
+### 5. `src/components/layout/Header.tsx` — Update
+- Change "Sign Out" label to "Switch Role"
+- Remove email display (anonymous users have no email)
+- Keep persona name and icon display
+
+### 6. `src/components/auth/ProtectedRoute.tsx` — No changes needed
+- Already checks `user` from Supabase session (anonymous users have a valid session)
+
+## What is NOT Disrupted
+- All 340+ RLS policies remain untouched (anonymous users get real `auth.uid()`)
+- All edge functions remain untouched
+- All sidebar filtering by role remains untouched
+- All 4 role-specific dashboards remain untouched
+- All existing pages and components remain untouched
+
+## Files Summary
+| File | Action |
+|------|--------|
+| Database migration | CREATE — `assign_own_role` function |
+| Auth config | UPDATE — enable anonymous sign-in |
+| `src/pages/Auth.tsx` | REWRITE — role cards only |
+| `src/hooks/useAuth.tsx` | EDIT — add `signInAsRole`, remove `signUp`/`signIn` |
+| `src/components/auth/RoleSelector.tsx` | EDIT — direct click login |
+| `src/components/layout/Header.tsx` | EDIT — "Switch Role", remove email |
+| `src/components/auth/SignInForm.tsx` | DELETE (unused) |
+| `src/components/auth/SignUpForm.tsx` | DELETE (unused) |
+
