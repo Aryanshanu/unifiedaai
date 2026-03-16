@@ -297,6 +297,7 @@ function DataGovernanceTab() {
 function ModelGovernanceTab() {
   const { data: models, isLoading } = useQuery({
     queryKey: ['audit-models'],
+    staleTime: 120_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('models')
