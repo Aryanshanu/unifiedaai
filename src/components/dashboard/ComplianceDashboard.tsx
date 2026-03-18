@@ -62,18 +62,6 @@ export function ComplianceDashboard() {
     refetchInterval: false,
   });
 
-  const { data: recentDecisions } = useQuery({
-    queryKey: ['compliance-decisions'],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('decision_ledger')
-        .select('id, decision_ref, decision_value, record_hash, created_at')
-        .order('created_at', { ascending: false })
-        .limit(5);
-      return data || [];
-    },
-    refetchInterval: false,
-  });
 
   const pendingAttestations = attestations?.filter(a => a.status === 'pending').length || 0;
   const signedAttestations = attestations?.filter(a => a.status === 'approved').length || 0;
