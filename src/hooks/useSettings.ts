@@ -18,6 +18,11 @@ export interface UpdateSettingsInput {
   default_workspace?: string;
   timezone?: string;
   data_retention_days?: number;
+  data_residency?: string;
+  compliance_frameworks?: string[];
+  gdpr_enabled?: boolean;
+  ccpa_enabled?: boolean;
+  audit_retention_years?: number;
 }
 
 export function useSettings() {
