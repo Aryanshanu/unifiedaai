@@ -67,7 +67,7 @@ export function useCreateGovernancePolicy() {
       };
       const { data, error } = await supabase
         .from("governance_policies")
-        .insert(insertData)
+        .insert([insertData])
         .select()
         .single();
       if (error) throw error;
