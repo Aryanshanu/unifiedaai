@@ -525,7 +525,7 @@ function RegionsSection() {
 
   useEffect(() => {
     if (settings) {
-      const s = settings as Record<string, unknown>;
+      const s = settings as unknown as Record<string, unknown>;
       setLocal({
         data_residency: (s.data_residency as string) || 'eu-west-1',
         compliance_frameworks: (s.compliance_frameworks as string[]) || ['eu-ai-act'],

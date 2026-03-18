@@ -105,7 +105,10 @@ export default function EnvironmentManagement() {
   });
 
   const getEnvCounts = (envName: string) => {
-    const systemCount = systems?.filter(s => (s as Record<string, unknown>).environment === envName || (envName === 'production' && (s as Record<string, unknown>).deployment_status === 'deployed'))?.length ?? 0;
+    const systemCount = systems?.filter(s => {
+      const sys = s as unknown as Record<string, unknown>;
+      return sys.environment === envName || (envName === 'production' && sys.deployment_status === 'deployed');
+    })?.length ?? 0;
     const agentCount = agents?.filter(a => a.environment === envName)?.length ?? 0;
     return { systemCount, agentCount };
   };
