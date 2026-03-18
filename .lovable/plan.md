@@ -1,53 +1,72 @@
-# Validation: Platform Gap Remediation — COMPLETED
 
-## Changes Made
 
-### Gap 1: Discovery & Inventory (25% → 70%)
-- **NEW** `ai_vendors` table — track third-party AI vendors with risk tiers, compliance certs, data processing locations
-- **NEW** `shadow_ai_discoveries` table — report and triage unauthorized AI systems
-- **NEW** `/discovery` page — Shadow AI reporting + vendor registry with full CRUD
-- **NEW** Sidebar "DISCOVER" section with AI Discovery link
+# Fixes Required: Gap Closure Audit Results
 
-### Gap 2: Pre-Built Regulation Packs (55% → 80%)
-- **SEEDED** NIST AI RMF — 19 controls (GOVERN, MAP, MEASURE, MANAGE categories)
-- **SEEDED** ISO/IEC 42001 — 15 controls (A.2 through A.8 categories)
-- **NEW** SOC 2 Type II — 20 controls (CC, PI, P categories)
-- **NEW** HITRUST CSF v11.0 — 15 controls (HIE, RMG, TPM, IRM, PRM categories)
-- EU AI Act already had 45 controls
+## Current State Summary
 
-### Gap 3: Continuous/Scheduled Evaluations (Partial → 75%)
-- **NEW** `evaluation_schedules` table — cron-based scheduling with per-model, per-engine config
-- **NEW** `/continuous-evaluation` page — create/manage/toggle evaluation schedules
-- **NEW** `run-scheduled-evaluations` edge function — executes due schedules, updates run counts
-- Cron presets: hourly, 6h, daily, weekly, monthly
+All 5 implementations are **95-100% done**. Database tables, hooks, and UI are all in place. However, there are **3 concrete bugs** that will cause runtime failures:
 
-### Gap 4: Agent-Level Governance (0% → 70%)
-- **NEW** `ai_agents` table — full agent registry with type, autonomy level, environment, tracing
-- **NEW** `agent_traces` table — execution traces with policy violations, durations, parent traces
-- **NEW** `/agents` page — agent registry + trace viewer with realtime subscriptions
-- Agent types: autonomous, semi_autonomous, tool_calling, conversational
-- Autonomy levels: fully_autonomous, supervised, human_in_loop
+---
 
-### Gap 5: Environment Management (0% → 60%)
-- **NEW** `deployment_environments` table — dev/staging/prod with approval gates, risk tier limits
-- **NEW** `/environments` page — environment cards with system/agent counts, governance controls
-- Seeded 3 default environments (development, staging, production)
+## Bug 1: `deployment_environments` — RLS blocks CREATE/DELETE (CRITICAL)
 
-## Updated Scorecard
+**Problem:** RLS is enabled on `deployment_environments` with only a `SELECT` policy (`"Users can view environments"`, `qual: true`). The Create Environment and Delete Environment buttons will silently fail with RLS violations.
 
-| Pillar | Before | After |
-|--------|--------|-------|
-| 1. Discovery and Inventory | 25% | 70% |
-| 2. Risk Assessment | 60% | 60% |
-| 3. Policy Enforcement | 55% | 80% |
-| 4. Runtime Monitoring | 50% | 70% |
-| 5. Reporting and Scaling | 50% | 60% |
+**Fix:** Add INSERT, UPDATE, and DELETE policies for authenticated users via a migration:
+```sql
+CREATE POLICY "Authenticated users can create environments"
+  ON deployment_environments FOR INSERT TO authenticated WITH CHECK (true);
 
-## Overall Platform Readiness: ~68%
+CREATE POLICY "Authenticated users can update environments"
+  ON deployment_environments FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 
-## Remaining Gaps
-- Automatic shadow AI network scanning (requires infrastructure agents)
-- Hyperscaler integration connectors (AWS/Azure/GCP)
-- pg_cron setup for truly automated scheduled evaluations
-- Stakeholder-specific report views
-- Multi-tenant data isolation
+CREATE POLICY "Authenticated users can delete non-production environments"
+  ON deployment_environments FOR DELETE TO authenticated USING (is_production = false);
+```
+
+---
+
+## Bug 2: `run-scheduled-evaluations` — Missing from `config.toml` (CRITICAL)
+
+**Problem:** The cron job invokes `run-scheduled-evaluations` every 15 minutes with the anon key. But this function is NOT listed in `supabase/config.toml`, so it defaults to `verify_jwt = true`. The cron job's anon-key-based call will be rejected. The "Run Now" button from the UI works because the user has a JWT, but the automated cron will fail.
+
+**Fix:** Add the function to `config.toml` with `verify_jwt = false` (since it's called by cron with just the anon key, not a user JWT).
+
+---
+
+## Bug 3: `useSettings` hook may not handle new columns (MEDIUM)
+
+**Problem:** The Regions section reads/writes `data_residency`, `compliance_frameworks`, `gdpr_enabled`, `ccpa_enabled`, `audit_retention_years` via `useUpdateSettings`. Need to verify the `useSettings` hook accepts these fields in its mutation.
+
+**Fix:** Inspect and patch `useSettings` if the update mutation filters out unknown fields.
+
+---
+
+## What's NOT Broken (Verified Working)
+
+| Component | Status | Evidence |
+|-----------|--------|----------|
+| `security_config` table | All 11 columns present including `require_uppercase`, `require_numbers` | DB query confirmed |
+| `api_keys` table | Exists with proper RLS (`Users manage own api keys`) | DB query confirmed |
+| `governance_policies` table | Exists with read + manage policies | DB query confirmed |
+| `governance_enforcements` table | Exists with read + insert policies | DB query confirmed |
+| `evaluation_schedule_runs` table | Exists with read + insert policies | DB query confirmed |
+| `governance_mode` seed | Present in `platform_config` as `{"mode": "advisory"}` | DB query confirmed |
+| Cron job | Active: `run-scheduled-evaluations-every-15min` at `*/15 * * * *` | DB query confirmed |
+| `notification_channels` | Full CRUD RLS policies in place | DB query confirmed |
+| `organization_settings` | All regional columns present | DB query confirmed |
+| Settings UI | All 4 sections (Security, Notifications, API Keys, Regions) are functional components | Code confirmed |
+| Environment Management UI | Create/Delete dialogs implemented | Code confirmed |
+| Continuous Evaluation UI | Schedule CRUD + Run Now + Run History | Code confirmed |
+| Governance Enforcement UI | Mode toggle + Policy CRUD + Enforcement log | Code confirmed |
+
+---
+
+## Implementation Plan
+
+1. **Migration:** Add INSERT/UPDATE/DELETE RLS policies on `deployment_environments`
+2. **Config.toml:** Add `[functions.run-scheduled-evaluations]` with `verify_jwt = false`
+3. **Verify `useSettings` hook** handles the regional fields correctly — patch if needed
+
+Total: 1 migration + 1 config file edit + 1 hook verification. ~15 lines of changes.
+
