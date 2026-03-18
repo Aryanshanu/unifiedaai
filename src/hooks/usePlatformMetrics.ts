@@ -174,8 +174,8 @@ export function useSystemHealthSummary() {
 
       return summaries;
     },
-    staleTime: 60_000,
-    refetchInterval: 60000,
+    staleTime: 120_000,
+    refetchInterval: false,
   });
 }
 
