@@ -37,12 +37,13 @@ import { ComplianceDashboard } from "@/components/dashboard/ComplianceDashboard"
 
 export default function Index() {
   const { persona } = useAuth();
-  const { data: models, isLoading: modelsLoading, isError: modelsError, refetch: refetchModels } = useModels();
+  const needsModels = persona.dashboardLayout === 'technical';
+  const { data: models, isLoading: modelsLoading, isError: modelsError, refetch: refetchModels } = useModels({ enabled: needsModels });
   const { data: metrics, isLoading: metricsLoading, isError: metricsError, refetch: refetchMetrics } = usePlatformMetrics();
   const navigate = useNavigate();
   
-  const isLoading = modelsLoading || metricsLoading;
-  const isError = modelsError || metricsError;
+  const isLoading = (needsModels && modelsLoading) || metricsLoading;
+  const isError = (needsModels && modelsError) || metricsError;
   const { status, lastUpdated } = useDataHealth(isLoading, isError);
   
   // Use metrics from usePlatformMetrics instead of separate queries
