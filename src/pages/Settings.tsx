@@ -206,6 +206,8 @@ function SecuritySection() {
         session_timeout_minutes: config.session_timeout_minutes,
         password_min_length: config.password_min_length,
         require_special_chars: config.require_special_chars,
+        require_uppercase: config.require_uppercase,
+        require_numbers: config.require_numbers,
         audit_retention_days: config.audit_retention_days,
       });
     }
