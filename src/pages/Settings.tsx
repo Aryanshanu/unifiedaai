@@ -283,16 +283,31 @@ function SecuritySection() {
             <Switch checked={local.require_special_chars} onCheckedChange={(v) => setLocal(p => ({ ...p, require_special_chars: v }))} />
           </div>
 
+          <div className="flex items-center justify-between max-w-lg">
+            <div>
+              <Label className="text-sm font-medium">Require Uppercase Letters</Label>
+              <p className="text-xs text-muted-foreground">Enforce at least one uppercase letter</p>
+            </div>
+            <Switch checked={local.require_uppercase} onCheckedChange={(v) => setLocal(p => ({ ...p, require_uppercase: v }))} />
+          </div>
+
+          <div className="flex items-center justify-between max-w-lg">
+            <div>
+              <Label className="text-sm font-medium">Require Numbers</Label>
+              <p className="text-xs text-muted-foreground">Enforce at least one numeric digit</p>
+            </div>
+            <Switch checked={local.require_numbers} onCheckedChange={(v) => setLocal(p => ({ ...p, require_numbers: v }))} />
+          </div>
+
           <div className="max-w-lg">
-            <Label className="text-sm font-medium mb-2 block">Audit Retention (days)</Label>
+            <Label className="text-sm font-medium mb-2 block">Audit Retention</Label>
             <Select value={String(local.audit_retention_days)} onValueChange={(v) => setLocal(p => ({ ...p, audit_retention_days: Number(v) }))}>
               <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
               <SelectContent>
+                <SelectItem value="90">90 days</SelectItem>
+                <SelectItem value="180">180 days</SelectItem>
                 <SelectItem value="365">1 year</SelectItem>
-                <SelectItem value="1095">3 years</SelectItem>
-                <SelectItem value="1825">5 years</SelectItem>
                 <SelectItem value="2555">7 years (recommended)</SelectItem>
-                <SelectItem value="3650">10 years</SelectItem>
               </SelectContent>
             </Select>
           </div>

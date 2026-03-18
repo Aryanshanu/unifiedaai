@@ -9,6 +9,8 @@ export interface SecurityConfig {
   session_timeout_minutes: number;
   password_min_length: number;
   require_special_chars: boolean;
+  require_uppercase: boolean;
+  require_numbers: boolean;
   audit_retention_days: number;
   created_at: string;
   updated_at: string;
