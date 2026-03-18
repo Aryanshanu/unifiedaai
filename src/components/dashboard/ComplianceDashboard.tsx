@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  FileCheck, FileText, Shield, ArrowRight, CheckCircle,
+  FileCheck, FileText, Shield, CheckCircle,
   Clock, AlertTriangle, Hash,
 } from "lucide-react";
 
@@ -62,18 +62,6 @@ export function ComplianceDashboard() {
     refetchInterval: false,
   });
 
-  const { data: recentDecisions } = useQuery({
-    queryKey: ['compliance-decisions'],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('decision_ledger')
-        .select('id, decision_ref, decision_value, record_hash, created_at')
-        .order('created_at', { ascending: false })
-        .limit(5);
-      return data || [];
-    },
-    refetchInterval: false,
-  });
 
   const pendingAttestations = attestations?.filter(a => a.status === 'pending').length || 0;
   const signedAttestations = attestations?.filter(a => a.status === 'approved').length || 0;
@@ -139,72 +127,39 @@ export function ComplianceDashboard() {
         </Card>
       </div>
 
-      {/* Attestations & Decision Ledger */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Shield className="w-4 h-4" />
-              Attestations
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {attestations && attestations.length > 0 ? (
-              <div className="space-y-3">
-                {attestations.slice(0, 5).map((a: any) => (
-                  <div key={a.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <div>
-                      <p className="text-sm font-medium line-clamp-1">{a.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {a.signed_at ? `Signed: ${new Date(a.signed_at).toLocaleDateString()}` : 'Not yet signed'}
-                      </p>
-                    </div>
-                    <Badge
-                      variant={a.status === 'approved' ? 'default' : a.status === 'pending' ? 'secondary' : 'destructive'}
-                      className="text-xs capitalize"
-                    >
-                      {a.status}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-center py-6 text-sm text-muted-foreground">No attestations</p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Hash className="w-4 h-4" />
-              Decision Ledger (Hash-Chain)
-            </CardTitle>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/decision-ledger')}>
-              Full Ledger <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {recentDecisions && recentDecisions.length > 0 ? (
-              <div className="space-y-3">
-                {recentDecisions.map((d: any) => (
-                  <div key={d.id} className="p-3 rounded-lg bg-muted/50">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-medium font-mono">{d.decision_ref}</p>
-                      <Badge variant="outline" className="text-xs">{d.decision_value}</Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground font-mono truncate">
-                      hash: {d.record_hash?.substring(0, 16)}...
+      {/* Attestations */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Shield className="w-4 h-4" />
+            Attestations
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {attestations && attestations.length > 0 ? (
+            <div className="space-y-3">
+              {attestations.slice(0, 5).map((a: any) => (
+                <div key={a.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                  <div>
+                    <p className="text-sm font-medium line-clamp-1">{a.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {a.signed_at ? `Signed: ${new Date(a.signed_at).toLocaleDateString()}` : 'Not yet signed'}
                     </p>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-center py-6 text-sm text-muted-foreground">No decisions recorded</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                  <Badge
+                    variant={a.status === 'approved' ? 'default' : a.status === 'pending' ? 'secondary' : 'destructive'}
+                    className="text-xs capitalize"
+                  >
+                    {a.status}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-center py-6 text-sm text-muted-foreground">No attestations</p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Non-Compliant Controls */}
       {(frameworkStats?.nonCompliant || 0) > 0 && (

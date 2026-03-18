@@ -60,7 +60,7 @@ export const PERSONA_MAP: Record<AppRole, PersonaConfig> = {
     avatarEmoji: '📋',
     avatarGradient: 'from-rose-500 to-pink-600',
     borderColor: 'border-l-rose-500',
-    defaultRoute: '/decision-ledger',
+    defaultRoute: '/audit-center',
     dashboardLayout: 'compliance',
     sidebarSections: ['govern', 'data-governance', 'docs'],
   },
@@ -97,11 +97,9 @@ export const ROUTE_ACCESS_MAP: Record<string, AppRole[]> = {
   // Governance — executive + steward + auditor
   '/governance': ['admin', 'reviewer', 'viewer'],
   '/governance/approvals': ['admin', 'reviewer'],
-  '/decision-ledger': ['admin', 'reviewer', 'viewer'],
   '/hitl': ['admin', 'reviewer'],
   '/incidents': ['admin', 'reviewer', 'viewer'],
   '/lineage': ['admin', 'reviewer', 'viewer'],
-  '/governance-framework': ['admin', 'reviewer', 'viewer'],
   '/audit-center': ['admin', 'reviewer', 'viewer'],
 
   // Core RAI Engines — technical only

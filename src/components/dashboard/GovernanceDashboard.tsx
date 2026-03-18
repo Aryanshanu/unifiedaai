@@ -6,7 +6,7 @@ import { usePlatformMetrics } from "@/hooks/usePlatformMetrics";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  ShieldCheck, Users, AlertCircle, FileText, ArrowRight,
+  ShieldCheck, Users, AlertCircle, ArrowRight,
   Clock, AlertTriangle, GitBranch,
 } from "lucide-react";
 
@@ -52,18 +52,6 @@ export function GovernanceDashboard() {
     refetchInterval: false,
   });
 
-  const { data: recentDecisions } = useQuery({
-    queryKey: ['governance-decisions'],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('decision_ledger')
-        .select('id, decision_ref, decision_value, created_at')
-        .order('created_at', { ascending: false })
-        .limit(5);
-      return data || [];
-    },
-    refetchInterval: false,
-  });
 
   return (
     <div className="space-y-6">
@@ -126,70 +114,39 @@ export function GovernanceDashboard() {
         </Card>
       </div>
 
-      {/* HITL Queue & Decisions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Clock className="w-4 h-4" />
-              HITL Review Queue
-            </CardTitle>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/hitl')}>
-              Open Console <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {reviewQueue && reviewQueue.length > 0 ? (
-              <div className="space-y-3">
-                {reviewQueue.slice(0, 5).map((item: any) => (
-                  <div key={item.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <div>
-                      <p className="text-sm font-medium line-clamp-1">{item.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {item.sla_deadline ? `SLA: ${new Date(item.sla_deadline).toLocaleString()}` : 'No SLA'}
-                      </p>
-                    </div>
-                    <Badge variant={item.severity === 'critical' ? 'destructive' : 'secondary'} className="text-xs">
-                      {item.severity}
-                    </Badge>
+      {/* HITL Queue */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Clock className="w-4 h-4" />
+            HITL Review Queue
+          </CardTitle>
+          <Button variant="ghost" size="sm" onClick={() => navigate('/hitl')}>
+            Open Console <ArrowRight className="h-4 w-4 ml-1" />
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {reviewQueue && reviewQueue.length > 0 ? (
+            <div className="space-y-3">
+              {reviewQueue.slice(0, 5).map((item: any) => (
+                <div key={item.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                  <div>
+                    <p className="text-sm font-medium line-clamp-1">{item.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.sla_deadline ? `SLA: ${new Date(item.sla_deadline).toLocaleString()}` : 'No SLA'}
+                    </p>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-center py-6 text-sm text-muted-foreground">Queue is empty</p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <FileText className="w-4 h-4" />
-              Recent Decisions
-            </CardTitle>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/decision-ledger')}>
-              View Ledger <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {recentDecisions && recentDecisions.length > 0 ? (
-              <div className="space-y-3">
-                {recentDecisions.map((d: any) => (
-                  <div key={d.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <div>
-                      <p className="text-sm font-medium font-mono line-clamp-1">{d.decision_ref}</p>
-                      <p className="text-xs text-muted-foreground">{new Date(d.created_at).toLocaleString()}</p>
-                    </div>
-                    <Badge variant="outline" className="text-xs">{d.decision_value}</Badge>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-center py-6 text-sm text-muted-foreground">No decisions recorded</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                  <Badge variant={item.severity === 'critical' ? 'destructive' : 'secondary'} className="text-xs">
+                    {item.severity}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-center py-6 text-sm text-muted-foreground">Queue is empty</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

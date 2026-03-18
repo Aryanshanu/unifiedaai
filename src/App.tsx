@@ -44,9 +44,7 @@ const Settings = lazy(() => import("./pages/Settings"));
 const Documentation = lazy(() => import("./pages/Documentation"));
 const Governance = lazy(() => import("./pages/Governance"));
 const Evaluation = lazy(() => import("./pages/Evaluation"));
-const DecisionLedger = lazy(() => import("./pages/DecisionLedger"));
 const AuditCenter = lazy(() => import("./pages/AuditCenter"));
-const GovernanceFramework = lazy(() => import("./pages/GovernanceFramework"));
 const SemanticLayerHub = lazy(() => import("./pages/SemanticLayerHub"));
 const Discovery = lazy(() => import("./pages/Discovery"));
 const AgentGovernance = lazy(() => import("./pages/AgentGovernance"));
@@ -100,7 +98,6 @@ const App = () => (
                 <Route path="/governance" element={<ProtectedRoute><Governance /></ProtectedRoute>} />
                 <Route path="/governance/approvals" element={<ProtectedRoute><Approvals /></ProtectedRoute>} />
                 <Route path="/hitl" element={<ProtectedRoute><HITL /></ProtectedRoute>} />
-                <Route path="/decision-ledger" element={<ProtectedRoute><DecisionLedger /></ProtectedRoute>} />
                 <Route path="/incidents" element={<ProtectedRoute><Incidents /></ProtectedRoute>} />
                 {/* Knowledge Graph */}
                 <Route path="/lineage" element={<ProtectedRoute><Lineage /></ProtectedRoute>} />
@@ -130,7 +127,7 @@ const App = () => (
                 {/* Audit */}
                 {/* Audit */}
                 <Route path="/audit-center" element={<ProtectedRoute><AuditCenter /></ProtectedRoute>} />
-                <Route path="/governance-framework" element={<ProtectedRoute><GovernanceFramework /></ProtectedRoute>} />
+                
                 <Route path="/semantic-hub" element={<ProtectedRoute><SemanticLayerHub /></ProtectedRoute>} />
                 <Route path="/discovery" element={<ProtectedRoute><Discovery /></ProtectedRoute>} />
                 <Route path="/agents" element={<ProtectedRoute><AgentGovernance /></ProtectedRoute>} />

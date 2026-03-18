@@ -561,46 +561,6 @@ const Documentation = () => {
                   <div className="flex items-center gap-4 mb-4">
                     <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xl font-bold">4</div>
                     <div>
-                      <h3 className="text-xl font-semibold">Review the Decision Ledger</h3>
-                      <p className="text-sm text-muted-foreground">See the immutable audit trail of all evaluations</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="p-4 rounded-lg bg-muted/50">
-                      <h4 className="font-medium mb-2 flex items-center gap-2">
-                        <MousePointer className="h-4 w-4" />
-                        How to Navigate
-                      </h4>
-                      <ol className="text-sm space-y-1 text-muted-foreground">
-                        <li>1. Click <code className="px-1.5 py-0.5 bg-background rounded text-xs">Govern</code> in the sidebar</li>
-                        <li>2. Click <code className="px-1.5 py-0.5 bg-background rounded text-xs">Decision Ledger</code></li>
-                        <li>3. See all recorded decisions with their hashes</li>
-                      </ol>
-                    </div>
-
-                    <div className="p-4 rounded-lg bg-green-500/5 border border-green-500/20">
-                      <h4 className="font-medium mb-2 flex items-center gap-2 text-green-700 dark:text-green-400">
-                        <CircleCheck className="h-4 w-4" />
-                        What You'll See
-                      </h4>
-                      <ul className="text-sm text-muted-foreground space-y-1">
-                        <li>• <strong>Decision Reference</strong>: Unique ID like "EVAL-2025-001"</li>
-                        <li>• <strong>Decision Value</strong>: "PASS" or "FAIL"</li>
-                        <li>• <strong>Confidence</strong>: 0-100%</li>
-                        <li>• <strong>Model Name</strong>: Which model was evaluated</li>
-                        <li>• <strong>Timestamp</strong>: Exact date and time</li>
-                        <li>• <strong>Record Hash</strong>: SHA-256 hash (tamper-proof)</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Step 5 */}
-                <div className="p-6 rounded-xl border bg-card">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xl font-bold">5</div>
-                    <div>
                       <h3 className="text-xl font-semibold">Generate a Compliance Report</h3>
                       <p className="text-sm text-muted-foreground">Create documentation for regulators or auditors</p>
                     </div>
@@ -1579,77 +1539,11 @@ const Documentation = () => {
                   </div>
                 </div>
 
-                {/* Decision Ledger */}
-                <div className="p-6 rounded-xl border bg-card">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <Hash className="h-5 w-5 text-blue-500" />
-                    8.2 Decision Ledger
-                  </h3>
-                  <p className="text-muted-foreground mb-4">
-                    An immutable audit trail of every AI decision. Uses blockchain-style hash chains 
-                    to ensure records cannot be tampered with.
-                  </p>
-
-                  <div className="space-y-4">
-                    <div className="p-4 rounded-lg bg-muted/30 font-mono text-sm">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-muted-foreground">record_hash</span>
-                        <span>=</span>
-                        <span className="text-blue-500">SHA256(decision_data + previous_hash)</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Each record's hash includes the previous record's hash, creating an unbreakable chain.
-                      </div>
-                    </div>
-
-                    <div className="p-4 rounded-lg bg-muted/50">
-                      <h4 className="font-medium mb-2">What's Recorded in Each Entry</h4>
-                      <div className="grid md:grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <span className="font-mono text-xs bg-background px-1 py-0.5 rounded">decision_ref</span>
-                          <p className="text-xs text-muted-foreground mt-1">Unique reference (e.g., "EVAL-2025-0042")</p>
-                        </div>
-                        <div>
-                          <span className="font-mono text-xs bg-background px-1 py-0.5 rounded">decision_value</span>
-                          <p className="text-xs text-muted-foreground mt-1">The actual decision ("APPROVED", "DENIED")</p>
-                        </div>
-                        <div>
-                          <span className="font-mono text-xs bg-background px-1 py-0.5 rounded">confidence</span>
-                          <p className="text-xs text-muted-foreground mt-1">Model confidence (0-100%)</p>
-                        </div>
-                        <div>
-                          <span className="font-mono text-xs bg-background px-1 py-0.5 rounded">model_id</span>
-                          <p className="text-xs text-muted-foreground mt-1">Which model made the decision</p>
-                        </div>
-                        <div>
-                          <span className="font-mono text-xs bg-background px-1 py-0.5 rounded">input_hash</span>
-                          <p className="text-xs text-muted-foreground mt-1">Hash of input data (privacy-safe)</p>
-                        </div>
-                        <div>
-                          <span className="font-mono text-xs bg-background px-1 py-0.5 rounded">output_hash</span>
-                          <p className="text-xs text-muted-foreground mt-1">Hash of output data</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-4 rounded-lg bg-red-500/5 border border-red-500/20">
-                      <h4 className="font-medium mb-2 text-red-700 dark:text-red-400 flex items-center gap-2">
-                        <TriangleAlert className="h-4 w-4" />
-                        Tamper Detection
-                      </h4>
-                      <p className="text-sm text-muted-foreground">
-                        If anyone modifies a record, the hash chain breaks. The system detects this automatically 
-                        and flags the inconsistency. This is required for EU AI Act Article 12 compliance.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
                 {/* HITL Console */}
                 <div className="p-6 rounded-xl border bg-card">
                   <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                     <Users className="h-5 w-5 text-purple-500" />
-                    8.3 HITL Console (Human-in-the-Loop)
+                    8.2 HITL Console (Human-in-the-Loop)
                   </h3>
                   <p className="text-muted-foreground mb-4">
                     A queue of AI decisions that need human review. Used for low-confidence predictions, 
@@ -2392,7 +2286,7 @@ const Documentation = () => {
                 </div>
                 <div className="p-3 rounded bg-background">
                   <strong>Incident response:</strong>
-                  <p className="text-muted-foreground text-xs mt-1">Alerts → Incidents → Decision Ledger (for audit)</p>
+                  <p className="text-muted-foreground text-xs mt-1">Alerts → Incidents → Audit Center (for audit)</p>
                 </div>
               </div>
             </div>
