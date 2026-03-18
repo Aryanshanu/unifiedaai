@@ -59,7 +59,7 @@ export function ComplianceDashboard() {
         reportsGenerated: reportCountRes.count || 0,
       };
     },
-    refetchInterval: 120000,
+    refetchInterval: false,
   });
 
   const { data: recentDecisions } = useQuery({

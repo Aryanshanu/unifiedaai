@@ -41,7 +41,7 @@ export function TechnicalDashboard() {
         activeContracts: contractsRes.count || 0,
       };
     },
-    refetchInterval: 60000,
+    refetchInterval: false,
   });
 
   const { data: securityStats } = useQuery({

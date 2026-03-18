@@ -49,7 +49,7 @@ export function GovernanceDashboard() {
         .eq('status', 'open');
       return count || 0;
     },
-    refetchInterval: 60000,
+    refetchInterval: false,
   });
 
   const { data: recentDecisions } = useQuery({

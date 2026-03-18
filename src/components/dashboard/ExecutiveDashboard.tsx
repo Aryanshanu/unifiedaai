@@ -46,7 +46,7 @@ export function ExecutiveDashboard() {
       data?.forEach(r => { if (r.risk_tier && r.risk_tier in dist) dist[r.risk_tier as keyof typeof dist]++; });
       return dist;
     },
-    refetchInterval: 120000,
+    refetchInterval: false,
   });
 
   const { data: recentIncidents } = useQuery({
