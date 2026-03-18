@@ -35,7 +35,7 @@ export function ExecutiveDashboard() {
         totalAttestations: attestationsRes.data?.length || 0,
       };
     },
-    refetchInterval: 120000,
+    refetchInterval: false,
   });
 
   const { data: riskDistribution } = useQuery({
