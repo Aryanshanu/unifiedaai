@@ -547,7 +547,7 @@ function RegionsSection() {
 
   const handleSave = async () => {
     try {
-      await updateSettings.mutateAsync(local as Record<string, unknown>);
+      await updateSettings.mutateAsync(local as unknown as Parameters<typeof updateSettings.mutateAsync>[0]);
       toast.success("Regional settings saved");
     } catch {
       toast.error("Failed to save settings");
