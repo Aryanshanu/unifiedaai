@@ -323,7 +323,7 @@ function NotificationsSection() {
   const updateChannel = useUpdateNotificationChannel();
   const deleteChannel = useDeleteNotificationChannel();
   const [open, setOpen] = useState(false);
-  const [newChannel, setNewChannel] = useState({ channel_type: 'email' as const, name: '', config: { endpoint: '' } });
+  const [newChannel, setNewChannel] = useState<{ channel_type: 'email' | 'slack' | 'teams' | 'webhook'; name: string; config: { endpoint: string } }>({ channel_type: 'email', name: '', config: { endpoint: '' } });
 
   const handleCreate = async () => {
     if (!newChannel.name) return;
