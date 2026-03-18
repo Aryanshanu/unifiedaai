@@ -57,17 +57,17 @@ export function useCreateGovernancePolicy() {
       action_type: string;
     }) => {
       if (!user?.id) throw new Error("Not authenticated");
+      const insertData = {
+        name: input.name,
+        description: input.description || null,
+        scope: input.scope || 'global',
+        condition_type: input.condition_type,
+        condition_config: input.condition_config,
+        action_type: input.action_type,
+      };
       const { data, error } = await supabase
         .from("governance_policies")
-        .insert({
-          name: input.name,
-          description: input.description || null,
-          scope: input.scope || 'global',
-          condition_type: input.condition_type,
-          condition_config: input.condition_config,
-          action_type: input.action_type,
-          created_by: user.id,
-        } as Record<string, unknown>)
+        .insert(insertData)
         .select()
         .single();
       if (error) throw error;
