@@ -561,46 +561,6 @@ const Documentation = () => {
                   <div className="flex items-center gap-4 mb-4">
                     <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xl font-bold">4</div>
                     <div>
-                      <h3 className="text-xl font-semibold">Review the Decision Ledger</h3>
-                      <p className="text-sm text-muted-foreground">See the immutable audit trail of all evaluations</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="p-4 rounded-lg bg-muted/50">
-                      <h4 className="font-medium mb-2 flex items-center gap-2">
-                        <MousePointer className="h-4 w-4" />
-                        How to Navigate
-                      </h4>
-                      <ol className="text-sm space-y-1 text-muted-foreground">
-                        <li>1. Click <code className="px-1.5 py-0.5 bg-background rounded text-xs">Govern</code> in the sidebar</li>
-                        <li>2. Click <code className="px-1.5 py-0.5 bg-background rounded text-xs">Decision Ledger</code></li>
-                        <li>3. See all recorded decisions with their hashes</li>
-                      </ol>
-                    </div>
-
-                    <div className="p-4 rounded-lg bg-green-500/5 border border-green-500/20">
-                      <h4 className="font-medium mb-2 flex items-center gap-2 text-green-700 dark:text-green-400">
-                        <CircleCheck className="h-4 w-4" />
-                        What You'll See
-                      </h4>
-                      <ul className="text-sm text-muted-foreground space-y-1">
-                        <li>• <strong>Decision Reference</strong>: Unique ID like "EVAL-2025-001"</li>
-                        <li>• <strong>Decision Value</strong>: "PASS" or "FAIL"</li>
-                        <li>• <strong>Confidence</strong>: 0-100%</li>
-                        <li>• <strong>Model Name</strong>: Which model was evaluated</li>
-                        <li>• <strong>Timestamp</strong>: Exact date and time</li>
-                        <li>• <strong>Record Hash</strong>: SHA-256 hash (tamper-proof)</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Step 5 */}
-                <div className="p-6 rounded-xl border bg-card">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xl font-bold">5</div>
-                    <div>
                       <h3 className="text-xl font-semibold">Generate a Compliance Report</h3>
                       <p className="text-sm text-muted-foreground">Create documentation for regulators or auditors</p>
                     </div>
