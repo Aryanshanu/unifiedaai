@@ -35,7 +35,7 @@ export function ExecutiveDashboard() {
         totalAttestations: attestationsRes.data?.length || 0,
       };
     },
-    refetchInterval: 120000,
+    refetchInterval: false,
   });
 
   const { data: riskDistribution } = useQuery({
@@ -46,7 +46,7 @@ export function ExecutiveDashboard() {
       data?.forEach(r => { if (r.risk_tier && r.risk_tier in dist) dist[r.risk_tier as keyof typeof dist]++; });
       return dist;
     },
-    refetchInterval: 120000,
+    refetchInterval: false,
   });
 
   const { data: recentIncidents } = useQuery({
@@ -59,7 +59,7 @@ export function ExecutiveDashboard() {
         .limit(5);
       return data || [];
     },
-    refetchInterval: 60000,
+    refetchInterval: false,
   });
 
   const totalModels = models?.length || 0;

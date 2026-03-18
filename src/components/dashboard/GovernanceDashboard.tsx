@@ -25,7 +25,7 @@ export function GovernanceDashboard() {
         .limit(10);
       return data || [];
     },
-    refetchInterval: 30000,
+    refetchInterval: false,
   });
 
   const { data: policyViolations } = useQuery({
@@ -37,7 +37,7 @@ export function GovernanceDashboard() {
         .eq('blocked', true);
       return count || 0;
     },
-    refetchInterval: 60000,
+    refetchInterval: false,
   });
 
   const { data: driftAlerts } = useQuery({
@@ -49,7 +49,7 @@ export function GovernanceDashboard() {
         .eq('status', 'open');
       return count || 0;
     },
-    refetchInterval: 60000,
+    refetchInterval: false,
   });
 
   const { data: recentDecisions } = useQuery({
@@ -62,7 +62,7 @@ export function GovernanceDashboard() {
         .limit(5);
       return data || [];
     },
-    refetchInterval: 60000,
+    refetchInterval: false,
   });
 
   return (

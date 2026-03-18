@@ -64,7 +64,7 @@ export function RuntimeRiskOverlay({ systemId }: RuntimeRiskOverlayProps) {
       };
     },
     staleTime: 60_000,
-    refetchInterval: 120_000,
+    refetchInterval: false,
     enabled: !!systemId,
   });
 

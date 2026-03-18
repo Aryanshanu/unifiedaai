@@ -31,7 +31,7 @@ export function ComplianceDashboard() {
         rate: total > 0 ? Math.round((compliant / total) * 100) : 0,
       };
     },
-    refetchInterval: 120000,
+    refetchInterval: false,
   });
 
   const { data: attestations } = useQuery({
@@ -44,7 +44,7 @@ export function ComplianceDashboard() {
         .limit(10);
       return data || [];
     },
-    refetchInterval: 120000,
+    refetchInterval: false,
   });
 
   const { data: auditStats } = useQuery({
@@ -59,7 +59,7 @@ export function ComplianceDashboard() {
         reportsGenerated: reportCountRes.count || 0,
       };
     },
-    refetchInterval: 120000,
+    refetchInterval: false,
   });
 
   const { data: recentDecisions } = useQuery({
@@ -72,7 +72,7 @@ export function ComplianceDashboard() {
         .limit(5);
       return data || [];
     },
-    refetchInterval: 60000,
+    refetchInterval: false,
   });
 
   const pendingAttestations = attestations?.filter(a => a.status === 'pending').length || 0;

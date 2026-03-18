@@ -24,7 +24,7 @@ export function TechnicalDashboard() {
         .limit(8);
       return data || [];
     },
-    refetchInterval: 60000,
+    refetchInterval: false,
   });
 
   const { data: dqMetrics } = useQuery({
@@ -41,7 +41,7 @@ export function TechnicalDashboard() {
         activeContracts: contractsRes.count || 0,
       };
     },
-    refetchInterval: 60000,
+    refetchInterval: false,
   });
 
   const { data: securityStats } = useQuery({
@@ -55,7 +55,7 @@ export function TechnicalDashboard() {
         .single();
       return data;
     },
-    refetchInterval: 120000,
+    refetchInterval: false,
   });
 
   const raiEngines = [

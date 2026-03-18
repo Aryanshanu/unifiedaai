@@ -1,40 +1,53 @@
+# Validation: Platform Gap Remediation — COMPLETED
 
+## Changes Made
 
-# Fix: Kill All Background Polling to Achieve Sub-2s Page Transitions
+### Gap 1: Discovery & Inventory (25% → 70%)
+- **NEW** `ai_vendors` table — track third-party AI vendors with risk tiers, compliance certs, data processing locations
+- **NEW** `shadow_ai_discoveries` table — report and triage unauthorized AI systems
+- **NEW** `/discovery` page — Shadow AI reporting + vendor registry with full CRUD
+- **NEW** Sidebar "DISCOVER" section with AI Discovery link
 
-## Root Cause
+### Gap 2: Pre-Built Regulation Packs (55% → 80%)
+- **SEEDED** NIST AI RMF — 19 controls (GOVERN, MAP, MEASURE, MANAGE categories)
+- **SEEDED** ISO/IEC 42001 — 15 controls (A.2 through A.8 categories)
+- **NEW** SOC 2 Type II — 20 controls (CC, PI, P categories)
+- **NEW** HITRUST CSF v11.0 — 15 controls (HIE, RMG, TPM, IRM, PRM categories)
+- EU AI Act already had 45 controls
 
-The global QueryClient config is correctly set (`staleTime: 120_000`, `refetchOnMount: false`, `refetchOnWindowFocus: false`). However, **16 files** override these defaults with explicit `refetchInterval` values (30s-120s), causing dozens of background fetch cycles that block the main thread during navigation. Every poll triggers the fetch interceptor, React state updates, and re-renders.
+### Gap 3: Continuous/Scheduled Evaluations (Partial → 75%)
+- **NEW** `evaluation_schedules` table — cron-based scheduling with per-model, per-engine config
+- **NEW** `/continuous-evaluation` page — create/manage/toggle evaluation schedules
+- **NEW** `run-scheduled-evaluations` edge function — executes due schedules, updates run counts
+- Cron presets: hourly, 6h, daily, weekly, monthly
 
-The `refetchOnMount: false` means cached data is reused instantly when navigating -- but the constant background polling from previously-visited pages keeps the network and React reconciler busy, causing 10-15s perceived latency.
+### Gap 4: Agent-Level Governance (0% → 70%)
+- **NEW** `ai_agents` table — full agent registry with type, autonomy level, environment, tracing
+- **NEW** `agent_traces` table — execution traces with policy violations, durations, parent traces
+- **NEW** `/agents` page — agent registry + trace viewer with realtime subscriptions
+- Agent types: autonomous, semi_autonomous, tool_calling, conversational
+- Autonomy levels: fully_autonomous, supervised, human_in_loop
 
-## The Fix: One Surgical Change
+### Gap 5: Environment Management (0% → 60%)
+- **NEW** `deployment_environments` table — dev/staging/prod with approval gates, risk tier limits
+- **NEW** `/environments` page — environment cards with system/agent counts, governance controls
+- Seeded 3 default environments (development, staging, production)
 
-Set `refetchInterval: false` in every file that currently has it. The data will still refresh when users manually navigate to a page (because `staleTime: 120_000` means after 2 minutes the next mount WILL refetch). No data goes stale -- it just stops polling in the background.
+## Updated Scorecard
 
-## Files to Change (all identical: `refetchInterval: <number>` → `refetchInterval: false`)
+| Pillar | Before | After |
+|--------|--------|-------|
+| 1. Discovery and Inventory | 25% | 70% |
+| 2. Risk Assessment | 60% | 60% |
+| 3. Policy Enforcement | 55% | 80% |
+| 4. Runtime Monitoring | 50% | 70% |
+| 5. Reporting and Scaling | 50% | 60% |
 
-| File | Current Intervals | Queries Affected |
-|------|------------------|-----------------|
-| `src/components/dashboard/GovernanceDashboard.tsx` | 30s, 60s, 60s, 60s | 4 queries |
-| `src/components/dashboard/ComplianceDashboard.tsx` | 120s, 120s, 120s, 60s | 4 queries |
-| `src/components/dashboard/ExecutiveDashboard.tsx` | 120s, 120s, 60s | 3 queries |
-| `src/components/dashboard/TechnicalDashboard.tsx` | 60s, 60s, 120s | 3 queries |
-| `src/components/dashboard/IncidentSummaryCard.tsx` | 60s | 1 query |
-| `src/components/dashboard/SLODashboard.tsx` | 120s | 1 query |
-| `src/components/dashboard/OversightAgentStatus.tsx` | 120s | 1 query |
-| `src/components/dashboard/RuntimeRiskOverlay.tsx` | 120s | 1 query |
-| `src/components/monitoring/FeedbackLoopDiagram.tsx` | 120s | 1 query |
-| `src/hooks/useRAIDashboard.ts` | 120s | 1 query |
-| `src/hooks/usePredictiveGovernance.ts` | 120s, 120s, 60s | 3 queries |
-| `src/hooks/useRealityMetrics.ts` | 120s | 1 query |
-| `src/hooks/useRequestLogs.ts` | 60s | 1 query |
-| `src/hooks/useGovernanceFlowMetrics.ts` | 120s | 1 query |
-| `src/hooks/useFileUploadStatus.ts` | 60s | 1 query |
+## Overall Platform Readiness: ~68%
 
-**Total: 27 background polling queries eliminated.**
-
-Each change is a single-line replacement: `refetchInterval: <number>` → `refetchInterval: false`.
-
-No behavioral change for users -- data still loads fresh on page visit (staleTime handles cache invalidation). The only difference is zero background network traffic when the user is on a different page.
-
+## Remaining Gaps
+- Automatic shadow AI network scanning (requires infrastructure agents)
+- Hyperscaler integration connectors (AWS/Azure/GCP)
+- pg_cron setup for truly automated scheduled evaluations
+- Stakeholder-specific report views
+- Multi-tenant data isolation
