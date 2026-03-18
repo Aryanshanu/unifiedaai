@@ -9,7 +9,7 @@ export interface GovernancePolicy {
   description: string | null;
   scope: string;
   condition_type: string;
-  condition_config: Record<string, unknown>;
+  condition_config: Json;
   action_type: string;
   is_active: boolean;
   created_by: string | null;
