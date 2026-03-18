@@ -23,6 +23,7 @@ export default function Governance() {
   const { data: complianceStats, isLoading: statsLoading, refetch: refetchStats } = useComplianceStats();
   const { data: attestations, isLoading: attestationsLoading, refetch: refetchAttestations } = useAttestations();
   const { data: controlAssessments } = useControlAssessments();
+  const deleteFramework = useDeleteFramework();
 
   const isLoading = frameworksLoading || controlsLoading || statsLoading || attestationsLoading;
   const { status, lastUpdated } = useDataHealth(isLoading, frameworksError);
