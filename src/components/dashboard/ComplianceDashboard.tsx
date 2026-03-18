@@ -44,7 +44,7 @@ export function ComplianceDashboard() {
         .limit(10);
       return data || [];
     },
-    refetchInterval: 120000,
+    refetchInterval: false,
   });
 
   const { data: auditStats } = useQuery({
