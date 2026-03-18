@@ -54,7 +54,7 @@ export function GovernanceEnforcementPanel() {
     try {
       await updateConfig.mutateAsync({
         configKey: 'governance_mode',
-        value: enforced ? 'enforced' : 'advisory' as unknown as Record<string, unknown>,
+        value: { mode: enforced ? 'enforced' : 'advisory' },
       });
       toast.success(`Governance mode set to ${enforced ? 'enforced' : 'advisory'}`);
     } catch {
