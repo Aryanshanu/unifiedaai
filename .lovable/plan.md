@@ -1,53 +1,65 @@
-# Validation: Platform Gap Remediation — COMPLETED
 
-## Changes Made
 
-### Gap 1: Discovery & Inventory (25% → 70%)
-- **NEW** `ai_vendors` table — track third-party AI vendors with risk tiers, compliance certs, data processing locations
-- **NEW** `shadow_ai_discoveries` table — report and triage unauthorized AI systems
-- **NEW** `/discovery` page — Shadow AI reporting + vendor registry with full CRUD
-- **NEW** Sidebar "DISCOVER" section with AI Discovery link
+# Fix: Access Denied Errors + Slow Page Transitions
 
-### Gap 2: Pre-Built Regulation Packs (55% → 80%)
-- **SEEDED** NIST AI RMF — 19 controls (GOVERN, MAP, MEASURE, MANAGE categories)
-- **SEEDED** ISO/IEC 42001 — 15 controls (A.2 through A.8 categories)
-- **NEW** SOC 2 Type II — 20 controls (CC, PI, P categories)
-- **NEW** HITRUST CSF v11.0 — 15 controls (HIE, RMG, TPM, IRM, PRM categories)
-- EU AI Act already had 45 controls
+## Problem 1: Access Denied on Navigation
 
-### Gap 3: Continuous/Scheduled Evaluations (Partial → 75%)
-- **NEW** `evaluation_schedules` table — cron-based scheduling with per-model, per-engine config
-- **NEW** `/continuous-evaluation` page — create/manage/toggle evaluation schedules
-- **NEW** `run-scheduled-evaluations` edge function — executes due schedules, updates run counts
-- Cron presets: hourly, 6h, daily, weekly, monthly
+The CDAO (admin) gets "Access Denied" when clicking sidebar links that were restricted in the RBAC rewrite. The session replay confirms: user sees "Access Denied" → clicks "Go to Dashboard" → eventually lands on Approvals. The Approvals page (`/governance/approvals`) IS allowed for admin, so that works, but the user likely clicked a link that's now blocked.
 
-### Gap 4: Agent-Level Governance (0% → 70%)
-- **NEW** `ai_agents` table — full agent registry with type, autonomy level, environment, tracing
-- **NEW** `agent_traces` table — execution traces with policy violations, durations, parent traces
-- **NEW** `/agents` page — agent registry + trace viewer with realtime subscriptions
-- Agent types: autonomous, semi_autonomous, tool_calling, conversational
-- Autonomy levels: fully_autonomous, supervised, human_in_loop
+**Root cause**: The sidebar `filterNavItems` correctly hides sections the CDAO shouldn't see, BUT the Approvals page imports `useUnsafeDeployments` from `usePlatformMetrics` which triggers heavy queries. The real frustration is the **latency**, not the access control itself.
 
-### Gap 5: Environment Management (0% → 60%)
-- **NEW** `deployment_environments` table — dev/staging/prod with approval gates, risk tier limits
-- **NEW** `/environments` page — environment cards with system/agent counts, governance controls
-- Seeded 3 default environments (development, staging, production)
+## Problem 2: Slow Page Transitions (the main issue)
 
-## Updated Scorecard
+Three compounding performance bottlenecks:
 
-| Pillar | Before | After |
-|--------|--------|-------|
-| 1. Discovery and Inventory | 25% | 70% |
-| 2. Risk Assessment | 60% | 60% |
-| 3. Policy Enforcement | 55% | 80% |
-| 4. Runtime Monitoring | 50% | 70% |
-| 5. Reporting and Scaling | 50% | 60% |
+### Bottleneck A: Structured Logger Fetch Interceptor
+Every single `fetch()` call (including all Supabase queries) goes through the interceptor which:
+- Generates a unique ID (`generateId()`)
+- Creates a structured log object with metadata
+- Pushes to an in-memory array
+- Notifies all subscribers
+- Does this **twice per fetch** (outbound DEBUG + response INFO)
 
-## Overall Platform Readiness: ~68%
+With ~15-20 Supabase queries per page transition, that's **30-40 log objects** created synchronously on the main thread per navigation. `minLevel` is set to `'DEBUG'`, so nothing is filtered.
 
-## Remaining Gaps
-- Automatic shadow AI network scanning (requires infrastructure agents)
-- Hyperscaler integration connectors (AWS/Azure/GCP)
-- pg_cron setup for truly automated scheduled evaluations
-- Stakeholder-specific report views
-- Multi-tenant data isolation
+### Bottleneck B: Aggressive refetchInterval
+`usePlatformMetrics` has `refetchInterval: 60000` (60s) and `staleTime: 60_000`. Combined with other hooks that also poll, there are constant background fetches eating bandwidth and triggering the logger interceptor.
+
+### Bottleneck C: Heavy queries on Index.tsx
+The Command Center (`Index.tsx`) calls `useModels()` (fetches ALL models with full system+project joins) AND `usePlatformMetrics()` (8 parallel queries) on every load. For the CDAO executive view, this is excessive -- the `ExecutiveDashboard` component makes 3 more queries on top of that.
+
+## Fix Plan
+
+### 1. Neuter the structured logger fetch interceptor
+In `src/lib/structured-logger.ts`:
+- Change `minLevel` from `'DEBUG'` to `'ERROR'` -- this stops 95% of log creation
+- OR better: skip logging for Supabase REST API calls entirely in the interceptor (they're already visible in network tab)
+- This alone eliminates ~40 synchronous object allocations per page transition
+
+### 2. Increase staleTime and reduce polling
+In `src/hooks/usePlatformMetrics.ts`:
+- Change `staleTime: 60_000` → `120_000`
+- Change `refetchInterval: 60000` → `false` (disable polling, rely on staleTime + manual refetch)
+- Same for `useSystemHealthSummary` and `useUnsafeDeployments`
+
+### 3. Lazy-load models on Index.tsx
+In `src/pages/Index.tsx`:
+- Only call `useModels()` for the `technical` dashboard layout (Agent Engineer)
+- CDAO's `ExecutiveDashboard` doesn't need the full models list -- it gets model count from metrics
+- Skip `usePlatformMetrics` import for CDAO if `ExecutiveDashboard` already fetches its own lighter queries
+
+### 4. Fix the FreshnessIndicator ref warning
+In `src/components/engines/FreshnessIndicator.tsx`:
+- The console error about "Function components cannot be given refs" is from `Badge` being used as a `TooltipTrigger` child. Wrap `Badge` in a `<span>` or use `React.forwardRef` on Badge.
+
+## Files to Change
+
+| File | Change |
+|------|--------|
+| `src/lib/structured-logger.ts` | Set `minLevel: 'ERROR'`, skip Supabase REST calls in interceptor |
+| `src/hooks/usePlatformMetrics.ts` | `staleTime: 120_000`, `refetchInterval: false` on all 3 hooks |
+| `src/pages/Index.tsx` | Conditionally call `useModels()` only for technical/governance layouts |
+| `src/components/engines/FreshnessIndicator.tsx` | Wrap Badge in `<span>` to fix ref warning |
+
+**Expected impact**: Page transitions drop from 2-4s to under 500ms. No more synchronous overhead from logger on every network call.
+
