@@ -212,7 +212,7 @@ export function useUnsafeDeployments() {
 
       return unsafeDeployments;
     },
-    staleTime: 60_000,
-    refetchInterval: 60000,
+    staleTime: 120_000,
+    refetchInterval: false,
   });
 }

@@ -116,8 +116,8 @@ class StructuredLogger {
       const startTime = performance.now();
       const traceId = logger.generateId();
 
-      // Skip logging for certain internal requests
-      if (urlString.includes('supabase') && urlString.includes('realtime')) {
+      // Skip logging for all Supabase REST/realtime calls (visible in network tab)
+      if (urlString.includes('supabase')) {
         return originalFetch.apply(this, args);
       }
 

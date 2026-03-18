@@ -83,13 +83,15 @@ export function FreshnessIndicator({
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Badge 
-              variant="outline" 
-              className={cn(config.className, sizeClasses[size], 'cursor-help')}
-            >
-              <StatusIcon className={cn(iconSizes[size], 'mr-1')} />
-              {config.label}
-            </Badge>
+            <span className="inline-flex">
+              <Badge 
+                variant="outline" 
+                className={cn(config.className, sizeClasses[size], 'cursor-help')}
+              >
+                <StatusIcon className={cn(iconSizes[size], 'mr-1')} />
+                {config.label}
+              </Badge>
+            </span>
           </TooltipTrigger>
           <TooltipContent side="top" className="max-w-xs">
             <div className="space-y-1">
