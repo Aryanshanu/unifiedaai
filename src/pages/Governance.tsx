@@ -314,6 +314,15 @@ export default function Governance() {
               </div>
             )}
           </div>
+
+          {/* Governance Enforcement */}
+          <div className="bg-card border border-border rounded-xl p-6">
+            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-4">
+              <Shield className="w-4 h-4 text-primary" />
+              Governance Enforcement
+            </h2>
+            <GovernanceEnforcementPanel />
+          </div>
         </div>
 
         {/* Sidebar */}
