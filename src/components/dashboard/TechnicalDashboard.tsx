@@ -24,7 +24,7 @@ export function TechnicalDashboard() {
         .limit(8);
       return data || [];
     },
-    refetchInterval: 60000,
+    refetchInterval: false,
   });
 
   const { data: dqMetrics } = useQuery({
