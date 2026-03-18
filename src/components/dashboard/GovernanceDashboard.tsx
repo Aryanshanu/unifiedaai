@@ -37,7 +37,7 @@ export function GovernanceDashboard() {
         .eq('blocked', true);
       return count || 0;
     },
-    refetchInterval: 60000,
+    refetchInterval: false,
   });
 
   const { data: driftAlerts } = useQuery({
