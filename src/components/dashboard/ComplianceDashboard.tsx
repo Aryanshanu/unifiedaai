@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   FileCheck, FileText, Shield, CheckCircle,
-  Clock, AlertTriangle,
+  Clock, AlertTriangle, Hash,
 } from "lucide-react";
 
 export function ComplianceDashboard() {
