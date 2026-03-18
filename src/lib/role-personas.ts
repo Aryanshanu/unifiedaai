@@ -60,7 +60,7 @@ export const PERSONA_MAP: Record<AppRole, PersonaConfig> = {
     avatarEmoji: '📋',
     avatarGradient: 'from-rose-500 to-pink-600',
     borderColor: 'border-l-rose-500',
-    defaultRoute: '/decision-ledger',
+    defaultRoute: '/audit-center',
     dashboardLayout: 'compliance',
     sidebarSections: ['govern', 'data-governance', 'docs'],
   },
