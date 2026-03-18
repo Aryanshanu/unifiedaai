@@ -272,16 +272,7 @@ export default function Governance() {
           <div className="bg-card border border-border rounded-xl p-6">
               <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-foreground">Pending Controls</h2>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="outline" size="sm" disabled>View All</Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Controls detail page coming soon</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Badge variant="outline">{pendingControls.length} pending</Badge>
             </div>
 
             {controls?.length === 0 ? (
