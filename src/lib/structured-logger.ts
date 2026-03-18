@@ -51,7 +51,7 @@ class StructuredLogger {
   private subscribers: Set<LogSubscriber> = new Set();
   private sessionId: string;
   private config: LogConfig = {
-    minLevel: 'DEBUG',
+    minLevel: 'ERROR',
     enableConsole: true,
     enablePersistence: true,
     maxLogs: 2000,
