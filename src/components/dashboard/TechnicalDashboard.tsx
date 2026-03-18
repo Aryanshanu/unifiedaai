@@ -55,7 +55,7 @@ export function TechnicalDashboard() {
         .single();
       return data;
     },
-    refetchInterval: 120000,
+    refetchInterval: false,
   });
 
   const raiEngines = [

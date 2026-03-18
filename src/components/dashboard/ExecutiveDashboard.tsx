@@ -59,7 +59,7 @@ export function ExecutiveDashboard() {
         .limit(5);
       return data || [];
     },
-    refetchInterval: 60000,
+    refetchInterval: false,
   });
 
   const totalModels = models?.length || 0;

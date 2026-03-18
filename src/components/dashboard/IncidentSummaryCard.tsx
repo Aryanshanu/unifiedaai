@@ -41,7 +41,7 @@ export function IncidentSummaryCard() {
       } as IncidentSummary;
     },
     staleTime: 60_000,
-    refetchInterval: 60_000, // Refresh every 60 seconds
+    refetchInterval: false,
   });
 
   if (isLoading) {

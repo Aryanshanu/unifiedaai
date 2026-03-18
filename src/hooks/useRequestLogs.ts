@@ -108,6 +108,6 @@ export function useActivityMetrics(systemId: string) {
     },
     enabled: !!systemId,
     staleTime: 60_000,
-    refetchInterval: 60_000, // Refresh every 60 seconds
+    refetchInterval: false,
   });
 }

@@ -104,7 +104,7 @@ export function usePredictionSummary() {
           : 0,
       };
     },
-    refetchInterval: 60000,
+    refetchInterval: false,
   });
 }
 

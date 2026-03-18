@@ -62,7 +62,7 @@ export function GovernanceDashboard() {
         .limit(5);
       return data || [];
     },
-    refetchInterval: 60000,
+    refetchInterval: false,
   });
 
   return (

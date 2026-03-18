@@ -68,7 +68,7 @@ export function useGovernanceFlowMetrics(): GovernanceFlowData {
       };
     },
     staleTime: 60_000,
-    refetchInterval: 120_000, // Refresh every 2 minutes
+    refetchInterval: false,
   });
 
   // Calculate stage statuses based on metrics

@@ -72,7 +72,7 @@ export function ComplianceDashboard() {
         .limit(5);
       return data || [];
     },
-    refetchInterval: 60000,
+    refetchInterval: false,
   });
 
   const pendingAttestations = attestations?.filter(a => a.status === 'pending').length || 0;

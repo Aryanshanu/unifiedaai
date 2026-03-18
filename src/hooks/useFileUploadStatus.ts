@@ -268,7 +268,7 @@ export function useQualityStats() {
       };
     },
     staleTime: 60_000,
-    refetchInterval: 60000,
+    refetchInterval: false,
   });
 
   return { stats, loading };

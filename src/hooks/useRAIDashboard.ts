@@ -188,7 +188,7 @@ export function useModelRAIScores(
       return results;
     },
     staleTime: 60_000,
-    refetchInterval: 120_000, // Refresh every 2 minutes
+    refetchInterval: false,
   });
 
   // Subscribe to realtime updates
