@@ -30,8 +30,6 @@ const navItems: NavItem[] = [
   { path: "/continuous-evaluation", icon: Clock, label: "Continuous Eval" },
   { divider: true, label: "Govern" },
   { path: "/governance/approvals", icon: Shield, label: "Approvals" },
-  { path: "/decision-ledger", icon: FileText, label: "Decision Ledger" },
-  { path: "/governance-framework", icon: Shield, label: "Governance API" },
   { path: "/hitl", icon: Users, label: "HITL Console" },
   { path: "/incidents", icon: AlertCircle, label: "Incidents" },
   { path: "/lineage", icon: GitBranch, label: "Knowledge Graph" },

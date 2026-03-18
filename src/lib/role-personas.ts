@@ -97,11 +97,9 @@ export const ROUTE_ACCESS_MAP: Record<string, AppRole[]> = {
   // Governance — executive + steward + auditor
   '/governance': ['admin', 'reviewer', 'viewer'],
   '/governance/approvals': ['admin', 'reviewer'],
-  '/decision-ledger': ['admin', 'reviewer', 'viewer'],
   '/hitl': ['admin', 'reviewer'],
   '/incidents': ['admin', 'reviewer', 'viewer'],
   '/lineage': ['admin', 'reviewer', 'viewer'],
-  '/governance-framework': ['admin', 'reviewer', 'viewer'],
   '/audit-center': ['admin', 'reviewer', 'viewer'],
 
   // Core RAI Engines — technical only

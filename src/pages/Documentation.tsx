@@ -2286,7 +2286,7 @@ const Documentation = () => {
                 </div>
                 <div className="p-3 rounded bg-background">
                   <strong>Incident response:</strong>
-                  <p className="text-muted-foreground text-xs mt-1">Alerts → Incidents → Decision Ledger (for audit)</p>
+                  <p className="text-muted-foreground text-xs mt-1">Alerts → Incidents → Audit Center (for audit)</p>
                 </div>
               </div>
             </div>

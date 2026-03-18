@@ -127,7 +127,7 @@ const App = () => (
                 {/* Audit */}
                 {/* Audit */}
                 <Route path="/audit-center" element={<ProtectedRoute><AuditCenter /></ProtectedRoute>} />
-                <Route path="/governance-framework" element={<ProtectedRoute><GovernanceFramework /></ProtectedRoute>} />
+                
                 <Route path="/semantic-hub" element={<ProtectedRoute><SemanticLayerHub /></ProtectedRoute>} />
                 <Route path="/discovery" element={<ProtectedRoute><Discovery /></ProtectedRoute>} />
                 <Route path="/agents" element={<ProtectedRoute><AgentGovernance /></ProtectedRoute>} />
