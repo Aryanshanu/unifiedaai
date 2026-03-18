@@ -4976,7 +4976,9 @@ export type Database = {
           id: string
           mfa_enabled: boolean
           password_min_length: number
+          require_numbers: boolean | null
           require_special_chars: boolean
+          require_uppercase: boolean | null
           session_timeout_minutes: number
           updated_at: string
           user_id: string
@@ -4987,7 +4989,9 @@ export type Database = {
           id?: string
           mfa_enabled?: boolean
           password_min_length?: number
+          require_numbers?: boolean | null
           require_special_chars?: boolean
+          require_uppercase?: boolean | null
           session_timeout_minutes?: number
           updated_at?: string
           user_id: string
@@ -4998,7 +5002,9 @@ export type Database = {
           id?: string
           mfa_enabled?: boolean
           password_min_length?: number
+          require_numbers?: boolean | null
           require_special_chars?: boolean
+          require_uppercase?: boolean | null
           session_timeout_minutes?: number
           updated_at?: string
           user_id?: string
