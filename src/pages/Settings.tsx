@@ -194,6 +194,8 @@ function SecuritySection() {
     session_timeout_minutes: 60,
     password_min_length: 12,
     require_special_chars: true,
+    require_uppercase: true,
+    require_numbers: true,
     audit_retention_days: 2555,
   });
 
