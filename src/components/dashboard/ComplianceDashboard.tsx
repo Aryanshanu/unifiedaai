@@ -5,8 +5,8 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  FileCheck, FileText, Shield, ArrowRight, CheckCircle,
-  Clock, AlertTriangle, Hash,
+  FileCheck, FileText, Shield, CheckCircle,
+  Clock, AlertTriangle,
 } from "lucide-react";
 
 export function ComplianceDashboard() {

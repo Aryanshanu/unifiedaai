@@ -6,7 +6,7 @@ import { usePlatformMetrics } from "@/hooks/usePlatformMetrics";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  ShieldCheck, Users, AlertCircle, FileText, ArrowRight,
+  ShieldCheck, Users, AlertCircle, ArrowRight,
   Clock, AlertTriangle, GitBranch,
 } from "lucide-react";
 
