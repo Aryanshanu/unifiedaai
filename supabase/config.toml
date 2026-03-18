@@ -152,3 +152,6 @@ verify_jwt = false
 
 [functions.semantic-drift-check]
 verify_jwt = false
+
+[functions.run-scheduled-evaluations]
+verify_jwt = false
