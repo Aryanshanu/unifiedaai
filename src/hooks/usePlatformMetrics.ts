@@ -88,8 +88,8 @@ export function usePlatformMetrics() {
         recentIncidents: incidentsRes.count || 0,
       } as PlatformMetrics;
     },
-    staleTime: 60_000,
-    refetchInterval: 60000,
+    staleTime: 120_000,
+    refetchInterval: false,
   });
 }
 
@@ -174,8 +174,8 @@ export function useSystemHealthSummary() {
 
       return summaries;
     },
-    staleTime: 60_000,
-    refetchInterval: 60000,
+    staleTime: 120_000,
+    refetchInterval: false,
   });
 }
 
@@ -212,7 +212,7 @@ export function useUnsafeDeployments() {
 
       return unsafeDeployments;
     },
-    staleTime: 60_000,
-    refetchInterval: 60000,
+    staleTime: 120_000,
+    refetchInterval: false,
   });
 }

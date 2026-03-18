@@ -66,7 +66,7 @@ export default function Index() {
         openViolations: violationsRes.count || 0,
       };
     },
-    refetchInterval: 60000,
+    refetchInterval: false,
   });
 
   // Semantic Layer metrics
@@ -87,9 +87,8 @@ export default function Index() {
         openDrift: driftRes.count || 0,
       };
     },
-    refetchInterval: 60000,
+    refetchInterval: false,
   });
-
 
   // Recent incidents - keep but with longer interval
   const { data: recentIncidents } = useQuery({
@@ -104,7 +103,7 @@ export default function Index() {
       if (error) return [];
       return data || [];
     },
-    refetchInterval: 60000,
+    refetchInterval: false,
   });
   
 
