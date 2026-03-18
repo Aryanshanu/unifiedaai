@@ -15,7 +15,7 @@ import { EnforcementBadge } from "@/components/shared/EnforcementBadge";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { CreateFrameworkDialog } from "@/components/governance/CreateFrameworkDialog";
-
+import { GovernanceEnforcementPanel } from "@/components/governance/GovernanceEnforcementPanel";
 
 export default function Governance() {
   const { data: frameworks, isLoading: frameworksLoading, isError: frameworksError, refetch: refetchFrameworks } = useControlFrameworks();
