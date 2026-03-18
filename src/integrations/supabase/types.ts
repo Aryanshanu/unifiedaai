@@ -258,6 +258,48 @@ export type Database = {
         }
         Relationships: []
       }
+      api_keys: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          key_hash: string
+          key_preview: string
+          last_used_at: string | null
+          name: string
+          permissions: Json
+          rate_limit: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          key_hash: string
+          key_preview: string
+          last_used_at?: string | null
+          name: string
+          permissions?: Json
+          rate_limit?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          key_hash?: string
+          key_preview?: string
+          last_used_at?: string | null
+          name?: string
+          permissions?: Json
+          rate_limit?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       app_errors: {
         Row: {
           component_name: string | null
@@ -1941,8 +1983,10 @@ export type Database = {
       deployment_environments: {
         Row: {
           approval_required: boolean | null
+          auto_destroy_at: string | null
           auto_monitoring: boolean | null
           created_at: string | null
+          created_by: string | null
           description: string | null
           display_name: string
           id: string
@@ -1950,12 +1994,16 @@ export type Database = {
           max_risk_tier: string | null
           name: string
           notification_channels: Json | null
+          region: string | null
+          status: string
           updated_at: string | null
         }
         Insert: {
           approval_required?: boolean | null
+          auto_destroy_at?: string | null
           auto_monitoring?: boolean | null
           created_at?: string | null
+          created_by?: string | null
           description?: string | null
           display_name: string
           id?: string
@@ -1963,12 +2011,16 @@ export type Database = {
           max_risk_tier?: string | null
           name: string
           notification_channels?: Json | null
+          region?: string | null
+          status?: string
           updated_at?: string | null
         }
         Update: {
           approval_required?: boolean | null
+          auto_destroy_at?: string | null
           auto_monitoring?: boolean | null
           created_at?: string | null
+          created_by?: string | null
           description?: string | null
           display_name?: string
           id?: string
@@ -1976,6 +2028,8 @@ export type Database = {
           max_risk_tier?: string | null
           name?: string
           notification_channels?: Json | null
+          region?: string | null
+          status?: string
           updated_at?: string | null
         }
         Relationships: []
@@ -2583,6 +2637,42 @@ export type Database = {
           },
         ]
       }
+      evaluation_schedule_runs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          engines_run: string[] | null
+          error_message: string | null
+          id: string
+          results: Json | null
+          schedule_id: string
+          started_at: string
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          engines_run?: string[] | null
+          error_message?: string | null
+          id?: string
+          results?: Json | null
+          schedule_id: string
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          engines_run?: string[] | null
+          error_message?: string | null
+          id?: string
+          results?: Json | null
+          schedule_id?: string
+          started_at?: string
+          status?: string
+        }
+        Relationships: []
+      }
       evaluation_schedules: {
         Row: {
           created_at: string | null
@@ -2976,6 +3066,95 @@ export type Database = {
           notes?: string | null
           status?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      governance_enforcements: {
+        Row: {
+          attempted_action: string
+          created_at: string
+          decision: string
+          id: string
+          overridden_by: string | null
+          override_justification: string | null
+          policy_id: string | null
+          reason: string | null
+          target_id: string | null
+          target_type: string
+        }
+        Insert: {
+          attempted_action: string
+          created_at?: string
+          decision: string
+          id?: string
+          overridden_by?: string | null
+          override_justification?: string | null
+          policy_id?: string | null
+          reason?: string | null
+          target_id?: string | null
+          target_type: string
+        }
+        Update: {
+          attempted_action?: string
+          created_at?: string
+          decision?: string
+          id?: string
+          overridden_by?: string | null
+          override_justification?: string | null
+          policy_id?: string | null
+          reason?: string | null
+          target_id?: string | null
+          target_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "governance_enforcements_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "governance_policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      governance_policies: {
+        Row: {
+          action_type: string
+          condition_config: Json
+          condition_type: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          scope: string
+          updated_at: string
+        }
+        Insert: {
+          action_type?: string
+          condition_config?: Json
+          condition_type: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          scope?: string
+          updated_at?: string
+        }
+        Update: {
+          action_type?: string
+          condition_config?: Json
+          condition_type?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          scope?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -3613,9 +3792,14 @@ export type Database = {
       }
       organization_settings: {
         Row: {
+          audit_retention_years: number | null
+          ccpa_enabled: boolean | null
+          compliance_frameworks: Json | null
           created_at: string
+          data_residency: string | null
           data_retention_days: number | null
           default_workspace: string | null
+          gdpr_enabled: boolean | null
           id: string
           organization_name: string | null
           timezone: string | null
@@ -3623,9 +3807,14 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          audit_retention_years?: number | null
+          ccpa_enabled?: boolean | null
+          compliance_frameworks?: Json | null
           created_at?: string
+          data_residency?: string | null
           data_retention_days?: number | null
           default_workspace?: string | null
+          gdpr_enabled?: boolean | null
           id?: string
           organization_name?: string | null
           timezone?: string | null
@@ -3633,9 +3822,14 @@ export type Database = {
           user_id: string
         }
         Update: {
+          audit_retention_years?: number | null
+          ccpa_enabled?: boolean | null
+          compliance_frameworks?: Json | null
           created_at?: string
+          data_residency?: string | null
           data_retention_days?: number | null
           default_workspace?: string | null
+          gdpr_enabled?: boolean | null
           id?: string
           organization_name?: string | null
           timezone?: string | null
@@ -4772,6 +4966,42 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           sidebar_sections?: Json
+        }
+        Relationships: []
+      }
+      security_config: {
+        Row: {
+          audit_retention_days: number
+          created_at: string
+          id: string
+          mfa_enabled: boolean
+          password_min_length: number
+          require_special_chars: boolean
+          session_timeout_minutes: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          audit_retention_days?: number
+          created_at?: string
+          id?: string
+          mfa_enabled?: boolean
+          password_min_length?: number
+          require_special_chars?: boolean
+          session_timeout_minutes?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          audit_retention_days?: number
+          created_at?: string
+          id?: string
+          mfa_enabled?: boolean
+          password_min_length?: number
+          require_special_chars?: boolean
+          session_timeout_minutes?: number
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }

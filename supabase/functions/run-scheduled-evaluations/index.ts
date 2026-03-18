@@ -16,17 +16,37 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get all active schedules that are due
-    const { data: schedules, error: schedErr } = await supabase
+    // Optionally filter to a specific schedule
+    let body: { schedule_id?: string } = {};
+    try { body = await req.json(); } catch { /* empty body is fine */ }
+
+    // Get schedules to run
+    let query = supabase
       .from("evaluation_schedules")
       .select("*")
       .eq("is_active", true);
 
+    if (body.schedule_id) {
+      query = query.eq("id", body.schedule_id);
+    }
+
+    const { data: schedules, error: schedErr } = await query;
     if (schedErr) throw schedErr;
 
     const results: { schedule_id: string; status: string; engines_run: string[] }[] = [];
 
     for (const schedule of schedules || []) {
+      // Log run start
+      const { data: runRecord } = await supabase
+        .from("evaluation_schedule_runs")
+        .insert({
+          schedule_id: schedule.id,
+          status: "running",
+          started_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
       try {
         const enginesRun: string[] = [];
 
@@ -45,6 +65,22 @@ serve(async (req) => {
           }
         }
 
+        const runStatus = enginesRun.length === schedule.engine_types.length ? "success" : 
+                          enginesRun.length > 0 ? "partial" : "failed";
+
+        // Update run record
+        if (runRecord) {
+          await supabase
+            .from("evaluation_schedule_runs")
+            .update({
+              completed_at: new Date().toISOString(),
+              status: runStatus,
+              engines_run: enginesRun,
+              results: { engines_requested: schedule.engine_types.length, engines_completed: enginesRun.length },
+            })
+            .eq("id", runRecord.id);
+        }
+
         // Update schedule metadata
         await supabase
           .from("evaluation_schedules")
@@ -59,11 +95,24 @@ serve(async (req) => {
 
         results.push({
           schedule_id: schedule.id,
-          status: enginesRun.length === schedule.engine_types.length ? "success" : "partial",
+          status: runStatus,
           engines_run: enginesRun,
         });
       } catch (e) {
         console.error(`Schedule ${schedule.id} failed:`, e);
+        
+        // Update run record as failed
+        if (runRecord) {
+          await supabase
+            .from("evaluation_schedule_runs")
+            .update({
+              completed_at: new Date().toISOString(),
+              status: "failed",
+              error_message: e instanceof Error ? e.message : "Unknown error",
+            })
+            .eq("id", runRecord.id);
+        }
+
         results.push({ schedule_id: schedule.id, status: "failed", engines_run: [] });
 
         await supabase
