@@ -26,7 +26,7 @@ export const PERSONA_MAP: Record<AppRole, PersonaConfig> = {
     borderColor: 'border-l-blue-500',
     defaultRoute: '/',
     dashboardLayout: 'executive',
-    sidebarSections: ['all'],
+    sidebarSections: ['govern', 'data-governance', 'docs'],
   },
   reviewer: {
     role: 'reviewer',
@@ -79,68 +79,63 @@ export const SECTION_KEY_MAP: Record<string, string> = {
 
 /**
  * Route-to-role access map.
- * Admin has access to everything, so is omitted (handled in code).
- * Each entry maps a route prefix to allowed non-admin roles.
+ * Every role is explicitly listed — there is NO admin bypass.
  */
 export const ROUTE_ACCESS_MAP: Record<string, AppRole[]> = {
   '/': ['admin', 'reviewer', 'analyst', 'viewer'],
   '/auth': ['admin', 'reviewer', 'analyst', 'viewer'],
   '/error': ['admin', 'reviewer', 'analyst', 'viewer'],
 
-  // Discover & Monitor
-  '/discovery': ['admin', 'reviewer', 'analyst'],
-  '/agents': ['admin', 'reviewer', 'analyst'],
-  '/observability': ['admin', 'reviewer', 'analyst'],
-  '/alerts': ['admin', 'reviewer', 'analyst'],
-  '/continuous-evaluation': ['admin', 'reviewer', 'analyst'],
-  '/evaluation': ['admin', 'reviewer', 'analyst'],
+  // Discover & Monitor — operational, not executive
+  '/discovery': ['reviewer', 'analyst'],
+  '/agents': ['reviewer', 'analyst'],
+  '/observability': ['reviewer', 'analyst'],
+  '/alerts': ['reviewer', 'analyst'],
+  '/continuous-evaluation': ['analyst'],
+  '/evaluation': ['analyst'],
 
-  // Governance
+  // Governance — executive + steward + auditor
   '/governance': ['admin', 'reviewer', 'viewer'],
   '/governance/approvals': ['admin', 'reviewer'],
   '/decision-ledger': ['admin', 'reviewer', 'viewer'],
-  '/hitl': ['admin', 'reviewer', 'viewer'],
+  '/hitl': ['admin', 'reviewer'],
   '/incidents': ['admin', 'reviewer', 'viewer'],
   '/lineage': ['admin', 'reviewer', 'viewer'],
   '/governance-framework': ['admin', 'reviewer', 'viewer'],
   '/audit-center': ['admin', 'reviewer', 'viewer'],
 
-  // Core RAI Engines
-  '/engine/fairness': ['admin', 'analyst'],
-  '/engine/hallucination': ['admin', 'analyst'],
-  '/engine/toxicity': ['admin', 'analyst'],
-  '/engine/privacy': ['admin', 'analyst'],
-  '/engine/explainability': ['admin', 'analyst'],
-  '/engine/data-quality': ['admin', 'reviewer', 'analyst', 'viewer'],
+  // Core RAI Engines — technical only
+  '/engine/fairness': ['analyst'],
+  '/engine/hallucination': ['analyst'],
+  '/engine/toxicity': ['analyst'],
+  '/engine/privacy': ['analyst'],
+  '/engine/explainability': ['analyst'],
+  '/engine/data-quality': ['analyst', 'reviewer', 'viewer'],
 
-  // Core Security
-  '/security': ['admin', 'analyst'],
-  '/security/pentest': ['admin', 'analyst'],
-  '/security/jailbreak': ['admin', 'analyst'],
-  '/security/threats': ['admin', 'analyst'],
+  // Core Security — technical only
+  '/security': ['analyst'],
+  '/security/pentest': ['analyst'],
+  '/security/jailbreak': ['analyst'],
+  '/security/threats': ['analyst'],
 
-  // Data Governance
+  // Data Governance — all roles for oversight
   '/data-contracts': ['admin', 'reviewer', 'analyst', 'viewer'],
   '/semantic-definitions': ['admin', 'reviewer', 'analyst', 'viewer'],
   '/semantic-hub': ['admin', 'reviewer', 'analyst', 'viewer'],
 
-  // Registry
-  '/projects': ['admin', 'analyst'],
-  '/models': ['admin', 'analyst'],
-  '/environments': ['admin', 'analyst'],
-
-  // Configure
-  '/settings': ['admin'],
+  // Configure — technical only
+  '/projects': ['analyst'],
+  '/models': ['analyst'],
+  '/environments': ['analyst'],
+  '/settings': ['analyst'],
   '/docs': ['admin', 'reviewer', 'analyst', 'viewer'],
 };
 
 /**
  * Check if a role can access a given pathname.
- * Uses longest-prefix matching.
+ * Uses longest-prefix matching. No admin bypass.
  */
 export function canAccessRoute(roles: AppRole[], pathname: string): boolean {
-  if (roles.includes('admin')) return true;
-
   // Find the longest matching route key
   let bestMatch = '';
   for (const routeKey of Object.keys(ROUTE_ACCESS_MAP)) {
@@ -166,7 +161,7 @@ export function canAccessRoute(roles: AppRole[], pathname: string): boolean {
     return roles.some(r => ROUTE_ACCESS_MAP[parentPath].includes(r));
   }
 
-  // Unknown routes: deny for non-admins
+  // Unknown routes: deny
   return false;
 }
 

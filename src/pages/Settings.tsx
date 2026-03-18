@@ -693,12 +693,6 @@ function IntegrationsSection() {
             <Badge className="bg-success/10 text-success">Enabled</Badge>
           </CardContent>
         </Card>
-        <h3 className="text-sm font-medium text-muted-foreground mt-6 mb-3 uppercase tracking-wide">Planned Integrations</h3>
-        <div className="space-y-3">
-          <PlannedFeatureCard title="MLflow" description="Experiment tracking and model registry integration." status="Planned" />
-          <PlannedFeatureCard title="Slack" description="Send alerts and notifications to Slack channels." status="Planned" />
-          <PlannedFeatureCard title="PagerDuty" description="Incident management and on-call escalation." status="Planned" />
-        </div>
       </div>
     </>
   );
