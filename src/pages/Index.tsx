@@ -67,7 +67,7 @@ export default function Index() {
         openViolations: violationsRes.count || 0,
       };
     },
-    refetchInterval: 60000,
+    refetchInterval: false,
   });
 
   // Semantic Layer metrics
