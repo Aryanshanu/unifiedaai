@@ -1,53 +1,49 @@
-# Validation: Platform Gap Remediation — COMPLETED
 
-## Changes Made
 
-### Gap 1: Discovery & Inventory (25% → 70%)
-- **NEW** `ai_vendors` table — track third-party AI vendors with risk tiers, compliance certs, data processing locations
-- **NEW** `shadow_ai_discoveries` table — report and triage unauthorized AI systems
-- **NEW** `/discovery` page — Shadow AI reporting + vendor registry with full CRUD
-- **NEW** Sidebar "DISCOVER" section with AI Discovery link
+# Gap Analysis: What Was Actually Missed
 
-### Gap 2: Pre-Built Regulation Packs (55% → 80%)
-- **SEEDED** NIST AI RMF — 19 controls (GOVERN, MAP, MEASURE, MANAGE categories)
-- **SEEDED** ISO/IEC 42001 — 15 controls (A.2 through A.8 categories)
-- **NEW** SOC 2 Type II — 20 controls (CC, PI, P categories)
-- **NEW** HITRUST CSF v11.0 — 15 controls (HIE, RMG, TPM, IRM, PRM categories)
-- EU AI Act already had 45 controls
+After auditing the database, hooks, and UI for all 4 implementations, here's the precise delta:
 
-### Gap 3: Continuous/Scheduled Evaluations (Partial → 75%)
-- **NEW** `evaluation_schedules` table — cron-based scheduling with per-model, per-engine config
-- **NEW** `/continuous-evaluation` page — create/manage/toggle evaluation schedules
-- **NEW** `run-scheduled-evaluations` edge function — executes due schedules, updates run counts
-- Cron presets: hourly, 6h, daily, weekly, monthly
+## Status of Each Implementation
 
-### Gap 4: Agent-Level Governance (0% → 70%)
-- **NEW** `ai_agents` table — full agent registry with type, autonomy level, environment, tracing
-- **NEW** `agent_traces` table — execution traces with policy violations, durations, parent traces
-- **NEW** `/agents` page — agent registry + trace viewer with realtime subscriptions
-- Agent types: autonomous, semi_autonomous, tool_calling, conversational
-- Autonomy levels: fully_autonomous, supervised, human_in_loop
+| Impl | Status | What's Missing |
+|------|--------|---------------|
+| 2: Settings | 95% done | Security config missing `require_uppercase` and `require_numbers` columns + UI toggles |
+| 3: Environments | 100% done | Fully functional CRUD with create/delete dialogs |
+| 4: Continuous Eval | 99% done | Cron + runs table + UI all working. Missing: `governance_mode` seed row in `platform_config` |
+| 5: Governance Enforcement | 99% done | Panel + policies + enforcements all working. `governance_mode` config row not seeded |
 
-### Gap 5: Environment Management (0% → 60%)
-- **NEW** `deployment_environments` table — dev/staging/prod with approval gates, risk tier limits
-- **NEW** `/environments` page — environment cards with system/agent counts, governance controls
-- Seeded 3 default environments (development, staging, production)
+## Concrete Fixes Required
 
-## Updated Scorecard
+### Fix 1: Add missing password policy columns to `security_config`
+- Migration: `ALTER TABLE security_config ADD COLUMN require_uppercase boolean DEFAULT true, ADD COLUMN require_numbers boolean DEFAULT true;`
+- Update `useSecurityConfig.ts` interface to include `require_uppercase` and `require_numbers`
+- Update `SecuritySection` in `Settings.tsx` to add two more Switch toggles for uppercase and numbers requirements
 
-| Pillar | Before | After |
-|--------|--------|-------|
-| 1. Discovery and Inventory | 25% | 70% |
-| 2. Risk Assessment | 60% | 60% |
-| 3. Policy Enforcement | 55% | 80% |
-| 4. Runtime Monitoring | 50% | 70% |
-| 5. Reporting and Scaling | 50% | 60% |
+### Fix 2: Seed `governance_mode` into `platform_config`
+- Insert (not migration): `INSERT INTO platform_config (config_key, config_value, category, description) VALUES ('governance_mode', '{"mode": "advisory"}', 'governance', 'Global governance enforcement mode');`
+- This makes the GovernanceEnforcementPanel toggle persist properly instead of always defaulting
 
-## Overall Platform Readiness: ~68%
+### Fix 3: Session timeout options mismatch
+- User spec says 15/30/60/240 min options. Current code has 15/30/60/120/480. Minor — update the select options to match spec (add 240, remove 120/480 or keep all).
 
-## Remaining Gaps
-- Automatic shadow AI network scanning (requires infrastructure agents)
-- Hyperscaler integration connectors (AWS/Azure/GCP)
-- pg_cron setup for truly automated scheduled evaluations
-- Stakeholder-specific report views
-- Multi-tenant data isolation
+### Fix 4: Audit retention display
+- User spec says 90d/180d/1y/7y. Current code has 1y/3y/5y/7y/10y. Add 90-day and 180-day options.
+
+## What's NOT Missing (already complete)
+- Security section: MFA toggle, session timeout, password length, special chars, audit retention — all functional with DB persistence
+- Notifications section: Channel CRUD (email/slack/webhook), enable/disable, delete — all functional
+- API Keys section: Generate with SHA-256 hash, copy-once display, revoke — all functional
+- Regions section: Data residency selector, GDPR/CCPA toggles, compliance frameworks, audit retention — all functional with DB persistence
+- Environment Management: Create/Delete dialogs, region selector, risk tier, approval gates — all functional
+- Continuous Evaluation: Schedule CRUD, Run Now button, run history display, pg_cron active — all functional
+- Governance Enforcement: Advisory/Enforced toggle, policy CRUD, enforcement log — all functional
+
+## Implementation Plan
+1. Database migration: add `require_uppercase` and `require_numbers` to `security_config`
+2. Insert `governance_mode` row into `platform_config` (using insert tool, not migration)
+3. Update `useSecurityConfig.ts` interface
+4. Update `SecuritySection` in `Settings.tsx` with additional toggles and corrected dropdown options
+
+Total scope: ~30 lines of code changes + 1 small migration + 1 data insert.
+
