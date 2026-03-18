@@ -1539,77 +1539,11 @@ const Documentation = () => {
                   </div>
                 </div>
 
-                {/* Decision Ledger */}
-                <div className="p-6 rounded-xl border bg-card">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <Hash className="h-5 w-5 text-blue-500" />
-                    8.2 Decision Ledger
-                  </h3>
-                  <p className="text-muted-foreground mb-4">
-                    An immutable audit trail of every AI decision. Uses blockchain-style hash chains 
-                    to ensure records cannot be tampered with.
-                  </p>
-
-                  <div className="space-y-4">
-                    <div className="p-4 rounded-lg bg-muted/30 font-mono text-sm">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-muted-foreground">record_hash</span>
-                        <span>=</span>
-                        <span className="text-blue-500">SHA256(decision_data + previous_hash)</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Each record's hash includes the previous record's hash, creating an unbreakable chain.
-                      </div>
-                    </div>
-
-                    <div className="p-4 rounded-lg bg-muted/50">
-                      <h4 className="font-medium mb-2">What's Recorded in Each Entry</h4>
-                      <div className="grid md:grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <span className="font-mono text-xs bg-background px-1 py-0.5 rounded">decision_ref</span>
-                          <p className="text-xs text-muted-foreground mt-1">Unique reference (e.g., "EVAL-2025-0042")</p>
-                        </div>
-                        <div>
-                          <span className="font-mono text-xs bg-background px-1 py-0.5 rounded">decision_value</span>
-                          <p className="text-xs text-muted-foreground mt-1">The actual decision ("APPROVED", "DENIED")</p>
-                        </div>
-                        <div>
-                          <span className="font-mono text-xs bg-background px-1 py-0.5 rounded">confidence</span>
-                          <p className="text-xs text-muted-foreground mt-1">Model confidence (0-100%)</p>
-                        </div>
-                        <div>
-                          <span className="font-mono text-xs bg-background px-1 py-0.5 rounded">model_id</span>
-                          <p className="text-xs text-muted-foreground mt-1">Which model made the decision</p>
-                        </div>
-                        <div>
-                          <span className="font-mono text-xs bg-background px-1 py-0.5 rounded">input_hash</span>
-                          <p className="text-xs text-muted-foreground mt-1">Hash of input data (privacy-safe)</p>
-                        </div>
-                        <div>
-                          <span className="font-mono text-xs bg-background px-1 py-0.5 rounded">output_hash</span>
-                          <p className="text-xs text-muted-foreground mt-1">Hash of output data</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-4 rounded-lg bg-red-500/5 border border-red-500/20">
-                      <h4 className="font-medium mb-2 text-red-700 dark:text-red-400 flex items-center gap-2">
-                        <TriangleAlert className="h-4 w-4" />
-                        Tamper Detection
-                      </h4>
-                      <p className="text-sm text-muted-foreground">
-                        If anyone modifies a record, the hash chain breaks. The system detects this automatically 
-                        and flags the inconsistency. This is required for EU AI Act Article 12 compliance.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
                 {/* HITL Console */}
                 <div className="p-6 rounded-xl border bg-card">
                   <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                     <Users className="h-5 w-5 text-purple-500" />
-                    8.3 HITL Console (Human-in-the-Loop)
+                    8.2 HITL Console (Human-in-the-Loop)
                   </h3>
                   <p className="text-muted-foreground mb-4">
                     A queue of AI decisions that need human review. Used for low-confidence predictions, 
