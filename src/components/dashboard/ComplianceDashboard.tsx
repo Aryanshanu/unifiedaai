@@ -31,7 +31,7 @@ export function ComplianceDashboard() {
         rate: total > 0 ? Math.round((compliant / total) * 100) : 0,
       };
     },
-    refetchInterval: 120000,
+    refetchInterval: false,
   });
 
   const { data: attestations } = useQuery({
