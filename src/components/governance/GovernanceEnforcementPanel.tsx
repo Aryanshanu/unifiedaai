@@ -47,7 +47,7 @@ export function GovernanceEnforcementPanel() {
     action_type: 'warn',
   });
 
-  const governanceMode = configs?.find(c => c.config_key === 'governance_mode')?.config_value as string || 'advisory';
+  const governanceMode = (configs?.find(c => c.config_key === 'governance_mode')?.config_value as unknown as string) || 'advisory';
   const isEnforced = governanceMode === 'enforced';
 
   const handleModeToggle = async (enforced: boolean) => {
