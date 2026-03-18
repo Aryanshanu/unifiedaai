@@ -34,7 +34,7 @@ export function usePredictiveGovernance(entityType?: string, limit = 20) {
       return data as PredictiveRisk[];
     },
     staleTime: 60_000,
-    refetchInterval: 120_000, // Refresh every 2 minutes
+    refetchInterval: false,
   });
 }
 
