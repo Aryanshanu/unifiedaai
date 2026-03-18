@@ -4,9 +4,9 @@ import { ComplianceGauge } from "@/components/dashboard/ComplianceGauge";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Shield, FileCheck, Download, ChevronRight, ExternalLink, Radio, AlertTriangle } from "lucide-react";
+import { Shield, FileCheck, Download, ExternalLink, AlertTriangle, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useControlFrameworks, useControls, useComplianceStats, useAttestations, useControlAssessments } from "@/hooks/useGovernance";
+import { useControlFrameworks, useControls, useComplianceStats, useAttestations, useControlAssessments, useDeleteFramework } from "@/hooks/useGovernance";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
 import { HealthIndicator } from "@/components/shared/HealthIndicator";
@@ -14,6 +14,8 @@ import { useDataHealth } from "@/components/shared/DataHealthWrapper";
 import { EnforcementBadge } from "@/components/shared/EnforcementBadge";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { CreateFrameworkDialog } from "@/components/governance/CreateFrameworkDialog";
+
 
 export default function Governance() {
   const { data: frameworks, isLoading: frameworksLoading, isError: frameworksError, refetch: refetchFrameworks } = useControlFrameworks();
@@ -21,6 +23,7 @@ export default function Governance() {
   const { data: complianceStats, isLoading: statsLoading, refetch: refetchStats } = useComplianceStats();
   const { data: attestations, isLoading: attestationsLoading, refetch: refetchAttestations } = useAttestations();
   const { data: controlAssessments } = useControlAssessments();
+  const deleteFramework = useDeleteFramework();
 
   const isLoading = frameworksLoading || controlsLoading || statsLoading || attestationsLoading;
   const { status, lastUpdated } = useDataHealth(isLoading, frameworksError);
@@ -191,10 +194,13 @@ export default function Governance() {
         <div className="lg:col-span-2 space-y-6">
           {/* Compliance Overview */}
           <div className="bg-card border border-border rounded-xl p-6">
-            <h2 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-              <Shield className="w-4 h-4 text-primary" />
-              Compliance Posture by Framework
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Shield className="w-4 h-4 text-primary" />
+                Compliance Posture by Framework
+              </h2>
+              <CreateFrameworkDialog />
+            </div>
             
             {frameworksLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -205,17 +211,7 @@ export default function Governance() {
             ) : frameworks?.length === 0 ? (
               <div className="text-center py-8">
                 <Shield className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">No control frameworks configured</p>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="outline" size="sm" className="mt-4" disabled>Add Framework</Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Framework management coming soon</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <p className="text-muted-foreground">No control frameworks configured. Create one to start tracking compliance.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -225,15 +221,32 @@ export default function Governance() {
                   const pct = framework.total_controls > 0 ? Math.round((satisfied / framework.total_controls) * 100) : 0;
                   const fwStatus = pct >= 90 ? "success" : pct >= 70 ? "warning" : "danger";
                   return (
-                    <div key={framework.id} className="bg-secondary/30 rounded-xl p-4">
+                    <div key={framework.id} className="bg-secondary/30 rounded-xl p-4 group relative">
                       <div className="flex items-center justify-between mb-3">
                         <span className="font-medium text-foreground">{framework.name}</span>
-                        <span className={cn(
-                          "text-2xl font-bold font-mono",
-                          fwStatus === "success" ? "text-success" : fwStatus === "warning" ? "text-warning" : "text-danger"
-                        )}>
-                          {pct}%
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={cn(
+                            "text-2xl font-bold font-mono",
+                            fwStatus === "success" ? "text-success" : fwStatus === "warning" ? "text-warning" : "text-danger"
+                          )}>
+                            {pct}%
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                            onClick={async () => {
+                              try {
+                                await deleteFramework.mutateAsync(framework.id);
+                                toast.success(`Framework "${framework.name}" deleted`);
+                              } catch (err: any) {
+                                toast.error(err.message || 'Failed to delete framework');
+                              }
+                            }}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
                       </div>
                       <div className="h-2 bg-secondary rounded-full overflow-hidden">
                         <div
@@ -247,6 +260,7 @@ export default function Governance() {
                       <p className="text-xs text-muted-foreground mt-2">
                         {satisfied} of {framework.total_controls} controls satisfied
                       </p>
+                      <p className="text-xs text-muted-foreground">v{framework.version}</p>
                     </div>
                   );
                 })}
@@ -258,16 +272,7 @@ export default function Governance() {
           <div className="bg-card border border-border rounded-xl p-6">
               <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-foreground">Pending Controls</h2>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="outline" size="sm" disabled>View All</Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Controls detail page coming soon</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Badge variant="outline">{pendingControls.length} pending</Badge>
             </div>
 
             {controls?.length === 0 ? (
