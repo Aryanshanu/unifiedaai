@@ -103,7 +103,7 @@ export default function Index() {
       if (error) return [];
       return data || [];
     },
-    refetchInterval: 60000,
+    refetchInterval: false,
   });
   
 
