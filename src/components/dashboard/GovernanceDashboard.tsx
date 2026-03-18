@@ -25,7 +25,7 @@ export function GovernanceDashboard() {
         .limit(10);
       return data || [];
     },
-    refetchInterval: 30000,
+    refetchInterval: false,
   });
 
   const { data: policyViolations } = useQuery({
