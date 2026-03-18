@@ -11,8 +11,11 @@ import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useEvaluationSchedules, useCreateSchedule, useToggleSchedule } from '@/hooks/useEvaluationSchedules';
 import { useModels } from '@/hooks/useModels';
-import { Clock, Plus, Play, Pause, Calendar, Timer, AlertCircle, CheckCircle } from 'lucide-react';
+import { useScheduleRuns } from '@/hooks/useScheduleRuns';
+import { Clock, Plus, Play, Pause, Timer, CheckCircle, XCircle, Loader2, RotateCw } from 'lucide-react';
 import { format } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const ENGINE_OPTIONS = [
   { id: 'fairness', label: 'Fairness' },
@@ -33,9 +36,11 @@ const CRON_PRESETS = [
 export default function ContinuousEvaluation() {
   const { data: schedules, isLoading } = useEvaluationSchedules();
   const { data: models } = useModels();
+  const { data: runs } = useScheduleRuns();
   const createMutation = useCreateSchedule();
   const toggleMutation = useToggleSchedule();
   const [open, setOpen] = useState(false);
+  const [runningId, setRunningId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: '', model_id: '', cron_expression: '0 0 * * *',
     engine_types: ['fairness', 'toxicity', 'privacy', 'hallucination', 'explainability'],
@@ -43,7 +48,7 @@ export default function ContinuousEvaluation() {
 
   const handleSubmit = () => {
     if (!form.name || !form.model_id) return;
-    createMutation.mutate(form as any, {
+    createMutation.mutate(form as Parameters<typeof createMutation.mutate>[0], {
       onSuccess: () => { setOpen(false); setForm({ name: '', model_id: '', cron_expression: '0 0 * * *', engine_types: ['fairness', 'toxicity', 'privacy', 'hallucination', 'explainability'] }); },
     });
   };
@@ -55,6 +60,25 @@ export default function ContinuousEvaluation() {
         ? f.engine_types.filter(e => e !== engineId)
         : [...f.engine_types, engineId],
     }));
+  };
+
+  const handleRunNow = async (scheduleId: string) => {
+    setRunningId(scheduleId);
+    try {
+      const { error } = await supabase.functions.invoke('run-scheduled-evaluations', {
+        body: { schedule_id: scheduleId },
+      });
+      if (error) throw error;
+      toast.success("Evaluation run triggered");
+    } catch {
+      toast.error("Failed to trigger evaluation run");
+    } finally {
+      setRunningId(null);
+    }
+  };
+
+  const getRunsForSchedule = (scheduleId: string) => {
+    return runs?.filter(r => r.schedule_id === scheduleId).slice(0, 5) || [];
   };
 
   return (
@@ -94,10 +118,7 @@ export default function ContinuousEvaluation() {
                   <div className="grid grid-cols-2 gap-2">
                     {ENGINE_OPTIONS.map(e => (
                       <label key={e.id} className="flex items-center gap-2 text-sm cursor-pointer">
-                        <Checkbox
-                          checked={form.engine_types.includes(e.id)}
-                          onCheckedChange={() => toggleEngine(e.id)}
-                        />
+                        <Checkbox checked={form.engine_types.includes(e.id)} onCheckedChange={() => toggleEngine(e.id)} />
                         {e.label}
                       </label>
                     ))}
@@ -117,43 +138,76 @@ export default function ContinuousEvaluation() {
           </CardContent></Card>
         ) : (
           <div className="grid gap-4">
-            {schedules.map(s => (
-              <Card key={s.id} className="bg-card border-border">
-                <CardContent className="py-4 px-5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      {s.is_active ? <Play className="w-5 h-5 text-green-400" /> : <Pause className="w-5 h-5 text-muted-foreground" />}
-                      <div>
-                        <div className="font-medium text-foreground">{s.name}</div>
-                        <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
-                          <Timer className="w-3 h-3" />
-                          {CRON_PRESETS.find(p => p.value === s.cron_expression)?.label || s.cron_expression}
-                          <span>·</span>
-                          <span>{s.run_count} runs</span>
-                          {s.failure_count > 0 && <><span>·</span><span className="text-red-400">{s.failure_count} failures</span></>}
+            {schedules.map(s => {
+              const scheduleRuns = getRunsForSchedule(s.id);
+              return (
+                <Card key={s.id} className="bg-card border-border">
+                  <CardContent className="py-4 px-5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {s.is_active ? <Play className="w-5 h-5 text-green-400" /> : <Pause className="w-5 h-5 text-muted-foreground" />}
+                        <div>
+                          <div className="font-medium text-foreground">{s.name}</div>
+                          <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
+                            <Timer className="w-3 h-3" />
+                            {CRON_PRESETS.find(p => p.value === s.cron_expression)?.label || s.cron_expression}
+                            <span>·</span>
+                            <span>{s.run_count} runs</span>
+                            {s.failure_count > 0 && <><span>·</span><span className="text-red-400">{s.failure_count} failures</span></>}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex gap-1">
-                        {s.engine_types.map(e => (
-                          <Badge key={e} variant="secondary" className="text-xs">{e}</Badge>
-                        ))}
+                      <div className="flex items-center gap-3">
+                        <div className="flex gap-1">
+                          {s.engine_types.map(e => (
+                            <Badge key={e} variant="secondary" className="text-xs">{e}</Badge>
+                          ))}
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => handleRunNow(s.id)} disabled={runningId === s.id}>
+                          {runningId === s.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
+                        </Button>
+                        <Switch
+                          checked={s.is_active}
+                          onCheckedChange={checked => toggleMutation.mutate({ id: s.id, is_active: checked })}
+                        />
                       </div>
-                      <Switch
-                        checked={s.is_active}
-                        onCheckedChange={checked => toggleMutation.mutate({ id: s.id, is_active: checked })}
-                      />
                     </div>
-                  </div>
-                  {s.last_run_at && (
-                    <div className="text-xs text-muted-foreground mt-2">
-                      Last run: {format(new Date(s.last_run_at), 'MMM d, yyyy HH:mm')}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+                    {s.last_run_at && (
+                      <div className="text-xs text-muted-foreground mt-2">
+                        Last run: {format(new Date(s.last_run_at), 'MMM d, yyyy HH:mm')}
+                      </div>
+                    )}
+
+                    {/* Run History */}
+                    {scheduleRuns.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-border">
+                        <p className="text-xs font-medium text-muted-foreground mb-2">Recent Runs</p>
+                        <div className="space-y-1">
+                          {scheduleRuns.map(run => (
+                            <div key={run.id} className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2">
+                                {run.status === 'success' ? <CheckCircle className="w-3 h-3 text-green-400" /> :
+                                 run.status === 'failed' ? <XCircle className="w-3 h-3 text-red-400" /> :
+                                 <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
+                                <span className="text-muted-foreground">{format(new Date(run.started_at), 'MMM d HH:mm')}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {run.engines_run?.length > 0 && (
+                                  <span className="text-muted-foreground">{run.engines_run.length} engines</span>
+                                )}
+                                <Badge variant={run.status === 'success' ? 'default' : run.status === 'failed' ? 'destructive' : 'secondary'} className="text-xs">
+                                  {run.status}
+                                </Badge>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
