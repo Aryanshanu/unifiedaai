@@ -54,7 +54,7 @@ export function useCreateGovernancePolicy() {
       description?: string;
       scope?: string;
       condition_type: string;
-      condition_config: Record<string, unknown>;
+      condition_config: Json;
       action_type: string;
     }) => {
       if (!user?.id) throw new Error("Not authenticated");
