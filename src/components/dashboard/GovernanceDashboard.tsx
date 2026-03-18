@@ -52,18 +52,6 @@ export function GovernanceDashboard() {
     refetchInterval: false,
   });
 
-  const { data: recentDecisions } = useQuery({
-    queryKey: ['governance-decisions'],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('decision_ledger')
-        .select('id, decision_ref, decision_value, created_at')
-        .order('created_at', { ascending: false })
-        .limit(5);
-      return data || [];
-    },
-    refetchInterval: false,
-  });
 
   return (
     <div className="space-y-6">
