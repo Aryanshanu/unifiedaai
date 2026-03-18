@@ -88,9 +88,8 @@ export default function Index() {
         openDrift: driftRes.count || 0,
       };
     },
-    refetchInterval: 60000,
+    refetchInterval: false,
   });
-
 
   // Recent incidents - keep but with longer interval
   const { data: recentIncidents } = useQuery({
