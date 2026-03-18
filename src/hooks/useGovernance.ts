@@ -160,6 +160,85 @@ export function useAttestations() {
   });
 }
 
+export function useCreateFramework() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      name: string;
+      version: string;
+      description?: string;
+      controls: { code: string; title: string; description?: string; severity: SeverityLevel }[];
+    }) => {
+      // Create framework
+      const { data: framework, error: fwError } = await supabase
+        .from('control_frameworks')
+        .insert({
+          name: input.name,
+          version: input.version,
+          description: input.description || null,
+          total_controls: input.controls.length,
+        })
+        .select()
+        .single();
+
+      if (fwError) throw fwError;
+
+      // Create controls
+      if (input.controls.length > 0) {
+        const controlRows = input.controls.map(c => ({
+          framework_id: framework.id,
+          code: c.code,
+          title: c.title,
+          description: c.description || null,
+          severity: c.severity,
+        }));
+
+        const { error: ctrlError } = await supabase
+          .from('controls')
+          .insert(controlRows);
+
+        if (ctrlError) throw ctrlError;
+      }
+
+      return framework as ControlFramework;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['control-frameworks'] });
+      queryClient.invalidateQueries({ queryKey: ['controls'] });
+      queryClient.invalidateQueries({ queryKey: ['compliance'] });
+    },
+  });
+}
+
+export function useDeleteFramework() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (frameworkId: string) => {
+      // Delete controls first (FK constraint)
+      const { error: ctrlError } = await supabase
+        .from('controls')
+        .delete()
+        .eq('framework_id', frameworkId);
+
+      if (ctrlError) throw ctrlError;
+
+      const { error: fwError } = await supabase
+        .from('control_frameworks')
+        .delete()
+        .eq('id', frameworkId);
+
+      if (fwError) throw fwError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['control-frameworks'] });
+      queryClient.invalidateQueries({ queryKey: ['controls'] });
+      queryClient.invalidateQueries({ queryKey: ['compliance'] });
+    },
+  });
+}
+
 export function useUpdateControlAssessment() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
