@@ -64,6 +64,18 @@ export const PERSONA_MAP: Record<AppRole, PersonaConfig> = {
     dashboardLayout: 'compliance',
     sidebarSections: ['govern', 'data-governance', 'docs'],
   },
+  superadmin: {
+    role: 'superadmin',
+    displayName: 'Platform Admin',
+    description: 'Full unrestricted access to all platform features, engines, and configuration',
+    icon: Crown,
+    avatarEmoji: '🔑',
+    avatarGradient: 'from-yellow-500 to-red-600',
+    borderColor: 'border-l-yellow-500',
+    defaultRoute: '/',
+    dashboardLayout: 'technical',
+    sidebarSections: ['all'],
+  },
 };
 
 /** Map sidebar section labels to their key identifiers */
