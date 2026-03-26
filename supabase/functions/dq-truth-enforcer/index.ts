@@ -35,7 +35,10 @@ const DIMENSION_PREREQUISITES: Record<string, { requires: string; status: string
 const SEVERITY_TO_PRIORITY: Record<string, string> = {
   'critical': 'P0',
   'warning': 'P1',
-  'info': 'P2'
+  'info': 'P2',
+  'P0': 'P0',
+  'P1': 'P1',
+  'P2': 'P2',
 };
 
 interface ExecutionMetric {

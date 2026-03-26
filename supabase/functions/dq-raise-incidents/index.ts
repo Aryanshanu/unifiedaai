@@ -208,19 +208,31 @@ serve(async (req) => {
 
     // Store incidents in database
     if (incidents.length > 0) {
-      const incidentsToInsert = incidents.map((incident) => ({
-        id: incident.id,
-        dataset_id: incident.dataset_id,
-        rule_id: incident.rule_id,
-        execution_id: incident.execution_reference,
-        dimension: incident.dimension,
-        severity: incident.severity,
-        action: incident.action,
-        example_failed_rows: incident.example_failed_rows,
-        profiling_reference: incident.profiling_reference,
-        failure_signature: incident.failure_signature,
-        status: "open",
-      }));
+      const incidentsToInsert = incidents.map((incident) => {
+        // Extract column name from rule_name (e.g., "email_not_null" → "email")
+        const columnName = incident.rule_name.split('_')[0] || null;
+        // Find the metric to get percentage
+        const metric = violatedMetrics.find(m => m.rule_id === incident.rule_id);
+        const affectedPct = metric ? parseFloat(((metric.failed_count / metric.total_count) * 100).toFixed(2)) : null;
+        
+        return {
+          id: incident.id,
+          dataset_id: incident.dataset_id,
+          rule_id: incident.rule_id,
+          execution_id: incident.execution_reference,
+          dimension: incident.dimension,
+          severity: incident.severity,
+          action: incident.action,
+          example_failed_rows: incident.example_failed_rows,
+          profiling_reference: incident.profiling_reference,
+          failure_signature: incident.failure_signature,
+          status: "open",
+          rule_name: incident.rule_name,
+          column_name: columnName,
+          affected_records_count: metric?.failed_count ?? null,
+          affected_records_percentage: affectedPct,
+        };
+      });
 
       const { error: insertError } = await supabase
         .from("dq_incidents")

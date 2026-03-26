@@ -505,7 +505,9 @@ function HistoryTab() {
 }
 
 function ControlPlaneTab() {
-  const [selectedDataset, setSelectedDataset] = useState<string>('');
+  const [selectedDataset, setSelectedDataset] = useState<string>(() => {
+    return localStorage.getItem('dq-cp-selected-dataset') || '';
+  });
   const [isChatOpen, setIsChatOpen] = useState(false);
   const queryClient = useQueryClient();
   

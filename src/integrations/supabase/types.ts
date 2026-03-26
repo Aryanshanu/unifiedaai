@@ -2120,6 +2120,9 @@ export type Database = {
       dq_incidents: {
         Row: {
           action: string
+          affected_records_count: number | null
+          affected_records_percentage: number | null
+          column_name: string | null
           created_at: string | null
           dataset_id: string
           dimension: string
@@ -2131,11 +2134,15 @@ export type Database = {
           resolved_at: string | null
           resolved_by: string | null
           rule_id: string | null
+          rule_name: string | null
           severity: string
           status: string | null
         }
         Insert: {
           action: string
+          affected_records_count?: number | null
+          affected_records_percentage?: number | null
+          column_name?: string | null
           created_at?: string | null
           dataset_id: string
           dimension: string
@@ -2147,11 +2154,15 @@ export type Database = {
           resolved_at?: string | null
           resolved_by?: string | null
           rule_id?: string | null
+          rule_name?: string | null
           severity: string
           status?: string | null
         }
         Update: {
           action?: string
+          affected_records_count?: number | null
+          affected_records_percentage?: number | null
+          column_name?: string | null
           created_at?: string | null
           dataset_id?: string
           dimension?: string
@@ -2163,6 +2174,7 @@ export type Database = {
           resolved_at?: string | null
           resolved_by?: string | null
           rule_id?: string | null
+          rule_name?: string | null
           severity?: string
           status?: string | null
         }
