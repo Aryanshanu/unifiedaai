@@ -51,6 +51,7 @@ const AgentGovernance = lazy(() => import("./pages/AgentGovernance"));
 const ContinuousEvaluation = lazy(() => import("./pages/ContinuousEvaluation"));
 const EnvironmentManagement = lazy(() => import("./pages/EnvironmentManagement"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
