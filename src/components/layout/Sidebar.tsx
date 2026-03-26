@@ -22,7 +22,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { path: "/", icon: LayoutDashboard, label: "Command Center" },
   { divider: true, label: "DISCOVER" },
-  { path: "/discovery", icon: ScanSearch, label: "AI Discovery" },
+  { path: "/discovery", icon: ScanSearch, label: "Discovery" },
   { path: "/agents", icon: Bot, label: "Agent Governance" },
   { divider: true, label: "Monitor" },
   { path: "/observability", icon: Activity, label: "Observability" },
