@@ -348,6 +348,10 @@ function EvaluateTab() {
   const [result, setResult] = useState<QualityResult | null>(null);
   const [rawLogs, setRawLogs] = useState<Array<{ id: string; timestamp: string; type: 'input' | 'output' | 'computation'; data: Record<string, unknown> }>>([]);
   const queryClient = useQueryClient();
+  
+  useEffect(() => {
+    if (selectedDataset) localStorage.setItem('dq-eval-selected-dataset', selectedDataset);
+  }, [selectedDataset]);
 
   const { data: datasets, isLoading: loadingDatasets } = useQuery({
     queryKey: ['datasets'],
