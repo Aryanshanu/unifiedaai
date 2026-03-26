@@ -133,7 +133,6 @@ ${summary.recommendations.map((r, i) => `${i + 1}. ${r}`).join('\n')}
 
 Verdict: ${summary.data_quality_verdict}
 Confidence: ${summary.confidence_score}%
-Model: ${summary.model_used}
     `.trim();
 
     navigator.clipboard.writeText(text);
