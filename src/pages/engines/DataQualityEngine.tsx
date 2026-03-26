@@ -515,6 +515,10 @@ function ControlPlaneTab() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const queryClient = useQueryClient();
   
+  useEffect(() => {
+    if (selectedDataset) localStorage.setItem('dq-cp-selected-dataset', selectedDataset);
+  }, [selectedDataset]);
+  
   const { data: datasets, refetch: refetchDatasets } = useQuery({
     queryKey: ['datasets-for-control-plane'],
     queryFn: async () => {
