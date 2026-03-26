@@ -773,7 +773,7 @@ function DataQualityEngineContent() {
           <Badge variant="outline">Phase 1: Data Governance</Badge>
         </div>
 
-        <InputOutputScope scope="BOTH" inputDescription="File uploads, datasets, schema" outputDescription="<InputOutputScope scope="BOTH" inputDescription="File uploads, datasets, schema" outputDescription="Quality scores, analysis, evidence" />" />
+        <InputOutputScope scope="BOTH" inputDescription="File uploads, datasets, schema" outputDescription="Quality scores, analysis, evidence" />
 
         <QualityStatsCards />
 

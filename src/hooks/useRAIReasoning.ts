@@ -33,7 +33,7 @@ export function useRAIReasoning() {
     try {
       toast({
         title: "Starting Deep Analysis",
-        description: `description: `Running deep analysis...`,`,
+        description: `Running deep analysis...`,
       });
 
       const { data, error } = await supabase.functions.invoke("rai-reasoning-engine", {

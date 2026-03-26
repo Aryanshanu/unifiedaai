@@ -69,7 +69,7 @@ function SecurityThreatModelContent() {
   return (
     <MainLayout title="Threat Modeling Engine" subtitle="STRIDE, OWASP LLM, MAESTRO, ATLAS Framework Analysis"
       headerActions={<HealthIndicator status={status} lastUpdated={lastUpdated} onRetry={refetch} showLabel />}>
-      <InputOutputScope scope="OUTPUT" inputDescription="Model metadata and system context" outputDescription="<InputOutputScope scope="OUTPUT" inputDescription="Model metadata and system context" outputDescription="Threat vectors with risk scoring" />" />
+      <InputOutputScope scope="OUTPUT" inputDescription="Model metadata and system context" outputDescription="Threat vectors with risk scoring" />
       <div className="flex items-center gap-2 mb-4"><Badge className="bg-primary/10 text-primary border-primary/20"><Shield className="w-3 h-3 mr-1" />4 Frameworks</Badge></div>
       <Card className="mb-6"><CardContent className="pt-6">
         <div className="flex items-center gap-4 flex-wrap">
