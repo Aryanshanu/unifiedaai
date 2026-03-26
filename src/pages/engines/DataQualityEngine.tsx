@@ -341,7 +341,9 @@ function ImportTab() {
 }
 
 function EvaluateTab() {
-  const [selectedDataset, setSelectedDataset] = useState<string>('');
+  const [selectedDataset, setSelectedDataset] = useState<string>(() => {
+    return localStorage.getItem('dq-eval-selected-dataset') || '';
+  });
   const [evaluationStatus, setEvaluationStatus] = useState<'idle' | 'running' | 'complete' | 'error'>('idle');
   const [result, setResult] = useState<QualityResult | null>(null);
   const [rawLogs, setRawLogs] = useState<Array<{ id: string; timestamp: string; type: 'input' | 'output' | 'computation'; data: Record<string, unknown> }>>([]);
