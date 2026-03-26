@@ -1,73 +1,74 @@
 
+Fix RAI + Security regressions end-to-end
 
-# Fix: DQ Incidents Severity Mapping + Description Data + Dataset Persistence
+What I verified
+- The hidden `/admin` auth path itself is working; the current role fetch is returning `superadmin`.
+- The bigger problem is not lost auth context alone — it is broken wiring across the RAI and Security segments.
+- The 5 core RAI engine pages currently invoke backend functions, but they do not persist and render full result data; most of them end at a toast + custom prompt test.
+- Security pages are more complete, but dashboard aggregation/history is inconsistent and score units are mixed between normalized values and percentages.
+- The visible `admin` persona is still restricted from Core RAI/Core Security in `role-personas.ts` and `Sidebar.tsx`, which does not match your “full access” expectation.
+- Data Quality still has a high-frequency control-plane timer and live churn, which can break dropdown usability and page responsiveness.
+- The auth timeout screen can still appear after inactivity and needs hardening.
 
-## Root Causes
+Plan
+1. Restore access and navigation consistency
+- Make the visible admin experience and `/admin` experience both expose all RAI + Security pages.
+- Align `src/lib/role-personas.ts`, route gating, and `src/components/layout/Sidebar.tsx` so sidebar visibility and route access match exactly.
 
-### Issue 1: "UNKNOWN_SEVERITY" warnings destroying trust score
-The `dq-raise-incidents` edge function stores severity as `P0/P1/P2` in the `dq_incidents` table. When `dq-truth-enforcer` reads these incidents back, its `SEVERITY_TO_PRIORITY` map only knows `critical→P0, warning→P1, info→P2`. It sees `P2` as an unknown severity, generates warnings, and deducts 20 points from the trust score.
+2. Make every RAI engine page fully operational
+- Fix `Fairness`, `Hallucination`, `Toxicity`, `Privacy`, and `Explainability` so each page:
+  - stores evaluation response state,
+  - renders the returned metrics/findings/computation/evidence,
+  - supports retry/rerun cleanly,
+  - preserves the last-used model selection.
+- Reuse existing result components instead of leaving pages as toast-only shells.
 
-**Fix**: Update `SEVERITY_TO_PRIORITY` in `dq-truth-enforcer/index.ts` to also map `P0→P0, P1→P1, P2→P2` (identity mapping) so it recognizes its own output format.
+3. Normalize Security module behavior
+- Fix score consistency across `Security Dashboard`, `Pentest`, `Jailbreak`, and `Threat Modeling`.
+- Add recent-run recall/history on the Security detail pages so the last used model/framework and latest outputs remain available for rerun.
+- Clean up remaining inconsistent titles/labels inside the Security flow.
 
-### Issue 2: "N/A%" and generic descriptions
-`DQIncidentsTabular.tsx` line 126 reads `incident.affected_records_percentage` and `incident.column_name` — fields that are never populated by `dq-raise-incidents`. The edge function stores `action` text but not structured metadata like column name or percentage.
+4. Stabilize shared controls and responsiveness
+- Refactor the DQ control-plane timer/update pattern so it stops thrashing the page.
+- Audit fixed overlays/backdrops that may be intercepting clicks.
+- Keep shared `Select` / `Dropdown` behavior stable while realtime updates are happening.
+- Harden auth loading so normal navigation does not fall into the timeout screen.
 
-**Fix**: Extract column name and percentage from the rule execution metrics data that's already available. Update `dq-raise-incidents` to include `column_name`, `affected_records_percentage`, and `rule_name` in the incident insert payload. Also update the `dq_incidents` table to accept these columns (or store them in a JSONB metadata field).
+5. Do a route-by-route validation pass
+- Validate access, load state, run action, result rendering, rerun/history, dropdown usability, and backend response alignment for:
+  - `/engine/fairness`
+  - `/engine/hallucination`
+  - `/engine/toxicity`
+  - `/engine/privacy`
+  - `/engine/explainability`
+  - `/engine/data-quality`
+  - `/security`
+  - `/security/pentest`
+  - `/security/jailbreak`
+  - `/security/threats`
 
-### Issue 3: No dataset persistence across navigation
-`selectedDataset` in both `EvaluateTab` and `ControlPlaneTab` uses `useState('')`. When user navigates away and comes back, the selection is lost.
+Files likely affected
+- `src/lib/role-personas.ts`
+- `src/components/layout/Sidebar.tsx`
+- `src/components/auth/ProtectedRoute.tsx`
+- `src/hooks/useAuth.tsx`
+- `src/hooks/useDQControlPlane.ts`
+- `src/hooks/useSecurityScans.ts`
+- `src/pages/engines/FairnessEngine.tsx`
+- `src/pages/engines/HallucinationEngine.tsx`
+- `src/pages/engines/ToxicityEngine.tsx`
+- `src/pages/engines/PrivacyEngine.tsx`
+- `src/pages/engines/ExplainabilityEngine.tsx`
+- `src/pages/engines/DataQualityEngine.tsx`
+- `src/pages/security/SecurityDashboard.tsx`
+- `src/pages/security/SecurityPentest.tsx`
+- `src/pages/security/SecurityJailbreak.tsx`
+- `src/pages/security/SecurityThreatModel.tsx`
 
-**Fix**: Persist `selectedDataset` to `localStorage` keyed by tab name. Restore on mount.
-
----
-
-## Changes
-
-### 1. `supabase/functions/dq-truth-enforcer/index.ts`
-Add `P0`, `P1`, `P2` to `SEVERITY_TO_PRIORITY` map so it recognizes priority-format severities:
-```
-const SEVERITY_TO_PRIORITY = {
-  'critical': 'P0',
-  'warning': 'P1', 
-  'info': 'P2',
-  'P0': 'P0',  // identity mapping for already-mapped severities
-  'P1': 'P1',
-  'P2': 'P2',
-};
-```
-
-### 2. `supabase/functions/dq-raise-incidents/index.ts`
-Add `rule_name` and `column_name` to the incident insert payload so the UI can display meaningful descriptions instead of "N/A":
-- Extract `column_name` from `metric.rule_name` (rules are named like `email_not_null`, `id_unique`)
-- Compute `affected_records_percentage` from `metric.failed_count / metric.total_count * 100`
-- Add these to the DB insert object
-
-### 3. DB Migration
-Add columns to `dq_incidents`: `rule_name TEXT`, `column_name TEXT`, `affected_records_count INT`, `affected_records_percentage NUMERIC`
-
-### 4. `src/pages/engines/DataQualityEngine.tsx`
-Persist `selectedDataset` to localStorage in both `EvaluateTab` and `ControlPlaneTab`:
-```typescript
-const [selectedDataset, setSelectedDataset] = useState<string>(() => {
-  return localStorage.getItem('dq-selected-dataset') || '';
-});
-useEffect(() => {
-  if (selectedDataset) localStorage.setItem('dq-selected-dataset', selectedDataset);
-}, [selectedDataset]);
-```
-
-### 5. `src/components/engines/DQIncidentsTabular.tsx`
-Update `generateIncidentDescription` fallback: if `column_name` is still missing, parse it from `rule_name` or `failure_signature` instead of showing "data" as default. Replace `N/A` percentage fallback with the failure info from `action` field.
-
----
-
-## Summary
-
-| File | Change |
-|------|--------|
-| `dq-truth-enforcer/index.ts` | Add P0/P1/P2 identity mappings to SEVERITY_TO_PRIORITY |
-| `dq-raise-incidents/index.ts` | Include rule_name, column_name, affected % in insert |
-| DB migration | Add 4 columns to dq_incidents |
-| `DataQualityEngine.tsx` | localStorage persistence for selected dataset |
-| `DQIncidentsTabular.tsx` | Smarter fallback for description generation |
-
+Definition of done
+- Admin access shows all intended RAI and Security pages with no hidden gaps.
+- Every engine page loads, runs, and displays full results.
+- Security dashboard values match the actual stored run payloads.
+- Recent model/framework selections stay available for rerun.
+- Dropdowns/selects work reliably.
+- No false auth-timeout screen during normal usage.
