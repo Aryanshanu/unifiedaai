@@ -1,47 +1,73 @@
 
 
-# Full Validation Audit + AI Label Removal
+# Fix: DQ Incidents Severity Mapping + Description Data + Dataset Persistence
 
-## Issues Found
+## Root Causes
 
-### Bug 1: Runtime Error — `useAuth must be used within AuthProvider`
-The error trace shows `ProtectedRoute` calling `useAuth` outside `AuthProvider`. Looking at `App.tsx`, the `/admin` route (line 90) is placed **outside** `ProtectedRoute` but **inside** `AuthProvider`, so it should work. However, the error may occur if the user navigates to a protected route before the auth state loads. The error in the logs is likely from a hot-reload race condition — not a persistent bug. No code fix needed here; the architecture is correct.
+### Issue 1: "UNKNOWN_SEVERITY" warnings destroying trust score
+The `dq-raise-incidents` edge function stores severity as `P0/P1/P2` in the `dq_incidents` table. When `dq-truth-enforcer` reads these incidents back, its `SEVERITY_TO_PRIORITY` map only knows `critical→P0, warning→P1, info→P2`. It sees `P2` as an unknown severity, generates warnings, and deducts 20 points from the trust score.
 
-### Bug 2: "AI" Labels Throughout the UI (User explicitly asked to remove)
-The user does not want ANY references to "AI score", "AI comments", "AI analysis", etc. in the visible UI. Here are all occurrences:
+**Fix**: Update `SEVERITY_TO_PRIORITY` in `dq-truth-enforcer/index.ts` to also map `P0→P0, P1→P1, P2→P2` (identity mapping) so it recognizes its own output format.
 
-| File | Current Text | Replacement |
-|------|-------------|-------------|
-| `src/components/engines/AISummaryPanel.tsx` line 122 | `AI Quality Summary` | `Quality Summary` |
-| `src/components/engines/AISummaryPanel.tsx` line 156 | `AI Quality Summary` | `Quality Summary` |
-| `src/components/engines/AISummaryPanel.tsx` line 240 | `AI Confidence` | `Confidence` |
-| `src/components/engines/AISummaryPanel.tsx` line 161 | Shows `{summary.model_used}` badge | Remove this badge entirely |
-| `src/components/engines/AISummaryPanel.tsx` line 136 | `Model: ${summary.model_used}` in copy text | Remove this line from copy text |
-| `src/pages/security/SecurityThreatModel.tsx` line 72 | `AI-generated threat vectors with risk scoring` | `Threat vectors with risk scoring` |
-| `src/pages/engines/DataQualityEngine.tsx` line 776 | `Quality scores, AI analysis, evidence` | `Quality scores, analysis, evidence` |
-| `src/hooks/useRAIReasoning.ts` line 36 | `Running K2 chain-of-thought reasoning with Gemini Pro...` | `Running deep analysis...` |
-| `src/components/engines/ReasoningChainDisplay.tsx` line 49 | `K2 Chain-of-Thought Reasoning` | `Chain-of-Thought Reasoning` |
-| `src/components/layout/Sidebar.tsx` line 25 | `AI Discovery` | `Discovery` |
-| `src/components/layout/Sidebar.tsx` line 49 | `AI Pentesting` | `Pentesting` |
+### Issue 2: "N/A%" and generic descriptions
+`DQIncidentsTabular.tsx` line 126 reads `incident.affected_records_percentage` and `incident.column_name` — fields that are never populated by `dq-raise-incidents`. The edge function stores `action` text but not structured metadata like column name or percentage.
 
-### Bug 3: Orphan Page Files Still Exist
-`DecisionLedger.tsx` and `GovernanceFramework.tsx` still exist as files even though their routes and sidebar entries were removed. They should be deleted to avoid confusion.
+**Fix**: Extract column name and percentage from the rule execution metrics data that's already available. Update `dq-raise-incidents` to include `column_name`, `affected_records_percentage`, and `rule_name` in the incident insert payload. Also update the `dq_incidents` table to accept these columns (or store them in a JSONB metadata field).
 
-### Bug 4: "RAI" Labels — NOT an Issue
-"RAI" (Responsible AI) is the platform's brand name ("Fractal RAI-OS"), not an "AI score" label. "RAI Score" = "Responsible AI Score" — this is a governance metric name, not an AI-generated label. These stay.
+### Issue 3: No dataset persistence across navigation
+`selectedDataset` in both `EvaluateTab` and `ControlPlaneTab` uses `useState('')`. When user navigates away and comes back, the selection is lost.
 
-### Bug 5: Duplicate Comment in App.tsx
-Line 130 has `{/* Audit */}` duplicated (lines 129-130). Minor cleanup.
+**Fix**: Persist `selectedDataset` to `localStorage` keyed by tab name. Restore on mount.
 
-## Implementation Plan
+---
 
-### 1. Remove all "AI" labels from UI text
-Edit the 7 files listed above — change visible strings only, no logic changes.
+## Changes
 
-### 2. Delete orphan page files
-Delete `src/pages/DecisionLedger.tsx` and `src/pages/GovernanceFramework.tsx`.
+### 1. `supabase/functions/dq-truth-enforcer/index.ts`
+Add `P0`, `P1`, `P2` to `SEVERITY_TO_PRIORITY` map so it recognizes priority-format severities:
+```
+const SEVERITY_TO_PRIORITY = {
+  'critical': 'P0',
+  'warning': 'P1', 
+  'info': 'P2',
+  'P0': 'P0',  // identity mapping for already-mapped severities
+  'P1': 'P1',
+  'P2': 'P2',
+};
+```
 
-### 3. Clean up duplicate comment in App.tsx
+### 2. `supabase/functions/dq-raise-incidents/index.ts`
+Add `rule_name` and `column_name` to the incident insert payload so the UI can display meaningful descriptions instead of "N/A":
+- Extract `column_name` from `metric.rule_name` (rules are named like `email_not_null`, `id_unique`)
+- Compute `affected_records_percentage` from `metric.failed_count / metric.total_count * 100`
+- Add these to the DB insert object
 
-Total: ~15 line changes across 7 files + 2 file deletions.
+### 3. DB Migration
+Add columns to `dq_incidents`: `rule_name TEXT`, `column_name TEXT`, `affected_records_count INT`, `affected_records_percentage NUMERIC`
+
+### 4. `src/pages/engines/DataQualityEngine.tsx`
+Persist `selectedDataset` to localStorage in both `EvaluateTab` and `ControlPlaneTab`:
+```typescript
+const [selectedDataset, setSelectedDataset] = useState<string>(() => {
+  return localStorage.getItem('dq-selected-dataset') || '';
+});
+useEffect(() => {
+  if (selectedDataset) localStorage.setItem('dq-selected-dataset', selectedDataset);
+}, [selectedDataset]);
+```
+
+### 5. `src/components/engines/DQIncidentsTabular.tsx`
+Update `generateIncidentDescription` fallback: if `column_name` is still missing, parse it from `rule_name` or `failure_signature` instead of showing "data" as default. Replace `N/A` percentage fallback with the failure info from `action` field.
+
+---
+
+## Summary
+
+| File | Change |
+|------|--------|
+| `dq-truth-enforcer/index.ts` | Add P0/P1/P2 identity mappings to SEVERITY_TO_PRIORITY |
+| `dq-raise-incidents/index.ts` | Include rule_name, column_name, affected % in insert |
+| DB migration | Add 4 columns to dq_incidents |
+| `DataQualityEngine.tsx` | localStorage persistence for selected dataset |
+| `DQIncidentsTabular.tsx` | Smarter fallback for description generation |
 
