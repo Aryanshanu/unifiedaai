@@ -33,7 +33,7 @@ export function useRAIReasoning() {
     try {
       toast({
         title: "Starting Deep Analysis",
-        description: `Running K2 chain-of-thought reasoning with Gemini Pro...`,
+        description: `Running deep analysis...`,
       });
 
       const { data, error } = await supabase.functions.invoke("rai-reasoning-engine", {

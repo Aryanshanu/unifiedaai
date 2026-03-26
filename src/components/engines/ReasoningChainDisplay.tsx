@@ -46,10 +46,7 @@ export function ReasoningChainDisplay({
       <div className="flex items-center gap-2">
         <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
           <Brain className="w-3 h-3 mr-1" />
-          K2 Chain-of-Thought Reasoning
-        </Badge>
-        <Badge variant="secondary" className="text-xs">
-          {analysisModel}
+          Chain-of-Thought Reasoning
         </Badge>
       </div>
 

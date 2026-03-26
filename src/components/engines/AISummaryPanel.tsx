@@ -119,7 +119,7 @@ function VerdictBadge({ verdict }: { verdict: string }) {
 export function AISummaryPanel({ summary }: AISummaryPanelProps) {
   const handleCopySummary = () => {
     const text = `
-AI Quality Summary
+Quality Summary
 ==================
 ${summary.brief_summary}
 
@@ -133,7 +133,6 @@ ${summary.recommendations.map((r, i) => `${i + 1}. ${r}`).join('\n')}
 
 Verdict: ${summary.data_quality_verdict}
 Confidence: ${summary.confidence_score}%
-Model: ${summary.model_used}
     `.trim();
 
     navigator.clipboard.writeText(text);
@@ -153,13 +152,9 @@ Model: ${summary.model_used}
             <div className="p-2 bg-primary/10 rounded-lg">
               <Brain className="h-5 w-5 text-primary" />
             </div>
-            AI Quality Summary
-          </CardTitle>
+            Quality Summary
+           </CardTitle>
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-xs">
-              <Sparkles className="h-3 w-3 mr-1" />
-              {summary.model_used}
-            </Badge>
             <Button variant="ghost" size="sm" onClick={handleCopySummary}>
               <Copy className="h-4 w-4" />
             </Button>
@@ -237,7 +232,7 @@ Model: ${summary.model_used}
           </div>
           
           <div className="text-right">
-            <p className="text-xs text-muted-foreground mb-1">AI Confidence</p>
+            <p className="text-xs text-muted-foreground mb-1">Confidence</p>
             <div className="flex items-center gap-2">
               <Progress value={summary.confidence_score} className="w-24 h-2" />
               <span className="text-sm font-medium">{summary.confidence_score}%</span>
