@@ -119,7 +119,7 @@ function VerdictBadge({ verdict }: { verdict: string }) {
 export function AISummaryPanel({ summary }: AISummaryPanelProps) {
   const handleCopySummary = () => {
     const text = `
-AI Quality Summary
+Quality Summary
 ==================
 ${summary.brief_summary}
 
