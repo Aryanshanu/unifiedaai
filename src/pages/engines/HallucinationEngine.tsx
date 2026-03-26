@@ -151,7 +151,7 @@ function HallucinationEngineContent() {
           <EngineResultsLayout score={evalResults.overallScore ?? 0} engineName="Hallucination" keyInsight={evalResults.verdict || `Score: ${evalResults.overallScore}%`}
             summaryBullets={buildSummaryBullets(evalResults)} recommendations={evalResults.recommendations || []}
             metricsContent={evalResults.computationSteps ? <ComputationBreakdown steps={evalResults.computationSteps} overallScore={evalResults.overallScore ?? 0} weightedFormula="0.30×Resp + 0.25×Claim + 0.25×Faith + 0.10×Span + 0.10×Abstain" engineType="hallucination" euAIActReference="EU AI Act Article 13" /> : <div className="text-center py-8 text-muted-foreground">Computation steps will appear after evaluation.</div>}
-            rawDataContent={<RawDataLog entries={evalResults.rawLogs || [{ timestamp: new Date().toISOString(), type: 'evaluation', data: evalResults }]} />}
+            rawDataContent={<RawDataLog logs={(evalResults.rawLogs || [{ timestamp: new Date().toISOString(), type: 'evaluation', data: evalResults }]).map((e: any, i: number) => ({ id: String(i), ...e }))} />}
             evidenceContent={<EvidencePackage mode="download" data={{ results: evalResults, rawLogs: evalResults.rawLogs || [], modelId: selectedModelId, evaluationType: 'hallucination', overallScore: evalResults.overallScore, isCompliant: (evalResults.overallScore ?? 0) >= 70 }} />}
           />
         </div>

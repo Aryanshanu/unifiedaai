@@ -273,7 +273,7 @@ function FairnessEngineContent() {
               )
             }
             rawDataContent={
-              <RawDataLog entries={evalResults.rawLogs || [{ timestamp: new Date().toISOString(), type: 'evaluation', data: evalResults }]} />
+              <RawDataLog logs={(evalResults.rawLogs || [{ timestamp: new Date().toISOString(), type: 'evaluation', data: evalResults }]).map((e: any, i: number) => ({ id: String(i), ...e }))} />
             }
             evidenceContent={
               <EvidencePackage 

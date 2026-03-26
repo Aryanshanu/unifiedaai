@@ -125,7 +125,7 @@ function ToxicityEngineContent() {
           <EngineResultsLayout score={evalResults.overallScore ?? 0} engineName="Toxicity" keyInsight={evalResults.verdict || `Score: ${evalResults.overallScore}%`}
             summaryBullets={buildBullets(evalResults)} recommendations={evalResults.recommendations || []}
             metricsContent={evalResults.computationSteps ? <ComputationBreakdown steps={evalResults.computationSteps} overallScore={evalResults.overallScore ?? 0} weightedFormula="0.30×Overall + 0.25×Severe + 0.20×Diff + 0.15×Topic + 0.10×Guard" engineType="toxicity" euAIActReference="EU AI Act Article 5" /> : <div className="text-center py-8 text-muted-foreground">Computation steps available after evaluation.</div>}
-            rawDataContent={<RawDataLog entries={evalResults.rawLogs || [{ timestamp: new Date().toISOString(), type: 'evaluation', data: evalResults }]} />}
+            rawDataContent={<RawDataLog logs={(evalResults.rawLogs || [{ timestamp: new Date().toISOString(), type: 'evaluation', data: evalResults }]).map((e: any, i: number) => ({ id: String(i), ...e }))} />}
             evidenceContent={<EvidencePackage mode="download" data={{ results: evalResults, rawLogs: evalResults.rawLogs || [], modelId: selectedModelId, evaluationType: 'toxicity', overallScore: evalResults.overallScore, isCompliant: (evalResults.overallScore ?? 0) >= 70 }} />}
           />
         </div>

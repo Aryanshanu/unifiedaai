@@ -125,7 +125,7 @@ function PrivacyEngineContent() {
           <EngineResultsLayout score={evalResults.overallScore ?? 0} engineName="Privacy" keyInsight={evalResults.verdict || `Score: ${evalResults.overallScore}%`}
             summaryBullets={buildBullets(evalResults)} recommendations={evalResults.recommendations || []}
             metricsContent={evalResults.computationSteps ? <ComputationBreakdown steps={evalResults.computationSteps} overallScore={evalResults.overallScore ?? 0} weightedFormula="0.30×PII + 0.20×PHI + 0.20×Redact + 0.20×Secrets + 0.10×Min" engineType="privacy" euAIActReference="GDPR Article 5" /> : <div className="text-center py-8 text-muted-foreground">Computation steps available after evaluation.</div>}
-            rawDataContent={<RawDataLog entries={evalResults.rawLogs || [{ timestamp: new Date().toISOString(), type: 'evaluation', data: evalResults }]} />}
+            rawDataContent={<RawDataLog logs={(evalResults.rawLogs || [{ timestamp: new Date().toISOString(), type: 'evaluation', data: evalResults }]).map((e: any, i: number) => ({ id: String(i), ...e }))} />}
             evidenceContent={<EvidencePackage mode="download" data={{ results: evalResults, rawLogs: evalResults.rawLogs || [], modelId: selectedModelId, evaluationType: 'privacy', overallScore: evalResults.overallScore, isCompliant: (evalResults.overallScore ?? 0) >= 70 }} />}
           />
         </div>
