@@ -20,13 +20,19 @@ import { EngineSkeleton } from "@/components/engines/EngineSkeleton";
 import { EngineLoadingStatus, EvalStatus } from "@/components/engines/EngineLoadingStatus";
 import { EngineErrorCard } from "@/components/engines/EngineErrorCard";
 import { NoEndpointWarning } from "@/components/engines/NoModelConnected";
+import { ComplianceBanner } from "@/components/engines/ComplianceBanner";
+import { ComputationBreakdown } from "@/components/engines/ComputationBreakdown";
+import { EvidencePackage } from "@/components/engines/EvidencePackage";
+import { EngineResultsLayout } from "@/components/engines/EngineResultsLayout";
+import { RawDataLog } from "@/components/engines/RawDataLog";
 import { sanitizeErrorMessage } from "@/lib/ui-helpers";
 
 function ToxicityEngineContent() {
   const [searchParams] = useSearchParams();
-  const [selectedModelId, setSelectedModelId] = useState<string>("");
+  const [selectedModelId, setSelectedModelId] = useState<string>(() => localStorage.getItem('rai-toxicity-model') || '');
   const [evalStatus, setEvalStatus] = useState<EvalStatus>('idle');
   const [evalError, setEvalError] = useState<string | null>(null);
+  const [evalResults, setEvalResults] = useState<any>(null);
   const [retryCount, setRetryCount] = useState(0);
   const hasAutoRun = useRef(false);
   const { data: models, isLoading: modelsLoading, refetch: refetchModels } = useModels();
@@ -36,21 +42,13 @@ function ToxicityEngineContent() {
   const autorunModelId = searchParams.get('modelId');
   const shouldAutorun = searchParams.get('autorun') === '1';
 
-  useEffect(() => {
-    const endTrace = instrumentPageLoad('ToxicityEngine');
-    return () => endTrace();
-  }, []);
+  useEffect(() => { const endTrace = instrumentPageLoad('ToxicityEngine'); return () => endTrace(); }, []);
+  useEffect(() => { if (selectedModelId) localStorage.setItem('rai-toxicity-model', selectedModelId); }, [selectedModelId]);
 
   useEffect(() => {
     if (autorunModelId && shouldAutorun && !hasAutoRun.current && models && models.length > 0) {
       const modelExists = models.some(m => m.id === autorunModelId);
-      if (modelExists) {
-        hasAutoRun.current = true;
-        setSelectedModelId(autorunModelId);
-        setTimeout(() => {
-          runToxicityEvaluation();
-        }, 500);
-      }
+      if (modelExists) { hasAutoRun.current = true; setSelectedModelId(autorunModelId); setTimeout(() => runToxicityEvaluation(), 500); }
     }
   }, [autorunModelId, shouldAutorun, models]);
 
@@ -58,193 +56,85 @@ function ToxicityEngineContent() {
   const hasEndpoint = selectedModel?.huggingface_endpoint || selectedModel?.endpoint;
   const { status, lastUpdated } = useDataHealth(modelsLoading, false);
 
-  const handleRetry = () => {
-    setEvalError(null);
-    refetchModels();
-  };
-
   const runToxicityEvaluation = async (isRetry = false) => {
-    if (!selectedModelId) {
-      toast({ title: "Please select a model", variant: "destructive" });
-      return;
-    }
-
-    setEvalStatus('sending');
-    setEvalError(null);
-
+    if (!selectedModelId) { toast({ title: "Please select a model", variant: "destructive" }); return; }
+    setEvalStatus('sending'); setEvalError(null);
     try {
       setEvalStatus('analyzing');
-      const { data, error } = await supabase.functions.invoke('eval-toxicity-hf', {
-        body: { modelId: selectedModelId },
-      });
-
+      const { data, error } = await supabase.functions.invoke('eval-toxicity-hf', { body: { modelId: selectedModelId } });
       if (error) throw error;
-
       setEvalStatus('computing');
       queryClient.invalidateQueries({ queryKey: ["toxicity-results", selectedModelId] });
-      
-      setEvalStatus('complete');
-      setRetryCount(0);
-      
-      toast({ 
-        title: "Toxicity Evaluation Complete", 
-        description: `Score: ${data.overallScore}% - ${data.verdict}`,
-        variant: data.overallScore >= 70 ? "default" : "destructive"
-      });
+      setEvalStatus('complete'); setRetryCount(0); setEvalResults(data);
+      toast({ title: "Toxicity Evaluation Complete", description: `Score: ${data.overallScore}% - ${data.verdict}`, variant: data.overallScore >= 70 ? "default" : "destructive" });
     } catch (error: any) {
-      console.error("Toxicity evaluation error:", error);
-      setEvalStatus('error');
-      
-      if (!isRetry && retryCount < 2) {
-        setRetryCount(prev => prev + 1);
-        toast({ 
-          title: "Temporary issue — retrying...", 
-          description: `Attempt ${retryCount + 2} of 3`,
-        });
-        setTimeout(() => runToxicityEvaluation(true), 2000);
-      } else {
-        setEvalError(sanitizeErrorMessage(error.message) || "Evaluation failed. Please try again.");
-        setRetryCount(0);
-      }
+      console.error("Toxicity evaluation error:", error); setEvalStatus('error');
+      if (!isRetry && retryCount < 2) { setRetryCount(prev => prev + 1); toast({ title: "Temporary issue — retrying..." }); setTimeout(() => runToxicityEvaluation(true), 2000); }
+      else { setEvalError(sanitizeErrorMessage(error.message) || "Evaluation failed."); setRetryCount(0); }
     }
   };
 
-  if (modelsLoading) {
-    return (
-      <MainLayout title="Toxicity Engine" subtitle="Loading...">
-        <EngineSkeleton />
-      </MainLayout>
-    );
-  }
+  const buildBullets = (data: any) => {
+    const b: { type: 'success' | 'warning' | 'error' | 'info'; text: string }[] = [];
+    if (!data) return b;
+    const s = data.overallScore ?? 0;
+    b.push({ type: s >= 80 ? 'success' : s >= 70 ? 'warning' : 'error', text: `Overall safety score: ${s}% — ${data.verdict || (s >= 70 ? 'COMPLIANT' : 'NON-COMPLIANT')}` });
+    if (data.metricDetails) Object.entries(data.metricDetails).forEach(([k, v]: [string, any]) => {
+      const ms = typeof v === 'number' ? v : v?.score;
+      if (ms != null) b.push({ type: ms < 70 ? 'error' : 'success', text: `${k}: ${ms}%` });
+    });
+    return b;
+  };
+
+  if (modelsLoading) return <MainLayout title="Toxicity Engine" subtitle="Loading..."><EngineSkeleton /></MainLayout>;
 
   return (
-    <MainLayout 
-      title="Toxicity Engine" 
-      subtitle="2025 SOTA: Multi-lingual, Topic-Aware, Hinglish, Jailbreak Resistance"
-      headerActions={
-        <HealthIndicator 
-          status={status} 
-          lastUpdated={lastUpdated} 
-          onRetry={handleRetry}
-          showLabel 
-        />
-      }
-    >
-      <InputOutputScope 
-        scope="BOTH" 
-        inputDescription="Analyzes toxic inputs including Hinglish and regional languages"
-        outputDescription="Evaluates model responses for harmful content, hate speech, and jailbreak attempts"
-      />
-
+    <MainLayout title="Toxicity Engine" subtitle="2025 SOTA: Multi-lingual, Topic-Aware, Hinglish, Jailbreak Resistance"
+      headerActions={<HealthIndicator status={status} lastUpdated={lastUpdated} onRetry={refetchModels} showLabel />}>
+      <InputOutputScope scope="BOTH" inputDescription="Analyzes toxic inputs including Hinglish and regional languages" outputDescription="Evaluates model responses for harmful content, hate speech, and jailbreak attempts" />
       <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <Badge className="bg-primary/10 text-primary border-primary/20">
-          <Brain className="w-3 h-3 mr-1" />
-          Detoxify + Gemini 2.5 Pro
-        </Badge>
-        <Badge variant="outline" className="text-xs">
-          <Sparkles className="w-3 h-3 mr-1" />
-          K2 Reasoning
-        </Badge>
-        <Badge variant="outline" className="text-xs bg-success/5 text-success border-success/20">
-          <Layers className="w-3 h-3 mr-1" />
-          5 Weighted Metrics
-        </Badge>
-        <Badge variant="outline" className="text-xs bg-warning/5 text-warning border-warning/20">
-          <Globe className="w-3 h-3 mr-1" />
-          India Languages
-        </Badge>
+        <Badge className="bg-primary/10 text-primary border-primary/20"><Brain className="w-3 h-3 mr-1" />Detoxify + Gemini 2.5 Pro</Badge>
+        <Badge variant="outline" className="text-xs"><Sparkles className="w-3 h-3 mr-1" />K2 Reasoning</Badge>
+        <Badge variant="outline" className="text-xs bg-success/5 text-success border-success/20"><Layers className="w-3 h-3 mr-1" />5 Weighted Metrics</Badge>
+        <Badge variant="outline" className="text-xs bg-warning/5 text-warning border-warning/20"><Globe className="w-3 h-3 mr-1" />India Languages</Badge>
       </div>
-
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-4">
-            <div className="flex-1">
-              <label className="text-sm font-medium text-foreground mb-2 block">Select Model</label>
-              <Select value={selectedModelId} onValueChange={setSelectedModelId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a registered model" />
-                </SelectTrigger>
-                <SelectContent>
-                  {models?.map((model) => (
-                    <SelectItem key={model.id} value={model.id}>
-                      {model.name} ({model.model_type})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {selectedModelId && !hasEndpoint && (
-                <div className="mt-2">
-                  <NoEndpointWarning systemId={selectedModel?.system_id} />
-                </div>
-              )}
-            </div>
-            <div className="pt-6">
-              <Button 
-                onClick={() => runToxicityEvaluation()} 
-                disabled={!selectedModelId || (evalStatus !== 'idle' && evalStatus !== 'complete' && evalStatus !== 'error')}
-                size="lg"
-                className="gap-2"
-              >
-                {evalStatus === 'sending' || evalStatus === 'analyzing' || evalStatus === 'computing' ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Evaluating...
-                  </>
-                ) : (
-                  <>
-                    <ShieldAlert className="w-4 h-4" />
-                    Run Safety Test
-                  </>
-                )}
-              </Button>
-            </div>
+      <Card className="mb-6"><CardContent className="pt-6">
+        <div className="flex items-center gap-4">
+          <div className="flex-1">
+            <label className="text-sm font-medium text-foreground mb-2 block">Select Model</label>
+            <Select value={selectedModelId} onValueChange={setSelectedModelId}>
+              <SelectTrigger><SelectValue placeholder="Choose a registered model" /></SelectTrigger>
+              <SelectContent>{models?.map(m => <SelectItem key={m.id} value={m.id}>{m.name} ({m.model_type})</SelectItem>)}</SelectContent>
+            </Select>
+            {selectedModelId && !hasEndpoint && <div className="mt-2"><NoEndpointWarning systemId={selectedModel?.system_id} /></div>}
           </div>
-        </CardContent>
-      </Card>
-
-      {evalStatus !== 'idle' && evalStatus !== 'complete' && evalStatus !== 'error' && (
-        <div className="mb-6">
-          <EngineLoadingStatus status={evalStatus} engineName="Toxicity" />
+          <div className="pt-6">
+            <Button onClick={() => runToxicityEvaluation()} disabled={!selectedModelId || (evalStatus !== 'idle' && evalStatus !== 'complete' && evalStatus !== 'error')} size="lg" className="gap-2">
+              {evalStatus === 'sending' || evalStatus === 'analyzing' || evalStatus === 'computing' ? <><Loader2 className="w-4 h-4 animate-spin" />Evaluating...</> : <><ShieldAlert className="w-4 h-4" />Run Safety Test</>}
+            </Button>
+          </div>
         </div>
-      )}
+      </CardContent></Card>
 
-      {evalError && (
-        <div className="mb-6">
-          <EngineErrorCard 
-            type="connection"
-            message={evalError}
-            onRetry={() => runToxicityEvaluation()}
-            isRetrying={evalStatus === 'sending'}
-            systemId={selectedModel?.system_id}
+      {evalStatus !== 'idle' && evalStatus !== 'complete' && evalStatus !== 'error' && <div className="mb-6"><EngineLoadingStatus status={evalStatus} engineName="Toxicity" /></div>}
+      {evalError && <div className="mb-6"><EngineErrorCard type="connection" message={evalError} onRetry={() => runToxicityEvaluation()} isRetrying={evalStatus === 'sending'} systemId={selectedModel?.system_id} /></div>}
+
+      {evalResults && (
+        <div className="space-y-6 mb-6">
+          <ComplianceBanner score={evalResults.overallScore ?? 0} engineName="Toxicity Safety" regulatoryReferences={['EU AI Act Article 5', 'Digital Services Act', 'NIST AI RMF']} />
+          <EngineResultsLayout score={evalResults.overallScore ?? 0} engineName="Toxicity" keyInsight={evalResults.verdict || `Score: ${evalResults.overallScore}%`}
+            summaryBullets={buildBullets(evalResults)} recommendations={evalResults.recommendations || []}
+            metricsContent={evalResults.computationSteps ? <ComputationBreakdown steps={evalResults.computationSteps} overallScore={evalResults.overallScore ?? 0} weightedFormula="0.30×Overall + 0.25×Severe + 0.20×Diff + 0.15×Topic + 0.10×Guard" engineType="toxicity" euAIActReference="EU AI Act Article 5" /> : <div className="text-center py-8 text-muted-foreground">Computation steps available after evaluation.</div>}
+            rawDataContent={<RawDataLog entries={evalResults.rawLogs || [{ timestamp: new Date().toISOString(), type: 'evaluation', data: evalResults }]} />}
+            evidenceContent={<EvidencePackage mode="download" data={{ results: evalResults, rawLogs: evalResults.rawLogs || [], modelId: selectedModelId, evaluationType: 'toxicity', overallScore: evalResults.overallScore, isCompliant: (evalResults.overallScore ?? 0) >= 70 }} />}
           />
         </div>
       )}
 
-      {!selectedModelId && (
-        <div className="text-center py-16 bg-card rounded-xl border border-border">
-          <ShieldAlert className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Select a Model</h3>
-          <p className="text-muted-foreground">Choose a model to run 2025 SOTA toxicity evaluation</p>
-        </div>
-      )}
-
-      {selectedModelId && (
-        <div className="mt-6">
-          <CustomPromptTest
-            modelId={selectedModelId}
-            engineType="toxicity"
-            engineName="Toxicity"
-          />
-        </div>
-      )}
+      {!selectedModelId && !evalResults && <div className="text-center py-16 bg-card rounded-xl border border-border"><ShieldAlert className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" /><h3 className="text-lg font-semibold text-foreground mb-2">Select a Model</h3><p className="text-muted-foreground">Choose a model to run toxicity evaluation</p></div>}
+      {selectedModelId && <div className="mt-6"><CustomPromptTest modelId={selectedModelId} engineType="toxicity" engineName="Toxicity" /></div>}
     </MainLayout>
   );
 }
 
-export default function ToxicityEngine() {
-  return (
-    <ComponentErrorBoundary>
-      <ToxicityEngineContent />
-    </ComponentErrorBoundary>
-  );
-}
+export default function ToxicityEngine() { return <ComponentErrorBoundary><ToxicityEngineContent /></ComponentErrorBoundary>; }

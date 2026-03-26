@@ -20,13 +20,19 @@ import { EngineSkeleton } from "@/components/engines/EngineSkeleton";
 import { EngineLoadingStatus, EvalStatus } from "@/components/engines/EngineLoadingStatus";
 import { EngineErrorCard } from "@/components/engines/EngineErrorCard";
 import { NoEndpointWarning } from "@/components/engines/NoModelConnected";
+import { ComplianceBanner } from "@/components/engines/ComplianceBanner";
+import { ComputationBreakdown } from "@/components/engines/ComputationBreakdown";
+import { EvidencePackage } from "@/components/engines/EvidencePackage";
+import { EngineResultsLayout } from "@/components/engines/EngineResultsLayout";
+import { RawDataLog } from "@/components/engines/RawDataLog";
 import { sanitizeErrorMessage } from "@/lib/ui-helpers";
 
 function FairnessEngineContent() {
   const [searchParams] = useSearchParams();
-  const [selectedModelId, setSelectedModelId] = useState<string>("");
+  const [selectedModelId, setSelectedModelId] = useState<string>(() => localStorage.getItem('rai-fairness-model') || '');
   const [evalStatus, setEvalStatus] = useState<EvalStatus>('idle');
   const [evalError, setEvalError] = useState<string | null>(null);
+  const [evalResults, setEvalResults] = useState<any>(null);
   const [retryCount, setRetryCount] = useState(0);
   const hasAutoRun = useRef(false);
   const { data: models, isLoading: modelsLoading, refetch: refetchModels } = useModels();
@@ -40,6 +46,10 @@ function FairnessEngineContent() {
     const endTrace = instrumentPageLoad('FairnessEngine');
     return () => endTrace();
   }, []);
+
+  useEffect(() => {
+    if (selectedModelId) localStorage.setItem('rai-fairness-model', selectedModelId);
+  }, [selectedModelId]);
 
   useEffect(() => {
     if (autorunModelId && shouldAutorun && !hasAutoRun.current && models && models.length > 0) {
@@ -85,6 +95,7 @@ function FairnessEngineContent() {
       
       setEvalStatus('complete');
       setRetryCount(0);
+      setEvalResults(data);
       
       toast({ 
         title: "Fairness Evaluation Complete", 
@@ -107,6 +118,27 @@ function FairnessEngineContent() {
         setRetryCount(0);
       }
     }
+  };
+
+  const buildSummaryBullets = (data: any) => {
+    const bullets: { type: 'success' | 'warning' | 'error' | 'info'; text: string }[] = [];
+    if (!data) return bullets;
+    const score = data.overallScore ?? 0;
+    if (score >= 80) bullets.push({ type: 'success', text: `Overall fairness score: ${score}% — COMPLIANT` });
+    else if (score >= 70) bullets.push({ type: 'warning', text: `Overall fairness score: ${score}% — Partial compliance, remediation recommended` });
+    else bullets.push({ type: 'error', text: `Overall fairness score: ${score}% — NON-COMPLIANT` });
+    
+    if (data.metricDetails) {
+      Object.entries(data.metricDetails).forEach(([key, val]: [string, any]) => {
+        const metricScore = typeof val === 'number' ? val : val?.score;
+        if (metricScore != null && metricScore < 70) {
+          bullets.push({ type: 'error', text: `${key}: ${metricScore}% — Below threshold` });
+        } else if (metricScore != null) {
+          bullets.push({ type: 'success', text: `${key}: ${metricScore}%` });
+        }
+      });
+    }
+    return bullets;
   };
 
   if (modelsLoading) {
@@ -212,7 +244,55 @@ function FairnessEngineContent() {
         </div>
       )}
 
-      {!selectedModelId && (
+      {evalResults && (
+        <div className="space-y-6 mb-6">
+          <ComplianceBanner 
+            score={evalResults.overallScore ?? 0} 
+            engineName="Fairness" 
+            regulatoryReferences={['EU AI Act Article 10', 'EU AI Act Article 71', 'ISO/IEC 24027']} 
+          />
+          <EngineResultsLayout
+            score={evalResults.overallScore ?? 0}
+            engineName="Fairness"
+            keyInsight={evalResults.verdict || `Fairness score: ${evalResults.overallScore}%`}
+            summaryBullets={buildSummaryBullets(evalResults)}
+            recommendations={evalResults.recommendations || []}
+            metricsContent={
+              evalResults.computationSteps ? (
+                <ComputationBreakdown 
+                  steps={evalResults.computationSteps} 
+                  overallScore={evalResults.overallScore ?? 0}
+                  weightedFormula="0.25×DP + 0.25×EO + 0.25×EOdds + 0.15×GLR + 0.10×Bias"
+                  engineType="fairness"
+                  euAIActReference="EU AI Act Article 10"
+                />
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>Detailed computation steps will appear here after evaluation.</p>
+                </div>
+              )
+            }
+            rawDataContent={
+              <RawDataLog entries={evalResults.rawLogs || [{ timestamp: new Date().toISOString(), type: 'evaluation', data: evalResults }]} />
+            }
+            evidenceContent={
+              <EvidencePackage 
+                mode="download" 
+                data={{ 
+                  results: evalResults, 
+                  rawLogs: evalResults.rawLogs || [], 
+                  modelId: selectedModelId,
+                  evaluationType: 'fairness',
+                  overallScore: evalResults.overallScore,
+                  isCompliant: (evalResults.overallScore ?? 0) >= 70
+                }} 
+              />
+            }
+          />
+        </div>
+      )}
+
+      {!selectedModelId && !evalResults && (
         <div className="text-center py-16 bg-card rounded-xl border border-border">
           <Scale className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-foreground mb-2">Select a Model</h3>
