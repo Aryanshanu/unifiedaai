@@ -1,6 +1,6 @@
 import { Crown, ShieldCheck, Wrench, FileCheck, LucideIcon } from 'lucide-react';
 
-export type AppRole = 'admin' | 'reviewer' | 'analyst' | 'viewer';
+export type AppRole = 'admin' | 'reviewer' | 'analyst' | 'viewer' | 'superadmin';
 
 export interface PersonaConfig {
   role: AppRole;
