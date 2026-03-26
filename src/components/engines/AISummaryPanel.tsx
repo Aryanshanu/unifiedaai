@@ -152,13 +152,9 @@ Confidence: ${summary.confidence_score}%
             <div className="p-2 bg-primary/10 rounded-lg">
               <Brain className="h-5 w-5 text-primary" />
             </div>
-            AI Quality Summary
-          </CardTitle>
+            Quality Summary
+           </CardTitle>
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-xs">
-              <Sparkles className="h-3 w-3 mr-1" />
-              {summary.model_used}
-            </Badge>
             <Button variant="ghost" size="sm" onClick={handleCopySummary}>
               <Copy className="h-4 w-4" />
             </Button>
