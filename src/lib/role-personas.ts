@@ -26,7 +26,7 @@ export const PERSONA_MAP: Record<AppRole, PersonaConfig> = {
     borderColor: 'border-l-blue-500',
     defaultRoute: '/',
     dashboardLayout: 'executive',
-    sidebarSections: ['govern', 'data-governance', 'docs'],
+    sidebarSections: ['discover', 'monitor', 'govern', 'data-governance', 'core-rai', 'core-security', 'configure', 'docs'],
   },
   reviewer: {
     role: 'reviewer',
