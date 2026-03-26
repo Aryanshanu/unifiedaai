@@ -87,6 +87,7 @@ const App = () => (
               <Suspense fallback={<PageFallback />}>
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
+                <Route path="/admin" element={<AdminLogin />} />
                 <Route path="/error" element={<Error />} />
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 {/* Project & System Registry */}

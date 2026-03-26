@@ -146,6 +146,9 @@ export const ROUTE_ACCESS_MAP: Record<string, AppRole[]> = {
  * Uses longest-prefix matching. No admin bypass.
  */
 export function canAccessRoute(roles: AppRole[], pathname: string): boolean {
+  // Superadmin bypasses all route restrictions
+  if (roles.includes('superadmin')) return true;
+
   // Find the longest matching route key
   let bestMatch = '';
   for (const routeKey of Object.keys(ROUTE_ACCESS_MAP)) {
