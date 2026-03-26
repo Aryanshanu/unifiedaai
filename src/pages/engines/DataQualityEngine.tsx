@@ -341,11 +341,17 @@ function ImportTab() {
 }
 
 function EvaluateTab() {
-  const [selectedDataset, setSelectedDataset] = useState<string>('');
+  const [selectedDataset, setSelectedDataset] = useState<string>(() => {
+    return localStorage.getItem('dq-eval-selected-dataset') || '';
+  });
   const [evaluationStatus, setEvaluationStatus] = useState<'idle' | 'running' | 'complete' | 'error'>('idle');
   const [result, setResult] = useState<QualityResult | null>(null);
   const [rawLogs, setRawLogs] = useState<Array<{ id: string; timestamp: string; type: 'input' | 'output' | 'computation'; data: Record<string, unknown> }>>([]);
   const queryClient = useQueryClient();
+  
+  useEffect(() => {
+    if (selectedDataset) localStorage.setItem('dq-eval-selected-dataset', selectedDataset);
+  }, [selectedDataset]);
 
   const { data: datasets, isLoading: loadingDatasets } = useQuery({
     queryKey: ['datasets'],
@@ -503,9 +509,15 @@ function HistoryTab() {
 }
 
 function ControlPlaneTab() {
-  const [selectedDataset, setSelectedDataset] = useState<string>('');
+  const [selectedDataset, setSelectedDataset] = useState<string>(() => {
+    return localStorage.getItem('dq-cp-selected-dataset') || '';
+  });
   const [isChatOpen, setIsChatOpen] = useState(false);
   const queryClient = useQueryClient();
+  
+  useEffect(() => {
+    if (selectedDataset) localStorage.setItem('dq-cp-selected-dataset', selectedDataset);
+  }, [selectedDataset]);
   
   const { data: datasets, refetch: refetchDatasets } = useQuery({
     queryKey: ['datasets-for-control-plane'],

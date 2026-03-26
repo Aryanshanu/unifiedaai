@@ -122,8 +122,14 @@ function generateIncidentDescription(incident: DQIncident): string {
   if (incident.description) return incident.description;
   
   const dim = incident.dimension.toLowerCase();
-  const col = incident.column_name || 'data';
-  const pct = incident.affected_records_percentage?.toFixed(1) || 'N/A';
+  // Try to extract column from rule_name or failure_signature if column_name missing
+  const col = incident.column_name 
+    || incident.rule_name?.split('_')[0] 
+    || incident.failure_signature?.split('_')[1] 
+    || 'data';
+  const pct = incident.affected_records_percentage?.toFixed(1) 
+    || (incident.action?.match(/([\d.]+)%/)?.[1]) 
+    || 'N/A';
   const count = incident.affected_records_count?.toLocaleString() || 'multiple';
   
   const templates: Record<string, string> = {
