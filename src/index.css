@@ -282,4 +282,13 @@
   .bg-gradient-hero {
     background-image: var(--gradient-hero);
   }
+
+  [data-radix-popper-content-wrapper] {
+    z-index: 150 !important;
+    pointer-events: auto !important;
+  }
+
+  [data-radix-popper-content-wrapper] > * {
+    pointer-events: auto !important;
+  }
 }
