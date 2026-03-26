@@ -212,12 +212,12 @@ export function useDQControlPlane(datasetId?: string): UseDQControlPlaneReturn {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeDatasetRef = useRef<string | null>(null);
 
-  // Timer for elapsed time
+  // Timer for elapsed time — 1s intervals to avoid UI thrashing
   useEffect(() => {
     if (pipelineStatus === 'running') {
       timerRef.current = setInterval(() => {
-        setElapsedTime(prev => prev + 100);
-      }, 100);
+        setElapsedTime(prev => prev + 1000);
+      }, 1000);
     } else if (timerRef.current) {
       clearInterval(timerRef.current);
     }
