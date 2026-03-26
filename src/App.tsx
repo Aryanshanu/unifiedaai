@@ -51,6 +51,7 @@ const AgentGovernance = lazy(() => import("./pages/AgentGovernance"));
 const ContinuousEvaluation = lazy(() => import("./pages/ContinuousEvaluation"));
 const EnvironmentManagement = lazy(() => import("./pages/EnvironmentManagement"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -86,6 +87,7 @@ const App = () => (
               <Suspense fallback={<PageFallback />}>
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
+                <Route path="/admin" element={<AdminLogin />} />
                 <Route path="/error" element={<Error />} />
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 {/* Project & System Registry */}

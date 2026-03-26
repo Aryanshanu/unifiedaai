@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { PERSONA_MAP, type AppRole } from '@/lib/role-personas';
 
-const roleOptions = Object.values(PERSONA_MAP);
+const roleOptions = Object.values(PERSONA_MAP).filter(p => p.role !== 'superadmin');
 
 interface RoleSelectorProps {
   onSelect: (role: AppRole) => void;

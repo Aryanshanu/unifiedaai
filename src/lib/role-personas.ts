@@ -1,6 +1,6 @@
 import { Crown, ShieldCheck, Wrench, FileCheck, LucideIcon } from 'lucide-react';
 
-export type AppRole = 'admin' | 'reviewer' | 'analyst' | 'viewer';
+export type AppRole = 'admin' | 'reviewer' | 'analyst' | 'viewer' | 'superadmin';
 
 export interface PersonaConfig {
   role: AppRole;
@@ -63,6 +63,18 @@ export const PERSONA_MAP: Record<AppRole, PersonaConfig> = {
     defaultRoute: '/audit-center',
     dashboardLayout: 'compliance',
     sidebarSections: ['govern', 'data-governance', 'docs'],
+  },
+  superadmin: {
+    role: 'superadmin',
+    displayName: 'Platform Admin',
+    description: 'Full unrestricted access to all platform features, engines, and configuration',
+    icon: Crown,
+    avatarEmoji: '🔑',
+    avatarGradient: 'from-yellow-500 to-red-600',
+    borderColor: 'border-l-yellow-500',
+    defaultRoute: '/',
+    dashboardLayout: 'technical',
+    sidebarSections: ['all'],
   },
 };
 
@@ -134,6 +146,9 @@ export const ROUTE_ACCESS_MAP: Record<string, AppRole[]> = {
  * Uses longest-prefix matching. No admin bypass.
  */
 export function canAccessRoute(roles: AppRole[], pathname: string): boolean {
+  // Superadmin bypasses all route restrictions
+  if (roles.includes('superadmin')) return true;
+
   // Find the longest matching route key
   let bestMatch = '';
   for (const routeKey of Object.keys(ROUTE_ACCESS_MAP)) {
