@@ -98,15 +98,15 @@ export const ROUTE_ACCESS_MAP: Record<string, AppRole[]> = {
   '/auth': ['admin', 'reviewer', 'analyst', 'viewer'],
   '/error': ['admin', 'reviewer', 'analyst', 'viewer'],
 
-  // Discover & Monitor — operational, not executive
-  '/discovery': ['reviewer', 'analyst'],
-  '/agents': ['reviewer', 'analyst'],
-  '/observability': ['reviewer', 'analyst'],
-  '/alerts': ['reviewer', 'analyst'],
-  '/continuous-evaluation': ['analyst'],
-  '/evaluation': ['analyst'],
+  // Discover & Monitor
+  '/discovery': ['admin', 'reviewer', 'analyst'],
+  '/agents': ['admin', 'reviewer', 'analyst'],
+  '/observability': ['admin', 'reviewer', 'analyst'],
+  '/alerts': ['admin', 'reviewer', 'analyst'],
+  '/continuous-evaluation': ['admin', 'analyst'],
+  '/evaluation': ['admin', 'analyst'],
 
-  // Governance — executive + steward + auditor
+  // Governance
   '/governance': ['admin', 'reviewer', 'viewer'],
   '/governance/approvals': ['admin', 'reviewer'],
   '/hitl': ['admin', 'reviewer'],
@@ -114,30 +114,30 @@ export const ROUTE_ACCESS_MAP: Record<string, AppRole[]> = {
   '/lineage': ['admin', 'reviewer', 'viewer'],
   '/audit-center': ['admin', 'reviewer', 'viewer'],
 
-  // Core RAI Engines — technical only
-  '/engine/fairness': ['analyst'],
-  '/engine/hallucination': ['analyst'],
-  '/engine/toxicity': ['analyst'],
-  '/engine/privacy': ['analyst'],
-  '/engine/explainability': ['analyst'],
-  '/engine/data-quality': ['analyst', 'reviewer', 'viewer'],
+  // Core RAI Engines — admin + analyst
+  '/engine/fairness': ['admin', 'analyst'],
+  '/engine/hallucination': ['admin', 'analyst'],
+  '/engine/toxicity': ['admin', 'analyst'],
+  '/engine/privacy': ['admin', 'analyst'],
+  '/engine/explainability': ['admin', 'analyst'],
+  '/engine/data-quality': ['admin', 'analyst', 'reviewer', 'viewer'],
 
-  // Core Security — technical only
-  '/security': ['analyst'],
-  '/security/pentest': ['analyst'],
-  '/security/jailbreak': ['analyst'],
-  '/security/threats': ['analyst'],
+  // Core Security — admin + analyst
+  '/security': ['admin', 'analyst'],
+  '/security/pentest': ['admin', 'analyst'],
+  '/security/jailbreak': ['admin', 'analyst'],
+  '/security/threats': ['admin', 'analyst'],
 
   // Data Governance — all roles for oversight
   '/data-contracts': ['admin', 'reviewer', 'analyst', 'viewer'],
   '/semantic-definitions': ['admin', 'reviewer', 'analyst', 'viewer'],
   '/semantic-hub': ['admin', 'reviewer', 'analyst', 'viewer'],
 
-  // Configure — technical only
-  '/projects': ['analyst'],
-  '/models': ['analyst'],
-  '/environments': ['analyst'],
-  '/settings': ['analyst'],
+  // Configure — admin + analyst
+  '/projects': ['admin', 'analyst'],
+  '/models': ['admin', 'analyst'],
+  '/environments': ['admin', 'analyst'],
+  '/settings': ['admin', 'analyst'],
   '/docs': ['admin', 'reviewer', 'analyst', 'viewer'],
 };
 
