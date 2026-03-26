@@ -46,7 +46,7 @@ const navItems: NavItem[] = [
   { path: "/engine/explainability", icon: Eye, label: "Explainability Engine" },
   { divider: true, label: "CORE SECURITY" },
   { path: "/security", icon: Shield, label: "Security Dashboard" },
-  { path: "/security/pentest", icon: ScanSearch, label: "AI Pentesting" },
+  { path: "/security/pentest", icon: ScanSearch, label: "Pentesting" },
   { path: "/security/jailbreak", icon: FlaskConical, label: "Jailbreak Lab" },
   { path: "/security/threats", icon: Target, label: "Threat Modeling" },
   { divider: true, label: "Configure" },

@@ -232,7 +232,7 @@ Confidence: ${summary.confidence_score}%
           </div>
           
           <div className="text-right">
-            <p className="text-xs text-muted-foreground mb-1">AI Confidence</p>
+            <p className="text-xs text-muted-foreground mb-1">Confidence</p>
             <div className="flex items-center gap-2">
               <Progress value={summary.confidence_score} className="w-24 h-2" />
               <span className="text-sm font-medium">{summary.confidence_score}%</span>
