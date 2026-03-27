@@ -178,16 +178,9 @@ export default function Evaluation() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-foreground">Evaluation Suites</h2>
-            <Dialog open={showCreateSuite} onOpenChange={setShowCreateSuite}>
-              <DialogTrigger asChild>
-                <Button variant="ghost" size="sm">
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <EvaluationSuiteForm onClose={() => setShowCreateSuite(false)} />
-              </DialogContent>
-            </Dialog>
+            <Button variant="ghost" size="sm" onClick={() => setShowCreateSuite(true)}>
+              <Plus className="w-4 h-4" />
+            </Button>
           </div>
 
           {suitesLoading ? (
