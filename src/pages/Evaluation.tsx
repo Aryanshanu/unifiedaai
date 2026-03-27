@@ -192,9 +192,8 @@ export default function Evaluation() {
           ) : suites?.length === 0 ? (
             <div className="bg-card border border-border rounded-xl p-6 text-center">
               <p className="text-muted-foreground text-sm">No evaluation suites created yet</p>
-              <Button variant="outline" size="sm" className="mt-4" onClick={() => setShowCreateSuite(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Create Suite
+              <Button variant="outline" size="sm" className="mt-4">
+                <EvaluationSuiteForm />
               </Button>
             </div>
           ) : (
