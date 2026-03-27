@@ -1,14 +1,20 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { ScoreRing } from "@/components/dashboard/ScoreRing";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Activity, Play, Calendar, Plus } from "lucide-react";
 import { useEvaluationRuns, useEvaluationSuites, useEvaluationStats, EvaluationRun } from "@/hooks/useEvaluations";
 import { useModels } from "@/hooks/useModels";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, subMonths, isAfter } from "date-fns";
+import { EvaluationSuiteForm } from "@/components/evaluation/EvaluationSuiteForm";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 function getEvalStatus(run: EvaluationRun): "healthy" | "warning" | "critical" {
   const score = run.overall_score ?? 0;
@@ -18,18 +24,30 @@ function getEvalStatus(run: EvaluationRun): "healthy" | "warning" | "critical" {
 }
 
 export default function Evaluation() {
+  const navigate = useNavigate();
+  const [showCreateSuite, setShowCreateSuite] = useState(false);
   const { data: runs, isLoading: runsLoading } = useEvaluationRuns();
   const { data: suites, isLoading: suitesLoading } = useEvaluationSuites();
   const { data: stats } = useEvaluationStats();
   const { data: models } = useModels();
 
-  // Create a model lookup map
+  // Compute trend from real data
+  const now = new Date();
+  const oneMonthAgo = subMonths(now, 1);
+  const twoMonthsAgo = subMonths(now, 2);
+  const thisMonthCount = runs?.filter(r => isAfter(new Date(r.created_at), oneMonthAgo)).length ?? 0;
+  const lastMonthCount = runs?.filter(r => {
+    const d = new Date(r.created_at);
+    return isAfter(d, twoMonthsAgo) && !isAfter(d, oneMonthAgo);
+  }).length ?? 0;
+  const trendValue = lastMonthCount > 0 ? Math.round(((thisMonthCount - lastMonthCount) / lastMonthCount) * 100) : thisMonthCount > 0 ? 100 : 0;
+  const trendDirection: "up" | "down" = trendValue >= 0 ? "up" : "down";
+
   const modelMap = models?.reduce((acc, m) => {
     acc[m.id] = m.name;
     return acc;
   }, {} as Record<string, string>) || {};
 
-  // Create suite lookup map
   const suiteMap = suites?.reduce((acc, s) => {
     acc[s.id] = s.name;
     return acc;
@@ -37,16 +55,27 @@ export default function Evaluation() {
 
   const recentRuns = runs?.slice(0, 10) || [];
 
+  const handleRunSuite = async (suiteId: string) => {
+    try {
+      const { error } = await supabase.functions.invoke('run-scheduled-evaluations', {
+        body: { suite_id: suiteId }
+      });
+      if (error) throw error;
+      toast.success("Evaluation triggered successfully");
+    } catch (err: unknown) {
+      toast.error("Failed to trigger evaluation: " + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+
   return (
     <MainLayout title="Evaluation Hub" subtitle="Systematic testing for fairness, robustness, safety, and compliance">
-      {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <MetricCard
           title="Total Runs"
           value={(stats?.total || 0).toString()}
           subtitle="All time"
           icon={<Activity className="w-4 h-4 text-primary" />}
-          trend={{ value: 23, direction: "up" }}
+          trend={{ value: Math.abs(trendValue), direction: trendDirection }}
         />
         <MetricCard
           title="Completed"
@@ -70,14 +99,12 @@ export default function Evaluation() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Evaluations */}
         <div className="lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-foreground">Recent Evaluations</h2>
-            <Button variant="outline" size="sm" disabled>
+            <Button variant="outline" size="sm" onClick={() => navigate('/continuous-evaluation')}>
               <Calendar className="w-4 h-4 mr-2" />
               Schedule
-              <Badge variant="secondary" className="ml-2 text-[10px]">Coming Soon</Badge>
             </Button>
           </div>
 
@@ -151,9 +178,16 @@ export default function Evaluation() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-foreground">Evaluation Suites</h2>
-            <Button variant="ghost" size="sm" disabled>
-              <Plus className="w-4 h-4" />
-            </Button>
+            <Dialog open={showCreateSuite} onOpenChange={setShowCreateSuite}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <EvaluationSuiteForm onClose={() => setShowCreateSuite(false)} />
+              </DialogContent>
+            </Dialog>
           </div>
 
           {suitesLoading ? (
@@ -168,9 +202,9 @@ export default function Evaluation() {
           ) : suites?.length === 0 ? (
             <div className="bg-card border border-border rounded-xl p-6 text-center">
               <p className="text-muted-foreground text-sm">No evaluation suites created yet</p>
-              <Button variant="outline" size="sm" className="mt-4" disabled>
+              <Button variant="outline" size="sm" className="mt-4" onClick={() => setShowCreateSuite(true)}>
                 <Plus className="w-4 h-4 mr-2" />
-                Create Suite (Coming Soon)
+                Create Suite
               </Button>
             </div>
           ) : (
@@ -184,7 +218,12 @@ export default function Evaluation() {
                     <span className="font-medium text-foreground group-hover:text-primary transition-colors">
                       {suite.name}
                     </span>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => handleRunSuite(suite.id)}
+                    >
                       <Play className="w-3 h-3" />
                     </Button>
                   </div>

@@ -105,10 +105,6 @@ export default function ImpactDashboard() {
     }
   });
 
-  const [computedGroups, setComputedGroups] = useState<Array<{ group: string; attribute?: string; positiveRate: number; harmRate: number; decisionCount: number; appealRate: number; sampleSize?: number; metrics: { disparateImpactRatio?: number; disparateImpact?: number; demographicParity?: number; equalizedOdds?: number; calibration?: number } }>>([]);
-  const [computedAlerts, setComputedAlerts] = useState<Array<{ type: string; message: string; severity: string }>>([]);
-  const [computedOverall, setComputedOverall] = useState<{ totalDecisions: number; harmfulOutcomes: number; positiveDecisions: number; appealedDecisions: number; decisionsWithDemographics?: number; demographicCoverage?: number }>({ totalDecisions: 0, harmfulOutcomes: 0, positiveDecisions: 0, appealedDecisions: 0 });
-
   // Use computed data
   const groups = computedGroups;
   const alerts = computedAlerts;
