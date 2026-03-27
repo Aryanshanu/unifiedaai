@@ -25,7 +25,6 @@ function getEvalStatus(run: EvaluationRun): "healthy" | "warning" | "critical" {
 
 export default function Evaluation() {
   const navigate = useNavigate();
-  const [showCreateSuite, setShowCreateSuite] = useState(false);
   const { data: runs, isLoading: runsLoading } = useEvaluationRuns();
   const { data: suites, isLoading: suitesLoading } = useEvaluationSuites();
   const { data: stats } = useEvaluationStats();
