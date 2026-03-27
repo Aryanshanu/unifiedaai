@@ -52,6 +52,11 @@ const ContinuousEvaluation = lazy(() => import("./pages/ContinuousEvaluation"));
 const EnvironmentManagement = lazy(() => import("./pages/EnvironmentManagement"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
+const ImpactDashboard = lazy(() => import("./pages/ImpactDashboard"));
+const RegulatoryReports = lazy(() => import("./pages/RegulatoryReports"));
+const Runbooks = lazy(() => import("./pages/Runbooks"));
+const Policy = lazy(() => import("./pages/Policy"));
+const GoldenDemoV2 = lazy(() => import("./pages/GoldenDemoV2"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
