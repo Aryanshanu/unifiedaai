@@ -6,7 +6,7 @@ import { ScoreRing } from "@/components/dashboard/ScoreRing";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Activity, Play, Calendar, Plus } from "lucide-react";
 import { useEvaluationRuns, useEvaluationSuites, useEvaluationStats, EvaluationRun } from "@/hooks/useEvaluations";
 import { useModels } from "@/hooks/useModels";
