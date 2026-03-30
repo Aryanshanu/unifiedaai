@@ -57,6 +57,7 @@ const RegulatoryReports = lazy(() => import("./pages/RegulatoryReports"));
 const Runbooks = lazy(() => import("./pages/Runbooks"));
 const Policy = lazy(() => import("./pages/Policy"));
 const GoldenDemoV2 = lazy(() => import("./pages/GoldenDemoV2"));
+const Vendors = lazy(() => import("./pages/Vendors"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
