@@ -4,7 +4,7 @@ import { ComplianceGauge } from "@/components/dashboard/ComplianceGauge";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Shield, FileCheck, Download, ExternalLink, AlertTriangle, Trash2 } from "lucide-react";
+import { Shield, FileCheck, Download, ExternalLink, AlertTriangle, Trash2, ChevronDown, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useControlFrameworks, useControls, useComplianceStats, useAttestations, useControlAssessments, useDeleteFramework } from "@/hooks/useGovernance";
 import { Skeleton } from "@/components/ui/skeleton";
