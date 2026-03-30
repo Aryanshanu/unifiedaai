@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Building2, Globe, Mail, ShieldCheck } from "lucide-react";
 import { useVendors } from "@/hooks/useVendors";
-import { EmptyState } from "@/components/shared/EmptyState";
 
 const riskTierColor = (tier: string | null) => {
   switch (tier) {
