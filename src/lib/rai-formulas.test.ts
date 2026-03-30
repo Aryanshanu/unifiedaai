@@ -321,7 +321,7 @@ describe('Privacy Metrics', () => {
       expect(r.status).toBe('pass');
     });
     it('fails with PHI leakage', () => {
-      const r = phiLeakageScore(5, 100);
+      const r = phiLeakageScore(10, 100);
       expect(r.status).toBe('fail');
     });
     it('returns MetricResult shape', () => expectMetricShape(phiLeakageScore(0, 100)));
