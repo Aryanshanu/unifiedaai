@@ -45,7 +45,25 @@ export default function Policy() {
     return model?.name || "Unknown Model";
   };
 
+  const CAMPAIGN_COOLDOWN_MS = 5 * 60 * 1000;
+  const canRunCampaign = (): boolean => {
+    const last = localStorage.getItem('fractal-last-campaign-run');
+    if (!last) return true;
+    return Date.now() - parseInt(last, 10) > CAMPAIGN_COOLDOWN_MS;
+  };
+  const getCooldownRemaining = (): string => {
+    const last = localStorage.getItem('fractal-last-campaign-run');
+    if (!last) return '';
+    const remaining = CAMPAIGN_COOLDOWN_MS - (Date.now() - parseInt(last, 10));
+    if (remaining <= 0) return '';
+    return `${Math.ceil(remaining / 60000)}m cooldown`;
+  };
+
   const runSampleCampaign = async () => {
+    if (!canRunCampaign()) {
+      toast.warning(`Campaign on cooldown. ${getCooldownRemaining()} remaining.`);
+      return;
+    }
     setIsRunningCampaign(true);
     setCampaignProgress(0);
     setLatestCampaignResult(null);
@@ -81,6 +99,7 @@ export default function Policy() {
       const passRate = data?.summary?.passRate || 0;
       const findings = data?.summary?.failedTests || 0;
 
+      localStorage.setItem('fractal-last-campaign-run', Date.now().toString());
       toast.success("Red Team Campaign Complete", {
         description: `Coverage: ${passRate}% | ${findings} vulnerabilities found`,
       });

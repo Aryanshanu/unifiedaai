@@ -42,6 +42,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, subDays } from 'date-fns';
+import { toast } from 'sonner';
 
 interface AuditEvent {
   id: string;
@@ -503,6 +504,31 @@ function ReportsTab() {
     },
   });
 
+  const handleDownloadReport = (report: any) => {
+    try {
+      const content = report.metadata ?? {
+        report_type: report.report_type,
+        report_id: report.report_id,
+        generated_at: report.generated_at,
+        verification_status: report.verification_status,
+        record_hash: report.record_hash,
+        content_hash: report.content_hash,
+        storage_path: report.storage_path,
+        note: "Full report content not stored inline — this is a metadata summary.",
+      };
+      const blob = new Blob([JSON.stringify(content, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `audit-report-${report.report_type}-${new Date(report.generated_at).toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Report downloaded");
+    } catch {
+      toast.error("No content available for download");
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -543,7 +569,7 @@ function ReportsTab() {
                   <Badge variant={report.verification_status === 'verified' ? 'default' : 'secondary'}>
                     {report.verification_status || 'Pending'}
                   </Badge>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" onClick={() => handleDownloadReport(report)}>
                     <Download className="h-4 w-4 mr-1" />
                     Download
                   </Button>

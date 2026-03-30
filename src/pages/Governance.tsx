@@ -4,7 +4,7 @@ import { ComplianceGauge } from "@/components/dashboard/ComplianceGauge";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Shield, FileCheck, Download, ExternalLink, AlertTriangle, Trash2 } from "lucide-react";
+import { Shield, FileCheck, Download, ExternalLink, AlertTriangle, Trash2, ChevronDown, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useControlFrameworks, useControls, useComplianceStats, useAttestations, useControlAssessments, useDeleteFramework } from "@/hooks/useGovernance";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,6 +16,10 @@ import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { CreateFrameworkDialog } from "@/components/governance/CreateFrameworkDialog";
 import { GovernanceEnforcementPanel } from "@/components/governance/GovernanceEnforcementPanel";
+import { usePredictiveGovernance } from "@/hooks/usePredictiveGovernance";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 
 export default function Governance() {
   const { data: frameworks, isLoading: frameworksLoading, isError: frameworksError, refetch: refetchFrameworks } = useControlFrameworks();
@@ -71,6 +75,17 @@ export default function Governance() {
   const recentAttestations = attestations?.slice(0, 3) || [];
 
   // Handle attestation download
+  const generateAttestationSummary = (attestation: typeof recentAttestations[0]) => ({
+    attestation_id: attestation.id,
+    title: attestation.title,
+    status: attestation.status,
+    signed_by: attestation.signed_by,
+    signed_at: attestation.signed_at,
+    created_at: attestation.created_at,
+    integrity_hash: attestation.document_url,
+    note: "This attestation is hash-referenced. No document binary is stored.",
+  });
+
   const handleDownloadAttestation = (attestation: typeof recentAttestations[0]) => {
     if (!attestation.document_url) {
       toast.error("No document available for this attestation");
@@ -78,6 +93,19 @@ export default function Governance() {
     }
     
     try {
+      // Handle sha256: hash references
+      if (attestation.document_url.startsWith('sha256:')) {
+        const summary = generateAttestationSummary(attestation);
+        const blob = new Blob([JSON.stringify(summary, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `attestation-${attestation.id.slice(0, 8)}-summary.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Attestation summary downloaded");
+        return;
+      }
       // Handle data URLs
       if (attestation.document_url.startsWith('data:')) {
         const a = document.createElement('a');
@@ -86,7 +114,6 @@ export default function Governance() {
         a.click();
         toast.success("Attestation downloaded");
       } else {
-        // Handle external URLs
         window.open(attestation.document_url, '_blank');
       }
     } catch (error) {
@@ -102,8 +129,32 @@ export default function Governance() {
     }
     
     try {
+      // Handle sha256: hash references
+      if (attestation.document_url.startsWith('sha256:')) {
+        const summary = generateAttestationSummary(attestation);
+        const newWindow = window.open('', '_blank');
+        if (newWindow) {
+          newWindow.document.write(`
+            <html>
+              <head><title>Attestation - ${attestation.title}</title>
+              <style>
+                body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; background: #f5f5f5; }
+                pre { background: white; padding: 20px; border-radius: 8px; overflow-x: auto; }
+                .hash { color: #666; font-size: 0.85em; }
+              </style>
+              </head>
+              <body>
+                <h1>${attestation.title}</h1>
+                <p class="hash">Integrity Hash: ${attestation.document_url}</p>
+                <pre>${JSON.stringify(summary, null, 2)}</pre>
+              </body>
+            </html>
+          `);
+          newWindow.document.close();
+        }
+        return;
+      }
       if (attestation.document_url.startsWith('data:')) {
-        // Parse and display data URL content
         const jsonStr = decodeURIComponent(attestation.document_url.split(',')[1]);
         const data = JSON.parse(jsonStr);
         const newWindow = window.open('', '_blank');
@@ -410,7 +461,51 @@ export default function Governance() {
             )}
           </div>
         </div>
+
+        {/* Predictive Risk Signals */}
+        <PredictiveRiskSection />
       </div>
     </MainLayout>
+  );
+}
+
+function PredictiveRiskSection() {
+  const { data: predictions } = usePredictiveGovernance(undefined, 3);
+  
+  if (!predictions?.length) return null;
+
+  return (
+    <Collapsible defaultOpen>
+      <CollapsibleTrigger className="flex items-center gap-2 w-full text-left group">
+        <ChevronDown className="h-4 w-4 transition-transform group-data-[state=closed]:-rotate-90" />
+        <h3 className="text-lg font-semibold">Predictive Risk Signals</h3>
+        <Badge variant="secondary" className="ml-auto">{predictions.length} signals</Badge>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {predictions.map((pred) => (
+            <Card key={pred.id} className="border-warning/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-warning" />
+                  {pred.prediction_type}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Risk Score</span>
+                  <span className="font-mono font-medium">{pred.risk_score}%</span>
+                </div>
+                <Progress value={pred.risk_score} className="h-2" />
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span className="capitalize">{pred.entity_type}</span>
+                  <span>Confidence: {(pred.confidence * 100).toFixed(0)}%</span>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

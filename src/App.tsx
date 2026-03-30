@@ -57,6 +57,7 @@ const RegulatoryReports = lazy(() => import("./pages/RegulatoryReports"));
 const Runbooks = lazy(() => import("./pages/Runbooks"));
 const Policy = lazy(() => import("./pages/Policy"));
 const GoldenDemoV2 = lazy(() => import("./pages/GoldenDemoV2"));
+const Vendors = lazy(() => import("./pages/Vendors"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -144,6 +145,7 @@ const App = () => (
                 <Route path="/runbooks" element={<ProtectedRoute><Runbooks /></ProtectedRoute>} />
                 <Route path="/policy" element={<ProtectedRoute><Policy /></ProtectedRoute>} />
                 <Route path="/golden-demo" element={<ProtectedRoute><GoldenDemoV2 /></ProtectedRoute>} />
+                <Route path="/vendors" element={<ProtectedRoute><Vendors /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
               </Suspense>

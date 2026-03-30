@@ -648,7 +648,7 @@ export function calculatePrivacyScore(metrics: {
  * Formula: CS = avg(clarity_rating) / max_rating
  * Score: Exp_Clarity = CS
  */
-export function clarityScrore(
+export function clarityScore(
   avgClarityRating: number,
   maxRating: number = 5
 ): MetricResult {
