@@ -16,6 +16,10 @@ import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { CreateFrameworkDialog } from "@/components/governance/CreateFrameworkDialog";
 import { GovernanceEnforcementPanel } from "@/components/governance/GovernanceEnforcementPanel";
+import { usePredictiveGovernance } from "@/hooks/usePredictiveGovernance";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 
 export default function Governance() {
   const { data: frameworks, isLoading: frameworksLoading, isError: frameworksError, refetch: refetchFrameworks } = useControlFrameworks();
