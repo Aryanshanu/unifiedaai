@@ -461,7 +461,51 @@ export default function Governance() {
             )}
           </div>
         </div>
+
+        {/* Predictive Risk Signals */}
+        <PredictiveRiskSection />
       </div>
     </MainLayout>
+  );
+}
+
+function PredictiveRiskSection() {
+  const { data: predictions } = usePredictiveGovernance(undefined, 3);
+  
+  if (!predictions?.length) return null;
+
+  return (
+    <Collapsible defaultOpen>
+      <CollapsibleTrigger className="flex items-center gap-2 w-full text-left group">
+        <ChevronDown className="h-4 w-4 transition-transform group-data-[state=closed]:-rotate-90" />
+        <h3 className="text-lg font-semibold">Predictive Risk Signals</h3>
+        <Badge variant="secondary" className="ml-auto">{predictions.length} signals</Badge>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {predictions.map((pred) => (
+            <Card key={pred.id} className="border-warning/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-warning" />
+                  {pred.prediction_type}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Risk Score</span>
+                  <span className="font-mono font-medium">{pred.risk_score}%</span>
+                </div>
+                <Progress value={pred.risk_score} className="h-2" />
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span className="capitalize">{pred.entity_type}</span>
+                  <span>Confidence: {(pred.confidence * 100).toFixed(0)}%</span>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
