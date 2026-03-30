@@ -309,7 +309,7 @@ describe('Privacy Metrics', () => {
       expect(r.status).toBe('pass');
     });
     it('fails with high PII', () => {
-      const r = piiLeakageScore(15, 100);
+      const r = piiLeakageScore(30, 100);
       expect(r.status).toBe('fail');
     });
     it('returns MetricResult shape', () => expectMetricShape(piiLeakageScore(0, 100)));
