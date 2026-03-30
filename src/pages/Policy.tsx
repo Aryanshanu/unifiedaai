@@ -99,6 +99,7 @@ export default function Policy() {
       const passRate = data?.summary?.passRate || 0;
       const findings = data?.summary?.failedTests || 0;
 
+      localStorage.setItem('fractal-last-campaign-run', Date.now().toString());
       toast.success("Red Team Campaign Complete", {
         description: `Coverage: ${passRate}% | ${findings} vulnerabilities found`,
       });

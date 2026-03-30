@@ -568,7 +568,7 @@ function ReportsTab() {
                   <Badge variant={report.verification_status === 'verified' ? 'default' : 'secondary'}>
                     {report.verification_status || 'Pending'}
                   </Badge>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" onClick={() => handleDownloadReport(report)}>
                     <Download className="h-4 w-4 mr-1" />
                     Download
                   </Button>

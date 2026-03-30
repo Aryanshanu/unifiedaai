@@ -125,8 +125,32 @@ export default function Governance() {
     }
     
     try {
+      // Handle sha256: hash references
+      if (attestation.document_url.startsWith('sha256:')) {
+        const summary = generateAttestationSummary(attestation);
+        const newWindow = window.open('', '_blank');
+        if (newWindow) {
+          newWindow.document.write(`
+            <html>
+              <head><title>Attestation - ${attestation.title}</title>
+              <style>
+                body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; background: #f5f5f5; }
+                pre { background: white; padding: 20px; border-radius: 8px; overflow-x: auto; }
+                .hash { color: #666; font-size: 0.85em; }
+              </style>
+              </head>
+              <body>
+                <h1>${attestation.title}</h1>
+                <p class="hash">Integrity Hash: ${attestation.document_url}</p>
+                <pre>${JSON.stringify(summary, null, 2)}</pre>
+              </body>
+            </html>
+          `);
+          newWindow.document.close();
+        }
+        return;
+      }
       if (attestation.document_url.startsWith('data:')) {
-        // Parse and display data URL content
         const jsonStr = decodeURIComponent(attestation.document_url.split(',')[1]);
         const data = JSON.parse(jsonStr);
         const newWindow = window.open('', '_blank');

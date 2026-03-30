@@ -145,6 +145,7 @@ const App = () => (
                 <Route path="/runbooks" element={<ProtectedRoute><Runbooks /></ProtectedRoute>} />
                 <Route path="/policy" element={<ProtectedRoute><Policy /></ProtectedRoute>} />
                 <Route path="/golden-demo" element={<ProtectedRoute><GoldenDemoV2 /></ProtectedRoute>} />
+                <Route path="/vendors" element={<ProtectedRoute><Vendors /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
               </Suspense>
