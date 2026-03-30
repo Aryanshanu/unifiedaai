@@ -71,6 +71,17 @@ export default function Governance() {
   const recentAttestations = attestations?.slice(0, 3) || [];
 
   // Handle attestation download
+  const generateAttestationSummary = (attestation: typeof recentAttestations[0]) => ({
+    attestation_id: attestation.id,
+    title: attestation.title,
+    status: attestation.status,
+    signed_by: attestation.signed_by,
+    signed_at: attestation.signed_at,
+    created_at: attestation.created_at,
+    integrity_hash: attestation.document_url,
+    note: "This attestation is hash-referenced. No document binary is stored.",
+  });
+
   const handleDownloadAttestation = (attestation: typeof recentAttestations[0]) => {
     if (!attestation.document_url) {
       toast.error("No document available for this attestation");
@@ -78,6 +89,19 @@ export default function Governance() {
     }
     
     try {
+      // Handle sha256: hash references
+      if (attestation.document_url.startsWith('sha256:')) {
+        const summary = generateAttestationSummary(attestation);
+        const blob = new Blob([JSON.stringify(summary, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `attestation-${attestation.id.slice(0, 8)}-summary.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Attestation summary downloaded");
+        return;
+      }
       // Handle data URLs
       if (attestation.document_url.startsWith('data:')) {
         const a = document.createElement('a');
@@ -86,7 +110,6 @@ export default function Governance() {
         a.click();
         toast.success("Attestation downloaded");
       } else {
-        // Handle external URLs
         window.open(attestation.document_url, '_blank');
       }
     } catch (error) {
