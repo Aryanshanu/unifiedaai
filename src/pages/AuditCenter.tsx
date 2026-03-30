@@ -42,6 +42,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, subDays } from 'date-fns';
+import { toast } from 'sonner';
 
 interface AuditEvent {
   id: string;
