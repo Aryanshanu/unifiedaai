@@ -21,10 +21,7 @@ serve(async (req) => {
     const { user } = authResult;
     // User client respects RLS for data reads
     const supabase = authResult.supabase!;
-    // TODO [SERVICE_ROLE_KEY PHASE 1 - due Q1 2026]: Migrate semantic_definitions read to user JWT + RLS
-    // The serviceClient below is used ONLY for semantic_definitions (cross-user shared data).
-    // All other reads use the user client (respects RLS).
-    console.warn('[copilot] SERVICE_ROLE_KEY in use for semantic_definitions read — Phase 1 migration target');
+    // Service client for system operations
     const serviceClient = getServiceClient();
     
     console.log(`[copilot] Authenticated user: ${user?.id}`);

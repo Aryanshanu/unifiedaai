@@ -1,6 +1,6 @@
 /**
- * @status ORPHANED - No page/route currently imports this hook
- * @todo Create UI route or deprecate this hook in next sprint
+ * @status ORPHANED - No page/route currently imports this hook.
+ * @todo Either create a Weight Profiles management page or deprecate this hook.
  * @tracked-in audit-report-2026-03-30
  */
 import { useState, useEffect, useCallback } from 'react';

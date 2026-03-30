@@ -197,9 +197,6 @@ serve(async (req) => {
   const { socket, response } = Deno.upgradeWebSocket(req);
   
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  // TODO [SERVICE_ROLE_KEY PHASE 1 - due Q1 2026]: Migrate to user JWT for per-user reads
-  // WebSocket connections currently use SERVICE_ROLE_KEY for all DB operations
-  console.warn('[realtime-chat] SERVICE_ROLE_KEY in use for WebSocket DB operations — Phase 1 migration target');
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseKey);
   

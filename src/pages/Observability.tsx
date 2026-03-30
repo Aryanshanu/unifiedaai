@@ -190,6 +190,25 @@ export default function Observability() {
     }
   };
 
+  const handleEscalateToPagerDuty = async (alert: DriftAlert) => {
+    try {
+      const { error } = await supabase.functions.invoke('send-notification', {
+        body: {
+          type: 'pagerduty',
+          severity: alert.severity,
+          incident_id: alert.id,
+          title: `Critical Drift Detected: ${alert.feature}`,
+          details: `Model: ${modelMap[alert.model_id]?.name}\nFeature: ${alert.feature}\nValue: ${alert.drift_value.toFixed(4)}`
+        }
+      });
+      if (error) throw error;
+      toast.success("Incident escalated to On-Call via PagerDuty");
+    } catch (err) {
+      console.error("PagerDuty Escalation Failed:", err);
+      toast.error("Failed to escalate via PagerDuty - fallback to internal incident log");
+    }
+  };
+
   const [activeTab, setActiveTab] = useState<'dashboard' | 'oversight' | 'realtime' | 'drift' | 'assistant' | 'semantic-drift'>('dashboard');
 
   return (
@@ -484,6 +503,7 @@ export default function Observability() {
                     key={alert.id} 
                     alert={alert} 
                     modelName={modelMap[alert.model_id]?.name || 'Unknown'}
+                    onEscalate={() => handleEscalateToPagerDuty(alert)}
                   />
                 ))}
               </div>
@@ -525,7 +545,7 @@ export default function Observability() {
   );
 }
 
-function DriftAlertCard({ alert, modelName }: { alert: DriftAlert; modelName: string }) {
+function DriftAlertCard({ alert, modelName, onEscalate }: { alert: DriftAlert; modelName: string; onEscalate: () => void }) {
   return (
     <div className={cn(
       "flex items-center gap-4 p-4 rounded-xl border-l-2",
@@ -542,7 +562,13 @@ function DriftAlertCard({ alert, modelName }: { alert: DriftAlert; modelName: st
           <span>Detected {formatDistanceToNow(new Date(alert.detected_at), { addSuffix: true })}</span>
         </div>
       </div>
-      <StatusBadge status={alert.severity === "critical" ? "critical" : "warning"} />
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="sm" onClick={onEscalate} className="h-8 text-xs gap-1 hover:bg-destructive/10 hover:text-destructive">
+          <Bell className="w-3 h-3" />
+          Escalate
+        </Button>
+        <StatusBadge status={alert.severity === "critical" ? "critical" : "warning"} />
+      </div>
     </div>
   );
 }

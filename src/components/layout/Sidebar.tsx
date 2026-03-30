@@ -57,7 +57,6 @@ const navItems: NavItem[] = [
   { divider: true, label: "Configure" },
   { path: "/projects", icon: FolderOpen, label: "Projects" },
   { path: "/models", icon: Database, label: "Models" },
-  { path: "/vendors", icon: Users, label: "Vendors" },
   { path: "/environments", icon: Server, label: "Environments" },
   { path: "/settings", icon: Settings, label: "Settings" },
   { path: "/docs", icon: BookOpen, label: "Documentation" },

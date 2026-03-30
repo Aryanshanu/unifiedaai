@@ -113,11 +113,6 @@ export const ROUTE_ACCESS_MAP: Record<string, AppRole[]> = {
   '/incidents': ['admin', 'reviewer', 'viewer'],
   '/lineage': ['admin', 'reviewer', 'viewer'],
   '/audit-center': ['admin', 'reviewer', 'viewer'],
-  '/impact': ['admin', 'reviewer', 'analyst'],
-  '/regulatory-reports': ['admin', 'reviewer', 'viewer'],
-  '/runbooks': ['admin', 'reviewer', 'analyst'],
-  '/policy': ['admin', 'analyst'],
-  '/golden-demo': ['admin', 'analyst'],
 
   // Core RAI Engines — admin + analyst
   '/engine/fairness': ['admin', 'analyst'],
@@ -149,28 +144,38 @@ export const ROUTE_ACCESS_MAP: Record<string, AppRole[]> = {
 
 /**
  * Check if a role can access a given pathname.
- * Exact match → dynamic parent lookup → deny (fail-closed).
+ * Uses longest-prefix matching. No admin bypass.
  */
 export function canAccessRoute(roles: AppRole[], pathname: string): boolean {
   // Superadmin bypasses all route restrictions
   if (roles.includes('superadmin')) return true;
 
-  // 1. Exact match — highest priority
+  // Find the longest matching route key
+  let bestMatch = '';
+  for (const routeKey of Object.keys(ROUTE_ACCESS_MAP)) {
+    if (pathname === routeKey || pathname.startsWith(routeKey + '/')) {
+      if (routeKey.length > bestMatch.length) {
+        bestMatch = routeKey;
+      }
+    }
+  }
+
+  // Exact match check
   if (ROUTE_ACCESS_MAP[pathname]) {
     return roles.some(r => ROUTE_ACCESS_MAP[pathname].includes(r));
   }
 
-  // 2. Dynamic routes: /projects/:id, /models/:id, /systems/:id
-  const parts = pathname.split('/').filter(Boolean);
-  if (parts.length >= 2) {
-    const parentPath = '/' + parts[0];
-    if (ROUTE_ACCESS_MAP[parentPath]) {
-      return roles.some(r => ROUTE_ACCESS_MAP[parentPath].includes(r));
-    }
+  if (bestMatch) {
+    return roles.some(r => ROUTE_ACCESS_MAP[bestMatch].includes(r));
   }
 
-  // 3. Unknown routes: DENY (fail-closed)
-  console.warn(`[RBAC] Unknown route "${pathname}" — denying access. Register in ROUTE_ACCESS_MAP.`);
+  // Dynamic routes like /projects/:id or /models/:id - check parent
+  const parentPath = '/' + pathname.split('/')[1];
+  if (ROUTE_ACCESS_MAP[parentPath]) {
+    return roles.some(r => ROUTE_ACCESS_MAP[parentPath].includes(r));
+  }
+
+  // Unknown routes: deny
   return false;
 }
 

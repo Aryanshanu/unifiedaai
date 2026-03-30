@@ -39,31 +39,40 @@ export default function Policy() {
   const [latestCampaignResult, setLatestCampaignResult] = useState<any>(null);
   const queryClient = useQueryClient();
 
+  // ── Rate limiting: 5-minute cooldown between campaigns ─────────────────────
+  const CAMPAIGN_COOLDOWN_MS = 5 * 60 * 1000;
+  const CAMPAIGN_TS_KEY = 'fractal-last-campaign-run';
+
+  const canRunCampaign = (): boolean => {
+    const last = localStorage.getItem(CAMPAIGN_TS_KEY);
+    if (!last) return true;
+    return Date.now() - parseInt(last, 10) > CAMPAIGN_COOLDOWN_MS;
+  };
+
+  const cooldownLabel = (): string => {
+    const last = localStorage.getItem(CAMPAIGN_TS_KEY);
+    if (!last) return '';
+    const remaining = CAMPAIGN_COOLDOWN_MS - (Date.now() - parseInt(last, 10));
+    if (remaining <= 0) return '';
+    return `${Math.ceil(remaining / 60000)}m cooldown`;
+  };
+  // ──────────────────────────────────────────────────────────────────────────
+
   const getModelName = (modelId: string | null) => {
     if (!modelId || !models) return "Unknown Model";
     const model = models.find((m) => m.id === modelId);
     return model?.name || "Unknown Model";
   };
 
-  const CAMPAIGN_COOLDOWN_MS = 5 * 60 * 1000;
-  const canRunCampaign = (): boolean => {
-    const last = localStorage.getItem('fractal-last-campaign-run');
-    if (!last) return true;
-    return Date.now() - parseInt(last, 10) > CAMPAIGN_COOLDOWN_MS;
-  };
-  const getCooldownRemaining = (): string => {
-    const last = localStorage.getItem('fractal-last-campaign-run');
-    if (!last) return '';
-    const remaining = CAMPAIGN_COOLDOWN_MS - (Date.now() - parseInt(last, 10));
-    if (remaining <= 0) return '';
-    return `${Math.ceil(remaining / 60000)}m cooldown`;
-  };
-
   const runSampleCampaign = async () => {
+    // Rate-limit guard
     if (!canRunCampaign()) {
-      toast.warning(`Campaign on cooldown. ${getCooldownRemaining()} remaining.`);
+      toast.warning(`Campaign on cooldown`, {
+        description: `Please wait ${cooldownLabel()} before running another campaign.`,
+      });
       return;
     }
+
     setIsRunningCampaign(true);
     setCampaignProgress(0);
     setLatestCampaignResult(null);
@@ -88,6 +97,9 @@ export default function Policy() {
 
       if (error) throw error;
 
+      // Record successful run timestamp for cooldown
+      localStorage.setItem(CAMPAIGN_TS_KEY, Date.now().toString());
+
       setLatestCampaignResult(data);
 
       // Invalidate queries to refresh data
@@ -99,7 +111,6 @@ export default function Policy() {
       const passRate = data?.summary?.passRate || 0;
       const findings = data?.summary?.failedTests || 0;
 
-      localStorage.setItem('fractal-last-campaign-run', Date.now().toString());
       toast.success("Red Team Campaign Complete", {
         description: `Coverage: ${passRate}% | ${findings} vulnerabilities found`,
       });

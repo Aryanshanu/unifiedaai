@@ -12,7 +12,6 @@
     "moduleDetection": "force",
     "moduleResolution": "bundler",
     "noEmit": true,
-    "types": ["vitest/globals"],
     "noFallthroughCasesInSwitch": false,
     "noImplicitAny": false,
     "noUnusedLocals": false,

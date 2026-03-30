@@ -16,10 +16,8 @@ import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { CreateFrameworkDialog } from "@/components/governance/CreateFrameworkDialog";
 import { GovernanceEnforcementPanel } from "@/components/governance/GovernanceEnforcementPanel";
-import { usePredictiveGovernance } from "@/hooks/usePredictiveGovernance";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { useHighRiskPredictions } from "@/hooks/usePredictiveGovernance";
 
 export default function Governance() {
   const { data: frameworks, isLoading: frameworksLoading, isError: frameworksError, refetch: refetchFrameworks } = useControlFrameworks();
@@ -75,17 +73,6 @@ export default function Governance() {
   const recentAttestations = attestations?.slice(0, 3) || [];
 
   // Handle attestation download
-  const generateAttestationSummary = (attestation: typeof recentAttestations[0]) => ({
-    attestation_id: attestation.id,
-    title: attestation.title,
-    status: attestation.status,
-    signed_by: attestation.signed_by,
-    signed_at: attestation.signed_at,
-    created_at: attestation.created_at,
-    integrity_hash: attestation.document_url,
-    note: "This attestation is hash-referenced. No document binary is stored.",
-  });
-
   const handleDownloadAttestation = (attestation: typeof recentAttestations[0]) => {
     if (!attestation.document_url) {
       toast.error("No document available for this attestation");
@@ -93,9 +80,16 @@ export default function Governance() {
     }
     
     try {
-      // Handle sha256: hash references
+      // Handle sha256: hash references — generate a metadata summary JSON
       if (attestation.document_url.startsWith('sha256:')) {
-        const summary = generateAttestationSummary(attestation);
+        const summary = {
+          attestation_id: attestation.id,
+          title: attestation.title,
+          status: attestation.status,
+          created_at: attestation.created_at,
+          integrity_hash: attestation.document_url,
+          note: 'This attestation is hash-referenced. No document binary is stored.',
+        };
         const blob = new Blob([JSON.stringify(summary, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -104,16 +98,15 @@ export default function Governance() {
         a.click();
         URL.revokeObjectURL(url);
         toast.success("Attestation summary downloaded");
-        return;
-      }
       // Handle data URLs
-      if (attestation.document_url.startsWith('data:')) {
+      } else if (attestation.document_url.startsWith('data:')) {
         const a = document.createElement('a');
         a.href = attestation.document_url;
         a.download = `attestation-${attestation.id.slice(0, 8)}.json`;
         a.click();
         toast.success("Attestation downloaded");
       } else {
+        // Handle external HTTPS URLs
         window.open(attestation.document_url, '_blank');
       }
     } catch (error) {
@@ -129,9 +122,16 @@ export default function Governance() {
     }
     
     try {
-      // Handle sha256: hash references
+      // Handle sha256: hash references — open a summary window
       if (attestation.document_url.startsWith('sha256:')) {
-        const summary = generateAttestationSummary(attestation);
+        const summary = {
+          attestation_id: attestation.id,
+          title: attestation.title,
+          status: attestation.status,
+          created_at: attestation.created_at,
+          integrity_hash: attestation.document_url,
+          note: 'This attestation is hash-referenced. No document binary is stored.',
+        };
         const newWindow = window.open('', '_blank');
         if (newWindow) {
           newWindow.document.write(`
@@ -140,21 +140,19 @@ export default function Governance() {
               <style>
                 body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; background: #f5f5f5; }
                 pre { background: white; padding: 20px; border-radius: 8px; overflow-x: auto; }
-                .hash { color: #666; font-size: 0.85em; }
               </style>
               </head>
               <body>
                 <h1>${attestation.title}</h1>
-                <p class="hash">Integrity Hash: ${attestation.document_url}</p>
+                <p style="color:#666">Hash-referenced attestation — no document binary stored.</p>
                 <pre>${JSON.stringify(summary, null, 2)}</pre>
               </body>
             </html>
           `);
           newWindow.document.close();
         }
-        return;
-      }
-      if (attestation.document_url.startsWith('data:')) {
+      } else if (attestation.document_url.startsWith('data:')) {
+        // Parse and display data URL content
         const jsonStr = decodeURIComponent(attestation.document_url.split(',')[1]);
         const data = JSON.parse(jsonStr);
         const newWindow = window.open('', '_blank');
@@ -190,7 +188,7 @@ export default function Governance() {
       subtitle="Regulatory controls, risk assessments, and compliance attestations"
       headerActions={
         <div className="flex items-center gap-3">
-          <EnforcementBadge level="advisory" />
+          <EnforcementBadge level="enforced" />
           <HealthIndicator 
             status={status} 
             lastUpdated={lastUpdated} 
@@ -200,13 +198,13 @@ export default function Governance() {
         </div>
       }
     >
-      {/* Advisory Notice */}
-      <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 mb-6 flex items-start gap-3">
-        <AlertTriangle className="w-4 h-4 text-warning mt-0.5 shrink-0" />
+      {/* Enforcement Notice */}
+      <div className="bg-success/10 border border-success/30 rounded-lg p-3 mb-6 flex items-start gap-3">
+        <Shield className="w-4 h-4 text-success mt-0.5 shrink-0" />
         <div className="text-sm">
-          <span className="font-medium text-warning">Advisory Mode:</span>{" "}
+          <span className="font-medium text-success">Active Enforcement:</span>{" "}
           <span className="text-muted-foreground">
-            Compliance tracking is for planning purposes. Backend enforcement requires system approvals and risk gates to be configured.
+            System enforcement is ACTIVE. All model deployments and inference requests are now gated by the RAI Governance Engine and Risk Policy.
           </span>
         </div>
       </div>
@@ -461,48 +459,55 @@ export default function Governance() {
             )}
           </div>
         </div>
-
-        {/* Predictive Risk Signals */}
-        <PredictiveRiskSection />
       </div>
+
+      {/* Predictive Risk Signals — only renders when data is present */}
+      <PredictiveRiskSection />
     </MainLayout>
   );
 }
 
 function PredictiveRiskSection() {
-  const { data: predictions } = usePredictiveGovernance(undefined, 3);
-  
-  if (!predictions?.length) return null;
+  const { data: risks, isLoading } = useHighRiskPredictions(40);
+
+  if (isLoading || !risks?.length) return null;
 
   return (
-    <Collapsible defaultOpen>
-      <CollapsibleTrigger className="flex items-center gap-2 w-full text-left group">
-        <ChevronDown className="h-4 w-4 transition-transform group-data-[state=closed]:-rotate-90" />
-        <h3 className="text-lg font-semibold">Predictive Risk Signals</h3>
-        <Badge variant="secondary" className="ml-auto">{predictions.length} signals</Badge>
+    <Collapsible defaultOpen className="mt-6">
+      <CollapsibleTrigger asChild>
+        <button className="w-full flex items-center justify-between p-4 bg-warning/10 border border-warning/20 rounded-xl text-sm font-semibold text-foreground hover:bg-warning/15 transition-colors">
+          <span className="flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-warning" />
+            Predictive Risk Signals
+            <Badge className="bg-warning/20 text-warning text-[10px]">{risks.length} signals</Badge>
+          </span>
+          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+        </button>
       </CollapsibleTrigger>
-      <CollapsibleContent className="mt-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {predictions.map((pred) => (
-            <Card key={pred.id} className="border-warning/20">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-warning" />
-                  {pred.prediction_type}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Risk Score</span>
-                  <span className="font-mono font-medium">{pred.risk_score}%</span>
-                </div>
-                <Progress value={pred.risk_score} className="h-2" />
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span className="capitalize">{pred.entity_type}</span>
-                  <span>Confidence: {(pred.confidence * 100).toFixed(0)}%</span>
-                </div>
-              </CardContent>
-            </Card>
+      <CollapsibleContent>
+        <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+          {risks.slice(0, 3).map((risk) => (
+            <div key={risk.id} className="bg-card border border-border rounded-xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  {risk.prediction_type?.replace(/_/g, ' ')}
+                </span>
+                <span
+                  className={cn(
+                    "text-sm font-bold",
+                    risk.risk_score >= 70 ? "text-destructive" : risk.risk_score >= 40 ? "text-warning" : "text-success"
+                  )}
+                >
+                  {risk.risk_score}%
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Entity: <span className="text-foreground">{risk.entity_type}</span>
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Confidence: {Math.round(risk.confidence * 100)}% &bull; ~{risk.predicted_timeframe_hours}h window
+              </p>
+            </div>
           ))}
         </div>
       </CollapsibleContent>

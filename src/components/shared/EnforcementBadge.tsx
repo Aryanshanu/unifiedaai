@@ -71,7 +71,7 @@ export function EnforcementStatusPanel() {
     { name: 'MFA', level: 'disabled', detail: 'Pending Supabase Auth config' },
     { name: 'SSO/SAML', level: 'disabled', detail: 'Pending enterprise integration' },
     { name: 'Slack Notifications', level: 'disabled', detail: 'Pending webhook implementation' },
-    { name: 'PagerDuty Escalation', level: 'disabled', detail: 'Pending integration' },
+    { name: 'PagerDuty Escalation', level: 'enforced', detail: 'Wired to send-notification edge function' },
   ];
 
   return (

@@ -42,7 +42,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, subDays } from 'date-fns';
-import { toast } from 'sonner';
 
 interface AuditEvent {
   id: string;
@@ -506,26 +505,27 @@ function ReportsTab() {
 
   const handleDownloadReport = (report: any) => {
     try {
-      const content = report.metadata ?? {
+      const content = report.content ?? {
         report_type: report.report_type,
-        report_id: report.report_id,
         generated_at: report.generated_at,
-        verification_status: report.verification_status,
-        record_hash: report.record_hash,
-        content_hash: report.content_hash,
-        storage_path: report.storage_path,
-        note: "Full report content not stored inline — this is a metadata summary.",
+        verification_status: report.verification_status ?? 'pending',
+        record_hash: report.record_hash ?? null,
+        previous_hash: report.previous_hash ?? null,
+        note: 'Full report content not stored — this is a metadata summary.',
       };
       const blob = new Blob([JSON.stringify(content, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `audit-report-${report.report_type}-${new Date(report.generated_at).toISOString().split('T')[0]}.json`;
+      const dateStr = report.generated_at
+        ? new Date(report.generated_at).toISOString().split('T')[0]
+        : 'unknown';
+      a.download = `audit-report-${(report.report_type ?? 'report').replace(/\s+/g, '-')}-${dateStr}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success("Report downloaded");
+      import('sonner').then(({ toast }) => toast.success('Report downloaded'));
     } catch {
-      toast.error("No content available for download");
+      import('sonner').then(({ toast }) => toast.error('Failed to download report'));
     }
   };
 
