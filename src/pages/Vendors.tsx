@@ -45,17 +45,16 @@ export default function Vendors() {
             {[1, 2, 3].map(i => <Skeleton key={i} className="h-48" />)}
           </div>
         ) : error ? (
-          <EmptyState
-            icon={Building2}
-            title="Failed to load vendors"
-            description="There was an error loading vendor data."
-          />
+          <div className="text-center py-12">
+            <Building2 className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-muted-foreground">Failed to load vendors</p>
+          </div>
         ) : !vendors?.length ? (
-          <EmptyState
-            icon={Building2}
-            title="No vendors registered"
-            description="Register AI vendors to track risk, compliance, and contracts."
-          />
+          <div className="text-center py-12">
+            <Building2 className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-muted-foreground">No vendors registered</p>
+            <p className="text-sm text-muted-foreground/70 mt-1">Register AI vendors to track risk, compliance, and contracts.</p>
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {vendors.map((vendor) => (
