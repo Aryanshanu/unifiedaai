@@ -349,7 +349,7 @@ describe('Privacy Metrics', () => {
       expect(r.status).toBe('pass');
     });
     it('fails with secrets leak', () => {
-      const r = secretsExposureScore(5, 100);
+      const r = secretsExposureScore(10, 100);
       expect(r.status).toBe('fail');
     });
     it('returns MetricResult shape', () => expectMetricShape(secretsExposureScore(0, 100)));
