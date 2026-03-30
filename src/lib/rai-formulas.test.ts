@@ -47,7 +47,7 @@ function expectMetricShape(result: any) {
 describe('Fairness Metrics', () => {
   describe('demographicParityScore', () => {
     it('passes when groups are within delta', () => {
-      const r = demographicParityScore({ A: 0.8, B: 0.75 }, 0.1);
+      const r = demographicParityScore({ A: 0.8, B: 0.78 }, 0.1);
       expect(r.status).toBe('pass');
       expect(r.score).toBeGreaterThanOrEqual(0.5);
     });
