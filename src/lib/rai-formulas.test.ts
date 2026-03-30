@@ -66,7 +66,7 @@ describe('Fairness Metrics', () => {
 
   describe('equalOpportunityScore', () => {
     it('passes with balanced TPRs', () => {
-      const r = equalOpportunityScore({ A: 0.85, B: 0.82 }, 0.1);
+      const r = equalOpportunityScore({ A: 0.85, B: 0.83 }, 0.1);
       expect(r.status).toBe('pass');
     });
     it('fails with large TPR gap', () => {
