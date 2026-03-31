@@ -6,6 +6,7 @@ import { usePlatformMetrics } from "@/hooks/usePlatformMetrics";
 import { useModels } from "@/hooks/useModels";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { InfrastructureHealth } from "./InfrastructureHealth";
 import {
   Shield, AlertTriangle, Database, CheckCircle, XCircle, ArrowRight,
   TrendingUp, Users, FileText, Crown,
@@ -70,8 +71,8 @@ export function ExecutiveDashboard() {
       <div className="flex items-center gap-3 mb-2">
         <Crown className="w-6 h-6 text-primary" />
         <div>
-          <h2 className="text-xl font-bold text-foreground">Executive Command Center</h2>
-          <p className="text-sm text-muted-foreground">Enterprise AI governance at a glance</p>
+          <h2 className="text-xl font-bold text-foreground">Sovereign Control Plane</h2>
+          <p className="text-sm text-muted-foreground">Unitary system governance and architectural oversight</p>
         </div>
       </div>
 
@@ -91,11 +92,11 @@ export function ExecutiveDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate('/incidents')}>
+        <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate('/anomalies')}>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Open Incidents</p>
+                <p className="text-sm text-muted-foreground">Open Anomalies</p>
                 <p className="text-3xl font-bold text-destructive">{metrics?.recentIncidents || 0}</p>
               </div>
               <div className="p-3 rounded-lg bg-destructive/10">
@@ -105,11 +106,11 @@ export function ExecutiveDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate('/models')}>
+        <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate('/engines')}>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Model Portfolio</p>
+                <p className="text-sm text-muted-foreground">Logic Inventory</p>
                 <p className="text-3xl font-bold text-foreground">{totalModels}</p>
               </div>
               <div className="p-3 rounded-lg bg-muted">
@@ -134,32 +135,39 @@ export function ExecutiveDashboard() {
         </Card>
       </div>
 
-      {/* Risk Distribution & Compliance */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <AlertTriangle className="w-4 h-4" />
-              Risk Distribution
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-4 gap-4">
-              {[
-                { label: 'Critical', count: riskDistribution?.critical || 0, color: 'text-destructive' },
-                { label: 'High', count: riskDistribution?.high || 0, color: 'text-warning' },
-                { label: 'Medium', count: riskDistribution?.medium || 0, color: 'text-muted-foreground' },
-                { label: 'Low', count: riskDistribution?.low || 0, color: 'text-success' },
-              ].map(item => (
-                <div key={item.label} className="text-center p-3 rounded-lg bg-muted/50">
-                  <p className={`text-2xl font-bold ${item.color}`}>{item.count}</p>
-                  <p className="text-xs text-muted-foreground">{item.label}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+      {/* Infrastructure Health & Risk Distribution */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1">
+          <InfrastructureHealth />
+        </div>
+        <div className="lg:col-span-2">
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <AlertTriangle className="w-4 h-4" />
+                Risk Distribution
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-4 gap-4">
+                {[
+                  { label: 'Critical', count: riskDistribution?.critical || 0, color: 'text-destructive' },
+                  { label: 'High', count: riskDistribution?.high || 0, color: 'text-warning' },
+                  { label: 'Medium', count: riskDistribution?.medium || 0, color: 'text-muted-foreground' },
+                  { label: 'Low', count: riskDistribution?.low || 0, color: 'text-success' },
+                ].map(item => (
+                  <div key={item.label} className="text-center p-3 rounded-lg bg-muted/50">
+                    <p className={`text-2xl font-bold ${item.color}`}>{item.count}</p>
+                    <p className="text-xs text-muted-foreground">{item.label}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -184,49 +192,49 @@ export function ExecutiveDashboard() {
             </div>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Recent Incidents */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <AlertTriangle className="w-4 h-4" />
-            Top Incidents
-          </CardTitle>
-          <Button variant="ghost" size="sm" onClick={() => navigate('/incidents')}>
-            View All <ArrowRight className="h-4 w-4 ml-1" />
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {recentIncidents && recentIncidents.length > 0 ? (
-            <div className="space-y-3">
-              {recentIncidents.map((incident: any) => (
-                <div key={incident.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <div className="flex items-center gap-3">
-                    {incident.status === 'open' ? (
-                      <XCircle className="h-4 w-4 text-destructive" />
-                    ) : (
-                      <CheckCircle className="h-4 w-4 text-success" />
-                    )}
-                    <div>
-                      <p className="text-sm font-medium line-clamp-1">{incident.title}</p>
-                      <p className="text-xs text-muted-foreground">{new Date(incident.created_at).toLocaleDateString()}</p>
+        {/* Recent Incidents (Moved inside the grid for layout) */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <AlertTriangle className="w-4 h-4" />
+              Critical Divergences
+            </CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/anomalies')}>
+              View All <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {recentIncidents && recentIncidents.length > 0 ? (
+              <div className="space-y-3">
+                {recentIncidents.map((incident: any) => (
+                  <div key={incident.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-3">
+                      {incident.status === 'open' ? (
+                        <XCircle className="h-4 w-4 text-destructive" />
+                      ) : (
+                        <CheckCircle className="h-4 w-4 text-success" />
+                      )}
+                      <div>
+                        <p className="text-sm font-medium line-clamp-1">{incident.title}</p>
+                        <p className="text-xs text-muted-foreground">{new Date(incident.created_at).toLocaleDateString()}</p>
+                      </div>
                     </div>
+                    <Badge variant={incident.severity === 'critical' ? 'destructive' : 'secondary'} className="text-xs">
+                      {incident.severity}
+                    </Badge>
                   </div>
-                  <Badge variant={incident.severity === 'critical' ? 'destructive' : 'secondary'} className="text-xs">
-                    {incident.severity}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-6 text-muted-foreground">
-              <CheckCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">No recent incidents</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                <CheckCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No recent incidents</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

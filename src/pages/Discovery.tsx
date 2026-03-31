@@ -19,6 +19,7 @@ import {
   ShieldAlert, CheckCircle, Clock, XCircle, Search,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import LiveDiscoveryScanner from '@/components/discovery/LiveDiscoveryScanner';
 
 function InventorySummary() {
   const { data: agents } = useAgents();
@@ -28,11 +29,11 @@ function InventorySummary() {
   const { data: shadows } = useShadowAIDiscoveries();
 
   const stats = [
-    { label: 'Registered Models', count: models?.length ?? 0, icon: Eye, color: 'text-blue-400' },
-    { label: 'AI Systems', count: systems?.length ?? 0, icon: ShieldAlert, color: 'text-green-400' },
-    { label: 'AI Agents', count: agents?.length ?? 0, icon: Bot, color: 'text-purple-400' },
-    { label: 'Vendors', count: vendors?.length ?? 0, icon: Building2, color: 'text-amber-400' },
-    { label: 'Shadow AI Alerts', count: shadows?.filter(s => s.status === 'discovered')?.length ?? 0, icon: AlertTriangle, color: 'text-red-400' },
+    { label: 'Registered Logic Engines', count: models?.length ?? 0, icon: Eye, color: 'text-blue-400' },
+    { label: 'Autonomous Assets', count: systems?.length ?? 0, icon: ShieldAlert, color: 'text-green-400' },
+    { label: 'Logic Controllers', count: agents?.length ?? 0, icon: Bot, color: 'text-purple-400' },
+    { label: 'Solution Providers', count: vendors?.length ?? 0, icon: Building2, color: 'text-amber-400' },
+    { label: 'Unregistered Logic Alerts', count: shadows?.filter(s => s.status === 'discovered')?.length ?? 0, icon: AlertTriangle, color: 'text-red-400' },
   ];
 
   return (
@@ -76,24 +77,24 @@ function ShadowAITab() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <p className="text-sm text-muted-foreground">Report and track unauthorized or unregistered AI systems discovered in your organization.</p>
+        <p className="text-sm text-muted-foreground">Report and track unauthorized or unregistered logic engines discovered in your organization.</p>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button size="sm"><Plus className="w-4 h-4 mr-1" /> Report Shadow AI</Button>
+            <Button size="sm"><Plus className="w-4 h-4 mr-1" /> Report Unregistered Logic</Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Report Shadow AI</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>Report Unregistered Logic</DialogTitle></DialogHeader>
             <div className="space-y-3">
-              <div><Label>System Name</Label><Input value={form.ai_system_name} onChange={e => setForm(f => ({ ...f, ai_system_name: e.target.value }))} placeholder="e.g. ChatGPT API in Marketing" /></div>
-              <div><Label>System Type</Label>
+              <div><Label>Logic Name</Label><Input value={form.ai_system_name} onChange={e => setForm(f => ({ ...f, ai_system_name: e.target.value }))} placeholder="e.g. Shadow API in Analytics" /></div>
+              <div><Label>Logic Type</Label>
                 <Select value={form.ai_system_type} onValueChange={v => setForm(f => ({ ...f, ai_system_type: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="model">Model</SelectItem>
-                    <SelectItem value="agent">Agent</SelectItem>
-                    <SelectItem value="api">API</SelectItem>
-                    <SelectItem value="saas_tool">SaaS Tool</SelectItem>
-                    <SelectItem value="plugin">Plugin</SelectItem>
+                    <SelectItem value="model">Logic Engine</SelectItem>
+                    <SelectItem value="agent">Controller</SelectItem>
+                    <SelectItem value="api">External API</SelectItem>
+                    <SelectItem value="saas_tool">SaaS Component</SelectItem>
+                    <SelectItem value="plugin">Plugin / Extension</SelectItem>
                     <SelectItem value="unknown">Unknown</SelectItem>
                   </SelectContent>
                 </Select>
@@ -121,7 +122,7 @@ function ShadowAITab() {
       ) : !discoveries?.length ? (
         <Card className="bg-card border-border"><CardContent className="py-12 text-center text-muted-foreground">
           <ScanSearch className="w-12 h-12 mx-auto mb-3 opacity-40" />
-          <p>No shadow AI discoveries yet. Use the report button to log unauthorized AI systems.</p>
+          <p>No unregistered logic discoveries yet. Use the report button to log unauthorized systems.</p>
         </CardContent></Card>
       ) : (
         <div className="space-y-2">
@@ -166,11 +167,11 @@ function VendorTab() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <p className="text-sm text-muted-foreground">Track third-party AI vendors and their compliance status.</p>
+        <p className="text-sm text-muted-foreground">Track third-party solution providers and their compliance status.</p>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button size="sm"><Plus className="w-4 h-4 mr-1" /> Add Vendor</Button></DialogTrigger>
+          <DialogTrigger asChild><Button size="sm"><Plus className="w-4 h-4 mr-1" /> Add Provider</Button></DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Register AI Vendor</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>Register Solution Provider</DialogTitle></DialogHeader>
             <div className="space-y-3">
               <div><Label>Vendor Name</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
               <div><Label>Type</Label>
@@ -194,7 +195,7 @@ function VendorTab() {
       {!vendors?.length ? (
         <Card className="bg-card border-border"><CardContent className="py-12 text-center text-muted-foreground">
           <Building2 className="w-12 h-12 mx-auto mb-3 opacity-40" />
-          <p>No vendors registered. Add your AI vendors to track their compliance.</p>
+          <p>No providers registered. Add your solution providers to track their compliance.</p>
         </CardContent></Card>
       ) : (
         <div className="grid gap-3">
@@ -220,22 +221,24 @@ function VendorTab() {
 
 export default function Discovery() {
   return (
-    <MainLayout title="AI Discovery & Inventory">
+    <MainLayout title="Infrastructure Audit & Inventory">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">AI Discovery & Inventory</h1>
+          <h1 className="text-2xl font-bold text-foreground">Infrastructure Audit & Inventory</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Complete visibility into all AI systems — models, agents, vendors, and shadow AI across your enterprise.
+            Complete visibility into all autonomous systems — logic engines, controllers, providers, and unregistered logic across your enterprise.
           </p>
         </div>
 
         <InventorySummary />
 
-        <Tabs defaultValue="shadow" className="space-y-4">
+        <Tabs defaultValue="auto" className="space-y-4">
           <TabsList>
-            <TabsTrigger value="shadow"><ScanSearch className="w-4 h-4 mr-1" /> Shadow AI</TabsTrigger>
-            <TabsTrigger value="vendors"><Building2 className="w-4 h-4 mr-1" /> Vendors</TabsTrigger>
+            <TabsTrigger value="auto"><ScanSearch className="w-4 h-4 mr-1" /> Active logic Auditor</TabsTrigger>
+            <TabsTrigger value="shadow"><AlertTriangle className="w-4 h-4 mr-1" /> Unregistered Logic</TabsTrigger>
+            <TabsTrigger value="vendors"><Building2 className="w-4 h-4 mr-1" /> Providers</TabsTrigger>
           </TabsList>
+          <TabsContent value="auto"><LiveDiscoveryScanner /></TabsContent>
           <TabsContent value="shadow"><ShadowAITab /></TabsContent>
           <TabsContent value="vendors"><VendorTab /></TabsContent>
         </Tabs>

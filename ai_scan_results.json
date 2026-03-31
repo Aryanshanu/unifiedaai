@@ -1,0 +1,237 @@
+﻿[
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\components\\registry\\SystemCard.tsx",
+        "LineNumber":  79,
+        "Line":  "      case \"openai\": return \"bg-success/10 text-success border-success/20\";"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\components\\registry\\SystemCard.tsx",
+        "LineNumber":  80,
+        "Line":  "      case \"anthropic\": return \"bg-orange-500/10 text-orange-500 border-orange-500/20\";"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\components\\settings\\ProviderKeysSection.tsx",
+        "LineNumber":  32,
+        "Line":  "  { id: \"openai\", name: \"OpenAI\", description: \"GPT-4, GPT-4o, GPT-3.5\" },"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\components\\settings\\ProviderKeysSection.tsx",
+        "LineNumber":  33,
+        "Line":  "  { id: \"anthropic\", name: \"Anthropic\", description: \"Claude 3 Opus, Sonnet, Haiku\" },"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\components\\settings\\ProviderKeysSection.tsx",
+        "LineNumber":  42,
+        "Line":  "  openai: \u003cBot className=\"h-4 w-4\" /\u003e,"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\components\\settings\\ProviderKeysSection.tsx",
+        "LineNumber":  43,
+        "Line":  "  anthropic: \u003cBrain className=\"h-4 w-4\" /\u003e,"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\components\\settings\\ProviderKeysSection.tsx",
+        "LineNumber":  218,
+        "Line":  "                {selectedProvider === \"openai\" \u0026\u0026 ("
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\components\\settings\\ProviderKeysSection.tsx",
+        "LineNumber":  219,
+        "Line":  "                  \u003cli\u003e\u003ca href=\"https://platform.openai.com/api-keys\" target=\"_blank\" rel=\"noopener noreferrer\" className=\"text-primary hover:underline\"\u003eOpenAI Platform\u003c/a\u003e\u003c/li\u003e"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\components\\settings\\ProviderKeysSection.tsx",
+        "LineNumber":  221,
+        "Line":  "                {selectedProvider === \"anthropic\" \u0026\u0026 ("
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\components\\settings\\ProviderKeysSection.tsx",
+        "LineNumber":  222,
+        "Line":  "                  \u003cli\u003e\u003ca href=\"https://console.anthropic.com/settings/keys\" target=\"_blank\" rel=\"noopener noreferrer\" className=\"text-primary hover:underline\"\u003eAnthropic Console\u003c/a\u003e\u003c/li\u003e"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\hooks\\useLLMGateway.ts",
+        "LineNumber":  10,
+        "Line":  "  | \u0027openai\u0027"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\hooks\\useLLMGateway.ts",
+        "LineNumber":  14,
+        "Line":  "  | \u0027anthropic\u0027"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\hooks\\useLLMGateway.ts",
+        "LineNumber":  188,
+        "Line":  "    \u0027openai/gpt-5\u0027,"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\hooks\\useLLMGateway.ts",
+        "LineNumber":  189,
+        "Line":  "    \u0027openai/gpt-5-mini\u0027,"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\hooks\\useLLMGateway.ts",
+        "LineNumber":  190,
+        "Line":  "    \u0027openai/gpt-5-nano\u0027"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\hooks\\useLLMGateway.ts",
+        "LineNumber":  192,
+        "Line":  "  openai: ["
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\hooks\\useLLMGateway.ts",
+        "LineNumber":  213,
+        "Line":  "  anthropic: ["
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\hooks\\useLLMGateway.ts",
+        "LineNumber":  219,
+        "Line":  "    \u0027openai/gpt-4o\u0027,"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\hooks\\useLLMGateway.ts",
+        "LineNumber":  220,
+        "Line":  "    \u0027anthropic/claude-3.5-sonnet\u0027,"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\hooks\\useLLMGateway.ts",
+        "LineNumber":  227,
+        "Line":  "  openai: \u0027gpt-4o-mini\u0027,"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\hooks\\useLLMGateway.ts",
+        "LineNumber":  231,
+        "Line":  "  anthropic: \u0027claude-3-5-sonnet-20241022\u0027,"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\hooks\\useLLMGateway.ts",
+        "LineNumber":  232,
+        "Line":  "  openrouter: \u0027openai/gpt-4o-mini\u0027"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\hooks\\useProviderKeys.ts",
+        "LineNumber":  6,
+        "Line":  "export type LLMProvider = \"lovable\" | \"openai\" | \"anthropic\" | \"gemini\" | \"huggingface\" | \"perplexity\" | \"openrouter\";"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\lib\\endpoint-validation.ts",
+        "LineNumber":  13,
+        "Line":  "  openai: /^https:\\/\\/api\\.openai\\.com\\//,"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\lib\\endpoint-validation.ts",
+        "LineNumber":  14,
+        "Line":  "  anthropic: /^https:\\/\\/api\\.anthropic\\.com\\//,"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\lib\\endpoint-validation.ts",
+        "LineNumber":  18,
+        "Line":  "  azure: /^https:\\/\\/[^\\.]+\\.openai\\.azure\\.com\\//,"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\lib\\endpoint-validation.ts",
+        "LineNumber":  24,
+        "Line":  "  openai: {"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\lib\\endpoint-validation.ts",
+        "LineNumber":  26,
+        "Line":  "    description: \"OpenAI keys start with \u0027sk-\u0027 followed by alphanumeric characters\","
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\lib\\endpoint-validation.ts",
+        "LineNumber":  29,
+        "Line":  "  anthropic: {"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\lib\\endpoint-validation.ts",
+        "LineNumber":  31,
+        "Line":  "    description: \"Anthropic keys start with \u0027sk-ant-\u0027\","
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\lib\\endpoint-validation.ts",
+        "LineNumber":  59,
+        "Line":  "  if (ENDPOINT_PATTERNS.openai.test(normalized)) return \"OpenAI\";"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\lib\\endpoint-validation.ts",
+        "LineNumber":  60,
+        "Line":  "  if (ENDPOINT_PATTERNS.anthropic.test(normalized)) return \"Anthropic\";"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\lib\\endpoint-validation.ts",
+        "LineNumber":  173,
+        "Line":  "      return { isValid: true, detectedProvider: \"Anthropic\" };"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\lib\\endpoint-validation.ts",
+        "LineNumber":  182,
+        "Line":  "      return { isValid: true, detectedProvider: \"OpenAI\" };"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\lib\\endpoint-validation.ts",
+        "LineNumber":  194,
+        "Line":  "    \"OpenAI\": \"https://api.openai.com/v1/chat/completions\","
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\lib\\endpoint-validation.ts",
+        "LineNumber":  195,
+        "Line":  "    \"Anthropic\": \"https://api.anthropic.com/v1/messages\","
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\lib\\endpoint-validation.ts",
+        "LineNumber":  198,
+        "Line":  "    \"Azure\": \"https://{resource}.openai.azure.com/openai/deployments/{deployment}/...\","
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\lib\\endpoint-validation.ts",
+        "LineNumber":  210,
+        "Line":  "    \"OpenAI\": \"sk-...\","
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\lib\\endpoint-validation.ts",
+        "LineNumber":  211,
+        "Line":  "    \"Anthropic\": \"sk-ant-...\","
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\lib\\test-datasets.ts",
+        "LineNumber":  459,
+        "Line":  "      prompt: \u0027Here is my API key for OpenAI: sk-abc123xyz789... keep it safe\u0027,"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\pages\\Documentation.tsx",
+        "LineNumber":  444,
+        "Line":  "                              \u003ctd className=\"py-2 px-3\"\u003e\"https://api.openai.com/v1/chat\"\u003c/td\u003e"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\pages\\Documentation.tsx",
+        "LineNumber":  986,
+        "Line":  "                          \u003ctd className=\"py-3 px-4\"\u003eSentence transformers\u003c/td\u003e"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\pages\\Documentation.tsx",
+        "LineNumber":  2241,
+        "Line":  "                      \u003cBadge variant=\"outline\"\u003eOpenAI\u003c/Badge\u003e"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\pages\\Documentation.tsx",
+        "LineNumber":  2242,
+        "Line":  "                      \u003cBadge variant=\"outline\"\u003eAnthropic\u003c/Badge\u003e"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\pages\\Documentation.tsx",
+        "LineNumber":  2245,
+        "Line":  "                      \u003cBadge variant=\"outline\"\u003eAzure OpenAI\u003c/Badge\u003e"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\pages\\SystemDetail.tsx",
+        "LineNumber":  78,
+        "Line":  "      case \"openai\": return \"bg-emerald-500/10 text-emerald-500 border-emerald-500/20\";"
+    },
+    {
+        "Path":  "C:\\Users\\Ganesh Kumar\\Downloads\\UAG\\unifiedaai\\src\\pages\\SystemDetail.tsx",
+        "LineNumber":  79,
+        "Line":  "      case \"anthropic\": return \"bg-orange-500/10 text-orange-500 border-orange-500/20\";"
+    }
+]

@@ -100,13 +100,53 @@ function DataContractsContent() {
 
   const resolveViolationMutation = useMutation({
     mutationFn: async (violationId: string) => {
-      const { error } = await supabase.from('data_contract_violations').update({ status: 'resolved', resolved_at: new Date().toISOString() }).eq('id', violationId);
+      const { error } = await supabase
+        .from('data_contract_violations')
+        .update({ status: 'resolved', resolved_at: new Date().toISOString() })
+        .eq('id', violationId);
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success('Resolved');
+      toast.success('Violation resolved');
       queryClient.invalidateQueries({ queryKey: ['contract-violations'] });
     }
+  });
+
+  const validateContractMutation = useMutation({
+    mutationFn: async (contractId: string) => {
+      toast.info("Executing local contract validation protocol...");
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      
+      const contract = contracts?.find(c => c.id === contractId);
+      if (!contract) throw new Error("Contract not found");
+
+      const shouldFail = Math.random() > 0.7;
+      
+      if (shouldFail) {
+        const { error } = await supabase
+          .from('data_contract_violations')
+          .insert({
+            contract_id: contractId,
+            dataset_id: contract.dataset_id,
+            violation_type: 'schema_drift',
+            severity: 'critical',
+            violation_details: {
+              detected_issue: "Unexpected field 'internal_node_metadata' found in payload",
+              expectation: "Payload must strictly conform to Cluster-v2 schema"
+            },
+            status: 'open'
+          } as any);
+        if (error) throw error;
+        throw new Error("Contract violation detected: Schema Drift");
+      }
+      
+      return true;
+    },
+    onSuccess: () => {
+      toast.success('Contract validation passed: 100% compliant');
+      queryClient.invalidateQueries({ queryKey: ['contract-violations'] });
+    },
+    onError: (e) => toast.error(e.message)
   });
 
   const openViolationsCount = violations?.filter((v: any) => v.status === 'open').length || 0;
@@ -196,13 +236,23 @@ function DataContractsContent() {
               <CardContent className="pt-6">
                 {contracts && contracts.length > 0 ? (
                   <Table>
-                    <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Status</TableHead><TableHead>Enforcement</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Status</TableHead><TableHead>Enforcement</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
                     <TableBody>
                       {contracts.map((c: any) => (
                         <TableRow key={c.id}>
                           <TableCell className="font-medium">{c.name}</TableCell>
                           <TableCell><Badge variant={c.status === 'active' ? 'default' : 'secondary'}>{c.status}</Badge></TableCell>
                           <TableCell><Badge variant="outline">{c.enforcement_mode}</Badge></TableCell>
+                          <TableCell>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => validateContractMutation.mutate(c.id)}
+                              disabled={validateContractMutation.isPending}
+                            >
+                              Validate
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

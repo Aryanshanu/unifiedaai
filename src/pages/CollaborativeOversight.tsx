@@ -18,7 +18,7 @@ import { RiskIndicator } from "@/components/fractal";
 import { FRACTAL_RISK, normalizeRiskLevel } from "@/lib/fractal-theme";
 import { useQuery } from "@tanstack/react-query";
 
-export default function HITL() {
+export default function CollaborativeOversight() {
   const { data: reviews, isLoading, refetch } = useReviewQueue();
   const { data: stats, refetch: refetchStats } = useReviewQueueStats();
   const [selectedReview, setSelectedReview] = useState<ReviewItem | null>(null);
@@ -79,8 +79,8 @@ export default function HITL() {
 
   return (
     <MainLayout 
-      title="HITL Console" 
-      subtitle="Human authority decisions and escalations"
+      title="Collaborative Oversight" 
+      subtitle="Operational authority determinations and intercessions"
       headerActions={
         <EnforcementBadge level="enforced" />
       }
@@ -101,16 +101,16 @@ export default function HITL() {
           icon={<Clock className="w-4 h-4 text-primary" />}
         />
         <MetricCard
-          title="Overdue"
+          title="Threshold Breach"
           value={(stats?.overdue || 0).toString()}
-          subtitle="Past SLA"
+          subtitle="Past Response Threshold"
           icon={<AlertTriangle className="w-4 h-4 text-risk-critical" />}
           status={stats?.overdue ? "danger" : "success"}
         />
         <MetricCard
           title="Total Queue"
           value={(stats?.total || 0).toString()}
-          subtitle="All reviews"
+          subtitle="All audits"
           icon={<Users className="w-4 h-4 text-muted-foreground" />}
         />
       </div>
@@ -119,11 +119,11 @@ export default function HITL() {
         <TabsList>
           <TabsTrigger value="queue" className="gap-2">
             <AlertTriangle className="w-4 h-4" />
-            Review Queue
+            Oversight Queue
           </TabsTrigger>
           <TabsTrigger value="bulk" className="gap-2">
             <ListChecks className="w-4 h-4" />
-            Bulk Triage
+            Bulk Determination
           </TabsTrigger>
         </TabsList>
 
@@ -134,7 +134,7 @@ export default function HITL() {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-risk-high" />
-                  Review Queue
+                  Oversight Queue
                 </h2>
                 <Button variant="ghost" size="sm" onClick={handleRefresh}>
                   <RefreshCw className="w-4 h-4" />
@@ -160,7 +160,7 @@ export default function HITL() {
                 <div className="text-center py-12 bg-card border border-border rounded-xl">
                   <CheckCircle className="w-12 h-12 text-success mx-auto mb-4" />
                   <p className="text-foreground font-medium">Queue Clear</p>
-                  <p className="text-sm text-muted-foreground mt-1">No pending reviews</p>
+                  <p className="text-sm text-muted-foreground mt-1">No pending audits</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -176,7 +176,7 @@ export default function HITL() {
               {/* Recent Decisions */}
               <h2 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-success" />
-                Recent Decisions
+                Recent Determinations
               </h2>
 
               <div className="bg-card border border-border rounded-xl p-4 mb-6">
@@ -192,10 +192,10 @@ export default function HITL() {
                             decision.decision === "escalate" ? "text-warning" : "text-risk-critical"
                           )}>
                             {decision.decision === "approve" ? "Authorized" : 
-                             decision.decision === "escalate" ? "Escalated" : "Denied"}
+                             decision.decision === "escalate" ? "Escalated" : "Overridden"}
                           </span>
                         </div>
-                        <p className="text-sm font-medium text-foreground">{decision.review?.title || 'Review'}</p>
+                        <p className="text-sm font-medium text-foreground">{decision.review?.title || 'Audit'}</p>
                         {decision.rationale && (
                           <p className="text-xs text-muted-foreground mt-1 line-clamp-2 italic">"{decision.rationale}"</p>
                         )}

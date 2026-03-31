@@ -58,14 +58,14 @@ function AgentRegistryTab() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <p className="text-sm text-muted-foreground">Register and manage all AI agents across your enterprise.</p>
+        <p className="text-sm text-muted-foreground">Register and manage all autonomous controllers across your enterprise.</p>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button size="sm"><Plus className="w-4 h-4 mr-1" /> Register Agent</Button></DialogTrigger>
+          <DialogTrigger asChild><Button size="sm"><Plus className="w-4 h-4 mr-1" /> Register Controller</Button></DialogTrigger>
           <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>Register AI Agent</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>Register Controller</DialogTitle></DialogHeader>
             <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-              <div><Label>Agent Name</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Customer Support Agent" /></div>
-              <div><Label>Agent Type</Label>
+              <div><Label>Controller Name</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Customer Support Controller" /></div>
+              <div><Label>Controller Type</Label>
                 <Select value={form.agent_type} onValueChange={v => setForm(f => ({ ...f, agent_type: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -98,7 +98,7 @@ function AgentRegistryTab() {
                 </Select>
               </div>
               {models?.length ? (
-                <div><Label>Linked Model (optional)</Label>
+                <div><Label>Linked Engine (optional)</Label>
                   <Select value={form.model_id} onValueChange={v => setForm(f => ({ ...f, model_id: v }))}>
                     <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
                     <SelectContent>
@@ -108,7 +108,7 @@ function AgentRegistryTab() {
                   </Select>
                 </div>
               ) : null}
-              <Button onClick={handleSubmit} disabled={!form.name || createMutation.isPending} className="w-full">Register Agent</Button>
+              <Button onClick={handleSubmit} disabled={!form.name || createMutation.isPending} className="w-full">Register Controller</Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -117,7 +117,7 @@ function AgentRegistryTab() {
       {!agents?.length ? (
         <Card className="bg-card border-border"><CardContent className="py-12 text-center text-muted-foreground">
           <Bot className="w-12 h-12 mx-auto mb-3 opacity-40" />
-          <p>No agents registered. Register your AI agents to enable governance.</p>
+          <p>No controllers registered. Register your autonomous controllers to enable governance.</p>
         </CardContent></Card>
       ) : (
         <div className="grid gap-3">
@@ -169,22 +169,22 @@ function AgentTracesTab() {
     <div className="space-y-4">
       <div className="flex items-center gap-4">
         <Select value={selectedAgent} onValueChange={setSelectedAgent}>
-          <SelectTrigger className="w-64"><SelectValue placeholder="Select an agent" /></SelectTrigger>
+          <SelectTrigger className="w-64"><SelectValue placeholder="Select a controller" /></SelectTrigger>
           <SelectContent>
             {agents?.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
           </SelectContent>
         </Select>
-        <p className="text-sm text-muted-foreground">View execution traces, policy violations, and agent behavior.</p>
+        <p className="text-sm text-muted-foreground">View execution traces, policy violations, and controller behavior.</p>
       </div>
 
       {!selectedAgent ? (
         <Card className="bg-card border-border"><CardContent className="py-12 text-center text-muted-foreground">
           <Activity className="w-12 h-12 mx-auto mb-3 opacity-40" />
-          <p>Select an agent to view its traces.</p>
+          <p>Select a controller to view its traces.</p>
         </CardContent></Card>
       ) : !traces?.length ? (
         <Card className="bg-card border-border"><CardContent className="py-12 text-center text-muted-foreground">
-          <p>No traces recorded yet for this agent.</p>
+          <p>No traces recorded yet for this controller.</p>
         </CardContent></Card>
       ) : (
         <div className="space-y-2">
@@ -218,19 +218,19 @@ function AgentTracesTab() {
 
 export default function AgentGovernance() {
   return (
-    <MainLayout title="Agent Governance">
+    <MainLayout title="Controller Governance">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Agent Governance</h1>
+          <h1 className="text-2xl font-bold text-foreground">Controller Governance</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Register, monitor, and govern all AI agents with trace-level visibility and policy enforcement.
+            Register, monitor, and govern all autonomous controllers with trace-level visibility and policy enforcement.
           </p>
         </div>
 
         <Tabs defaultValue="registry" className="space-y-4">
           <TabsList>
-            <TabsTrigger value="registry"><Bot className="w-4 h-4 mr-1" /> Agent Registry</TabsTrigger>
-            <TabsTrigger value="traces"><Activity className="w-4 h-4 mr-1" /> Agent Traces</TabsTrigger>
+            <TabsTrigger value="registry"><Bot className="w-4 h-4 mr-1" /> Controller Registry</TabsTrigger>
+            <TabsTrigger value="traces"><Activity className="w-4 h-4 mr-1" /> Execution Traces</TabsTrigger>
           </TabsList>
           <TabsContent value="registry"><AgentRegistryTab /></TabsContent>
           <TabsContent value="traces"><AgentTracesTab /></TabsContent>

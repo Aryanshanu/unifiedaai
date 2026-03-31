@@ -131,7 +131,7 @@ export default function ImpactDashboard() {
   }).length || 0;
 
   return (
-    <MainLayout title="Impact Dashboard" subtitle="Population-level fairness and outcome tracking">
+    <MainLayout title="Outcome Analytics" subtitle="Population-level parity and engineering outcome tracking">
       <div className="space-y-6">
         {/* Filters */}
         <div className="flex flex-wrap gap-4 items-center">
@@ -175,7 +175,7 @@ export default function ImpactDashboard() {
               <div className="flex items-start gap-3">
                 <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
                 <div>
-                  <h3 className="font-semibold text-destructive">Fairness Alerts Detected</h3>
+                  <h3 className="font-semibold text-destructive">Parity Anomalies Detected</h3>
                   <ul className="mt-2 space-y-1">
                     {(alerts as Array<{ type: string; message: string; severity: string }>).map((alert, i) => (
                       <li key={i} className="text-sm text-muted-foreground">
@@ -216,7 +216,7 @@ export default function ImpactDashboard() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-destructive">{overall?.harmfulOutcomes || 0}</p>
-                  <p className="text-sm text-muted-foreground">Harmful Outcomes</p>
+                  <p className="text-sm text-muted-foreground">Non-Compliant Outcomes</p>
                 </div>
               </div>
             </CardContent>
@@ -230,7 +230,7 @@ export default function ImpactDashboard() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{appealStats.total}</p>
-                  <p className="text-sm text-muted-foreground">Appeals Filed</p>
+                  <p className="text-sm text-muted-foreground">Resolutions Filed</p>
                 </div>
               </div>
             </CardContent>
@@ -255,7 +255,7 @@ export default function ImpactDashboard() {
 
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Longitudinal Fairness Chart */}
+          {/* Longitudinal Parity Chart */}
           <LongitudinalFairness 
             groups={groups as Array<{ group: string; positiveRate: number; harmRate: number }>} 
             timeWindow={timeWindow}
@@ -266,13 +266,13 @@ export default function ImpactDashboard() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <PieChart className="h-5 w-5 text-primary" />
-                Harm Categories
+                Outcome Categories
               </CardTitle>
             </CardHeader>
             <CardContent>
               {Object.keys(harmByCategory).length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  No harmful outcomes recorded
+                  No non-compliant outcomes recorded
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -300,7 +300,7 @@ export default function ImpactDashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5 text-primary" />
-              Group-Level Metrics
+              Categorical Metrics
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -313,12 +313,12 @@ export default function ImpactDashboard() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b">
-                      <th className="text-left py-3 px-4">Group</th>
+                      <th className="text-left py-3 px-4">Category</th>
                       <th className="text-right py-3 px-4">Decisions</th>
-                      <th className="text-right py-3 px-4">Positive Rate</th>
-                      <th className="text-right py-3 px-4">Harm Rate</th>
-                      <th className="text-right py-3 px-4">Appeal Rate</th>
-                      <th className="text-right py-3 px-4">Disparate Impact</th>
+                      <th className="text-right py-3 px-4">Target Rate</th>
+                      <th className="text-right py-3 px-4">Variance Rate</th>
+                      <th className="text-right py-3 px-4">Resolution Rate</th>
+                      <th className="text-right py-3 px-4">Systemic Impact</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -356,7 +356,7 @@ export default function ImpactDashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-primary" />
-              Appeal Performance
+              Resolution Performance
             </CardTitle>
           </CardHeader>
           <CardContent>

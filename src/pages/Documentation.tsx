@@ -61,7 +61,7 @@ import {
 
 const Documentation = () => {
   return (
-    <MainLayout title="Documentation" subtitle="Complete Cookbook Guide to Fractal Unified Autonomous Governance Platform">
+    <MainLayout title="Documentation" subtitle="Beginner-Friendly Guide to UnifiedAAI Sovereign Governance Cluster">
       <div className="min-h-screen bg-background">
         <ScrollArea className="h-[calc(100vh-4rem)]">
           <div className="max-w-5xl mx-auto px-6 py-12">
@@ -69,24 +69,23 @@ const Documentation = () => {
             {/* Header */}
             <div className="text-center mb-16">
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full mb-6">
-                <BookOpen className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium text-primary">Complete Cookbook</span>
+                <ShieldCheck className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium text-primary">Sovereign Engineering Manual</span>
               </div>
-              <h1 className="text-4xl font-bold tracking-tight mb-4">
-                Fractal Unified Autonomous Governance Platform
+              <h1 className="text-4xl font-bold tracking-tight mb-4 text-foreground">
+                UnifiedAAI: Sovereign Governance Cluster
               </h1>
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-4">
-                The World's First End-to-End Responsible AI Operating System
+                The First Vendor-Neutral Operating System for Autonomous Logic
               </p>
               <p className="text-sm text-muted-foreground max-w-3xl mx-auto">
-                This documentation covers <strong>every feature, every step, every input, and every output</strong> in extreme detail.
-                Whether you have zero knowledge or are an expert, this guide will help you understand the entire platform.
+                This platform is designed for <strong>Total Transparency</strong>. All governance engines, simulations, and audits run <strong>locally within your cluster</strong>. No remote compute, no vendor lock-in, and zero latency for integrity checks.
               </p>
               <div className="flex items-center justify-center gap-3 mt-6">
-                <Badge variant="outline">v1.0.0</Badge>
-                <Badge variant="secondary">100% Open Source</Badge>
-                <Badge className="bg-green-500/10 text-green-600 hover:bg-green-500/20">MIT License</Badge>
-                <Badge className="bg-blue-500/10 text-blue-600 hover:bg-blue-500/20">Zero Cost</Badge>
+                <Badge variant="outline" className="border-primary/20 bg-primary/5 text-primary">v2.0 Sovereign</Badge>
+                <Badge variant="secondary">Zero Remote Compute</Badge>
+                <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20">Local-First Architecture</Badge>
+                <Badge className="bg-blue-500/10 text-blue-600 hover:bg-blue-500/20">Beginner Friendly</Badge>
               </div>
             </div>
 
@@ -100,13 +99,13 @@ const Documentation = () => {
               </h2>
               <div className="grid md:grid-cols-3 gap-4 text-sm">
                 <div className="space-y-2">
-                  <a href="#what-is-this" className="block p-2 rounded hover:bg-muted transition-colors">1. What is Fractal?</a>
+                  <a href="#what-is-this" className="block p-2 rounded hover:bg-muted transition-colors">1. What is UnifiedALogic Engine?</a>
                   <a href="#getting-started" className="block p-2 rounded hover:bg-muted transition-colors">2. Getting Started (Step-by-Step)</a>
                   <a href="#architecture" className="block p-2 rounded hover:bg-muted transition-colors">3. Understanding the Architecture</a>
                   <a href="#projects" className="block p-2 rounded hover:bg-muted transition-colors">4. Projects (Complete Guide)</a>
                 </div>
                 <div className="space-y-2">
-                  <a href="#models" className="block p-2 rounded hover:bg-muted transition-colors">5. Models (Complete Guide)</a>
+                  <a href="#models" className="block p-2 rounded hover:bg-muted transition-colors">5. Engines (Complete Guide)</a>
                   <a href="#observability" className="block p-2 rounded hover:bg-muted transition-colors">6. Observability (Deep Dive)</a>
                   <a href="#alerts" className="block p-2 rounded hover:bg-muted transition-colors">7. Alerts (Complete Guide)</a>
                   <a href="#governance" className="block p-2 rounded hover:bg-muted transition-colors">8. Governance (All Features)</a>
@@ -135,7 +134,7 @@ const Documentation = () => {
                 <div className="p-6 rounded-xl border bg-card">
                   <h3 className="text-lg font-semibold mb-4">The Problem We Solve</h3>
                   <p className="text-muted-foreground mb-4">
-                    AI systems are being deployed everywhere, but they often:
+                    Logic Engine systems are being deployed everywhere, but they often:
                   </p>
                   <ul className="space-y-2 text-sm">
                     <li className="flex items-start gap-2">
@@ -164,16 +163,16 @@ const Documentation = () => {
                 <div className="p-6 rounded-xl border bg-card">
                   <h3 className="text-lg font-semibold mb-4">Our Solution</h3>
                   <p className="text-muted-foreground mb-4">
-                    Fractal provides a complete platform to:
+                    UnifiedALogic Engine provides a complete platform to:
                   </p>
                   <ul className="space-y-2 text-sm">
                     <li className="flex items-start gap-2">
                       <CircleCheck className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                      <span><strong>Evaluate</strong> — Test your AI for fairness, safety, privacy, and accuracy before deployment</span>
+                      <span><strong>Evaluate</strong> — Test your Logic Engine for fairness, safety, privacy, and accuracy before deployment</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <CircleCheck className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                      <span><strong>Monitor</strong> — Track every decision your AI makes in real-time with full audit trails</span>
+                      <span><strong>Monitor</strong> — Track every decision your Logic Engine makes in real-time with full audit trails</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <CircleCheck className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
@@ -205,7 +204,7 @@ const Documentation = () => {
                   <div className="p-4 rounded-lg border bg-orange-500/5 border-orange-500/20">
                     <FileCheck className="h-6 w-6 text-orange-500 mb-2" />
                     <h4 className="font-semibold mb-1">Compliant</h4>
-                    <p className="text-xs text-muted-foreground">Aligned with EU AI Act & NIST</p>
+                    <p className="text-xs text-muted-foreground">Aligned with EU Logic Engine Act & NIST</p>
                   </div>
                 </div>
 
@@ -215,7 +214,7 @@ const Documentation = () => {
                     <div>
                       <h4 className="font-medium text-blue-700 dark:text-blue-400 mb-1">Who Should Use This?</h4>
                       <p className="text-sm text-muted-foreground">
-                        <strong>AI/ML Engineers</strong> (model testing), <strong>Data Scientists</strong> (fairness metrics), 
+                        <strong>Logic Engine/ML Engineers</strong> (model testing), <strong>Data Scientists</strong> (fairness metrics), 
                         <strong>Compliance Officers</strong> (regulatory reports), <strong>Product Managers</strong> (decision tracking), 
                         <strong>CISOs</strong> (risk management)
                       </p>
@@ -255,7 +254,7 @@ const Documentation = () => {
                     <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xl font-bold">1</div>
                     <div>
                       <h3 className="text-xl font-semibold">Create Your First Project</h3>
-                      <p className="text-sm text-muted-foreground">A project is a container for all related AI systems</p>
+                      <p className="text-sm text-muted-foreground">A project is a container for all related logic tracks</p>
                     </div>
                   </div>
 
@@ -292,13 +291,13 @@ const Documentation = () => {
                             <tr className="border-b">
                               <td className="py-2 px-3 font-mono text-xs">name</td>
                               <td className="py-2 px-3">A human-readable name for your project</td>
-                              <td className="py-2 px-3">"Loan Approval AI"</td>
+                              <td className="py-2 px-3">"Loan Approval Logic Engine"</td>
                               <td className="py-2 px-3"><Badge variant="destructive" className="text-xs">Yes</Badge></td>
                             </tr>
                             <tr className="border-b">
                               <td className="py-2 px-3 font-mono text-xs">description</td>
                               <td className="py-2 px-3">Explain what this project does</td>
-                              <td className="py-2 px-3">"AI system for evaluating loan applications"</td>
+                              <td className="py-2 px-3">"Logic Engine system for evaluating loan applications"</td>
                               <td className="py-2 px-3"><Badge variant="secondary" className="text-xs">No</Badge></td>
                             </tr>
                             <tr className="border-b">
@@ -316,7 +315,7 @@ const Documentation = () => {
                             <tr>
                               <td className="py-2 px-3 font-mono text-xs">compliance_frameworks</td>
                               <td className="py-2 px-3">Which regulations apply?</td>
-                              <td className="py-2 px-3">"EU AI Act", "NIST AI RMF", "SOC 2"</td>
+                              <td className="py-2 px-3">"EU Logic Engine Act", "NIST Logic Engine RMF", "SOC 2"</td>
                               <td className="py-2 px-3"><Badge variant="secondary" className="text-xs">No</Badge></td>
                             </tr>
                           </tbody>
@@ -344,8 +343,8 @@ const Documentation = () => {
                   <div className="flex items-center gap-4 mb-4">
                     <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xl font-bold">2</div>
                     <div>
-                      <h3 className="text-xl font-semibold">Register a Model</h3>
-                      <p className="text-sm text-muted-foreground">Add an AI model to evaluate and monitor</p>
+                      <h3 className="text-xl font-semibold">Register an Engine</h3>
+                      <p className="text-sm text-muted-foreground">Add a logic engine to validate and monitor</p>
                     </div>
                   </div>
 
@@ -357,8 +356,8 @@ const Documentation = () => {
                       </h4>
                       <ol className="text-sm space-y-1 text-muted-foreground">
                         <li>1. In the left sidebar, click <code className="px-1.5 py-0.5 bg-background rounded text-xs">Configure</code></li>
-                        <li>2. Click on <code className="px-1.5 py-0.5 bg-background rounded text-xs">Models</code></li>
-                        <li>3. Click <strong>Register Model</strong> or <strong>Import from Hugging Face</strong></li>
+                        <li>2. Click on <code className="px-1.5 py-0.5 bg-background rounded text-xs">Logic Engines</code></li>
+                        <li>3. Click <strong>Register Engine</strong> or <strong>Import via Identity</strong></li>
                       </ol>
                     </div>
 
@@ -366,17 +365,17 @@ const Documentation = () => {
                       <div className="p-4 rounded-lg border bg-muted/30">
                         <h4 className="font-medium mb-2 flex items-center gap-2">
                           <Download className="h-4 w-4 text-blue-500" />
-                          Option A: Import from Hugging Face
+                          Option A: Import from External Registry
                         </h4>
-                        <p className="text-xs text-muted-foreground mb-3">Fastest method if your model is hosted on Hugging Face</p>
+                        <p className="text-xs text-muted-foreground mb-3">Fastest method if your model is hosted on External Registry</p>
                         <div className="space-y-2 text-sm">
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Model ID</span>
-                            <code className="text-xs">meta-llama/Llama-2-7b</code>
+                            <code className="text-xs">engine-core/v2-standard</code>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Endpoint URL</span>
-                            <code className="text-xs">https://api-inference.huggingface.co/...</code>
+                            <code className="text-xs">https://api-inference.External Registry.co/...</code>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">API Token</span>
@@ -398,7 +397,7 @@ const Documentation = () => {
                           </div>
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Model Type</span>
-                            <span className="text-xs">LLM / Classification / Regression</span>
+                            <span className="text-xs">Pattern Engine / Classification / Regression</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">API Endpoint</span>
@@ -411,7 +410,7 @@ const Documentation = () => {
                     <div className="p-4 rounded-lg bg-muted/50">
                       <h4 className="font-medium mb-3 flex items-center gap-2">
                         <FileText className="h-4 w-4" />
-                        All Model Fields Explained
+                        All Engine Properties Explained
                       </h4>
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
@@ -426,12 +425,12 @@ const Documentation = () => {
                             <tr className="border-b">
                               <td className="py-2 px-3 font-mono text-xs">name</td>
                               <td className="py-2 px-3">Display name for the model</td>
-                              <td className="py-2 px-3">"GPT-4 Customer Support"</td>
+                              <td className="py-2 px-3">"Core Logic v4 Customer Support"</td>
                             </tr>
                             <tr className="border-b">
                               <td className="py-2 px-3 font-mono text-xs">model_type</td>
-                              <td className="py-2 px-3">Type of AI model</td>
-                              <td className="py-2 px-3">LLM, Classification, Regression, NER, Embedding</td>
+                              <td className="py-2 px-3">Type of Logic Engine model</td>
+                              <td className="py-2 px-3">Pattern Engine, Classification, Regression, NER, Embedding</td>
                             </tr>
                             <tr className="border-b">
                               <td className="py-2 px-3 font-mono text-xs">version</td>
@@ -441,7 +440,7 @@ const Documentation = () => {
                             <tr className="border-b">
                               <td className="py-2 px-3 font-mono text-xs">endpoint</td>
                               <td className="py-2 px-3">API URL to call the model</td>
-                              <td className="py-2 px-3">"https://api.openai.com/v1/chat"</td>
+                              <td className="py-2 px-3">"https://api.Internal Cluster.com/v1/chat"</td>
                             </tr>
                             <tr className="border-b">
                               <td className="py-2 px-3 font-mono text-xs">project_id</td>
@@ -483,8 +482,8 @@ const Documentation = () => {
                   <div className="flex items-center gap-4 mb-4">
                     <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xl font-bold">3</div>
                     <div>
-                      <h3 className="text-xl font-semibold">Run Your First Evaluation</h3>
-                      <p className="text-sm text-muted-foreground">Test your model for fairness, safety, or other metrics</p>
+                      <h3 className="text-xl font-semibold">Run Your First Validation</h3>
+                      <p className="text-sm text-muted-foreground">Test your engine for parity, safety, or core integrity</p>
                     </div>
                   </div>
 
@@ -550,7 +549,7 @@ const Documentation = () => {
                         <li>• <strong>ComputationBreakdown</strong>: Shows the exact formulas used</li>
                         <li>• <strong>RawDataLog</strong>: Timestamps, latency, raw test data</li>
                         <li>• <strong>EvidencePackage</strong>: Downloadable JSON with SHA-256 hash</li>
-                        <li>• <strong>If score &lt; 70%</strong>: Red "NON-COMPLIANT" warning with EU AI Act reference</li>
+                        <li>• <strong>If score &lt; 70%</strong>: Red "NON-COMPLIANT" warning with EU Logic Engine Act reference</li>
                       </ul>
                     </div>
                   </div>
@@ -585,7 +584,7 @@ const Documentation = () => {
                         Available Report Types
                       </h4>
                       <ul className="text-sm text-muted-foreground space-y-1">
-                        <li>• <strong>EU AI Act Compliance</strong>: Full conformity assessment</li>
+                        <li>• <strong>EU Logic Engine Act Compliance</strong>: Full conformity assessment</li>
                         <li>• <strong>Bias Audit</strong>: Fairness analysis across demographics</li>
                         <li>• <strong>Risk Assessment</strong>: Comprehensive risk evaluation</li>
                         <li>• <strong>Technical Documentation</strong>: Model specifications</li>
@@ -618,7 +617,7 @@ const Documentation = () => {
                     <div className="flex items-center gap-2">
                       <Building className="h-4 w-4 text-blue-500" />
                       <span className="text-blue-500 font-medium">Project</span>
-                      <span className="text-muted-foreground">(e.g., "Loan Approval AI")</span>
+                      <span className="text-muted-foreground">(e.g., "Loan Approval Logic Engine")</span>
                     </div>
                     <div className="ml-6 mt-2 flex items-center gap-2">
                       <span className="text-muted-foreground">├──</span>
@@ -636,7 +635,7 @@ const Documentation = () => {
                       <span className="text-muted-foreground">├──</span>
                       <Brain className="h-4 w-4 text-green-500" />
                       <span className="text-green-500 font-medium">Model</span>
-                      <span className="text-muted-foreground">(e.g., "LLM Explainer v1.0")</span>
+                      <span className="text-muted-foreground">(e.g., "Pattern Engine Explainer v1.0")</span>
                     </div>
                     <div className="ml-6 mt-2 flex items-center gap-2">
                       <span className="text-muted-foreground">├──</span>
@@ -657,21 +656,21 @@ const Documentation = () => {
                       <Building className="h-5 w-5 text-blue-500 mb-2" />
                       <h4 className="font-medium mb-1">Project</h4>
                       <p className="text-xs text-muted-foreground">
-                        Top-level container. Groups related AI systems. Contains compliance frameworks, data sensitivity, and environment settings.
+                        Top-level container. Groups related Logic Engine systems. Contains compliance frameworks, data sensitivity, and environment settings.
                       </p>
                     </div>
                     <div className="p-4 rounded-lg border">
                       <Layers className="h-5 w-5 text-purple-500 mb-2" />
                       <h4 className="font-medium mb-1">System</h4>
                       <p className="text-xs text-muted-foreground">
-                        Deployed AI component. Has API endpoint, runtime governance, request logging. Requires approval if high-risk.
+                        Deployed Logic Engine component. Has API endpoint, runtime governance, request logging. Requires approval if high-risk.
                       </p>
                     </div>
                     <div className="p-4 rounded-lg border">
                       <Brain className="h-5 w-5 text-green-500 mb-2" />
                       <h4 className="font-medium mb-1">Model</h4>
                       <p className="text-xs text-muted-foreground">
-                        The actual AI/ML model. Has type (LLM, Classification), version, evaluation scores, and version history.
+                        The actual Logic Engine/ML model. Has type (Pattern Engine, Classification), version, evaluation scores, and version history.
                       </p>
                     </div>
                   </div>
@@ -712,7 +711,7 @@ const Documentation = () => {
                           <td className="py-3 px-4">
                             <CircleX className="h-4 w-4 text-muted-foreground" />
                           </td>
-                          <td className="py-3 px-4">Customer support AI, content moderation</td>
+                          <td className="py-3 px-4">Customer support Logic Engine, content moderation</td>
                         </tr>
                         <tr className="border-b">
                           <td className="py-3 px-4">
@@ -758,7 +757,7 @@ const Documentation = () => {
                 <div className="p-6 rounded-xl border bg-card">
                   <h3 className="text-lg font-semibold mb-4">What is a Project?</h3>
                   <p className="text-muted-foreground mb-4">
-                    A Project is the top-level organizational unit. Think of it as a folder that contains all the AI systems 
+                    A Project is the top-level organizational unit. Think of it as a folder that contains all the Logic Engine systems 
                     and models for a specific business initiative.
                   </p>
                   
@@ -768,7 +767,7 @@ const Documentation = () => {
                       <div>
                         <h4 className="font-medium text-blue-700 dark:text-blue-400 mb-1">Example</h4>
                         <p className="text-sm text-muted-foreground">
-                          If you're building a loan approval system, you might have a project called "Loan Approval AI" 
+                          If you're building a loan approval system, you might have a project called "Loan Approval Logic Engine" 
                           that contains systems like "Credit Scoring", "Fraud Detection", and "Document Processing".
                         </p>
                       </div>
@@ -837,7 +836,7 @@ const Documentation = () => {
                               <tr>
                                 <td className="py-2 px-3">Compliance Frameworks</td>
                                 <td className="py-2 px-3">Multi-select</td>
-                                <td className="py-2 px-3">EU AI Act, NIST AI RMF, SOC 2, ISO 27001</td>
+                                <td className="py-2 px-3">EU Logic Engine Act, NIST Logic Engine RMF, SOC 2, ISO 27001</td>
                               </tr>
                             </tbody>
                           </table>
@@ -936,8 +935,8 @@ const Documentation = () => {
                 <div className="p-6 rounded-xl border bg-card">
                   <h3 className="text-lg font-semibold mb-4">What is a Model in Fractal?</h3>
                   <p className="text-muted-foreground mb-4">
-                    A Model represents any AI/ML model that you want to evaluate, monitor, and govern. 
-                    This can be an LLM (like GPT-4), a classification model (like XGBoost), 
+                    A Model represents any Logic Engine/ML model that you want to evaluate, monitor, and govern. 
+                    This can be an Pattern Engine (like Core Logic v4), a classification model (like XGBoost), 
                     or any other type of ML model.
                   </p>
                 </div>
@@ -957,9 +956,9 @@ const Documentation = () => {
                       </thead>
                       <tbody className="text-muted-foreground">
                         <tr className="border-b">
-                          <td className="py-3 px-4 font-medium">LLM</td>
+                          <td className="py-3 px-4 font-medium">Pattern Engine</td>
                           <td className="py-3 px-4">Large Language Model for text generation</td>
-                          <td className="py-3 px-4">GPT-4, Claude, Llama, Gemini</td>
+                          <td className="py-3 px-4">Core Logic v4, Claude, Llama, Gemini</td>
                           <td className="py-3 px-4">Hallucination, Toxicity, Privacy</td>
                         </tr>
                         <tr className="border-b">
@@ -1001,22 +1000,22 @@ const Documentation = () => {
                   <h3 className="text-lg font-semibold mb-4">Registering a Model (Two Methods)</h3>
 
                   <div className="space-y-6">
-                    {/* Method 1: Hugging Face */}
+                    {/* Method 1: External Registry */}
                     <div className="p-4 rounded-lg border bg-gradient-to-r from-yellow-500/5 to-orange-500/5">
                       <h4 className="font-medium mb-3 flex items-center gap-2">
                         <Download className="h-5 w-5 text-yellow-500" />
-                        Method 1: Import from Hugging Face
+                        Method 1: Import from External Registry
                       </h4>
                       <p className="text-sm text-muted-foreground mb-4">
-                        Best for models hosted on Hugging Face Hub or Inference Endpoints.
+                        Best for models hosted on External Registry Hub or Inference Endpoints.
                       </p>
 
                       <div className="space-y-3">
                         <div className="flex items-start gap-3 p-3 rounded bg-background">
                           <div className="w-6 h-6 rounded-full bg-yellow-500/20 text-yellow-500 flex items-center justify-center text-xs font-medium flex-shrink-0">1</div>
                           <div>
-                            <h5 className="font-medium text-sm mb-1">Click "Import from Hugging Face"</h5>
-                            <p className="text-xs text-muted-foreground">Opens the HuggingFace import form</p>
+                            <h5 className="font-medium text-sm mb-1">Click "Import from External Registry"</h5>
+                            <p className="text-xs text-muted-foreground">Opens the External Registry import form</p>
                           </div>
                         </div>
 
@@ -1028,7 +1027,7 @@ const Documentation = () => {
                               Format: <code className="px-1 py-0.5 bg-muted rounded text-xs">organization/model-name</code>
                             </p>
                             <p className="text-xs text-muted-foreground mt-1">
-                              Example: <code className="px-1 py-0.5 bg-muted rounded text-xs">meta-llama/Llama-2-7b-chat-hf</code>
+                              Example: <code className="px-1 py-0.5 bg-muted rounded text-xs">engine-core/v2-standard-chat-hf</code>
                             </p>
                           </div>
                         </div>
@@ -1038,10 +1037,10 @@ const Documentation = () => {
                           <div>
                             <h5 className="font-medium text-sm mb-1">Enter Inference Endpoint URL</h5>
                             <p className="text-xs text-muted-foreground">
-                              Format: <code className="px-1 py-0.5 bg-muted rounded text-xs">https://api-inference.huggingface.co/models/...</code>
+                              Format: <code className="px-1 py-0.5 bg-muted rounded text-xs">https://api-inference.External Registry.co/models/...</code>
                             </p>
                             <p className="text-xs text-muted-foreground mt-1">
-                              Or your dedicated endpoint: <code className="px-1 py-0.5 bg-muted rounded text-xs">https://xxx.endpoints.huggingface.cloud</code>
+                              Or your dedicated endpoint: <code className="px-1 py-0.5 bg-muted rounded text-xs">https://xxx.endpoints.External Registry.cloud</code>
                             </p>
                           </div>
                         </div>
@@ -1051,10 +1050,10 @@ const Documentation = () => {
                           <div>
                             <h5 className="font-medium text-sm mb-1">Enter API Token</h5>
                             <p className="text-xs text-muted-foreground">
-                              Your HuggingFace API token starting with <code className="px-1 py-0.5 bg-muted rounded text-xs">hf_</code>
+                              Your External Registry API token starting with <code className="px-1 py-0.5 bg-muted rounded text-xs">hf_</code>
                             </p>
                             <p className="text-xs text-muted-foreground mt-1">
-                              Get it from: huggingface.co → Settings → Access Tokens
+                              Get it from: External Registry.co → Settings → Access Tokens
                             </p>
                           </div>
                         </div>
@@ -1071,7 +1070,7 @@ const Documentation = () => {
                           <div className="w-6 h-6 rounded-full bg-green-500/20 text-green-500 flex items-center justify-center text-xs font-medium flex-shrink-0">✓</div>
                           <div>
                             <h5 className="font-medium text-sm mb-1">Click "Import"</h5>
-                            <p className="text-xs text-muted-foreground">Model will be created with metadata fetched from HuggingFace</p>
+                            <p className="text-xs text-muted-foreground">Model will be created with metadata fetched from External Registry</p>
                           </div>
                         </div>
                       </div>
@@ -1084,7 +1083,7 @@ const Documentation = () => {
                         Method 2: Manual Registration
                       </h4>
                       <p className="text-sm text-muted-foreground mb-4">
-                        Best for custom models, private APIs, or non-HuggingFace models.
+                        Best for custom models, private APIs, or non-External Registry models.
                       </p>
 
                       <div className="overflow-x-auto">
@@ -1105,7 +1104,7 @@ const Documentation = () => {
                             <tr className="border-b">
                               <td className="py-2 px-3 font-mono text-xs">model_type</td>
                               <td className="py-2 px-3"><Badge variant="destructive" className="text-xs">Yes</Badge></td>
-                              <td className="py-2 px-3">LLM, Classification, Regression, etc.</td>
+                              <td className="py-2 px-3">Pattern Engine, Classification, Regression, etc.</td>
                             </tr>
                             <tr className="border-b">
                               <td className="py-2 px-3 font-mono text-xs">version</td>
@@ -1233,7 +1232,7 @@ const Documentation = () => {
                 <div className="p-6 rounded-xl border bg-card">
                   <h3 className="text-lg font-semibold mb-4">What is Observability?</h3>
                   <p className="text-muted-foreground mb-4">
-                    Observability is your real-time window into what your AI systems are doing. 
+                    Observability is your real-time window into what your Logic Engine systems are doing. 
                     It answers questions like: "How many requests is my model handling?", 
                     "Is performance degrading?", "Is there drift in the data?".
                   </p>
@@ -1382,7 +1381,7 @@ const Documentation = () => {
                 <div className="p-6 rounded-xl border bg-card">
                   <h3 className="text-lg font-semibold mb-4">What are Alerts?</h3>
                   <p className="text-muted-foreground mb-4">
-                    Alerts notify you when something important happens in your AI systems. 
+                    Alerts notify you when something important happens in your Logic Engine systems. 
                     They can be triggered by drift, latency spikes, errors, or policy violations.
                   </p>
 
@@ -1546,7 +1545,7 @@ const Documentation = () => {
                     8.2 HITL Console (Human-in-the-Loop)
                   </h3>
                   <p className="text-muted-foreground mb-4">
-                    A queue of AI decisions that need human review. Used for low-confidence predictions, 
+                    A queue of Logic Engine decisions that need human review. Used for low-confidence predictions, 
                     edge cases, and appeals.
                   </p>
 
@@ -1578,7 +1577,7 @@ const Documentation = () => {
                     8.4 Incidents
                   </h3>
                   <p className="text-muted-foreground mb-4">
-                    Track safety and compliance incidents. Required for EU AI Act Article 62 incident reporting.
+                    Track safety and compliance incidents. Required for EU Logic Engine Act Article 62 incident reporting.
                   </p>
 
                   <div className="p-4 rounded-lg bg-muted/50">
@@ -1724,7 +1723,7 @@ const Documentation = () => {
                         <h4 className="font-medium mb-2 text-red-700 dark:text-red-400">Fail (&lt;70%)</h4>
                         <p className="text-xs text-muted-foreground">
                           Model shows significant bias. Red warning and "NON-COMPLIANT" status 
-                          with EU AI Act Article 10 reference.
+                          with EU Logic Engine Act Article 10 reference.
                         </p>
                       </div>
                     </div>
@@ -1738,7 +1737,7 @@ const Documentation = () => {
                     9.2 Hallucination Engine
                   </h3>
                   <p className="text-muted-foreground mb-4">
-                    Detects when your LLM generates false, unsupported, or made-up information.
+                    Detects when your Pattern Engine generates false, unsupported, or made-up information.
                   </p>
 
                   <div className="space-y-4">
@@ -1792,7 +1791,7 @@ const Documentation = () => {
                       </h4>
                       <p className="text-xs text-muted-foreground">
                         If any test case produces toxic output, a Critical alert is generated and 
-                        the model is flagged for immediate review. This maps to EU AI Act Article 5 (prohibited practices).
+                        the model is flagged for immediate review. This maps to EU Logic Engine Act Article 5 (prohibited practices).
                       </p>
                     </div>
                   </div>
@@ -1862,7 +1861,7 @@ const Documentation = () => {
                         Regulatory Requirement
                       </h4>
                       <p className="text-xs text-muted-foreground">
-                        EU AI Act Article 13 requires that users can understand how high-risk AI systems 
+                        EU Logic Engine Act Article 13 requires that users can understand how high-risk Logic Engine systems 
                         make decisions. This engine helps demonstrate compliance.
                       </p>
                     </div>
@@ -2050,7 +2049,7 @@ const Documentation = () => {
                     11.1 Impact Dashboard
                   </h3>
                   <p className="text-muted-foreground mb-4">
-                    Track the real-world impact of your AI decisions across populations.
+                    Track the real-world impact of your Logic Engine decisions across populations.
                   </p>
 
                   <div className="space-y-4">
@@ -2059,7 +2058,7 @@ const Documentation = () => {
                       <ul className="text-sm text-muted-foreground space-y-1">
                         <li>• <strong>Decision Outcomes</strong>: Approval/denial rates by demographic group</li>
                         <li>• <strong>Appeal Analysis</strong>: How often are decisions appealed? What's the overturn rate?</li>
-                        <li>• <strong>Harm Detection</strong>: Tracked incidents of AI-caused harm</li>
+                        <li>• <strong>Harm Detection</strong>: Tracked incidents of Logic Engine-caused harm</li>
                         <li>• <strong>Longitudinal Trends</strong>: How are metrics changing over time?</li>
                       </ul>
                     </div>
@@ -2090,9 +2089,9 @@ const Documentation = () => {
                           </thead>
                           <tbody className="text-muted-foreground">
                             <tr className="border-b">
-                              <td className="py-2 px-3">EU AI Act Conformity</td>
+                              <td className="py-2 px-3">EU Logic Engine Act Conformity</td>
                               <td className="py-2 px-3">Full compliance assessment</td>
-                              <td className="py-2 px-3">EU AI Act</td>
+                              <td className="py-2 px-3">EU Logic Engine Act</td>
                             </tr>
                             <tr className="border-b">
                               <td className="py-2 px-3">Bias Audit Report</td>
@@ -2102,17 +2101,17 @@ const Documentation = () => {
                             <tr className="border-b">
                               <td className="py-2 px-3">Technical Documentation</td>
                               <td className="py-2 px-3">Model specifications and design</td>
-                              <td className="py-2 px-3">EU AI Act Annex IV</td>
+                              <td className="py-2 px-3">EU Logic Engine Act Annex IV</td>
                             </tr>
                             <tr className="border-b">
                               <td className="py-2 px-3">Risk Assessment</td>
                               <td className="py-2 px-3">Comprehensive risk evaluation</td>
-                              <td className="py-2 px-3">NIST AI RMF</td>
+                              <td className="py-2 px-3">NIST Logic Engine RMF</td>
                             </tr>
                             <tr>
                               <td className="py-2 px-3">Incident Report</td>
                               <td className="py-2 px-3">Safety incident documentation</td>
-                              <td className="py-2 px-3">EU AI Act Art. 62</td>
+                              <td className="py-2 px-3">EU Logic Engine Act Art. 62</td>
                             </tr>
                           </tbody>
                         </table>
@@ -2238,12 +2237,12 @@ const Documentation = () => {
                   <div className="p-4 rounded-lg bg-muted/50">
                     <h4 className="font-medium mb-2">Supported Providers</h4>
                     <div className="flex flex-wrap gap-2">
-                      <Badge variant="outline">OpenAI</Badge>
-                      <Badge variant="outline">Anthropic</Badge>
-                      <Badge variant="outline">HuggingFace</Badge>
-                      <Badge variant="outline">Google AI</Badge>
-                      <Badge variant="outline">Azure OpenAI</Badge>
-                      <Badge variant="outline">AWS Bedrock</Badge>
+                      <Badge variant="outline">Internal Cluster</Badge>
+                      <Badge variant="outline">External Node</Badge>
+                      <Badge variant="outline">External Registry</Badge>
+                      <Badge variant="outline">Compute Node Logic Engine</Badge>
+                      <Badge variant="outline">edge Internal Cluster</Badge>
+                      <Badge variant="outline">Primary Cloud Bedrock</Badge>
                       <Badge variant="outline">Cohere</Badge>
                       <Badge variant="outline">Custom</Badge>
                     </div>

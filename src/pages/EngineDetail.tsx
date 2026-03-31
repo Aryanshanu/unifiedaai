@@ -135,7 +135,7 @@ function ScoreCard({ title, score, icon, type }: ScoreCardProps) {
             {score !== null ? `${score}%` : "N/A"}
           </p>
           <Badge variant={explanation.status === "critical" ? "destructive" : explanation.status === "warning" ? "secondary" : "default"} className="mt-1">
-            {explanation.status.toUpperCase()}
+            {explanation.status === "critical" ? "CRITICAL DRIFT" : explanation.status === "warning" ? "DIVERGING" : "STABLE"}
           </Badge>
         </div>
       </div>
@@ -154,7 +154,7 @@ function ScoreCard({ title, score, icon, type }: ScoreCardProps) {
   );
 }
 
-export default function ModelDetail() {
+export default function EngineDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [showRiskWizard, setShowRiskWizard] = useState(false);
@@ -198,12 +198,12 @@ export default function ModelDetail() {
   
   if (modelError || !model) {
     return (
-      <MainLayout title="Model Not Found" subtitle="">
+      <MainLayout title="Engine Not Found" subtitle="">
         <div className="text-center py-12">
-          <p className="text-destructive mb-4">Failed to load model details</p>
-          <Button variant="outline" onClick={() => navigate("/models")}>
+          <p className="text-destructive mb-4">Failed to load engine details</p>
+          <Button variant="outline" onClick={() => navigate("/engines")}>
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Models
+            Back to Engines
           </Button>
         </div>
       </MainLayout>
@@ -227,7 +227,7 @@ export default function ModelDetail() {
     >
       {/* Header Actions */}
       <div className="flex flex-wrap items-center gap-3 mb-6">
-        <Button variant="outline" size="sm" onClick={() => navigate("/models")}>
+        <Button variant="outline" size="sm" onClick={() => navigate("/engines")}>
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back
         </Button>
@@ -245,10 +245,10 @@ export default function ModelDetail() {
           variant="default" 
           size="sm" 
           className="bg-gradient-primary"
-          onClick={() => toast.info("Navigate to Evaluation page to run evaluations on this model", { description: "Select an engine from the sidebar" })}
+          onClick={() => toast.info("Navigate to Validation hub to run checks on this engine", { description: "Select a validation engine from the sidebar" })}
         >
           <Play className="w-4 h-4 mr-2" />
-          Run Evaluation
+          Run Validation
         </Button>
         
         {system && (
@@ -290,17 +290,13 @@ export default function ModelDetail() {
           <p className="text-xs text-muted-foreground">Overall Score</p>
         </div>
         <div className="bg-card border border-border rounded-xl p-4">
-          <p className="text-2xl font-bold font-mono text-foreground">{modelEvaluations.length}</p>
-          <p className="text-xs text-muted-foreground">Evaluations Run</p>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-4">
           <p className={cn(
             "text-2xl font-bold font-mono",
             modelIncidents.filter(i => i.status !== 'resolved').length > 0 ? "text-warning" : "text-success"
           )}>
             {modelIncidents.filter(i => i.status !== 'resolved').length}
           </p>
-          <p className="text-xs text-muted-foreground">Active Incidents</p>
+          <p className="text-xs text-muted-foreground">Active Anomalies</p>
         </div>
         <div className="bg-card border border-border rounded-xl p-4">
           <p className={cn(
@@ -328,20 +324,20 @@ export default function ModelDetail() {
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList className="bg-secondary flex-wrap h-auto gap-1 p-1">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="scores">RAI Scores</TabsTrigger>
+          <TabsTrigger value="scores">Validation Scores</TabsTrigger>
           <TabsTrigger value="risk">Risk</TabsTrigger>
           <TabsTrigger value="impact">Impact</TabsTrigger>
-          <TabsTrigger value="governance">Governance</TabsTrigger>
+          <TabsTrigger value="governance">Controls</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
-          <TabsTrigger value="evaluations">Evaluations</TabsTrigger>
-          <TabsTrigger value="incidents">Incidents</TabsTrigger>
+          <TabsTrigger value="evaluations">Validations</TabsTrigger>
+          <TabsTrigger value="incidents">Anomalies</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-              <h4 className="font-medium text-foreground">Model Information</h4>
+              <h4 className="font-medium text-foreground">Engine Information</h4>
               <div className="space-y-3">
                 <div>
                   <p className="text-xs text-muted-foreground">Name</p>
@@ -420,38 +416,38 @@ export default function ModelDetail() {
 
         {/* RAI Scores Tab */}
         <TabsContent value="scores" className="space-y-4">
-          <h3 className="text-lg font-semibold text-foreground">Responsible AI Score Breakdown</h3>
+          <h3 className="text-lg font-semibold text-foreground">Autonomous Logic Validation Breakdown</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            Detailed analysis of each RAI pillar with explanations and recommendations.
+            Detailed analysis of each governance dimension with explanations and recommendations.
           </p>
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <ScoreCard 
-              title="Fairness Score" 
+              title="Parity Score" 
               score={model.fairness_score} 
               icon={<Scale className="w-5 h-5" />}
               type="fairness"
             />
             <ScoreCard 
-              title="Robustness Score" 
+              title="Stability Score" 
               score={model.robustness_score} 
               icon={<Shield className="w-5 h-5" />}
               type="robustness"
             />
             <ScoreCard 
-              title="Privacy Score" 
+              title="Protection Score" 
               score={model.privacy_score} 
               icon={<Lock className="w-5 h-5" />}
               type="privacy"
             />
             <ScoreCard 
-              title="Safety Score" 
+              title="Integrity Score" 
               score={model.toxicity_score} 
               icon={<Eye className="w-5 h-5" />}
               type="toxicity"
             />
             <ScoreCard 
-              title="Overall Score" 
+              title="Aggregate Performance" 
               score={model.overall_score} 
               icon={<Brain className="w-5 h-5" />}
               type="overall"

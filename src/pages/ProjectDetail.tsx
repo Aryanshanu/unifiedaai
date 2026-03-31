@@ -23,7 +23,7 @@ import { format } from "date-fns";
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [showAddModel, setShowAddModel] = useState(false);
+  const [showAddEngine, setShowAddEngine] = useState(false);
 
   const { data: project, isLoading: projectLoading } = useProject(id ?? "");
   const { data: systems, isLoading: systemsLoading } = useSystems(id);
@@ -122,9 +122,9 @@ export default function ProjectDetail() {
             </div>
           </div>
 
-          <Button onClick={() => setShowAddModel(true)} className="gap-2">
+          <Button onClick={() => setShowAddEngine(true)} className="gap-2">
             <Plus className="h-4 w-4" />
-            Add Model
+            Register Engine
           </Button>
         </div>
 
@@ -203,11 +203,11 @@ export default function ProjectDetail() {
           <TabsList>
             <TabsTrigger value="systems" className="gap-2">
               <Cpu className="h-4 w-4" />
-              Systems ({systems?.length ?? 0})
+              Logic Assets ({systems?.length ?? 0})
             </TabsTrigger>
             <TabsTrigger value="models" className="gap-2">
-              <Brain className="h-4 w-4" />
-              Models
+              <Settings className="h-4 w-4" />
+              Engines
             </TabsTrigger>
             <TabsTrigger value="risk" className="gap-2">
               <AlertTriangle className="h-4 w-4" />
@@ -245,13 +245,13 @@ export default function ProjectDetail() {
                   <div className="p-4 rounded-full bg-muted mb-4">
                     <Cpu className="h-10 w-10 text-muted-foreground" />
                   </div>
-                  <h3 className="text-xl font-semibold">No Systems Yet</h3>
+                  <h3 className="text-xl font-semibold">No Engines Yet</h3>
                   <p className="text-muted-foreground mt-2 max-w-md">
-                    Add AI models to this project to start monitoring and governance. Systems are created automatically when you add a model.
+                    Register logic engines to this project to start monitoring and governance. Controlled assets are tracked automatically upon engine registration.
                   </p>
-                  <Button onClick={() => setShowAddModel(true)} className="mt-6 gap-2">
+                  <Button onClick={() => setShowAddEngine(true)} className="mt-6 gap-2">
                     <Plus className="h-4 w-4" />
-                    Add Your First Model
+                    Register Your First Engine
                   </Button>
                 </CardContent>
               </Card>
@@ -267,15 +267,15 @@ export default function ProjectDetail() {
           <TabsContent value="models" className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold">Project Models</h3>
-                <p className="text-sm text-muted-foreground">AI models registered in this project</p>
+                <h3 className="text-lg font-semibold">Project Engines</h3>
+                <p className="text-sm text-muted-foreground">Logic engines registered in this project</p>
               </div>
-              <Button onClick={() => setShowAddModel(true)} className="gap-2">
+              <Button onClick={() => setShowAddEngine(true)} className="gap-2">
                 <Plus className="h-4 w-4" />
-                Add Model
+                Register Engine
               </Button>
             </div>
-            {id && <ProjectModelsTab projectId={id} onAddModel={() => setShowAddModel(true)} />}
+            {id && <ProjectModelsTab projectId={id} onAddModel={() => setShowAddEngine(true)} />}
           </TabsContent>
 
           <TabsContent value="risk">
@@ -294,8 +294,8 @@ export default function ProjectDetail() {
 
       {id && (
         <ModelRegistrationForm
-          open={showAddModel}
-          onOpenChange={setShowAddModel}
+          open={showAddEngine}
+          onOpenChange={setShowAddEngine}
           defaultProjectId={id}
         />
       )}

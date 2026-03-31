@@ -1,0 +1,42 @@
+[
+  {
+    "File": "src/pages/SystemDetail.tsx",
+    "LineNumber": 78,
+    "LineContent": "      case \"openai\": return \"bg-emerald-500/10 text-emerald-500 border-emerald-500/20\";"
+  },
+  {
+    "File": "src/pages/SystemDetail.tsx",
+    "LineNumber": 79,
+    "LineContent": "      case \"anthropic\": return \"bg-orange-500/10 text-orange-500 border-orange-500/20\";"
+  },
+  {
+    "File": "src/pages/Documentation.tsx",
+    "LineNumber": 375,
+    "LineContent": "                            <code className=\"text-xs\">meta-llama/Llama-2-7b</code>"
+  },
+  {
+    "File": "src/lib/endpoint-validation.ts",
+    "LineNumber": 13,
+    "LineContent": "  openai: /^https:\\/\\/api\\.openai\\.com\\//,"
+  },
+  {
+    "File": "src/lib/endpoint-validation.ts",
+    "LineNumber": 14,
+    "LineContent": "  anthropic: /^https:\\/\\/api\\.anthropic\\.com\\//,"
+  },
+  {
+    "File": "src/hooks/useLLMGateway.ts",
+    "LineNumber": 10,
+    "LineContent": "import { OpenAI } from 'openai';"
+  },
+  {
+    "File": "package.json",
+    "LineNumber": 25,
+    "LineContent": "\"openai\": \"^4.20.0\","
+  },
+  {
+    "File": "package.json",
+    "LineNumber": 26,
+    "LineContent": "\"@anthropic-ai/sdk\": \"^0.18.0\","
+  }
+]

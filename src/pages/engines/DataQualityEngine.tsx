@@ -58,6 +58,7 @@ import { useFileUploadStatus, useAllUploads, useQualityStats, UploadStatus } fro
 import { DataSourceConnectors } from '@/components/data/DataSourceConnectors';
 import { ReadyDatasetsList } from '@/components/data/ReadyDatasetsList';
 import { DatasetBiasScan } from '@/components/engines/DatasetBiasScan';
+import { WeightProfileManager } from '@/components/engines/WeightProfileManager';
 import { useQualityTrend } from '@/hooks/useQualityTrend';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -790,7 +791,7 @@ function DataQualityEngineContent() {
         <QualityStatsCards />
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5 max-w-3xl">
+          <TabsList className="grid w-full grid-cols-6 max-w-4xl">
             <TabsTrigger value="control-plane" className="flex items-center gap-2">
               <Zap className="h-4 w-4" />
               Control Plane
@@ -802,6 +803,10 @@ function DataQualityEngineContent() {
             <TabsTrigger value="evaluate" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Evaluate
+            </TabsTrigger>
+            <TabsTrigger value="schema" className="flex items-center gap-2">
+              <Database className="h-4 w-4" />
+              Schema
             </TabsTrigger>
             <TabsTrigger value="bias" className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" />
@@ -829,6 +834,10 @@ function DataQualityEngineContent() {
               <EvaluateTab />
               <ReadyDatasetsList />
             </div>
+          </TabsContent>
+
+          <TabsContent value="schema" className="mt-6">
+            <WeightProfileManager />
           </TabsContent>
 
           <TabsContent value="bias" className="mt-6">

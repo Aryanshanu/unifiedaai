@@ -19,11 +19,11 @@ const Error = lazy(() => import("./pages/Error"));
 const Projects = lazy(() => import("./pages/Projects"));
 const ProjectDetail = lazy(() => import("./pages/ProjectDetail"));
 const SystemDetail = lazy(() => import("./pages/SystemDetail"));
-const Models = lazy(() => import("./pages/Models"));
-const ModelDetail = lazy(() => import("./pages/ModelDetail"));
+const LogicEngines = lazy(() => import("./pages/LogicEngines"));
+const EngineDetail = lazy(() => import("./pages/EngineDetail"));
 const Approvals = lazy(() => import("./pages/Approvals"));
-const HITL = lazy(() => import("./pages/HITL"));
-const Incidents = lazy(() => import("./pages/Incidents"));
+const CollaborativeOversight = lazy(() => import("./pages/CollaborativeOversight"));
+const Anomalies = lazy(() => import("./pages/Anomalies"));
 const Lineage = lazy(() => import("./pages/Lineage"));
 const Observability = lazy(() => import("./pages/Observability"));
 const Alerts = lazy(() => import("./pages/Alerts"));
@@ -47,8 +47,8 @@ const Evaluation = lazy(() => import("./pages/Evaluation"));
 const AuditCenter = lazy(() => import("./pages/AuditCenter"));
 const SemanticLayerHub = lazy(() => import("./pages/SemanticLayerHub"));
 const Discovery = lazy(() => import("./pages/Discovery"));
-const AgentGovernance = lazy(() => import("./pages/AgentGovernance"));
-const ContinuousEvaluation = lazy(() => import("./pages/ContinuousEvaluation"));
+const ControllerGovernance = lazy(() => import("./pages/AgentGovernance"));
+const ContinuousValidation = lazy(() => import("./pages/ContinuousValidation"));
 const EnvironmentManagement = lazy(() => import("./pages/EnvironmentManagement"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
@@ -57,7 +57,8 @@ const RegulatoryReports = lazy(() => import("./pages/RegulatoryReports"));
 const Runbooks = lazy(() => import("./pages/Runbooks"));
 const Policy = lazy(() => import("./pages/Policy"));
 const GoldenDemoV2 = lazy(() => import("./pages/GoldenDemoV2"));
-const Vendors = lazy(() => import("./pages/Vendors"));
+const SolutionProviders = lazy(() => import("./pages/Vendors"));
+const Benchmarks = lazy(() => import("@/pages/Benchmarks"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -81,7 +82,7 @@ function PageFallback() {
 
 const App = () => (
   <ErrorBoundary>
-    <ThemeProvider attribute="class" defaultTheme="dark" storageKey="fractal-theme">
+    <ThemeProvider attribute="class" defaultTheme="dark" storageKey="unifiedaai-theme">
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <SidebarProvider>
@@ -100,13 +101,13 @@ const App = () => (
                 <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
                 <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetail /></ProtectedRoute>} />
                 <Route path="/systems/:id" element={<ProtectedRoute><SystemDetail /></ProtectedRoute>} />
-                <Route path="/models" element={<ProtectedRoute><Models /></ProtectedRoute>} />
-                <Route path="/models/:id" element={<ProtectedRoute><ModelDetail /></ProtectedRoute>} />
+                <Route path="/engines" element={<ProtectedRoute><LogicEngines /></ProtectedRoute>} />
+                <Route path="/engines/:id" element={<ProtectedRoute><EngineDetail /></ProtectedRoute>} />
                 {/* Governance */}
                 <Route path="/governance" element={<ProtectedRoute><Governance /></ProtectedRoute>} />
                 <Route path="/governance/approvals" element={<ProtectedRoute><Approvals /></ProtectedRoute>} />
-                <Route path="/hitl" element={<ProtectedRoute><HITL /></ProtectedRoute>} />
-                <Route path="/incidents" element={<ProtectedRoute><Incidents /></ProtectedRoute>} />
+                <Route path="/oversight" element={<ProtectedRoute><CollaborativeOversight /></ProtectedRoute>} />
+                <Route path="/anomalies" element={<ProtectedRoute><Anomalies /></ProtectedRoute>} />
                 {/* Knowledge Graph */}
                 <Route path="/lineage" element={<ProtectedRoute><Lineage /></ProtectedRoute>} />
                 {/* Monitoring */}
@@ -115,7 +116,7 @@ const App = () => (
                 <Route path="/evaluation" element={<ProtectedRoute><Evaluation /></ProtectedRoute>} />
                 {/* Semantic Layer */}
                 <Route path="/semantic-definitions" element={<ProtectedRoute><SemanticDefinitions /></ProtectedRoute>} />
-                {/* Core RAI Engines */}
+                {/* Logic Governance Engines */}
                 <Route path="/engine/fairness" element={<ProtectedRoute><FairnessEngine /></ProtectedRoute>} />
                 <Route path="/engine/hallucination" element={<ProtectedRoute><HallucinationEngine /></ProtectedRoute>} />
                 <Route path="/engine/toxicity" element={<ProtectedRoute><ToxicityEngine /></ProtectedRoute>} />
@@ -137,15 +138,16 @@ const App = () => (
                 
                 <Route path="/semantic-hub" element={<ProtectedRoute><SemanticLayerHub /></ProtectedRoute>} />
                 <Route path="/discovery" element={<ProtectedRoute><Discovery /></ProtectedRoute>} />
-                <Route path="/agents" element={<ProtectedRoute><AgentGovernance /></ProtectedRoute>} />
-                <Route path="/continuous-evaluation" element={<ProtectedRoute><ContinuousEvaluation /></ProtectedRoute>} />
+                <Route path="/agents" element={<ProtectedRoute><ControllerGovernance /></ProtectedRoute>} />
+                <Route path="/continuous-validation" element={<ProtectedRoute><ContinuousValidation /></ProtectedRoute>} />
                 <Route path="/environments" element={<ProtectedRoute><EnvironmentManagement /></ProtectedRoute>} />
                 <Route path="/impact" element={<ProtectedRoute><ImpactDashboard /></ProtectedRoute>} />
                 <Route path="/regulatory-reports" element={<ProtectedRoute><RegulatoryReports /></ProtectedRoute>} />
                 <Route path="/runbooks" element={<ProtectedRoute><Runbooks /></ProtectedRoute>} />
                 <Route path="/policy" element={<ProtectedRoute><Policy /></ProtectedRoute>} />
-                <Route path="/vendors" element={<ProtectedRoute><Vendors /></ProtectedRoute>} />
-                <Route path="/golden-demo" element={<ProtectedRoute><GoldenDemoV2 /></ProtectedRoute>} />
+                <Route path="/providers" element={<ProtectedRoute><SolutionProviders /></ProtectedRoute>} />
+                <Route path="/benchmarks" element={<ProtectedRoute><Benchmarks /></ProtectedRoute>} />
+                <Route path="/simulation" element={<ProtectedRoute><GoldenDemoV2 /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
               </Suspense>

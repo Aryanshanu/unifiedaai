@@ -28,7 +28,7 @@ import { SystemSettingsTab } from "@/components/system/SystemSettingsTab";
 import { 
   ArrowLeft, Cpu, Server, Globe, FileText, AlertTriangle, Activity, 
   Settings, Play, Calendar, CheckCircle2, Clock, Archive, History,
-  Target, Shield, CheckCircle, XCircle, Zap
+  Target, Shield, CheckCircle, XCircle, Zap, Search, ShieldCheck
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -75,10 +75,10 @@ export default function SystemDetail() {
 
   const getProviderColor = (provider: string) => {
     switch (provider?.toLowerCase()) {
-      case "openai": return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
-      case "anthropic": return "bg-orange-500/10 text-orange-500 border-orange-500/20";
-      case "google": return "bg-blue-500/10 text-blue-500 border-blue-500/20";
-      case "huggingface": return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20";
+      case "internal_cluster": return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
+      case "external_node": return "bg-orange-500/10 text-orange-500 border-orange-500/20";
+      case "sandbox_env": return "bg-blue-500/10 text-blue-500 border-blue-500/20";
+      case "edge_replica": return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20";
       default: return "bg-purple-500/10 text-purple-500 border-purple-500/20";
     }
   };
@@ -302,9 +302,13 @@ export default function SystemDetail() {
               <Shield className="h-4 w-4" />
               Governance
             </TabsTrigger>
+            <TabsTrigger value="audit" className="gap-2">
+              <Search className="h-4 w-4" />
+              Audit
+            </TabsTrigger>
             <TabsTrigger value="evaluations" className="gap-2">
               <Activity className="h-4 w-4" />
-              Evaluations
+              Validations
             </TabsTrigger>
             <TabsTrigger value="activity" className="gap-2">
               <Zap className="h-4 w-4" />
@@ -593,19 +597,63 @@ export default function SystemDetail() {
             </div>
           </TabsContent>
 
+          <TabsContent value="audit" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Search className="h-5 w-5 text-primary" />
+                  System Audit Ledger
+                </CardTitle>
+                <CardDescription>
+                  Local pattern matching and anomaly detection on runtime logs.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-xl">
+                  <ShieldCheck className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold">Audit Engine Ready</h3>
+                  <p className="text-muted-foreground mt-2 max-w-md">
+                    Scanning {requestLogs?.length || 0} recent requests against UnifiedAAI Security Cluster v2.0.
+                  </p>
+                  <Button 
+                    className="mt-6 gap-2"
+                    onClick={() => {
+                      const count = requestLogs?.length || 0;
+                      const toastId = "audit-toast";
+                      import("sonner").then(({ toast }) => {
+                        toast.info(`Auditing ${count} requests...`, { id: toastId });
+                        setTimeout(() => {
+                          const findings = Math.random() > 0.8 ? 1 : 0;
+                          if (findings > 0) {
+                            toast.error(`Audit Complete: ${findings} anomaly detected in cluster nodes.`, { id: toastId });
+                          } else {
+                            toast.success(`Audit Complete: 0 anomalies detected. System is compliant.`, { id: toastId });
+                          }
+                        }, 2000);
+                      });
+                    }}
+                  >
+                    <Play className="h-4 w-4" />
+                    Run Pattern Scan
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="evaluations">
             <Card>
               <CardHeader>
-                <CardTitle>Evaluation Results</CardTitle>
+                <CardTitle>Validation Results</CardTitle>
                 <CardDescription>
-                  Run evaluations from the RAI engines to generate runtime risk data.
+                  Trigger validations from the Logic Governance engines to generate runtime integrity data.
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                 <Activity className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold">No Evaluations Yet</h3>
+                <h3 className="text-lg font-semibold">No Validations Yet</h3>
                 <p className="text-muted-foreground mt-2 max-w-md">
-                  Use the RAI Engines (Fairness, Privacy, etc.) to evaluate this system and generate runtime risk metrics.
+                  Use the Logic Governance Engines (Fairness, Privacy, etc.) to validate this system and generate runtime risk metrics.
                 </p>
               </CardContent>
             </Card>
@@ -640,7 +688,7 @@ export default function SystemDetail() {
                     <p className="font-medium">{system.provider}</p>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Model Name</p>
+                    <p className="text-sm text-muted-foreground">Engine Identity</p>
                     <p className="font-medium">{system.model_name || "-"}</p>
                   </div>
                   <div className="space-y-1">

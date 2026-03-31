@@ -34,23 +34,23 @@ export default function Vendors() {
 
   return (
     <MainLayout
-      title="AI Vendor Registry"
-      subtitle="Third-party AI service providers and supply-chain risk management"
+      title="Solution Provider Registry"
+      subtitle="Third-party solution providers and supply-chain risk management"
     >
       {/* KPI Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <MetricCard title="Total Vendors"    value={String(total)}    subtitle="Registered" icon={<Building2 className="w-4 h-4 text-primary" />} />
+        <MetricCard title="Total Providers"    value={String(total)}    subtitle="Registered" icon={<Building2 className="w-4 h-4 text-primary" />} />
         <MetricCard title="Active Contracts" value={String(active)}   subtitle="In service"  icon={<ShieldCheck className="w-4 h-4 text-success" />} status="success" />
-        <MetricCard title="Critical Risk"    value={String(critical)} subtitle="High-risk vendors" icon={<ShieldCheck className="w-4 h-4 text-destructive" />} status="danger" />
+        <MetricCard title="Critical Risk"    value={String(critical)} subtitle="High-risk providers" icon={<ShieldCheck className="w-4 h-4 text-destructive" />} status="danger" />
         <MetricCard title="Assessed"         value={String(assessed)} subtitle="Risk-assessed" />
       </div>
 
       {/* Header + Add */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-semibold text-foreground">Vendor List</h2>
+        <h2 className="text-sm font-semibold text-foreground">Provider List</h2>
         <Button variant="gradient" size="sm" disabled>
           <Plus className="w-4 h-4 mr-2" />
-          Add Vendor
+          Add Provider
         </Button>
       </div>
 
@@ -62,9 +62,9 @@ export default function Vendors() {
       ) : !vendors?.length ? (
         <div className="bg-card border border-border rounded-xl p-12 text-center">
           <Building2 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="font-medium text-foreground">No AI vendors registered</p>
+          <p className="font-medium text-foreground">No solution providers registered</p>
           <p className="text-sm text-muted-foreground mt-1">
-            Add vendors to track supply-chain risk and compliance
+            Add providers to track supply-chain risk and compliance
           </p>
         </div>
       ) : (

@@ -128,8 +128,8 @@ export default function Incidents() {
 
   return (
     <MainLayout 
-      title="Incidents" 
-      subtitle="Track and manage security and safety incidents"
+      title="Runtime Anomalies" 
+      subtitle="Track and manage system behavioral anomalies and divergences"
       headerActions={
         <div className="flex items-center gap-2">
           <Button 
@@ -151,7 +151,7 @@ export default function Incidents() {
     >
       <Tabs defaultValue="list" className="w-full">
         <TabsList className="mb-4">
-          <TabsTrigger value="list">Incident List</TabsTrigger>
+          <TabsTrigger value="list">Anomaly List</TabsTrigger>
           <TabsTrigger value="bulk">Bulk Resolution</TabsTrigger>
         </TabsList>
 
@@ -159,30 +159,30 @@ export default function Incidents() {
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <MetricCard
-          title="Open Incidents"
+          title="Active Anomalies"
           value={(stats?.open || 0).toString()}
-          subtitle="Require attention"
+          subtitle="Require evaluation"
           icon={<AlertCircle className="w-4 h-4 text-danger" />}
           status={stats?.open ? "danger" : "success"}
         />
         <MetricCard
-          title="Critical"
+          title="Critical Drift"
           value={(stats?.critical || 0).toString()}
-          subtitle="Highest priority"
+          subtitle="Priority focus"
           icon={<AlertTriangle className="w-4 h-4 text-danger" />}
           status={stats?.critical ? "danger" : "success"}
         />
         <MetricCard
-          title="High Severity"
+          title="Significant Divergence"
           value={(stats?.high || 0).toString()}
-          subtitle="Needs immediate action"
+          subtitle="Immediate action"
           icon={<AlertTriangle className="w-4 h-4 text-warning" />}
           status={stats?.high ? "warning" : "success"}
         />
         <MetricCard
-          title="Total Incidents"
+          title="Total Observations"
           value={(stats?.total || 0).toString()}
-          subtitle="All time (non-archived)"
+          subtitle="Non-archived registry"
           icon={<Clock className="w-4 h-4 text-muted-foreground" />}
         />
       </div>
@@ -245,11 +245,11 @@ export default function Incidents() {
       ) : filteredIncidents.length === 0 ? (
         <div className="text-center py-12 bg-card border border-border rounded-xl">
           <CheckCircle className="w-12 h-12 text-success mx-auto mb-4" />
-          <p className="text-foreground font-medium">No incidents found</p>
+          <p className="text-foreground font-medium">No anomalies found</p>
           <p className="text-sm text-muted-foreground mt-1">
             {searchQuery || statusFilter !== 'all' 
               ? "Try adjusting your filters" 
-              : "All systems operating normally"}
+              : "All engines operating normally"}
           </p>
         </div>
       ) : (
@@ -363,7 +363,7 @@ export default function Incidents() {
                 selectedIncident?.severity === "critical" ? "text-danger" : 
                 selectedIncident?.severity === "high" ? "text-warning" : "text-primary"
               )} />
-              Incident Details
+              Anomaly Details
             </DialogTitle>
             <DialogDescription>
               {selectedIncident?.id}
@@ -466,10 +466,10 @@ export default function Incidents() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Archive className="w-5 h-5" />
-              Bulk Archive Incidents
+              Bulk Archive Observations
             </DialogTitle>
             <DialogDescription>
-              Archive old incidents to clean up your queue. Archived incidents are hidden but not deleted.
+              Archive old observations to clean up your queue.
             </DialogDescription>
           </DialogHeader>
           

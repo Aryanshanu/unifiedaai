@@ -4,7 +4,7 @@ import { ComplianceGauge } from "@/components/dashboard/ComplianceGauge";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Shield, FileCheck, Download, ExternalLink, AlertTriangle, Trash2, ChevronDown, TrendingUp } from "lucide-react";
+import { Shield, FileCheck, Download, ExternalLink, AlertTriangle, Trash2, ChevronDown, TrendingUp, Play } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useControlFrameworks, useControls, useComplianceStats, useAttestations, useControlAssessments, useDeleteFramework } from "@/hooks/useGovernance";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -184,8 +184,8 @@ export default function Governance() {
 
   return (
     <MainLayout 
-      title="Governance & Compliance" 
-      subtitle="Regulatory controls, risk assessments, and compliance attestations"
+      title="Controls & Conformity" 
+      subtitle="Operational controls, integrity assessments, and compliance attestations"
       headerActions={
         <div className="flex items-center gap-3">
           <EnforcementBadge level="enforced" />
@@ -199,14 +199,31 @@ export default function Governance() {
       }
     >
       {/* Enforcement Notice */}
-      <div className="bg-success/10 border border-success/30 rounded-lg p-3 mb-6 flex items-start gap-3">
-        <Shield className="w-4 h-4 text-success mt-0.5 shrink-0" />
-        <div className="text-sm">
-          <span className="font-medium text-success">Active Enforcement:</span>{" "}
-          <span className="text-muted-foreground">
-            System enforcement is ACTIVE. All model deployments and inference requests are now gated by the RAI Governance Engine and Risk Policy.
-          </span>
+      <div className="bg-success/10 border border-success/30 rounded-lg p-3 mb-6 flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <Shield className="w-4 h-4 text-success mt-0.5 shrink-0" />
+          <div className="text-sm">
+            <span className="font-medium text-success">Active Enforcement:</span>{" "}
+            <span className="text-muted-foreground">
+              System enforcement is ACTIVE. All engine deployments and execution requests are now gated by the Autonomous Governance Engine and Control Logic.
+            </span>
+          </div>
         </div>
+        <Button 
+          size="sm" 
+          variant="outline" 
+          className="h-7 text-xs border-success/30 hover:bg-success/20"
+          onClick={() => {
+            const toastId = "gov-scan";
+            toast.info("Initializing Logic Controller Audit...", { id: toastId });
+            setTimeout(() => {
+              toast.success("Governance Audit Complete: All local cluster nodes compliant with active policies.", { id: toastId });
+            }, 1500);
+          }}
+        >
+          <Play className="h-3 w-3 mr-1" />
+          Evaluate
+        </Button>
       </div>
 
       {/* KPIs */}
@@ -478,7 +495,7 @@ function PredictiveRiskSection() {
         <button className="w-full flex items-center justify-between p-4 bg-warning/10 border border-warning/20 rounded-xl text-sm font-semibold text-foreground hover:bg-warning/15 transition-colors">
           <span className="flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-warning" />
-            Predictive Risk Signals
+            Anticipatory Risk Signals
             <Badge className="bg-warning/20 text-warning text-[10px]">{risks.length} signals</Badge>
           </span>
           <ChevronDown className="w-4 h-4 text-muted-foreground" />

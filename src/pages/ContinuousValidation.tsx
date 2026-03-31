@@ -17,12 +17,12 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-const ENGINE_OPTIONS = [
-  { id: 'fairness', label: 'Fairness' },
-  { id: 'toxicity', label: 'Toxicity' },
-  { id: 'privacy', label: 'Privacy' },
-  { id: 'hallucination', label: 'Hallucination' },
-  { id: 'explainability', label: 'Explainability' },
+const CHECK_OPTIONS = [
+  { id: 'fairness', label: 'Parity' },
+  { id: 'toxicity', label: 'Integrity' },
+  { id: 'privacy', label: 'Protection' },
+  { id: 'hallucination', label: 'Divergence' },
+  { id: 'explainability', label: 'Interpretability' },
 ];
 
 const CRON_PRESETS = [
@@ -33,7 +33,7 @@ const CRON_PRESETS = [
   { label: 'Monthly (1st)', value: '0 0 1 * *' },
 ];
 
-export default function ContinuousEvaluation() {
+export default function OngoingValidation() {
   const { data: schedules, isLoading } = useEvaluationSchedules();
   const { data: models } = useModels();
   const { data: runs } = useScheduleRuns();
@@ -69,9 +69,9 @@ export default function ContinuousEvaluation() {
         body: { schedule_id: scheduleId },
       });
       if (error) throw error;
-      toast.success("Evaluation run triggered");
+      toast.success("Validation run triggered");
     } catch {
-      toast.error("Failed to trigger evaluation run");
+      toast.error("Failed to trigger validation run");
     } finally {
       setRunningId(null);
     }
@@ -82,24 +82,24 @@ export default function ContinuousEvaluation() {
   };
 
   return (
-    <MainLayout title="Continuous Evaluation">
+    <MainLayout title="Ongoing Validation">
       <div className="space-y-6">
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Continuous Evaluation</h1>
+            <h1 className="text-2xl font-bold text-foreground">Ongoing Validation</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Schedule automated RAI evaluations to run continuously — not just on-demand.
+              Schedule automated governance validations to run continuously — not just on-demand.
             </p>
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-1" /> Create Schedule</Button></DialogTrigger>
             <DialogContent className="max-w-lg">
-              <DialogHeader><DialogTitle>Create Evaluation Schedule</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>Create Validation Schedule</DialogTitle></DialogHeader>
               <div className="space-y-4">
                 <div><Label>Schedule Name</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Daily Production Audit" /></div>
-                <div><Label>Model</Label>
+                <div><Label>Logic Engine</Label>
                   <Select value={form.model_id} onValueChange={v => setForm(f => ({ ...f, model_id: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Select model" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Select logic engine" /></SelectTrigger>
                     <SelectContent>
                       {models?.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
                     </SelectContent>
@@ -114,9 +114,9 @@ export default function ContinuousEvaluation() {
                   </Select>
                 </div>
                 <div>
-                  <Label className="mb-2 block">Engines</Label>
+                  <Label className="mb-2 block">Validation Checks</Label>
                   <div className="grid grid-cols-2 gap-2">
-                    {ENGINE_OPTIONS.map(e => (
+                    {CHECK_OPTIONS.map(e => (
                       <label key={e.id} className="flex items-center gap-2 text-sm cursor-pointer">
                         <Checkbox checked={form.engine_types.includes(e.id)} onCheckedChange={() => toggleEngine(e.id)} />
                         {e.label}
@@ -133,8 +133,8 @@ export default function ContinuousEvaluation() {
         {!schedules?.length ? (
           <Card className="bg-card border-border"><CardContent className="py-12 text-center text-muted-foreground">
             <Clock className="w-12 h-12 mx-auto mb-3 opacity-40" />
-            <p className="text-lg font-medium mb-1">No Evaluation Schedules</p>
-            <p className="text-sm">Create a schedule to run automated RAI evaluations continuously.</p>
+            <p className="text-lg font-medium mb-1">No Validation Schedules</p>
+            <p className="text-sm">Create a schedule to run automated governance validations continuously.</p>
           </CardContent></Card>
         ) : (
           <div className="grid gap-4">

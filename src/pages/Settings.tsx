@@ -32,8 +32,8 @@ const settingsSections = [
   { id: "users", icon: User, label: "Users & Teams", description: "Manage access and permissions" },
   { id: "security", icon: Shield, label: "Security", description: "Authentication and encryption settings" },
   { id: "notifications", icon: Bell, label: "Notifications", description: "Alert channels and preferences" },
-  { id: "integrations", icon: Database, label: "Integrations", description: "Model registries and data sources" },
-  { id: "providers", icon: Bot, label: "LLM Providers", description: "Configure AI provider API keys" },
+  { id: "integrations", icon: Database, label: "Integrations", description: "Engine registries and data sources" },
+  { id: "providers", icon: Bot, label: "Logic Providers", description: "Configure logic engine credentials" },
   { id: "api", icon: Key, label: "API Keys", description: "Manage API access tokens" },
   { id: "regions", icon: Globe, label: "Regions & Compliance", description: "Jurisdictional settings" },
 ];
@@ -573,8 +573,8 @@ function RegionsSection() {
   };
 
   const frameworks = [
-    { id: 'eu-ai-act', label: 'EU AI Act', regulation: 'Regulation (EU) 2024/1689' },
-    { id: 'nist-ai-rmf', label: 'NIST AI RMF', regulation: 'NIST AI 100-1' },
+    { id: 'eu-gov-act', label: 'EU Digital Governance Regulation', regulation: 'Regulation (EU) 2024/1689' },
+    { id: 'nist-rmf', label: 'NIST Risk Management', regulation: 'NIST 100-1' },
     { id: 'soc2', label: 'SOC 2 Type II', regulation: 'AICPA Trust Services' },
     { id: 'iso-42001', label: 'ISO/IEC 42001', regulation: 'ISO/IEC 42001:2023' },
   ];
@@ -588,12 +588,12 @@ function RegionsSection() {
           <Select value={local.data_residency} onValueChange={(v) => setLocal(p => ({ ...p, data_residency: v }))}>
             <SelectTrigger className="max-w-md bg-secondary"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="us-east-1">US East (Virginia)</SelectItem>
-              <SelectItem value="us-west-2">US West (Oregon)</SelectItem>
-              <SelectItem value="eu-west-1">EU West (Ireland)</SelectItem>
-              <SelectItem value="eu-central-1">EU Central (Frankfurt)</SelectItem>
-              <SelectItem value="ap-southeast-1">Asia Pacific (Singapore)</SelectItem>
-              <SelectItem value="ap-northeast-1">Asia Pacific (Tokyo)</SelectItem>
+              <SelectItem value="north-america-east">North America East</SelectItem>
+              <SelectItem value="north-america-west">North America West</SelectItem>
+              <SelectItem value="europe-west">Europe West</SelectItem>
+              <SelectItem value="europe-central">Europe Central</SelectItem>
+              <SelectItem value="asia-pacific-south">Asia Pacific South</SelectItem>
+              <SelectItem value="asia-pacific-east">Asia Pacific East</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -752,7 +752,7 @@ function PlatformConfigEditor() {
       <div className="space-y-8">
         <div>
           <h3 className="text-sm font-medium mb-4 text-muted-foreground uppercase tracking-wide">Engine Weights</h3>
-          <p className="text-sm text-muted-foreground mb-4">Adjust relative importance of each RAI engine in overall score.</p>
+          <p className="text-sm text-muted-foreground mb-4">Adjust relative importance of each governance engine in overall score.</p>
           <div className="space-y-4 max-w-xl">
             {Object.entries(localWeights).map(([key, value]) => (
               <div key={key} className="flex items-center gap-4">

@@ -1,47 +1,47 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { ModelCard } from "@/components/dashboard/ModelCard";
-import { ModelRegistrationForm } from "@/components/models/ModelRegistrationForm";
+import { ModelCard as EngineCard } from "@/components/dashboard/ModelCard";
+import { EngineRegistrationForm } from "@/components/engines/EngineRegistrationForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, Plus } from "lucide-react";
-import { useModels, ModelWithSystem } from "@/hooks/useModels";
+import { useModels, ModelWithSystem as EngineWithSystem } from "@/hooks/useModels";
 import { useIncidents } from "@/hooks/useIncidents";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // Helper functions
-function getModelStatus(model: ModelWithSystem): "healthy" | "warning" | "critical" {
-  if (model.system?.uri_score !== null && model.system?.uri_score !== undefined) {
-    const uriScore = model.system.uri_score;
+function getEngineStatus(engine: EngineWithSystem): "healthy" | "warning" | "critical" {
+  if (engine.system?.uri_score !== null && engine.system?.uri_score !== undefined) {
+    const uriScore = engine.system.uri_score;
     if (uriScore >= 61) return "critical";
     if (uriScore >= 31) return "warning";
     return "healthy";
   }
-  if (model.fairness_score === null && model.robustness_score === null) {
+  if (engine.fairness_score === null && engine.robustness_score === null) {
     return "warning";
   }
-  const fairness = model.fairness_score ?? Infinity;
-  const robustness = model.robustness_score ?? Infinity;
+  const fairness = engine.fairness_score ?? Infinity;
+  const robustness = engine.robustness_score ?? Infinity;
   const minScore = Math.min(fairness, robustness);
   if (minScore < 60) return "critical";
   if (minScore < 80) return "warning";
   return "healthy";
 }
 
-function getRiskLevel(model: ModelWithSystem): "minimal" | "limited" | "high" | "critical" {
-  if (model.system?.risk_tier) {
-    const tier = model.system.risk_tier;
+function getRiskLevel(engine: EngineWithSystem): "minimal" | "limited" | "high" | "critical" {
+  if (engine.system?.risk_tier) {
+    const tier = engine.system.risk_tier;
     if (tier === 'low') return 'minimal';
     if (tier === 'medium') return 'limited';
     if (tier === 'high') return 'high';
     return 'critical';
   }
-  if (model.fairness_score === null && model.robustness_score === null) {
+  if (engine.fairness_score === null && engine.robustness_score === null) {
     return 'limited';
   }
-  const fairness = model.fairness_score;
-  const robustness = model.robustness_score;
+  const fairness = engine.fairness_score;
+  const robustness = engine.robustness_score;
   const minScore = Math.min(fairness ?? Infinity, robustness ?? Infinity);
   if (minScore >= 80) return 'minimal';
   if (minScore >= 60) return 'limited';
@@ -49,29 +49,29 @@ function getRiskLevel(model: ModelWithSystem): "minimal" | "limited" | "high" | 
   return 'critical';
 }
 
-function getEnvironment(model: ModelWithSystem): "production" | "staging" | "development" {
-  if (model.project?.environment) {
-    return model.project.environment as "production" | "staging" | "development";
+function getEnvironment(engine: EngineWithSystem): "production" | "staging" | "development" {
+  if (engine.project?.environment) {
+    return engine.project.environment as "production" | "staging" | "development";
   }
-  if (model.system?.deployment_status === 'deployed') return 'production';
-  if (model.system?.deployment_status === 'approved') return 'staging';
+  if (engine.system?.deployment_status === 'deployed') return 'production';
+  if (engine.system?.deployment_status === 'approved') return 'staging';
   return 'development';
 }
 
-function getTeamName(modelType: string): string {
+function getTeamName(engineType: string): string {
   const teams: Record<string, string> = {
-    'llm': 'AI Team',
-    'classification': 'Data Science',
-    'regression': 'ML Engineering',
+    'llm': 'System Team',
+    'classification': 'Data Engineering',
+    'regression': 'Core Logic',
     'nlp': 'NLP Team',
     'vision': 'Computer Vision',
   };
-  return teams[modelType.toLowerCase()] || 'Product Team';
+  return teams[engineType.toLowerCase()] || 'Product Team';
 }
 
-export default function Models() {
+export default function LogicEngines() {
   const [search, setSearch] = useState("");
-  const [showRegistration, setShowRegistration] = useState(false);
+  const [showRegistration, setShowRegistration] = useState(new URLSearchParams(window.location.search).get('register') === 'true');
   const navigate = useNavigate();
   
   const { data: models, isLoading, error } = useModels();
@@ -94,14 +94,14 @@ export default function Models() {
   const totalModels = models?.length || 0;
 
   return (
-    <MainLayout title="Model Registry" subtitle="Manage and track all AI models">
+    <MainLayout title="Engine Registry" subtitle="Manage and track all logic engines and autonomous systems">
       <div className="space-y-6">
         {/* Search and Actions */}
         <div className="flex flex-col md:flex-row gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Search models by name, type, project..."
+              placeholder="Search engines by name, type, project..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-10 h-11 bg-card border-border text-sm"
@@ -114,7 +114,7 @@ export default function Models() {
               onClick={() => setShowRegistration(true)}
             >
               <Plus className="w-4 h-4 mr-2" />
-              Add Model
+              Register Engine
             </Button>
           </div>
         </div>
@@ -122,7 +122,7 @@ export default function Models() {
         {/* Count */}
         <p className="text-sm text-muted-foreground">
           Showing <span className="font-semibold text-foreground">{filteredModels.length}</span> of{" "}
-          <span className="font-semibold text-foreground">{totalModels}</span> models
+          <span className="font-semibold text-foreground">{totalModels}</span> engines
         </p>
 
         {/* Loading State */}
@@ -164,9 +164,9 @@ export default function Models() {
         {/* Empty State */}
         {!isLoading && !error && filteredModels.length === 0 && (
           <div className="text-center py-16 bg-card border border-border rounded-xl">
-            <p className="text-foreground font-medium text-lg">No models found</p>
+            <p className="text-foreground font-medium text-lg">No engines found</p>
             <p className="text-sm text-muted-foreground mt-2">
-              {search ? "Try adjusting your search" : "Register your first model to get started"}
+              {search ? "Try adjusting your search" : "Register your first engine to get started"}
             </p>
             {!search && (
               <Button 
@@ -174,7 +174,7 @@ export default function Models() {
                 onClick={() => setShowRegistration(true)}
               >
                 <Plus className="w-4 h-4 mr-2" />
-                Add Model
+                Add Engine
               </Button>
             )}
           </div>
@@ -184,14 +184,14 @@ export default function Models() {
         {!isLoading && !error && filteredModels.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {filteredModels.map((model) => (
-              <ModelCard
+              <EngineCard
                 key={model.id}
                 id={model.id}
                 name={model.name}
                 type={model.model_type}
                 version={model.version}
                 description={model.description || undefined}
-                status={getModelStatus(model)}
+                status={getEngineStatus(model)}
                 riskLevel={getRiskLevel(model)}
                 environment={getEnvironment(model)}
                 fairnessScore={model.fairness_score}
@@ -206,7 +206,7 @@ export default function Models() {
       </div>
 
       {/* Registration Form Modal */}
-      <ModelRegistrationForm open={showRegistration} onOpenChange={setShowRegistration} />
+      <EngineRegistrationForm open={showRegistration} onOpenChange={setShowRegistration} />
     </MainLayout>
   );
 }

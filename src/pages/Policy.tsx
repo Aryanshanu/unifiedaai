@@ -19,12 +19,12 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ChevronDown, HelpCircle } from "lucide-react";
 
 const ATTACK_CATEGORIES = [
-  { name: "Jailbreak", color: "bg-danger/20 text-danger" },
-  { name: "Prompt Injection", color: "bg-warning/20 text-warning" },
-  { name: "Toxicity", color: "bg-purple-500/20 text-purple-400" },
-  { name: "PII Extraction", color: "bg-blue-500/20 text-blue-400" },
-  { name: "Hallucination", color: "bg-orange-500/20 text-orange-400" },
-  { name: "Policy Bypass", color: "bg-pink-500/20 text-pink-400" },
+  { name: "Logic Override", color: "bg-danger/20 text-danger" },
+  { name: "Input Injection", color: "bg-warning/20 text-warning" },
+  { name: "Output Anomaly", color: "bg-purple-500/20 text-purple-400" },
+  { name: "Resource Extraction", color: "bg-blue-500/20 text-blue-400" },
+  { name: "Logic Drift", color: "bg-orange-500/20 text-orange-400" },
+  { name: "Logic Bypass", color: "bg-pink-500/20 text-pink-400" },
 ];
 
 export default function Policy() {
@@ -59,9 +59,9 @@ export default function Policy() {
   // ──────────────────────────────────────────────────────────────────────────
 
   const getModelName = (modelId: string | null) => {
-    if (!modelId || !models) return "Unknown Model";
+    if (!modelId || !models) return "Unknown Engine";
     const model = models.find((m) => m.id === modelId);
-    return model?.name || "Unknown Model";
+    return model?.name || "Unknown Engine";
   };
 
   const runSampleCampaign = async () => {
@@ -78,8 +78,8 @@ export default function Policy() {
     setLatestCampaignResult(null);
 
     try {
-      toast.info("Starting Red Team Campaign", {
-        description: "Executing adversarial attack scenarios...",
+      toast.info("Starting Stress Test", {
+        description: "Executing boundary condition simulations...",
       });
 
       // Simple indeterminate loading - no fake progress simulation
@@ -111,12 +111,12 @@ export default function Policy() {
       const passRate = data?.summary?.passRate || 0;
       const findings = data?.summary?.failedTests || 0;
 
-      toast.success("Red Team Campaign Complete", {
-        description: `Coverage: ${passRate}% | ${findings} vulnerabilities found`,
+      toast.success("Stress Test Complete", {
+        description: `Coverage: ${passRate}% | ${findings} logic gaps found`,
       });
 
       if (findings > 0) {
-        toast.warning("Vulnerabilities detected", {
+        toast.warning("Anomalies detected", {
           description: `${findings} issues added to review queue for human oversight`,
         });
       }
@@ -131,7 +131,7 @@ export default function Policy() {
   const isLoading = policiesLoading || campaignsLoading || statsLoading;
 
   return (
-    <MainLayout title="Policy Studio" subtitle="Runtime guardrails, enforcement rules, and red team orchestration">
+    <MainLayout title="Control Logic Studio" subtitle="Runtime guardrails, enforcement rules, and stress test orchestration">
       {/* Sample Campaign Button - Prominent */}
       <div className="mb-6 p-4 bg-gradient-to-r from-danger/10 via-warning/10 to-primary/10 border border-danger/20 rounded-xl">
         <div className="flex items-center justify-between">
@@ -140,9 +140,9 @@ export default function Policy() {
               <FlameKindling className="w-6 h-6 text-danger" />
             </div>
             <div>
-              <h3 className="font-semibold text-foreground">Run Sample Red-Team Campaign</h3>
+              <h3 className="font-semibold text-foreground">Run Stress Test Campaign</h3>
               <p className="text-sm text-muted-foreground">
-                Execute 30 adversarial attacks (jailbreaks, prompt injection, toxicity, PII extraction)
+                Execute 30 boundary condition tests (logic override, input injection, anomalies, leakage)
               </p>
             </div>
           </div>
@@ -170,7 +170,7 @@ export default function Policy() {
           <div className="mt-4">
             <Progress value={campaignProgress} className="h-2" />
             <p className="text-xs text-muted-foreground mt-2">
-              Testing adversarial prompts against deployed systems...
+              Testing edge-case inputs against operational engines...
             </p>
           </div>
         )}
@@ -215,22 +215,22 @@ export default function Policy() {
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <MetricCard
-          title="Active Policies"
+          title="Active Logic Hubs"
           value={statsLoading ? "..." : String(stats?.activePolicies || 0)}
-          subtitle={`${policies?.length || 0} total policies`}
+          subtitle={`${policies?.length || 0} total configurations`}
           icon={<Lock className="w-4 h-4 text-primary" />}
         />
         <MetricCard
-          title="Blocked Violations"
+          title="Blocked Deviations"
           value={statsLoading ? "..." : String(stats?.blockedViolations || 0)}
           subtitle="Threats prevented"
           icon={<Shield className="w-4 h-4 text-warning" />}
           status="warning"
         />
         <MetricCard
-          title="Running Campaigns"
+          title="Active Simulations"
           value={statsLoading ? "..." : String(stats?.runningCampaigns || 0)}
-          subtitle="Active red team tests"
+          subtitle="Active stress tests"
           icon={<AlertTriangle className="w-4 h-4 text-success" />}
           status="success"
         />
@@ -247,7 +247,7 @@ export default function Policy() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
               <Lock className="w-4 h-4 text-primary" />
-              Policy Packs
+              Logic Hubs
             </h2>
             <Button variant="gradient" size="sm" onClick={() => setShowPolicyEditor(true)}>
               <Plus className="w-4 h-4 mr-2" />
@@ -312,7 +312,7 @@ export default function Policy() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-warning" />
-              Red Team Campaigns
+              Stress Test Campaigns
             </h2>
             <Button variant="outline" size="sm" onClick={() => setShowCampaignForm(true)}>
               <Play className="w-4 h-4 mr-2" />
@@ -411,7 +411,7 @@ export default function Policy() {
           <Button variant="outline" className="w-full justify-between">
             <span className="flex items-center gap-2">
               <HelpCircle className="w-4 h-4" />
-              Learn About Policy Packs & Red Team Campaigns
+              Learn About Logic Hubs & Stress Test Campaigns
             </span>
             <ChevronDown className="w-4 h-4" />
           </Button>

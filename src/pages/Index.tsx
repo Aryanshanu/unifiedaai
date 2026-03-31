@@ -112,33 +112,33 @@ export default function Index() {
     refetchMetrics();
   };
 
-  const raiEngines = [
+  const logicGovernanceEngines = [
     { 
       name: "Fairness", 
       icon: Scale, 
       path: "/engine/fairness",
-      description: "Evaluate demographic parity, equalized odds, and bias metrics"
+      description: "Validate demographic parity, equalized odds, and parity metrics"
     },
     { 
-      name: "Hallucination", 
+      name: "Fidelity", 
       icon: AlertCircle, 
       path: "/engine/hallucination",
-      description: "Detect factuality issues, groundedness, and false claims"
+      description: "Detect factuality issues, groundedness, and system drift"
     },
     { 
-      name: "Toxicity", 
+      name: "Safety", 
       icon: ShieldAlert, 
       path: "/engine/toxicity",
-      description: "Measure harmful content, hate speech, and jailbreak resistance"
+      description: "Measure content safety, policy adherence, and resistance parameters"
     },
     { 
       name: "Privacy", 
       icon: Lock, 
       path: "/engine/privacy",
-      description: "Assess PII leakage, data memorization, and privacy risks"
+      description: "Audit sensitive data leakage and cryptographic boundaries"
     },
     { 
-      name: "Explainability", 
+      name: "Logic", 
       icon: Eye, 
       path: "/engine/explainability",
       description: "Analyze reasoning quality, transparency, and decision clarity"
@@ -176,8 +176,8 @@ export default function Index() {
 
   return (
     <MainLayout 
-      title="Command Center" 
-      subtitle="Chief Data & AI Officer — Executive View"
+      title="CDAO Command Center" 
+      subtitle="Executive Control Plane"
       headerActions={
         <div className="flex items-center gap-3">
           <HealthIndicator
@@ -189,296 +189,7 @@ export default function Index() {
         </div>
       }
     >
-      {/* Pending Reviews Alert - Critical HITL Queue */}
-      {(pendingReviewsCount || 0) > 0 && (
-        <div className="p-4 mb-6 rounded-xl border-2 border-primary bg-primary/5 flex items-start gap-4">
-          <ClipboardList className="h-6 w-6 text-primary shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <h3 className="font-semibold text-primary">Human-in-the-Loop Queue</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              {pendingReviewsCount} item(s) require human review for governance compliance.
-            </p>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="mt-3 border-primary/50 text-primary hover:bg-primary/10"
-              onClick={() => navigate("/hitl")}
-            >
-              Review Queue
-              <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Data Governance */}
-      <div className="mb-6">
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-            <Database className="w-5 h-5 text-primary" />
-            Data Governance
-          </h2>
-          
-          {/* Data Quality Engine Card */}
-          <Card 
-            className="cursor-pointer hover:border-primary/50 transition-colors"
-            onClick={() => navigate("/engine/data-quality")}
-          >
-            <CardContent className="pt-6">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 rounded-lg bg-primary/10">
-                    <Database className="h-6 w-6 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground">Data Quality Engine</h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Profile, validate, and monitor dataset quality
-                    </p>
-                  </div>
-                </div>
-                <ArrowRight className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t">
-                <div>
-                  <p className="text-2xl font-bold">{dqMetrics?.datasets || 0}</p>
-                  <p className="text-xs text-muted-foreground">Datasets</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-warning">{dqMetrics?.openIncidents || 0}</p>
-                  <p className="text-xs text-muted-foreground">Open Incidents</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Data Contracts Card */}
-          <Card 
-            className="cursor-pointer hover:border-primary/50 transition-colors"
-            onClick={() => navigate("/data-contracts")}
-          >
-            <CardContent className="pt-6">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 rounded-lg bg-success/10">
-                    <FileText className="h-6 w-6 text-success" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground">Data Contracts</h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Schema expectations and SLA enforcement
-                    </p>
-                  </div>
-                </div>
-                <ArrowRight className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t">
-                <div>
-                  <p className="text-2xl font-bold">{dqMetrics?.activeContracts || 0}</p>
-                  <p className="text-xs text-muted-foreground">Active Contracts</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-destructive">{dqMetrics?.openViolations || 0}</p>
-                  <p className="text-xs text-muted-foreground">Open Violations</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Semantic Layer Card */}
-          <Card 
-            className="cursor-pointer hover:border-primary/50 transition-colors"
-            onClick={() => navigate("/semantic-definitions")}
-          >
-            <CardContent className="pt-6">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 rounded-lg bg-cyan-500/10">
-                    <BookOpen className="h-6 w-6 text-cyan-500" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground">Semantic Layer</h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Governed metric definitions &amp; semantic contracts
-                    </p>
-                  </div>
-                </div>
-                <ArrowRight className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t">
-                <div>
-                  <p className="text-2xl font-bold">{semanticMetrics?.active || 0}</p>
-                  <p className="text-xs text-muted-foreground">Active</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-muted-foreground">{semanticMetrics?.draft || 0}</p>
-                  <p className="text-xs text-muted-foreground">Draft</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-warning">{semanticMetrics?.openDrift || 0}</p>
-                  <p className="text-xs text-muted-foreground">Drift Alerts</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Core Security Engines */}
-      <div className="mb-6">
-        <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-          <Shield className="w-5 h-5 text-primary" />
-          Core Security
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[
-            { name: 'AI Pentesting', icon: ScanSearch, path: '/security/pentest', description: 'OWASP LLM Top 10 adversarial testing' },
-            { name: 'Jailbreak Lab', icon: FlaskConical, path: '/security/jailbreak', description: 'Prompt injection resistance testing' },
-            { name: 'Threat Modeling', icon: Target, path: '/security/threats', description: 'STRIDE, OWASP, MAESTRO, ATLAS' },
-          ].map((engine) => {
-            const Icon = engine.icon;
-            return (
-              <Card key={engine.path} className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate(engine.path)}>
-                <CardContent className="pt-6">
-                  <div className="flex flex-col items-center text-center">
-                    <div className="p-3 rounded-lg bg-muted mb-3"><Icon className="w-6 h-6 text-muted-foreground" /></div>
-                    <h3 className="font-semibold text-foreground text-sm">{engine.name}</h3>
-                    <p className="text-xs text-muted-foreground mt-1">{engine.description}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Core RAI Engines Grid */}
-      <div className="mb-6">
-        <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-          <Scale className="w-5 h-5 text-primary" />
-          Core RAI Engines
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          {raiEngines.map((engine) => {
-            const Icon = engine.icon;
-            return (
-              <Card 
-                key={engine.path} 
-                className="cursor-pointer hover:border-primary/50 transition-colors"
-                onClick={() => navigate(engine.path)}
-              >
-                <CardContent className="pt-6">
-                  <div className="flex flex-col items-center text-center">
-                    <div className="p-3 rounded-lg bg-muted mb-3">
-                      <Icon className="w-6 h-6 text-muted-foreground" />
-                    </div>
-                    <h3 className="font-semibold text-foreground text-sm">{engine.name}</h3>
-                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                      {engine.description}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Activity & Platform Stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Incidents */}
-        <div className="lg:col-span-2">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-foreground flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4" />
-                  Recent Incidents
-                </h3>
-                <Button variant="ghost" size="sm" onClick={() => navigate("/incidents")}>
-                  View All
-                  <ArrowRight className="h-4 w-4 ml-1" />
-                </Button>
-              </div>
-              {recentIncidents && recentIncidents.length > 0 ? (
-                <div className="space-y-3">
-                  {recentIncidents.map((incident: any) => (
-                    <div 
-                      key={incident.id} 
-                      className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted cursor-pointer"
-                      onClick={() => navigate("/incidents")}
-                    >
-                      <div className="flex items-center gap-3">
-                        {incident.status === 'open' ? (
-                          <XCircle className="h-4 w-4 text-destructive" />
-                        ) : (
-                          <CheckCircle className="h-4 w-4 text-success" />
-                        )}
-                        <div>
-                          <p className="text-sm font-medium line-clamp-1">{incident.title}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(incident.created_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                      <Badge 
-                        variant={incident.severity === 'critical' ? 'destructive' : 'secondary'}
-                        className="text-xs"
-                      >
-                        {incident.severity}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <CheckCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No recent incidents</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Platform Stats */}
-        <div className="space-y-4">
-          <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate("/models")}>
-            <CardContent className="pt-6 flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-muted">
-                <Database className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{models?.length || 0}</p>
-                <p className="text-sm text-muted-foreground">ML Models</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate("/governance/approvals")}>
-            <CardContent className="pt-6 flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-muted">
-                <Shield className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{metrics?.pendingApprovals || 0}</p>
-                <p className="text-sm text-muted-foreground">Pending Approvals</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate("/incidents")}>
-            <CardContent className="pt-6 flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-muted">
-                <AlertTriangle className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{metrics?.recentIncidents || 0}</p>
-                <p className="text-sm text-muted-foreground">Open Incidents</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <ExecutiveDashboard />
     </MainLayout>
   );
 }

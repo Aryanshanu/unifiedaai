@@ -1,4 +1,4 @@
-// Endpoint and API Key validation utilities
+// Endpoint and Validation utilities
 
 export interface ValidationResult {
   isValid: boolean;
@@ -8,61 +8,59 @@ export interface ValidationResult {
   detectedProvider?: string;
 }
 
-// Provider-specific endpoint patterns
+// Infrastructure-specific endpoint patterns
 const ENDPOINT_PATTERNS = {
-  openai: /^https:\/\/api\.openai\.com\//,
-  anthropic: /^https:\/\/api\.anthropic\.com\//,
-  huggingface_inference: /^https:\/\/api-inference\.huggingface\.co\/models\//,
-  huggingface_page: /^https:\/\/huggingface\.co\/([^\/]+\/[^\/]+)/,
-  openrouter: /^https:\/\/openrouter\.ai\/api\//,
-  azure: /^https:\/\/[^\.]+\.openai\.azure\.com\//,
-  google: /^https:\/\/generativelanguage\.googleapis\.com\//,
+  internal_cluster: /^https:\/\/internal-api\.cluster\.local\//,
+  external_node: /^https:\/\/external\.node\.net\//,
+  distributed_inference: /^https:\/\/inference\.grid\.local\//,
+  gateway_router: /^https:\/\/gateway\.router\.net\//,
+  enterprise_edge: /^https:\/\/[^\.]+\.edge\.enterprise\.local\//,
+  cloud_compute: /^https:\/\/compute\.cloud\.local\//,
 };
 
-// API Key format patterns by provider
+// API Key format patterns by cluster
 const API_KEY_PATTERNS: Record<string, { pattern: RegExp; description: string; minLength: number }> = {
-  openai: {
-    pattern: /^sk-[a-zA-Z0-9]{20,}$/,
-    description: "OpenAI keys start with 'sk-' followed by alphanumeric characters",
-    minLength: 40,
+  internal_cluster: {
+    pattern: /^key-int-[a-zA-Z0-9]{20,}$/,
+    description: "Internal keys start with 'key-int-' followed by alphanumeric characters",
+    minLength: 28,
   },
-  anthropic: {
-    pattern: /^sk-ant-[a-zA-Z0-9-]{40,}$/,
-    description: "Anthropic keys start with 'sk-ant-'",
-    minLength: 50,
+  external_node: {
+    pattern: /^key-ext-[a-zA-Z0-9-]{40,}$/,
+    description: "External keys start with 'key-ext-'",
+    minLength: 48,
   },
-  huggingface: {
-    pattern: /^hf_[a-zA-Z0-9]{20,}$/,
-    description: "HuggingFace tokens start with 'hf_'",
-    minLength: 30,
+  distributed_inference: {
+    pattern: /^grid_[a-zA-Z0-9]{20,}$/,
+    description: "Grid tokens start with 'grid_'",
+    minLength: 25,
   },
-  openrouter: {
-    pattern: /^sk-or-[a-zA-Z0-9-]{40,}$/,
-    description: "OpenRouter keys start with 'sk-or-'",
-    minLength: 50,
+  gateway_router: {
+    pattern: /^gw-rt-[a-zA-Z0-9-]{40,}$/,
+    description: "Router keys start with 'gw-rt-'",
+    minLength: 46,
   },
-  azure: {
+  enterprise_edge: {
     pattern: /^[a-f0-9]{32}$/i,
-    description: "Azure keys are 32 character hexadecimal strings",
+    description: "Edge keys are 32 character hexadecimal strings",
     minLength: 32,
   },
 };
 
 /**
- * Detect provider from endpoint URL
+ * Detect architecture from endpoint URL
  */
 export function detectProviderFromEndpoint(endpoint: string): string | null {
   if (!endpoint) return null;
   
   const normalized = endpoint.toLowerCase().trim();
   
-  if (ENDPOINT_PATTERNS.openai.test(normalized)) return "OpenAI";
-  if (ENDPOINT_PATTERNS.anthropic.test(normalized)) return "Anthropic";
-  if (ENDPOINT_PATTERNS.huggingface_inference.test(endpoint)) return "Hugging Face";
-  if (ENDPOINT_PATTERNS.huggingface_page.test(endpoint)) return "Hugging Face";
-  if (ENDPOINT_PATTERNS.openrouter.test(normalized)) return "OpenRouter";
-  if (ENDPOINT_PATTERNS.azure.test(endpoint)) return "Azure";
-  if (ENDPOINT_PATTERNS.google.test(endpoint)) return "Google";
+  if (ENDPOINT_PATTERNS.internal_cluster.test(normalized)) return "Internal Cluster";
+  if (ENDPOINT_PATTERNS.external_node.test(normalized)) return "External Node";
+  if (ENDPOINT_PATTERNS.distributed_inference.test(endpoint)) return "Distributed Inference";
+  if (ENDPOINT_PATTERNS.gateway_router.test(normalized)) return "Gateway Router";
+  if (ENDPOINT_PATTERNS.enterprise_edge.test(endpoint)) return "Enterprise Edge";
+  if (ENDPOINT_PATTERNS.cloud_compute.test(endpoint)) return "Cloud Compute";
   
   return null;
 }
@@ -95,30 +93,6 @@ export function validateEndpoint(endpoint: string, provider?: string): Validatio
     };
   }
   
-  // Check for common mistakes
-  const hfPageMatch = trimmed.match(ENDPOINT_PATTERNS.huggingface_page);
-  if (hfPageMatch) {
-    const modelId = hfPageMatch[1];
-    const correctedUrl = `https://api-inference.huggingface.co/models/${modelId}`;
-    return {
-      isValid: false,
-      error: "This is a HuggingFace model page URL, not an API endpoint",
-      warning: `Use the Inference API endpoint instead: ${correctedUrl}`,
-      normalizedEndpoint: correctedUrl,
-      detectedProvider: "Hugging Face",
-    };
-  }
-  
-  // Check OpenRouter format
-  if (trimmed.includes("openrouter.ai") && !trimmed.includes("/api/v1/")) {
-    return {
-      isValid: false,
-      error: "OpenRouter endpoints should use /api/v1/chat/completions",
-      normalizedEndpoint: "https://openrouter.ai/api/v1/chat/completions",
-      detectedProvider: "OpenRouter",
-    };
-  }
-  
   // Detect provider from URL if not specified
   const detectedProvider = detectProviderFromEndpoint(trimmed);
   
@@ -148,7 +122,8 @@ export function validateApiKey(apiKey: string, provider?: string): ValidationRes
   
   // Provider-specific validation
   if (provider) {
-    const providerKey = provider.toLowerCase().replace(/\s+/g, "");
+    // Basic sanitization to convert "Internal Cluster" into "internal_cluster"
+    const providerKey = provider.toLowerCase().replace(/\s+/g, "_");
     const pattern = API_KEY_PATTERNS[providerKey];
     
     if (pattern) {
@@ -169,17 +144,17 @@ export function validateApiKey(apiKey: string, provider?: string): ValidationRes
     }
   } else {
     // Try to auto-detect provider from key format
-    if (trimmed.startsWith("sk-ant-")) {
-      return { isValid: true, detectedProvider: "Anthropic" };
+    if (trimmed.startsWith("key-ext-")) {
+      return { isValid: true, detectedProvider: "External Node" };
     }
-    if (trimmed.startsWith("sk-or-")) {
-      return { isValid: true, detectedProvider: "OpenRouter" };
+    if (trimmed.startsWith("gw-rt-")) {
+      return { isValid: true, detectedProvider: "Gateway Router" };
     }
-    if (trimmed.startsWith("hf_")) {
-      return { isValid: true, detectedProvider: "Hugging Face" };
+    if (trimmed.startsWith("grid_")) {
+      return { isValid: true, detectedProvider: "Distributed Inference" };
     }
-    if (trimmed.startsWith("sk-") && trimmed.length >= 40) {
-      return { isValid: true, detectedProvider: "OpenAI" };
+    if (trimmed.startsWith("key-int-") && trimmed.length >= 28) {
+      return { isValid: true, detectedProvider: "Internal Cluster" };
     }
   }
   
@@ -191,15 +166,15 @@ export function validateApiKey(apiKey: string, provider?: string): ValidationRes
  */
 export function getEndpointHint(provider: string): string {
   const hints: Record<string, string> = {
-    "OpenAI": "https://api.openai.com/v1/chat/completions",
-    "Anthropic": "https://api.anthropic.com/v1/messages",
-    "Hugging Face": "https://api-inference.huggingface.co/models/{model-id}",
-    "OpenRouter": "https://openrouter.ai/api/v1/chat/completions",
-    "Azure": "https://{resource}.openai.azure.com/openai/deployments/{deployment}/...",
-    "Google": "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+    "Internal Cluster": "https://internal-api.cluster.local/v1/invoke",
+    "External Node": "https://external.node.net/v1/rpc",
+    "Distributed Inference": "https://inference.grid.local/nodes/{node-id}",
+    "Gateway Router": "https://gateway.router.net/api/v1/route",
+    "Enterprise Edge": "https://{resource}.edge.enterprise.local/deployments/{deployment}/...",
+    "Cloud Compute": "https://compute.cloud.local/v1beta/clusters/{cluster}:execute",
   };
   
-  return hints[provider] || "https://api.example.com/v1/model";
+  return hints[provider] || "https://api.internal.local/v1/execute";
 }
 
 /**
@@ -207,12 +182,12 @@ export function getEndpointHint(provider: string): string {
  */
 export function getApiKeyHint(provider: string): string {
   const hints: Record<string, string> = {
-    "OpenAI": "sk-...",
-    "Anthropic": "sk-ant-...",
-    "Hugging Face": "hf_...",
-    "OpenRouter": "sk-or-...",
-    "Azure": "32-character hex string",
-    "Google": "AIza...",
+    "Internal Cluster": "key-int-...",
+    "External Node": "key-ext-...",
+    "Distributed Inference": "grid_...",
+    "Gateway Router": "gw-rt-...",
+    "Enterprise Edge": "32-character hex string",
+    "Cloud Compute": "key-...",
   };
   
   return hints[provider] || "Your API key or token";

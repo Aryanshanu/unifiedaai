@@ -139,13 +139,13 @@ export default function EnvironmentManagement() {
   };
 
   return (
-    <MainLayout title="Environment Management">
+    <MainLayout title="Runtime Environment Management">
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Environment Management</h1>
+            <h1 className="text-2xl font-bold text-foreground">Runtime Environment Management</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Manage deployment environments with governance controls, approval gates, and risk isolation.
+              Manage runtime environments with governance controls, approval gates, and compliance isolation.
             </p>
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
@@ -153,7 +153,7 @@ export default function EnvironmentManagement() {
               <Button><Plus className="w-4 h-4 mr-1" />Create Environment</Button>
             </DialogTrigger>
             <DialogContent className="max-w-lg">
-              <DialogHeader><DialogTitle>Create Deployment Environment</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>Create Runtime Environment</DialogTitle></DialogHeader>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -183,7 +183,7 @@ export default function EnvironmentManagement() {
                   </Select>
                 </div>
                 <div>
-                  <Label>Max Risk Tier</Label>
+                  <Label>Max Integrity Tier</Label>
                   <Select value={form.max_risk_tier} onValueChange={v => setForm(p => ({ ...p, max_risk_tier: v }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -200,7 +200,7 @@ export default function EnvironmentManagement() {
                     <Switch checked={form.is_production} onCheckedChange={v => setForm(p => ({ ...p, is_production: v, approval_required: v ? true : p.approval_required }))} />
                   </div>
                   <div className="flex items-center justify-between">
-                    <Label>Require Approval for Deploy</Label>
+                    <Label>Require Approval for Execution</Label>
                     <Switch checked={form.approval_required} onCheckedChange={v => setForm(p => ({ ...p, approval_required: v }))} />
                   </div>
                   <div className="flex items-center justify-between">
@@ -239,11 +239,11 @@ export default function EnvironmentManagement() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="bg-muted/30 rounded-lg p-3 text-center">
                       <div className="text-xl font-bold text-foreground">{counts.systemCount}</div>
-                      <div className="text-xs text-muted-foreground">Systems</div>
+                      <div className="text-xs text-muted-foreground">Engines</div>
                     </div>
                     <div className="bg-muted/30 rounded-lg p-3 text-center">
                       <div className="text-xl font-bold text-foreground">{counts.agentCount}</div>
-                      <div className="text-xs text-muted-foreground">Agents</div>
+                      <div className="text-xs text-muted-foreground">Controllers</div>
                     </div>
                   </div>
 
@@ -260,7 +260,7 @@ export default function EnvironmentManagement() {
                     <div className="flex items-center justify-between">
                       <span className="text-muted-foreground flex items-center gap-1">
                         <Shield className="w-3 h-3" />
-                        Max Risk Tier
+                        Max Integrity Tier
                       </span>
                       <Badge variant="secondary">{env.max_risk_tier}</Badge>
                     </div>

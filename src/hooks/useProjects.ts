@@ -76,17 +76,28 @@ export function useCreateProject() {
 
   return useMutation({
     mutationFn: async (input: CreateProjectInput) => {
-      const { data, error } = await supabase
-        .from("projects")
-        .insert([{
-          ...input,
-          owner_id: user?.id,
-        }])
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data as Project;
+      const tryInsert = async (attemptName: string) => {
+        const { data, error } = await supabase
+          .from("projects")
+          .insert([{
+            ...input,
+            name: attemptName,
+            owner_id: user?.id,
+          }])
+          .select()
+          .single();
+        
+        if (error) {
+          if (error.code === '23505') {
+            const suffix = Math.random().toString(36).substring(2, 6);
+            return tryInsert(`${input.name}-${suffix}`);
+          }
+          throw error;
+        }
+        return data as Project;
+      };
+
+      return tryInsert(input.name);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });

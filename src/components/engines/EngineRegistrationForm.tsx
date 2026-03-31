@@ -19,10 +19,10 @@ import { toast } from "sonner";
 import { Loader2, ChevronRight, ChevronLeft, Check, Brain, Shield, FileCheck, FolderOpen, Scale, ExternalLink, AlertTriangle, Database, Zap, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const modelSchema = z.object({
-  name: z.string().min(2, "Model name must be at least 2 characters"),
+const engineSchema = z.object({
+  name: z.string().min(2, "Engine name must be at least 2 characters"),
   description: z.string().min(10, "Description must be at least 10 characters").max(500),
-  model_type: z.enum(["LLM", "ML", "NLP", "Computer Vision", "Recommendation", "Other"]),
+  engine_type: z.enum(["LLM", "ML", "NLP", "Computer Vision", "Recommendation", "Other"]),
   version: z.string().regex(/^\d+\.\d+\.\d+$/, "Version must be in semver format (e.g., 1.0.0)").default("1.0.0"),
   use_case: z.string().optional(),
   project_id: z.string().min(1, "Project is required"),
@@ -32,16 +32,16 @@ const modelSchema = z.object({
   base_model: z.string().optional(),
   model_card_url: z.string().url("Must be a valid URL").optional().or(z.literal("")),
   access_tier: z.enum(["internal-only", "partner", "customer", "public"]).default("internal-only"),
-  sla_tier: z.enum(["best-effort", "standard", "premium", "mission-critical"]).default("best-effort"),
+  threshold_tier: z.enum(["best-effort", "standard", "premium", "mission-critical"]).default("best-effort"),
   training_dataset_id: z.string().optional(),
   limitations: z.string().optional(),
   intended_use: z.string().optional(),
   risk_classification: z.enum(["minimal", "limited", "high", "unacceptable", ""]).optional(),
 });
 
-type ModelFormData = z.infer<typeof modelSchema>;
+type EngineFormData = z.infer<typeof engineSchema>;
 
-interface ModelRegistrationFormProps {
+interface EngineRegistrationFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultProjectId?: string;
@@ -54,13 +54,13 @@ const steps = [
   { id: 4, name: "Review", icon: FileCheck },
 ];
 
-const modelTypes = [
-  { value: "LLM", label: "Large Language Model", description: "GPT, Claude, Llama, etc." },
-  { value: "ML", label: "Machine Learning", description: "Classification, Regression, etc." },
-  { value: "NLP", label: "NLP Model", description: "Sentiment, NER, Summarization" },
-  { value: "Computer Vision", label: "Computer Vision", description: "Image Classification, Detection" },
-  { value: "Recommendation", label: "Recommendation", description: "Personalization, Suggestions" },
-  { value: "Other", label: "Other", description: "Custom model type" },
+const engineTypes = [
+  { value: "LLM", label: "Logic Language Engine", description: "Llama, Mistral, etc." },
+  { value: "ML", label: "Statistical Engine", description: "Classification, Regression, etc." },
+  { value: "NLP", label: "Linguistic Engine", description: "Sentiment, Summarization" },
+  { value: "Computer Vision", label: "Visual Processing", description: "Image Detection, Analysis" },
+  { value: "Recommendation", label: "Heuristic Engine", description: "Ranking, Suggestions" },
+  { value: "Other", label: "Custom Engine", description: "Custom core logic" },
 ];
 
 const useCases = [
@@ -113,14 +113,14 @@ function LinkedSemanticDefinitions() {
   );
 }
 
-export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: ModelRegistrationFormProps) {
+export function EngineRegistrationForm({ open, onOpenChange, defaultProjectId }: EngineRegistrationFormProps) {
   const [step, setStep] = useState(defaultProjectId ? 2 : 1);
   const navigate = useNavigate();
   const createModel = useCreateModel();
   const { data: projects, isLoading: projectsLoading } = useProjects();
 
   const { data: approvedDatasets } = useQuery({
-    queryKey: ["approved-datasets-for-models"],
+    queryKey: ["approved-datasets-for-engines"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("datasets")
@@ -132,12 +132,12 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
     },
   });
 
-  const form = useForm<ModelFormData>({
-    resolver: zodResolver(modelSchema),
+  const form = useForm<EngineFormData>({
+    resolver: zodResolver(engineSchema),
     defaultValues: {
       name: "",
       description: "",
-      model_type: "LLM",
+      engine_type: "LLM" as any,
       version: "1.0.0",
       use_case: "",
       project_id: defaultProjectId || "",
@@ -146,7 +146,7 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
       base_model: "",
       model_card_url: "",
       access_tier: "internal-only",
-      sla_tier: "best-effort",
+      threshold_tier: "best-effort",
       training_dataset_id: "",
       limitations: "",
       intended_use: "",
@@ -154,32 +154,32 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
     },
   });
 
-  const onSubmit = async (data: ModelFormData) => {
+  const onSubmit = async (data: EngineFormData) => {
     try {
       const result = await createModel.mutateAsync({
         name: data.name,
         description: data.description || undefined,
-        model_type: data.model_type,
+        model_type: data.engine_type,
         version: data.version,
         use_case: data.use_case || undefined,
         project_id: data.project_id,
         // Auto-configured gateway
-        provider: 'Lovable',
-        endpoint: 'https://ai.gateway.lovable.dev/v1/chat/completions',
+        provider: 'System Control Plane',
+        endpoint: 'https://gateway.system.internal/v1',
         // Governance fields
         business_owner_email: data.business_owner_email || undefined,
         license: data.license || undefined,
         base_model: data.base_model || undefined,
         model_card_url: data.model_card_url || undefined,
         access_tier: data.access_tier,
-        sla_tier: data.sla_tier,
+        sla_tier: data.threshold_tier,
         training_dataset_id: data.training_dataset_id || undefined,
         limitations: data.limitations || undefined,
         intended_use: data.intended_use || undefined,
         risk_classification: data.risk_classification || undefined,
       });
       
-      toast.success("Model registered and system created!", {
+      toast.success("Engine registered and system created!", {
         description: "Run Risk & Impact assessments next.",
       });
       onOpenChange(false);
@@ -214,9 +214,9 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl">Register New Model</DialogTitle>
+          <DialogTitle className="text-xl">Register New Engine</DialogTitle>
           <DialogDescription>
-            Add a new AI/ML model to your registry. A governed System will be created automatically.
+            Add a new core logic engine to your registry. A governed System will be created automatically.
           </DialogDescription>
         </DialogHeader>
 
@@ -336,8 +336,8 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                 <Alert className="bg-primary/5 border-primary/20">
                   <Zap className="w-4 h-4 text-primary" />
                   <AlertDescription className="text-foreground text-sm">
-                    This model will be evaluated using the <strong>Fractal AI Gateway</strong> (Gemini 3 Flash Preview). 
-                    No API key or endpoint configuration needed — all inference is routed automatically.
+                    This engine will be interceded via the <strong>System Control Plane</strong>. 
+                    No API key or endpoint configuration needed — all execution logic is routed automatically.
                   </AlertDescription>
                 </Alert>
                 
@@ -346,12 +346,12 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Model Name *</FormLabel>
+                      <FormLabel>Engine Name *</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., Customer Support GPT-4" {...field} />
+                        <Input placeholder="e.g., Customer Response Engine" {...field} />
                       </FormControl>
                       <FormDescription>
-                        A descriptive name to identify this model.
+                        A descriptive name to identify this engine.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -360,18 +360,18 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
 
                 <FormField
                   control={form.control}
-                  name="model_type"
+                  name="engine_type"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Model Type *</FormLabel>
+                      <FormLabel>Engine Type *</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select model type" />
+                            <SelectValue placeholder="Select logic type" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {modelTypes.map((type) => (
+                          {engineTypes.map((type) => (
                             <SelectItem key={type.value} value={type.value}>
                               <div>
                                 <span className="font-medium">{type.label}</span>
@@ -524,16 +524,16 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
 
                   <FormField
                     control={form.control}
-                    name="sla_tier"
+                    name="threshold_tier"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="flex items-center gap-1">
-                          <Scale className="w-4 h-4" /> SLA Tier
+                          <Scale className="w-4 h-4" /> Response Threshold
                         </FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Service level" />
+                              <SelectValue placeholder="Execution threshold" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -560,13 +560,13 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select AI-approved dataset" />
+                            <SelectValue placeholder="Select approved dataset" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           {approvedDatasets?.length === 0 ? (
                             <div className="p-2 text-sm text-muted-foreground text-center">
-                              No AI-approved datasets available
+                              No approved datasets available
                             </div>
                           ) : (
                             approvedDatasets?.map((ds) => (
@@ -593,7 +593,7 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="flex items-center gap-1">
-                        <AlertTriangle className="w-4 h-4" /> EU AI Act Risk Classification
+                        <AlertTriangle className="w-4 h-4" /> Global Conformity Classification
                       </FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
@@ -679,12 +679,12 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                   </div>
 
                   <div className="border-t border-border pt-4">
-                    <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">AI Gateway</h4>
+                    <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">Control Plane</h4>
                     <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
                       <Zap className="w-4 h-4 text-primary" />
                       <div>
-                        <p className="text-sm font-medium text-foreground">Fractal AI Gateway</p>
-                        <p className="text-xs text-muted-foreground">google/gemini-3-flash-preview • Auto-configured</p>
+                        <p className="text-sm font-medium text-foreground">System Control Plane</p>
+                        <p className="text-xs text-muted-foreground">Standardized Logic Router • Auto-configured</p>
                       </div>
                     </div>
                   </div>
@@ -704,9 +704,9 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                         <p className="text-xs text-muted-foreground">Access Tier</p>
                         <p className="font-medium text-foreground capitalize">{formValues.access_tier?.replace("-", " ") || "Internal only"}</p>
                       </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">SLA Tier</p>
-                        <p className="font-medium text-foreground capitalize">{formValues.sla_tier?.replace("-", " ") || "Best effort"}</p>
+                       <div>
+                        <p className="text-xs text-muted-foreground">Response Threshold</p>
+                        <p className="font-medium text-foreground capitalize">{formValues.threshold_tier?.replace("-", " ") || "Best effort"}</p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Risk Classification</p>
@@ -756,7 +756,7 @@ export function ModelRegistrationForm({ open, onOpenChange, defaultProjectId }: 
                   ) : (
                     <>
                       <Check className="w-4 h-4 mr-2" />
-                      Register Model
+                      Register Engine
                     </>
                   )}
                 </Button>

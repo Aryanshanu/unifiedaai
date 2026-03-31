@@ -151,10 +151,10 @@ export default function GoldenDemoV2() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Settings2 className="w-5 h-5 text-primary" />
-            Demo Configuration
+            Simulation Configuration
           </CardTitle>
           <CardDescription>
-            Select a project and model to run the end-to-end RAI pipeline demonstration
+            Select a project and engine to run the end-to-end governance pipeline simulation
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -184,7 +184,7 @@ export default function GoldenDemoV2() {
 
           {/* Model Selection */}
           <div className="space-y-2">
-            <Label>Model / LLM</Label>
+            <Label>Logic Engine</Label>
             <Select 
               value={selectedModelId} 
               onValueChange={setSelectedModelId}
@@ -195,8 +195,8 @@ export default function GoldenDemoV2() {
                   !selectedProjectId 
                     ? "Select a project first" 
                     : modelsLoading 
-                      ? "Loading models..." 
-                      : "Select a model"
+                      ? "Loading engines..." 
+                      : "Select an engine"
                 } />
               </SelectTrigger>
               <SelectContent>
@@ -300,7 +300,7 @@ export default function GoldenDemoV2() {
             className="w-full gap-2"
           >
             <Play className="w-5 h-5" />
-            Start Golden Demo
+            Start Lifecycle Simulation
           </Button>
         </CardContent>
       </Card>
@@ -312,24 +312,24 @@ export default function GoldenDemoV2() {
         </CardHeader>
         <CardContent>
           <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-            <li>Run all 5 evaluation engines (Fairness, Toxicity, Privacy, Hallucination, Explainability)</li>
-            <li>Generate real traffic through the AI Gateway</li>
-            <li>Detect drift in model behavior</li>
-            <li>Create incidents and escalate to HITL review</li>
-            <li>Run Red Team adversarial campaign</li>
+            <li>Run all 5 evaluation engines (Parity, Anomaly, Integrity, Drift, Attribution)</li>
+            <li>Generate real traffic through the System Control Plane</li>
+            <li>Detect drift in engine behavior</li>
+            <li>Create anomalies and escalate to HITL review</li>
+            <li>Run Adversarial Simulation campaign</li>
             <li className="flex items-center gap-2">
               <Cpu className="w-4 h-4 text-primary" />
-              Run Oversight Agent simulation (new)
+              Run Autonomous Controller simulation (new)
             </li>
             <li className="flex items-center gap-2">
               <Shield className="w-4 h-4 text-primary" />
-              Execute Predictive Governance analysis (new)
+              Execute Anticipatory Controls analysis (new)
             </li>
             <li className="flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-primary" />
-              Check for Governance Bypass attempts (new)
+              Check for Control Bypass attempts (new)
             </li>
-            <li>Generate regulatory-grade compliance scorecard</li>
+            <li>Generate standardized compliance trace</li>
           </ol>
         </CardContent>
       </Card>
@@ -394,9 +394,9 @@ export default function GoldenDemoV2() {
         <div className="grid grid-cols-5 gap-3">
           <CounterCard label="Requests" value={orchestrator.counters.requests} icon={Activity} />
           <CounterCard label="Blocks" value={orchestrator.counters.blocks} icon={Shield} />
-          <CounterCard label="Evaluations" value={orchestrator.counters.evaluations} icon={BarChart3} />
-          <CounterCard label="Incidents" value={orchestrator.counters.incidents} icon={AlertCircle} />
-          <CounterCard label="HITL Items" value={orchestrator.counters.hitlItems} icon={Users} />
+          <CounterCard label="Validations" value={orchestrator.counters.evaluations} icon={BarChart3} />
+          <CounterCard label="Anomalies" value={orchestrator.counters.incidents} icon={AlertCircle} />
+          <CounterCard label="Oversight Items" value={orchestrator.counters.hitlItems} icon={Users} />
         </div>
 
         {/* Live Logs */}
@@ -474,16 +474,16 @@ export default function GoldenDemoV2() {
               <Button 
                 variant="outline" 
                 className="w-full justify-start"
-                onClick={() => navigate('/hitl')}
+                onClick={() => navigate('/oversight')}
               >
-                Review HITL Queue
+                Review Oversight Queue
               </Button>
               <Button 
                 variant="outline" 
                 className="w-full justify-start"
-                onClick={() => navigate('/incidents')}
+                onClick={() => navigate('/anomalies')}
               >
-                View Incidents
+                View Anomalies
               </Button>
               <Button 
                 variant="outline" 
@@ -562,8 +562,8 @@ export default function GoldenDemoV2() {
 
   return (
     <MainLayout 
-      title="Golden Demo" 
-      subtitle="End-to-End RAI Pipeline Demonstration"
+      title="System Lifecycle Simulation" 
+      subtitle="End-to-End Governance Pipeline Simulation"
       headerActions={
         <Button variant="ghost" size="sm" onClick={handleBack} className="gap-2">
           <ArrowLeft className="w-4 h-4" />

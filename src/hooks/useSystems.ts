@@ -32,6 +32,12 @@ export interface System {
   locked_at: string | null;
   locked_by: string | null;
   lock_reason: string | null;
+  // Metadata fields
+  data_residency: string | null;
+  access_tier: string | null;
+  sla_tier: string | null;
+  technical_owner: string | null;
+  business_owner_email: string | null;
 }
 
 export interface CreateSystemInput {

@@ -123,15 +123,12 @@ export function ModelComparisonTable({ models, isLoading = false }: ModelCompari
   if (models.length === 0) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>Model Comparison</CardTitle>
-        </CardHeader>
         <CardContent>
           <div className="text-center py-8 text-muted-foreground">
-            <p>No models registered yet</p>
-            <Link to="/models">
+            <p>No engines registered in the inventory yet</p>
+            <Link to="/engines">
               <Button variant="outline" className="mt-4">
-                Register a Model
+                Register an Engine
               </Button>
             </Link>
           </div>
@@ -145,9 +142,9 @@ export function ModelComparisonTable({ models, isLoading = false }: ModelCompari
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Model Comparison</CardTitle>
+        <CardTitle>Engine Comparative Analysis</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Compare all models across RAI pillars
+          Unitary comparison across validation metrics
         </p>
       </CardHeader>
       <CardContent>
@@ -156,7 +153,7 @@ export function ModelComparisonTable({ models, isLoading = false }: ModelCompari
             <TableHeader>
               <TableRow>
                 <TableHead className="w-48">
-                  <SortButton field="name">Model</SortButton>
+                  <SortButton field="name">Engine</SortButton>
                 </TableHead>
                 <TableHead className="text-center">
                   <SortButton field="composite">Composite</SortButton>
@@ -165,19 +162,19 @@ export function ModelComparisonTable({ models, isLoading = false }: ModelCompari
                   <SortButton field="fairness">Fairness</SortButton>
                 </TableHead>
                 <TableHead className="text-center">
-                  <SortButton field="toxicity">Toxicity</SortButton>
+                  <SortButton field="toxicity">Safety</SortButton>
                 </TableHead>
                 <TableHead className="text-center">
                   <SortButton field="privacy">Privacy</SortButton>
                 </TableHead>
                 <TableHead className="text-center">
-                  <SortButton field="hallucination">Halluc.</SortButton>
+                  <SortButton field="hallucination">Fidelity</SortButton>
                 </TableHead>
                 <TableHead className="text-center">
-                  <SortButton field="explainability">Explain.</SortButton>
+                  <SortButton field="explainability">Logic</SortButton>
                 </TableHead>
                 <TableHead className="text-center">Status</TableHead>
-                <TableHead className="text-right">Last Eval</TableHead>
+                <TableHead className="text-right">Last Validation</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -185,7 +182,7 @@ export function ModelComparisonTable({ models, isLoading = false }: ModelCompari
                 <TableRow key={model.modelId}>
                   <TableCell className="font-medium">
                     <Link
-                      to={`/models/${model.modelId}`}
+                      to={`/engines/${model.modelId}`}
                       className="hover:text-primary flex items-center gap-1"
                     >
                       {model.modelName}

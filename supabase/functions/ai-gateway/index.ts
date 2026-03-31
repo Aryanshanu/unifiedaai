@@ -226,6 +226,15 @@ serve(async (req) => {
   console.log(`Request started at: ${new Date().toISOString()}`);
 
   try {
+    const rawBody = await req.json().catch(() => ({}));
+    
+    // Health check ping handler - avoids auth and validation for simple pings
+    if (rawBody?.ping === true) {
+      return new Response(
+        JSON.stringify({ status: "online", timestamp: new Date().toISOString() }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     // =====================================================
     // AUTHENTICATION: Validate user JWT via auth-helper
     // This enforces RLS for user-scoped queries
@@ -247,10 +256,10 @@ serve(async (req) => {
     // This is isolated from user context and used only for system writes
     const serviceClient = getServiceClient();
 
-    // Parse and validate input with schema validation
-    const rawBody = await req.json().catch(() => null);
+    // Use already parsed rawBody (instead of parsing again with .json())
+    const bodyToValidate = rawBody;
 
-    if (!rawBody) {
+    if (!bodyToValidate) {
       return new Response(
         JSON.stringify({ error: "Invalid JSON body" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }

@@ -58,7 +58,7 @@ export function TechnicalDashboard() {
     refetchInterval: false,
   });
 
-  const raiEngines = [
+  const sovereignEngines = [
     { name: "Fairness", icon: Scale, path: "/engine/fairness" },
     { name: "Hallucination", icon: AlertCircle, path: "/engine/hallucination" },
     { name: "Toxicity", icon: ShieldAlert, path: "/engine/toxicity" },
@@ -78,15 +78,15 @@ export function TechnicalDashboard() {
         <Wrench className="w-6 h-6 text-primary" />
         <div>
           <h2 className="text-xl font-bold text-foreground">Technical Operations Center</h2>
-          <p className="text-sm text-muted-foreground">Model evaluation, security testing, and data quality</p>
+          <p className="text-sm text-muted-foreground">Engine validation, security testing, and data integrity</p>
         </div>
       </div>
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="cursor-pointer hover:border-primary/50" onClick={() => navigate('/models')}>
+        <Card className="cursor-pointer hover:border-primary/50" onClick={() => navigate('/engines')}>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Registered Models</p>
+            <p className="text-sm text-muted-foreground">Registered Engines</p>
             <p className="text-3xl font-bold">{models?.length || 0}</p>
           </CardContent>
         </Card>
@@ -110,13 +110,13 @@ export function TechnicalDashboard() {
         </Card>
       </div>
 
-      {/* RAI Engines */}
+      {/* Sovereign Governance Engines */}
       <div>
         <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
-          <Scale className="w-4 h-4 text-primary" /> Core RAI Engines
+          <Scale className="w-4 h-4 text-primary" /> Core Sovereign Engines
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          {raiEngines.map(e => {
+          {sovereignEngines.map(e => {
             const Icon = e.icon;
             return (
               <Card key={e.path} className="cursor-pointer hover:border-primary/50" onClick={() => navigate(e.path)}>
@@ -151,11 +151,11 @@ export function TechnicalDashboard() {
         </div>
       </div>
 
-      {/* Recent Evaluations */}
+      {/* Recent Validations */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Recent Evaluation Runs</CardTitle>
-          <Button variant="ghost" size="sm" onClick={() => navigate('/evaluation')}>
+          <CardTitle className="text-base">Recent Validation Runs</CardTitle>
+          <Button variant="ghost" size="sm" onClick={() => navigate('/validation')}>
             View All <ArrowRight className="h-4 w-4 ml-1" />
           </Button>
         </CardHeader>

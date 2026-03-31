@@ -9,7 +9,7 @@ import {
   LayoutDashboard, FolderOpen, Database, Scale, AlertCircle,
   ShieldAlert, Lock, Eye, Settings, ChevronLeft, ChevronRight,
   Shield, GitBranch, Users, Activity, FileText, Bell, BookOpen,
-  ScanSearch, FlaskConical, Target, Bot, Clock, Server,
+  ScanSearch, FlaskConical, Target, Bot, Clock, Server, Layers,
 } from "lucide-react";
 
 interface NavItem {
@@ -21,19 +21,19 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { path: "/", icon: LayoutDashboard, label: "Command Center" },
-  { divider: true, label: "DISCOVER" },
-  { path: "/discovery", icon: ScanSearch, label: "Discovery" },
-  { path: "/agents", icon: Bot, label: "Agent Governance" },
+  { divider: true, label: "AUDIT" },
+  { path: "/discovery", icon: ScanSearch, label: "System Audit" },
+  { path: "/agents", icon: Bot, label: "Controller Governance" },
   { divider: true, label: "Monitor" },
   { path: "/observability", icon: Activity, label: "Observability" },
   { path: "/alerts", icon: Bell, label: "Alerts" },
-  { path: "/continuous-evaluation", icon: Clock, label: "Continuous Eval" },
+  { path: "/continuous-validation", icon: Clock, label: "Ongoing Validation" },
   { divider: true, label: "Govern" },
   { path: "/governance/approvals", icon: Shield, label: "Approvals" },
-  { path: "/hitl", icon: Users, label: "HITL Console" },
-  { path: "/incidents", icon: AlertCircle, label: "Incidents" },
+  { path: "/oversight", icon: Users, label: "Oversight Console" },
+  { path: "/anomalies", icon: AlertCircle, label: "Anomalies" },
   { path: "/lineage", icon: GitBranch, label: "Knowledge Graph" },
-  { path: "/evaluation", icon: FlaskConical, label: "Evaluation Hub" },
+  { path: "/validation", icon: FlaskConical, label: "Validation Hub" },
   { path: "/impact", icon: Target, label: "Impact Dashboard" },
   { path: "/runbooks", icon: BookOpen, label: "Runbooks" },
   { path: "/policy", icon: FileText, label: "Policy Studio" },
@@ -43,20 +43,22 @@ const navItems: NavItem[] = [
   { path: "/data-contracts", icon: FileText, label: "Data Contracts" },
   { path: "/semantic-definitions", icon: BookOpen, label: "Semantic Layer" },
   { path: "/semantic-hub", icon: Database, label: "Feature Store" },
-  { divider: true, label: "CORE RAI" },
-  { path: "/engine/fairness", icon: Scale, label: "Fairness Engine" },
-  { path: "/engine/hallucination", icon: AlertCircle, label: "Hallucination Engine" },
-  { path: "/engine/toxicity", icon: ShieldAlert, label: "Toxicity Engine" },
-  { path: "/engine/privacy", icon: Lock, label: "Privacy Engine" },
-  { path: "/engine/explainability", icon: Eye, label: "Explainability Engine" },
+  { divider: true, label: "LOGIC GOVERNANCE" },
+  { path: "/engine/fairness", icon: Scale, label: "Bias Mitigation" },
+  { path: "/engine/hallucination", icon: AlertCircle, label: "Factuality Auditor" },
+  { path: "/engine/toxicity", icon: ShieldAlert, label: "Safety Engine" },
+  { path: "/engine/privacy", icon: Lock, label: "Data Protection" },
+  { path: "/engine/explainability", icon: Eye, label: "Logic Transparency" },
   { divider: true, label: "CORE SECURITY" },
   { path: "/security", icon: Shield, label: "Security Dashboard" },
-  { path: "/security/pentest", icon: ScanSearch, label: "Pentesting" },
-  { path: "/security/jailbreak", icon: FlaskConical, label: "Jailbreak Lab" },
+  { path: "/security/pentest", icon: ScanSearch, label: "System Hardening" },
+  { path: "/security/jailbreak", icon: FlaskConical, label: "Constraint Testing" },
   { path: "/security/threats", icon: Target, label: "Threat Modeling" },
   { divider: true, label: "Configure" },
   { path: "/projects", icon: FolderOpen, label: "Projects" },
-  { path: "/models", icon: Database, label: "Models" },
+  { path: "/engines", icon: Database, label: "Logic Engines" },
+  { path: "/benchmarks", icon: Layers, label: "Stability Benchmarks" },
+  { path: "/simulation", icon: FlaskConical, label: "Lifecycle Simulation" },
   { path: "/environments", icon: Server, label: "Environments" },
   { path: "/settings", icon: Settings, label: "Settings" },
   { path: "/docs", icon: BookOpen, label: "Documentation" },
@@ -87,7 +89,7 @@ export function Sidebar() {
           </div>
           {!collapsed && (
             <div className="flex flex-col">
-              <span className="font-bold text-foreground text-sm tracking-tight">Fractal RAI-OS</span>
+              <span className="font-bold text-foreground text-sm tracking-tight">UnifiedAAI System</span>
               <Badge variant="outline" className="text-[9px] h-4 px-1.5 w-fit capitalize mt-0.5">
                 {persona.displayName}
               </Badge>

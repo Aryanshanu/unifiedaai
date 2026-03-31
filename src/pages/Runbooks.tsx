@@ -41,10 +41,10 @@ function DecisionTree() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <AlertTriangle className="w-5 h-5 text-warning" />
-          Incident Triage Decision Tree
+          Anomaly Triage Decision Tree
         </CardTitle>
         <CardDescription>
-          Follow this flowchart to properly triage and escalate incidents
+          Follow this flowchart to properly triage and escalate anomalies
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -132,7 +132,7 @@ function DecisionTree() {
             <div className="flex-1">
               <h4 className="font-semibold">Document and close</h4>
               <p className="text-sm text-muted-foreground mt-1">
-                Complete RCA template, record lessons learned, and verify resolution
+                Complete PCA template, record lessons learned, and verify resolution
               </p>
               <div className="flex gap-2 mt-2">
                 <Badge variant="outline" className="bg-success/10 text-success border-success/30">
@@ -157,7 +157,7 @@ function EscalationPaths() {
           Escalation Paths
         </CardTitle>
         <CardDescription>
-          Contact matrix for different incident types and severity levels
+          Contact matrix for different anomaly types and severity levels
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -244,7 +244,7 @@ function RCATemplates() {
     return (
       <div className="text-center py-12 bg-muted/30 rounded-lg">
         <FileText className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-        <p className="text-sm text-muted-foreground">No RCA templates available</p>
+        <p className="text-sm text-muted-foreground">No PCA templates available</p>
       </div>
     );
   }
@@ -294,8 +294,8 @@ function RCATemplates() {
 export default function Runbooks() {
   return (
     <MainLayout 
-      title="Runbooks" 
-      subtitle="Incident response guides and decision frameworks"
+      title="Response Protocols" 
+      subtitle="Anomaly response protocols and decision frameworks"
       headerActions={
         <Badge variant="outline" className="gap-1.5">
           <BookOpen className="w-3 h-3" />
@@ -307,7 +307,7 @@ export default function Runbooks() {
         <TabsList>
           <TabsTrigger value="decision-tree">Triage Decision Tree</TabsTrigger>
           <TabsTrigger value="escalation">Escalation Paths</TabsTrigger>
-          <TabsTrigger value="rca">RCA Templates</TabsTrigger>
+          <TabsTrigger value="rca">PCA Templates</TabsTrigger>
         </TabsList>
 
         <TabsContent value="decision-tree">
@@ -323,10 +323,10 @@ export default function Runbooks() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-primary" />
-                Root Cause Analysis Templates
+                Primary Cause Analysis Templates
               </CardTitle>
               <CardDescription>
-                Structured templates for post-incident analysis
+                Structured templates for post-anomaly analysis
               </CardDescription>
             </CardHeader>
             <CardContent>

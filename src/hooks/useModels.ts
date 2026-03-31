@@ -171,74 +171,82 @@ export function useCreateModel() {
 
   return useMutation({
     mutationFn: async (input: CreateModelInput) => {
-      // All inference routes through Lovable AI Gateway
-      const resolvedProvider = 'Lovable';
-      const systemEndpoint = 'https://ai.gateway.lovable.dev/v1/chat/completions';
-      const resolvedModelName = 'google/gemini-3-flash-preview';
+      // Configuration for internal gateway routing
+      const resolvedProvider = 'internal_cluster';
+      const systemEndpoint = 'https://gateway.internal.node/v1/compute';
+      const resolvedModelName = 'cluster-core-v2';
       
-      // Step 1: Create the System first
-      const { data: systemData, error: systemError } = await supabase
-        .from('systems')
-        .insert({
-          project_id: input.project_id,
-          name: input.name,
-          provider: resolvedProvider,
-          system_type: 'model',
-          model_name: resolvedModelName,
-          endpoint: systemEndpoint,
-          use_case: input.use_case || null,
-          status: 'draft',
-          deployment_status: 'draft',
-          owner_id: user?.id,
-          // Governance fields
-          business_owner_email: input.business_owner_email || null,
-          license: input.license || null,
-          base_model: input.base_model || null,
-          model_card_url: input.model_card_url || null,
-          access_tier: input.access_tier || 'internal-only',
-          sla_tier: input.sla_tier || 'best-effort',
-        })
-        .select()
-        .single();
-      
-      if (systemError) throw systemError;
+      const tryInsert = async (attemptName: string) => {
+        // Step 1: Create the System first
+        const { data: systemData, error: systemError } = await supabase
+          .from('systems')
+          .insert({
+            project_id: input.project_id,
+            name: attemptName,
+            provider: resolvedProvider,
+            system_type: 'model',
+            model_name: resolvedModelName,
+            endpoint: systemEndpoint,
+            use_case: input.use_case || null,
+            status: 'draft',
+            deployment_status: 'draft',
+            owner_id: user?.id,
+            business_owner_email: input.business_owner_email || null,
+            license: input.license || null,
+            base_model: input.base_model || null,
+            model_card_url: input.model_card_url || null,
+            access_tier: input.access_tier || 'internal-only',
+            sla_tier: input.sla_tier || 'best-effort',
+          })
+          .select()
+          .single();
+        
+        if (systemError) {
+          // Check for Postgrest Error 23505 (unique_violation)
+          if (systemError.code === '23505') {
+            const suffix = Math.random().toString(36).substring(2, 6);
+            return tryInsert(`${input.name}-${suffix}`);
+          }
+          throw systemError;
+        }
 
-      // Step 2: Create the Model linked to the System
-      const { data: modelData, error: modelError } = await supabase
-        .from('models')
-        .insert({
-          name: input.name,
-          description: input.description || null,
-          model_type: input.model_type,
-          version: input.version || '1.0.0',
-          provider: resolvedProvider,
-          use_case: input.use_case || null,
-          endpoint: systemEndpoint,
-          project_id: input.project_id,
-          system_id: systemData.id,
-          owner_id: user?.id,
-          status: 'draft',
-          // Governance fields on model too
-          business_owner_email: input.business_owner_email || null,
-          license: input.license || null,
-          base_model: input.base_model || null,
-          model_card_url: input.model_card_url || null,
-          // Traceability fields
-          training_dataset_id: input.training_dataset_id || null,
-          limitations: input.limitations || null,
-          intended_use: input.intended_use || null,
-          risk_classification: input.risk_classification || null,
-        })
-        .select()
-        .single();
-      
-      if (modelError) {
-        // Rollback: delete the system if model creation fails
-        await supabase.from('systems').delete().eq('id', systemData.id);
-        throw modelError;
-      }
-      
-      return { model: modelData as Model, system: systemData };
+        // Step 2: Create the Model linked to the System
+        const { data: modelData, error: modelError } = await supabase
+          .from('models')
+          .insert({
+            name: attemptName,
+            description: input.description || null,
+            model_type: input.model_type,
+            version: input.version || '1.0.0',
+            provider: resolvedProvider,
+            use_case: input.use_case || null,
+            endpoint: systemEndpoint,
+            project_id: input.project_id,
+            system_id: systemData.id,
+            owner_id: user?.id,
+            status: 'draft',
+            business_owner_email: input.business_owner_email || null,
+            license: input.license || null,
+            base_model: input.base_model || null,
+            model_card_url: input.model_card_url || null,
+            training_dataset_id: input.training_dataset_id || null,
+            limitations: input.limitations || null,
+            intended_use: input.intended_use || null,
+            risk_classification: input.risk_classification || null,
+          })
+          .select()
+          .single();
+        
+        if (modelError) {
+          // Rollback: delete the system if model creation fails
+          await supabase.from('systems').delete().eq('id', systemData.id);
+          throw modelError;
+        }
+        
+        return { model: modelData as Model, system: systemData };
+      };
+
+      return tryInsert(input.name);
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['models'] });
