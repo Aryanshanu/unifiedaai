@@ -82,6 +82,8 @@ export const PERSONA_MAP: Record<AppRole, PersonaConfig> = {
 export const SECTION_KEY_MAP: Record<string, string> = {
   'AUDIT': 'discover',
   'DISCOVER': 'discover',
+  'Audit Center': 'discover',
+  'System Audit': 'discover',
   'Monitor': 'monitor',
   'Govern': 'govern',
   'DATA GOVERNANCE': 'data-governance',
@@ -89,6 +91,8 @@ export const SECTION_KEY_MAP: Record<string, string> = {
   'CORE RAI': 'core-rai',
   'CORE SECURITY': 'core-security',
   'Configure': 'configure',
+  'Risk & Impact': 'monitor',
+  'Impact Dashboard': 'monitor',
 };
 
 /**
@@ -115,8 +119,10 @@ export const ROUTE_ACCESS_MAP: Record<string, AppRole[]> = {
   '/oversight': ['admin', 'reviewer'],
   '/anomalies': ['admin', 'reviewer', 'viewer'],
   '/lineage': ['admin', 'reviewer', 'viewer'],
-  '/audit-center': ['admin', 'reviewer', 'viewer'],
-  '/impact': ['admin', 'reviewer', 'viewer'],
+  '/audit-center': ['admin', 'reviewer', 'viewer', 'superadmin'],
+  '/audit': ['admin', 'reviewer', 'viewer', 'superadmin'],
+  '/impact': ['admin', 'reviewer', 'viewer', 'superadmin'],
+  '/risk': ['admin', 'reviewer', 'viewer', 'superadmin'],
   '/runbooks': ['admin', 'reviewer', 'viewer'],
   '/policy': ['admin', 'reviewer'],
   '/regulatory-reports': ['admin', 'reviewer', 'viewer'],
@@ -136,9 +142,9 @@ export const ROUTE_ACCESS_MAP: Record<string, AppRole[]> = {
   '/security/threats': ['admin', 'analyst'],
 
   // Data Governance — all roles for oversight
-  '/data-contracts': ['admin', 'reviewer', 'analyst', 'viewer'],
-  '/semantic-definitions': ['admin', 'reviewer', 'analyst', 'viewer'],
-  '/semantic-hub': ['admin', 'reviewer', 'analyst', 'viewer'],
+  '/data-contracts': ['admin', 'reviewer', 'analyst', 'viewer', 'superadmin'],
+  '/semantic-definitions': ['admin', 'reviewer', 'analyst', 'viewer', 'superadmin'],
+  '/semantic-hub': ['admin', 'reviewer', 'analyst', 'viewer', 'superadmin'],
 
   // Configure — admin + analyst
   '/projects': ['admin', 'analyst'],

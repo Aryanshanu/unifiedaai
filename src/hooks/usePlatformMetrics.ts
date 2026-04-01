@@ -185,6 +185,7 @@ export function useUnsafeDeployments() {
     queryFn: async () => {
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
+      // Step 1: Fetch all unapproved systems that require approval
       const { data: unapprovedSystems, error: systemsError } = await supabase
         .from("systems")
         .select("id, name, project_id, uri_score, deployment_status")
@@ -192,27 +193,37 @@ export function useUnsafeDeployments() {
         .not("deployment_status", "in", '("approved","deployed")');
 
       if (systemsError) throw systemsError;
+      if (!unapprovedSystems || unapprovedSystems.length === 0) return [];
 
-      const unsafeDeployments = [];
+      const systemIds = unapprovedSystems.map(s => s.id);
 
-      for (const system of unapprovedSystems || []) {
-        const { count } = await supabase
-          .from("request_logs")
-          .select("id", { count: "exact", head: true })
-          .eq("system_id", system.id)
-          .gte("created_at", twentyFourHoursAgo);
+      // Step 2: Fetch log counts for all these systems in a single query
+      const { data: logCounts, error: logsError } = await supabase
+        .from("request_logs")
+        .select("system_id")
+        .in("system_id", systemIds)
+        .gte("created_at", twentyFourHoursAgo);
 
-        if ((count || 0) > 0) {
-          unsafeDeployments.push({
-            ...system,
-            recentRequests: count,
-          });
+      if (logsError) throw logsError;
+
+      // Step 3: Count logs per system client-side
+      const countsMap = (logCounts || []).reduce((acc, log) => {
+        if (log.system_id) {
+          acc[log.system_id] = (acc[log.system_id] || 0) + 1;
         }
-      }
+        return acc;
+      }, {} as Record<string, number>);
 
-      return unsafeDeployments;
+      // Step 4: Map back to the system objects
+      return unapprovedSystems
+        .filter(system => (countsMap[system.id] || 0) > 0)
+        .map(system => ({
+          ...system,
+          recentRequests: countsMap[system.id],
+        }));
     },
     staleTime: 120_000,
     refetchInterval: false,
   });
 }
+

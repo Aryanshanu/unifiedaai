@@ -16,9 +16,9 @@ import { ProjectDocumentationTab } from "@/components/project/ProjectDocumentati
 import { EngineRegistrationForm as ModelRegistrationForm } from "@/components/engines/EngineRegistrationForm";
 import { 
   ArrowLeft, Plus, FolderOpen, Server, Shield, Database, 
-  Gauge, Building2, Calendar, Cpu, AlertTriangle, Activity, FileText, Brain 
+  Gauge, Building2, Calendar, Cpu, AlertTriangle, Activity, FileText, Brain, Settings
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
@@ -190,7 +190,9 @@ export default function ProjectDetail() {
                   <Calendar className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium">{format(new Date(project.created_at), "MMM d, yyyy")}</p>
+                  <p className="text-sm font-medium">
+                    {project.created_at ? format(new Date(project.created_at), "MMM d, yyyy") : "Date Unknown"}
+                  </p>
                   <p className="text-sm text-muted-foreground">Created</p>
                 </div>
               </div>

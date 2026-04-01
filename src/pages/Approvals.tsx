@@ -24,9 +24,12 @@ export default function Approvals() {
   const [activeTab, setActiveTab] = useState("systems");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { data: pendingApprovals, isLoading: pendingLoading } = usePendingApprovals();
-  const { data: unsafeDeployments, isLoading: unsafeLoading } = useUnsafeDeployments();
+  const { data: pendingApprovals, isLoading: pendingLoading, error: pendingError } = usePendingApprovals();
+  const { data: unsafeDeployments, isLoading: unsafeLoading, error: unsafeError } = useUnsafeDeployments();
   const processApproval = useProcessApproval();
+
+  const isAnyError = !!pendingError || !!unsafeError;
+
 
   // Get approved and rejected systems
   const { data: approvedSystems, isLoading: approvedLoading } = useQuery({
@@ -110,7 +113,20 @@ export default function Approvals() {
       headerActions={undefined}
     >
       <div className="space-y-6">
+        {isAnyError && (
+          <div className="p-4 rounded-xl border border-destructive/50 bg-destructive/5 text-destructive flex items-center gap-3">
+            <AlertOctagon className="h-5 w-5" />
+            <div className="text-sm">
+              <p className="font-semibold">Data Synchronization Error</p>
+              <p className="opacity-80">Failed to fetch recent governance data. Verify connectivity to the Logic Registry.</p>
+            </div>
+            <Button variant="outline" size="sm" className="ml-auto border-destructive/20 text-destructive hover:bg-destructive/10" onClick={() => queryClient.invalidateQueries({ queryKey: ["system-approvals"] })}>
+              Retry
+            </Button>
+          </div>
+        )}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
+
           <TabsList className="grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="systems" className="flex items-center gap-2">
               <Shield className="h-4 w-4" />

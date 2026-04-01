@@ -94,7 +94,7 @@ const App = () => (
               <Suspense fallback={<PageFallback />}>
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
-                <Route path="/admin" element={<AdminLogin />} />
+                  <Route path="/admin" element={<ProtectedRoute><AdminLogin /></ProtectedRoute>} />
                 <Route path="/error" element={<Error />} />
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 {/* Project & System Registry */}
@@ -134,10 +134,12 @@ const App = () => (
                 <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 <Route path="/docs" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
                 {/* Audit */}
+                <Route path="/audit" element={<ProtectedRoute><AuditCenter /></ProtectedRoute>} />
                 <Route path="/audit-center" element={<ProtectedRoute><AuditCenter /></ProtectedRoute>} />
                 
                 <Route path="/semantic-hub" element={<ProtectedRoute><SemanticLayerHub /></ProtectedRoute>} />
                 <Route path="/discovery" element={<ProtectedRoute><Discovery /></ProtectedRoute>} />
+                <Route path="/risk" element={<ProtectedRoute><ImpactDashboard /></ProtectedRoute>} />
                 <Route path="/agents" element={<ProtectedRoute><ControllerGovernance /></ProtectedRoute>} />
                 <Route path="/continuous-validation" element={<ProtectedRoute><ContinuousValidation /></ProtectedRoute>} />
                 <Route path="/environments" element={<ProtectedRoute><EnvironmentManagement /></ProtectedRoute>} />

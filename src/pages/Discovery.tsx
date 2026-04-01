@@ -64,7 +64,7 @@ const riskColor = (r: string) => {
 };
 
 function ShadowAITab() {
-  const { data: discoveries, isLoading } = useShadowAIDiscoveries();
+  const { data: discoveries, isLoading, error } = useShadowAIDiscoveries();
   const reportMutation = useReportShadowAI();
   const updateMutation = useUpdateShadowAI();
   const [open, setOpen] = useState(false);

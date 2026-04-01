@@ -21,8 +21,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { path: "/", icon: LayoutDashboard, label: "Command Center" },
-  { divider: true, label: "AUDIT" },
-  { path: "/discovery", icon: ScanSearch, label: "System Audit" },
+  { path: "/audit-center", icon: ScanSearch, label: "Audit Center" },
   { path: "/agents", icon: Bot, label: "Controller Governance" },
   { divider: true, label: "Monitor" },
   { path: "/observability", icon: Activity, label: "Observability" },
@@ -34,7 +33,7 @@ const navItems: NavItem[] = [
   { path: "/anomalies", icon: AlertCircle, label: "Anomalies" },
   { path: "/lineage", icon: GitBranch, label: "Knowledge Graph" },
   { path: "/evaluation", icon: FlaskConical, label: "Validation Hub" },
-  { path: "/impact", icon: Target, label: "Impact Dashboard" },
+  { path: "/risk", icon: Target, label: "Risk & Impact" },
   { path: "/runbooks", icon: BookOpen, label: "Runbooks" },
   { path: "/policy", icon: FileText, label: "Policy Studio" },
   { path: "/regulatory-reports", icon: FileText, label: "Regulatory Reports" },

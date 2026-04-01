@@ -12,7 +12,7 @@ interface ProtectedRouteProps {
 const AUTH_TIMEOUT_MS = 10_000;
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { user, roles, persona, loading } = useAuth();
+  const { user, roles, persona, loading, isAuthorized } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [timedOut, setTimedOut] = useState(false);
@@ -55,7 +55,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  if (!user) {
+  if (!user || !isAuthorized) {
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 

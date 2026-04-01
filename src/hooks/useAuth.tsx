@@ -11,6 +11,7 @@ interface AuthContextType {
   roles: AppRole[];
   persona: PersonaConfig;
   loading: boolean;
+  isAuthorized: boolean;
   signInAsRole: (role: AppRole) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   hasRole: (role: AppRole) => boolean;
@@ -24,6 +25,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAuthorized, setIsAuthorized] = useState(() => {
+    return localStorage.getItem('uag_role_authorized') === 'true';
+  });
 
   const fetchUserRoles = async (userId: string) => {
     try {
@@ -132,18 +136,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Update local roles state immediately
       setRoles([role]);
+      setIsAuthorized(true);
+      localStorage.setItem('uag_role_authorized', 'true');
+      localStorage.setItem('uag_active_role', role);
+
+      // Refresh session to ensure claims are updated if needed
+      await supabase.auth.refreshSession();
 
       return { error: null };
     } catch (err) {
+      setIsAuthorized(false);
+      localStorage.removeItem('uag_role_authorized');
       return { error: err instanceof Error ? err : new Error(String(err)) };
     }
   }, []);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
+    localStorage.removeItem('uag_role_authorized');
+    localStorage.clear(); // Complete wipe for POC security
     setUser(null);
     setSession(null);
     setRoles([]);
+    setIsAuthorized(false);
   }, []);
 
   const hasRole = useCallback((role: AppRole) => roles.includes(role), [roles]);
@@ -162,11 +177,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     roles,
     persona,
     loading,
+    isAuthorized,
     signInAsRole,
     signOut,
     hasRole,
     hasAnyRole,
-  }), [user, session, roles, persona, loading, signInAsRole, signOut, hasRole, hasAnyRole]);
+  }), [user, session, roles, persona, loading, isAuthorized, signInAsRole, signOut, hasRole, hasAnyRole]);
 
   return (
     <AuthContext.Provider value={value}>
