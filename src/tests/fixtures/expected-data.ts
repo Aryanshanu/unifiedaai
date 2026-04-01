@@ -1,4 +1,4 @@
-// Minimum required data counts for Fractal RAI-OS - December 2025
+// Minimum required data counts for UnifiedAAI - December 2025
 // These are the absolute minimum counts that must exist for the platform to be considered functional
 
 export const MINIMUM_COUNTS = {
@@ -22,7 +22,7 @@ export const REQUIRED_SCORECARD_ELEMENTS = [
   'EU AI Act',
   'SHA-256',
   'December 2025',
-  'Fractal RAI-OS',
+  'UnifiedAAI',
 ] as const;
 
 export const GOLDEN_DEMO_STEPS = 7;

@@ -74,7 +74,7 @@ function ModelProjectCard({ model }: { model: ModelWithSystem }) {
   return (
     <Card 
       className="cursor-pointer hover:border-primary/50 transition-colors"
-      onClick={() => navigate(`/models/${model.id}`)}
+      onClick={() => navigate(`/engines/${model.id}`)}
     >
       <CardContent className="p-6">
         <div className="flex items-start justify-between mb-4">

@@ -14,7 +14,7 @@ const ENDPOINT_PATTERNS = {
   external_node: /^https:\/\/external\.node\.net\//,
   distributed_inference: /^https:\/\/inference\.grid\.local\//,
   gateway_router: /^https:\/\/gateway\.router\.net\//,
-  enterprise_edge: /^https:\/\/[^\.]+\.edge\.enterprise\.local\//,
+  enterprise_edge: /^https:\/\/[^.]+\.edge\.enterprise\.local\//,
   cloud_compute: /^https:\/\/compute\.cloud\.local\//,
 };
 

@@ -139,7 +139,7 @@ export class ErrorBoundary extends Component<Props, State> {
             </div>
 
             <p className="text-xs text-muted-foreground pt-4">
-              Fractal Unified Autonomous Governance Platform
+              UnifiedAAI - Enterprise AI Governance Platform
             </p>
           </div>
         </div>

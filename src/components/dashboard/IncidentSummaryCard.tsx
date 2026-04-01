@@ -137,7 +137,7 @@ export function IncidentSummaryCard() {
               variant={hasCritical ? "destructive" : "default"}
               size="sm" 
               className="w-full"
-              onClick={() => navigate('/incidents')}
+              onClick={() => navigate('/anomalies')}
             >
               View All Incidents
               <ArrowRight className="h-4 w-4 ml-2" />

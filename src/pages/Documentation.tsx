@@ -2292,7 +2292,7 @@ const Documentation = () => {
 
             {/* Footer */}
             <div className="text-center text-sm text-muted-foreground">
-              <p>Fractal Unified Autonomous Governance Platform Documentation • Version 1.0.0 • MIT License</p>
+              <p>UnifiedAAI Platform Documentation • Version 1.0.0 • MIT License</p>
               <p className="mt-2">
                 Built with transparency, honesty, and passion. 🚀
               </p>

@@ -107,6 +107,7 @@ class StructuredLogger {
 
   private interceptFetch(): void {
     const originalFetch = window.fetch;
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     const logger = this;
 
     window.fetch = async function (...args) {
@@ -160,6 +161,7 @@ class StructuredLogger {
   }
 
   private interceptConsole(): void {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     const logger = this;
     const originalError = console.error;
     const originalWarn = console.warn;
@@ -196,6 +198,7 @@ class StructuredLogger {
   private trackNavigation(): void {
     if (typeof window === 'undefined') return;
 
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     const logger = this;
     let lastPath = window.location.pathname;
 

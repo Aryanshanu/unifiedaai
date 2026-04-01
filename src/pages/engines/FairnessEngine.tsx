@@ -62,6 +62,7 @@ function FairnessEngineContent() {
         }, 500);
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autorunModelId, shouldAutorun, models]);
 
   const selectedModel = models?.find(m => m.id === selectedModelId);

@@ -36,7 +36,7 @@ let currentContext: TraceContext | null = null;
 
 export class Telemetry {
   private static instance: Telemetry;
-  private serviceName: string = 'fractal-rai-platform';
+  private serviceName: string = 'unifiedaai-platform';
   private enabled: boolean = true;
 
   private constructor() {}

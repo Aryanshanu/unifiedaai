@@ -65,7 +65,7 @@ export function GovernanceDashboard() {
 
       {/* KPI Row */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="cursor-pointer hover:border-primary/50" onClick={() => navigate('/hitl')}>
+        <Card className="cursor-pointer hover:border-primary/50" onClick={() => navigate('/oversight')}>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
@@ -77,7 +77,7 @@ export function GovernanceDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:border-primary/50" onClick={() => navigate('/incidents')}>
+        <Card className="cursor-pointer hover:border-primary/50" onClick={() => navigate('/anomalies')}>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
@@ -121,7 +121,7 @@ export function GovernanceDashboard() {
             <Clock className="w-4 h-4" />
             HITL Review Queue
           </CardTitle>
-          <Button variant="ghost" size="sm" onClick={() => navigate('/hitl')}>
+          <Button variant="ghost" size="sm" onClick={() => navigate('/oversight')}>
             Open Console <ArrowRight className="h-4 w-4 ml-1" />
           </Button>
         </CardHeader>

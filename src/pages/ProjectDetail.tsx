@@ -13,7 +13,7 @@ import { ProjectModelsTab } from "@/components/project/ProjectModelsTab";
 import { ProjectRiskTab } from "@/components/project/ProjectRiskTab";
 import { ProjectActivityTab } from "@/components/project/ProjectActivityTab";
 import { ProjectDocumentationTab } from "@/components/project/ProjectDocumentationTab";
-import { ModelRegistrationForm } from "@/components/models/ModelRegistrationForm";
+import { EngineRegistrationForm as ModelRegistrationForm } from "@/components/engines/EngineRegistrationForm";
 import { 
   ArrowLeft, Plus, FolderOpen, Server, Shield, Database, 
   Gauge, Building2, Calendar, Cpu, AlertTriangle, Activity, FileText, Brain 

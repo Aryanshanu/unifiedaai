@@ -122,7 +122,7 @@ export default function Error() {
         {/* Footer */}
         <div className="pt-8 border-t border-border">
           <p className="text-sm text-muted-foreground">
-            <span className="font-semibold text-primary">Fractal Unified Autonomous Governance Platform</span>
+            <span className="font-semibold text-primary">UnifiedAAI - Enterprise AI Governance Platform</span>
             {' '}• Global Responsible AI Operating System
           </p>
           <p className="text-xs text-muted-foreground mt-2">

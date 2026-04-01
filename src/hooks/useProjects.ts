@@ -132,7 +132,6 @@ export function useDeleteProject() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      console.log(`[useDeleteProject] Starting cascade delete for project: ${id}`);
       
       // Step 1: Get all systems in this project
       const { data: systems, error: systemsError } = await supabase
@@ -143,7 +142,6 @@ export function useDeleteProject() {
       if (systemsError) throw new Error(`Failed to fetch project systems: ${systemsError.message}`);
       
       const systemIds = systems?.map(s => s.id) || [];
-      console.log(`[useDeleteProject] Found ${systemIds.length} systems to delete`);
       
       if (systemIds.length > 0) {
         // Step 2: Fetch threat_model IDs (threat_vectors references threat_models)
@@ -207,9 +205,7 @@ export function useDeleteProject() {
       const { error: projectError } = await supabase.from("projects").delete().eq("id", id);
       if (projectError) throw new Error(`Failed to delete project: ${projectError.message}`);
       
-      console.log(`[useDeleteProject] Successfully deleted project ${id} and all related data`);
 
-      console.log(`[useDeleteProject] Successfully deleted project ${id} and all related data`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });

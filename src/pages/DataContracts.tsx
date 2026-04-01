@@ -131,7 +131,7 @@ function DataContractsContent() {
             violation_type: 'schema_drift',
             severity: 'critical',
             violation_details: {
-              detected_issue: "Unexpected field 'internal_node_metadata' found in payload",
+              detected_issue: "Schema validation failed: unexpected fields detected in payload",
               expectation: "Payload must strictly conform to Cluster-v2 schema"
             },
             status: 'open'

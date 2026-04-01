@@ -159,7 +159,7 @@ export default function Evaluation() {
         <div className="lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-foreground">Recent Validation Cycles</h2>
-            <Button variant="outline" size="sm" onClick={() => navigate('/continuous-evaluation')}>
+            <Button variant="outline" size="sm" onClick={() => navigate('/continuous-validation')}>
               <Calendar className="w-4 h-4 mr-2" />
               Schedule
             </Button>

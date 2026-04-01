@@ -172,8 +172,7 @@ function runFastLayerCheck(engine: EngineType, response: string): { passed: bool
   const issues: string[] = [];
   
   switch (engine) {
-    case 'toxicity':
-      // Fast toxicity patterns
+    case 'toxicity': {
       const toxicPatterns = [
         /\b(hate|kill|attack|destroy)\b/gi,
         /\b(racist|sexist|bigot)\b/gi,
@@ -184,9 +183,8 @@ function runFastLayerCheck(engine: EngineType, response: string): { passed: bool
         }
       });
       break;
-      
-    case 'privacy':
-      // PII patterns
+    }
+    case 'privacy': {
       const piiPatterns = [
         { pattern: /\b\d{3}-\d{2}-\d{4}\b/, name: 'SSN' },
         { pattern: /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/, name: 'Credit Card' },
@@ -200,9 +198,8 @@ function runFastLayerCheck(engine: EngineType, response: string): { passed: bool
         }
       });
       break;
-      
-    case 'hallucination':
-      // Check for uncertainty hedges that might indicate hallucination
+    }
+    case 'hallucination': {
       const hedgePatterns = [
         /I think|I believe|probably|might be|possibly/gi,
       ];
@@ -212,7 +209,7 @@ function runFastLayerCheck(engine: EngineType, response: string): { passed: bool
         }
       });
       break;
-      
+    }
     default:
       break;
   }

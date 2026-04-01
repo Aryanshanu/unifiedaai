@@ -42,6 +42,7 @@ class ActivityLogger {
   // Intercept all fetch calls to log API requests
   private interceptFetch(): void {
     const originalFetch = window.fetch;
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     const logger = this;
 
     window.fetch = async function (...args) {
@@ -97,6 +98,7 @@ class ActivityLogger {
   // Intercept console.error to capture errors
   private interceptConsole(): void {
     const originalError = console.error;
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     const logger = this;
 
     console.error = function (...args) {

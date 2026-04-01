@@ -51,7 +51,7 @@ export function EngineActionBar({
       description: `${engineName} evaluation flagged for human review`,
     });
     
-    navigate("/hitl", { 
+    navigate("/oversight", { 
       state: { 
         escalationType: engineName.toLowerCase(),
         modelId,

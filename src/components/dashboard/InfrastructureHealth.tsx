@@ -103,7 +103,7 @@ export function InfrastructureHealth() {
         </div>
         
         <div className="p-3 bg-slate-900/60 flex items-center justify-between text-[9px] text-slate-500 border-t border-slate-800/40">
-          <span>Active Nodes: 12</span>
+          <span>Gateway: {health?.gateway.status || 'checking'}</span>
           <span>Last Check: {new Date(health?.lastChecked || '').toLocaleTimeString()}</span>
         </div>
       </CardContent>

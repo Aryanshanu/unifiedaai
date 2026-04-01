@@ -33,7 +33,7 @@ const navItems: NavItem[] = [
   { path: "/oversight", icon: Users, label: "Oversight Console" },
   { path: "/anomalies", icon: AlertCircle, label: "Anomalies" },
   { path: "/lineage", icon: GitBranch, label: "Knowledge Graph" },
-  { path: "/validation", icon: FlaskConical, label: "Validation Hub" },
+  { path: "/evaluation", icon: FlaskConical, label: "Validation Hub" },
   { path: "/impact", icon: Target, label: "Impact Dashboard" },
   { path: "/runbooks", icon: BookOpen, label: "Runbooks" },
   { path: "/policy", icon: FileText, label: "Policy Studio" },

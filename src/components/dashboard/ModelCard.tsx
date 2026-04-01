@@ -106,7 +106,7 @@ export function ModelCard({
   const formattedDate = updatedAt ? format(new Date(updatedAt), 'MM/dd/yyyy') : '-';
   
   const handleClick = () => {
-    navigate(`/models/${id}`);
+    navigate(`/engines/${id}`);
   };
 
   const handleDelete = async () => {

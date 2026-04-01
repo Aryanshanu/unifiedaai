@@ -99,7 +99,7 @@ export function FileUploadCard({
 
       // Upload to storage
       const { error: uploadError } = await supabase.storage
-        .from('fractal')
+        .from('data-quality')
         .upload(filePath, file);
 
       if (uploadError) {
@@ -110,7 +110,7 @@ export function FileUploadCard({
 
       // Get public URL
       const { data: urlData } = supabase.storage
-        .from('fractal')
+        .from('data-quality')
         .getPublicUrl(filePath);
 
       // Create upload record with contract link

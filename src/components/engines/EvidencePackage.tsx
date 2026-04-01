@@ -108,7 +108,7 @@ export function EvidencePackage({ data, mode = 'full' }: EvidencePackageProps) {
             evaluationType: engineType,
             modelId: data.modelId,
             version: "2.0.0",
-            platform: "Fractal RAI-OS",
+            platform: "UnifiedAAI",
             specification: "2025 SOTA Responsible AI Metrics",
             huggingface_models: modelsUsed,
           },

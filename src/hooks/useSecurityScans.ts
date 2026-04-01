@@ -5,7 +5,7 @@ export function useSecurityTestRuns(modelId?: string) {
   return useQuery({
     queryKey: ['security-test-runs', modelId],
     queryFn: async () => {
-      let query = supabase
+      const query = supabase
         .from('security_test_runs' as any)
         .select('*')
         .order('created_at', { ascending: false })

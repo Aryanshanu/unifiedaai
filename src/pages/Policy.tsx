@@ -41,7 +41,7 @@ export default function Policy() {
 
   // ── Rate limiting: 5-minute cooldown between campaigns ─────────────────────
   const CAMPAIGN_COOLDOWN_MS = 5 * 60 * 1000;
-  const CAMPAIGN_TS_KEY = 'fractal-last-campaign-run';
+  const CAMPAIGN_TS_KEY = 'unifiedaai-last-campaign-run';
 
   const canRunCampaign = (): boolean => {
     const last = localStorage.getItem(CAMPAIGN_TS_KEY);

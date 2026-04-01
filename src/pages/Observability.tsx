@@ -68,7 +68,7 @@ export default function Observability() {
 
   // Supabase Realtime subscriptions
   useEffect(() => {
-    console.log("Setting up Observability Realtime subscriptions...");
+    
     
     const channel = supabase
       .channel('observability-realtime')
@@ -76,7 +76,6 @@ export default function Observability() {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'request_logs' },
         (payload) => {
-          console.log('New request log:', payload);
           setRealtimeCount(prev => prev + 1);
           refetchMetrics();
           refetchHealth();
@@ -86,7 +85,6 @@ export default function Observability() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'drift_alerts' },
         (payload) => {
-          console.log('Drift alert change:', payload);
           setNewAlertBadge(true);
           refetchAlerts();
           refetchStats();
@@ -105,7 +103,6 @@ export default function Observability() {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'incidents' },
         (payload) => {
-          console.log('New incident:', payload);
           refetchMetrics();
           toast.error("New Incident Created", {
             description: (payload.new as any)?.title || "Incident requires attention",
@@ -115,11 +112,11 @@ export default function Observability() {
         }
       )
       .subscribe((status) => {
-        console.log('Observability realtime status:', status);
+        
       });
 
     return () => {
-      console.log("Cleaning up Observability Realtime subscriptions");
+      
       supabase.removeChannel(channel);
     };
   }, [refetchAlerts, refetchStats, refetchMetrics, refetchHealth]);
@@ -481,7 +478,7 @@ export default function Observability() {
                   </Badge>
                 )}
               </h2>
-              <Button variant="outline" size="sm" disabled title="Threshold configuration coming in next release">Configure Thresholds</Button>
+              <AlertThresholdConfig />
             </div>
 
             {alertsLoading ? (

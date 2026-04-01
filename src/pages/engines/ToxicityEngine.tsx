@@ -50,6 +50,7 @@ function ToxicityEngineContent() {
       const modelExists = models.some(m => m.id === autorunModelId);
       if (modelExists) { hasAutoRun.current = true; setSelectedModelId(autorunModelId); setTimeout(() => runToxicityEvaluation(), 500); }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autorunModelId, shouldAutorun, models]);
 
   const selectedModel = models?.find(m => m.id === selectedModelId);

@@ -35,12 +35,27 @@ export default function Benchmarks() {
   const { data: trendsData, isLoading: isTrendsLoading } = useDashboardTrends(30);
   const [isRunningEval, setIsRunningEval] = useState(false);
 
+  // Compute real average composite score from RAI data
+  const avgCompositeScore = raiData && raiData.length > 0
+    ? Math.round(raiData.reduce((sum, m) => sum + (m.compositeScore || 0), 0) / raiData.length * 10) / 10
+    : null;
+
   const runRealEvaluation = async (modelId: string, pillar: string) => {
     setIsRunningEval(true);
     toast.info(`Starting real-time ${pillar} evaluation...`);
     
+    // Map pillar names to actual edge function names
+    const fnMap: Record<string, string> = {
+      fairness: 'eval-fairness',
+      hallucination: 'eval-hallucination-hf',
+      toxicity: 'eval-toxicity-hf',
+      privacy: 'eval-privacy-hf',
+      explainability: 'eval-explainability-hf',
+    };
+    const fnName = fnMap[pillar] || `eval-${pillar}`;
+
     try {
-      const { data, error } = await supabase.functions.invoke(`eval-${pillar}`, {
+      const { data, error } = await supabase.functions.invoke(fnName, {
         body: { modelId, includeRawLogs: true }
       });
       
@@ -97,7 +112,7 @@ export default function Benchmarks() {
                   <TrendingUp className="h-5 w-5 text-amber-500" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-amber-500">72.4%</p>
+                  <p className="text-2xl font-bold text-amber-500">{avgCompositeScore !== null ? `${avgCompositeScore}%` : '—'}</p>
                   <p className="text-xs text-slate-500">Avg Composite Score</p>
                 </div>
               </div>

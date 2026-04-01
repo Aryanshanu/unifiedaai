@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 const DEMO_MODE_KEY = 'fractal-rai-demo-mode';
-const DEMO_INITIALIZED_KEY = 'fractal-rai-demo-initialized';
+const DEMO_INITIALIZED_KEY = 'unifiedaai-demo-initialized';
 
 // TRUTH ENFORCEMENT: Demo mode is ONLY allowed on /golden route
 function isGoldenDemoRoute(): boolean {
@@ -146,7 +146,7 @@ export function useDemoMode() {
       // Mark as initialized for this session
       sessionStorage.setItem(DEMO_INITIALIZED_KEY, 'true');
 
-      console.log('FRACTAL RAI-OS: DEMO MODE INITIALIZED. ALL DATA SEEDED.');
+      console.log('UnifiedAAI: DEMO MODE INITIALIZED. ALL DATA SEEDED.');
 
     } catch (error) {
       console.error('Demo initialization error:', error);
@@ -419,7 +419,7 @@ async function verifyMinimumData() {
     control_assessments: assessmentsCount || 0
   };
 
-  console.log('FRACTAL RAI-OS: Final data counts:', results);
+  console.log('UnifiedAAI: Demo data seeded:', results);
 
   // Verify minimums
   const minimums = {
@@ -437,13 +437,13 @@ async function verifyMinimumData() {
   let allPassed = true;
   for (const [key, min] of Object.entries(minimums)) {
     if (results[key as keyof typeof results] < min) {
-      console.error(`FRACTAL RAI-OS QA: ${key} below minimum (${results[key as keyof typeof results]} < ${min})`);
+      console.error(`UnifiedAAI QA: ${key} below minimum (${results[key as keyof typeof results]} < ${min})`);
       allPassed = false;
     }
   }
 
   if (allPassed) {
-    console.log('FRACTAL RAI-OS: 100% FUNCTIONAL. ALL GAPS CLOSED. EVERY BUTTON WORKS. DEC 2025.');
+    console.log('UnifiedAAI: 100% FUNCTIONAL. ALL GAPS CLOSED. EVERY BUTTON WORKS. DEC 2025.');
   }
 
   return results;

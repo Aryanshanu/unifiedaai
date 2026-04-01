@@ -84,7 +84,7 @@ export default function RegulatoryReports() {
           id: system.id,
           name: system.name,
           provider: system.provider,
-          engine_version: "cluster-core-v2.1",
+          engine_version: "1.0.0",
           endpoint: system.endpoint
         },
         compliance_metrics: {

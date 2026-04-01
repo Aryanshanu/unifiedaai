@@ -200,7 +200,6 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
     setIsUploading(true);
     
     try {
-      console.log('[DQFileUploader] Invoking dq-ingest-data edge function...');
       
       // Use edge function to ingest data (bypasses RLS issues)
       const { data, error } = await supabase.functions.invoke<IngestResponse>('dq-ingest-data', {
@@ -232,7 +231,6 @@ export function DQFileUploader({ onDatasetCreated, onRunPipeline, isRunning }: D
         throw new Error('No dataset ID returned from ingestion');
       }
 
-      console.log('[DQFileUploader] ✅ Data ingested successfully:', data);
       
       setCreatedDatasetId(data.dataset_id);
       toast.success(`Dataset created with ${data.rows_ingested} rows!`);

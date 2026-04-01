@@ -36,7 +36,7 @@ export const PERSONA_MAP: Record<AppRole, PersonaConfig> = {
     avatarEmoji: '🛡️',
     avatarGradient: 'from-emerald-500 to-teal-600',
     borderColor: 'border-l-emerald-500',
-    defaultRoute: '/hitl',
+    defaultRoute: '/oversight',
     dashboardLayout: 'governance',
     sidebarSections: ['discover', 'monitor', 'govern', 'data-governance'],
   },
@@ -80,10 +80,12 @@ export const PERSONA_MAP: Record<AppRole, PersonaConfig> = {
 
 /** Map sidebar section labels to their key identifiers */
 export const SECTION_KEY_MAP: Record<string, string> = {
+  'AUDIT': 'discover',
   'DISCOVER': 'discover',
   'Monitor': 'monitor',
   'Govern': 'govern',
   'DATA GOVERNANCE': 'data-governance',
+  'LOGIC GOVERNANCE': 'core-rai',
   'CORE RAI': 'core-rai',
   'CORE SECURITY': 'core-security',
   'Configure': 'configure',
@@ -98,23 +100,28 @@ export const ROUTE_ACCESS_MAP: Record<string, AppRole[]> = {
   '/auth': ['admin', 'reviewer', 'analyst', 'viewer'],
   '/error': ['admin', 'reviewer', 'analyst', 'viewer'],
 
-  // Discover & Monitor
+  // Discover & Monitor (AUDIT section)
   '/discovery': ['admin', 'reviewer', 'analyst'],
   '/agents': ['admin', 'reviewer', 'analyst'],
   '/observability': ['admin', 'reviewer', 'analyst'],
   '/alerts': ['admin', 'reviewer', 'analyst'],
-  '/continuous-evaluation': ['admin', 'analyst'],
+  '/continuous-validation': ['admin', 'analyst'],
   '/evaluation': ['admin', 'analyst'],
+  '/benchmarks': ['admin', 'analyst'],
 
   // Governance
   '/governance': ['admin', 'reviewer', 'viewer'],
   '/governance/approvals': ['admin', 'reviewer'],
-  '/hitl': ['admin', 'reviewer'],
-  '/incidents': ['admin', 'reviewer', 'viewer'],
+  '/oversight': ['admin', 'reviewer'],
+  '/anomalies': ['admin', 'reviewer', 'viewer'],
   '/lineage': ['admin', 'reviewer', 'viewer'],
   '/audit-center': ['admin', 'reviewer', 'viewer'],
+  '/impact': ['admin', 'reviewer', 'viewer'],
+  '/runbooks': ['admin', 'reviewer', 'viewer'],
+  '/policy': ['admin', 'reviewer'],
+  '/regulatory-reports': ['admin', 'reviewer', 'viewer'],
 
-  // Core RAI Engines — admin + analyst
+  // Logic Governance Engines (was Core RAI) — admin + analyst
   '/engine/fairness': ['admin', 'analyst'],
   '/engine/hallucination': ['admin', 'analyst'],
   '/engine/toxicity': ['admin', 'analyst'],
@@ -135,10 +142,11 @@ export const ROUTE_ACCESS_MAP: Record<string, AppRole[]> = {
 
   // Configure — admin + analyst
   '/projects': ['admin', 'analyst'],
-  '/models': ['admin', 'analyst'],
+  '/engines': ['admin', 'analyst'],
   '/environments': ['admin', 'analyst'],
   '/settings': ['admin', 'analyst'],
-  '/vendors': ['admin', 'analyst'],
+  '/providers': ['admin', 'analyst'],
+  '/simulation': ['admin', 'analyst'],
   '/docs': ['admin', 'reviewer', 'analyst', 'viewer'],
 };
 

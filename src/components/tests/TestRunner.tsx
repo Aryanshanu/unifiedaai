@@ -70,7 +70,7 @@ export function TestRunner({ autoRun = true }: TestRunnerProps) {
     return acc;
   }, {} as Record<string, TestResult[]>);
 
-  const consoleOutput = `🚀 FRACTAL RAI-OS AUTOMATED TEST SUITE - DECEMBER 2025
+  const consoleOutput = `🚀 UnifiedAAI AUTOMATED TEST SUITE - DECEMBER 2025
 ═══════════════════════════════════════════════════════
 Running ${ALL_TESTS.length} tests...
 
@@ -81,8 +81,8 @@ ${suiteResult ? `═════════════════════
 ⏱️  Duration: ${(suiteResult.duration / 1000).toFixed(2)}s
 
 ${suiteResult.verdict === 'PASS' 
-  ? '🎉 FRACTAL RAI-OS: 100% FUNCTIONAL. ALL 42 TESTS PASSED. THE GAP DOCUMENT IS DEAD.' 
-  : '❌ FRACTAL RAI-OS REGRESSION FAILURE'}` : ''}`;
+  ? '🎉 UnifiedAAI: 100% FUNCTIONAL. ALL 42 TESTS PASSED. THE GAP DOCUMENT IS DEAD.' 
+  : '❌ UnifiedAAI REGRESSION FAILURE'}` : ''}`;
 
   return (
     <div className="fixed inset-0 bg-background/95 backdrop-blur-sm z-50 overflow-auto">
@@ -92,7 +92,7 @@ ${suiteResult.verdict === 'PASS'
             <div className="flex items-center justify-between">
               <CardTitle className="text-2xl flex items-center gap-3">
                 <Zap className="w-8 h-8 text-primary" />
-                Fractal RAI-OS Test Suite
+                UnifiedAAI Test Suite
               </CardTitle>
               <Badge variant="outline" className="text-sm">
                 December 2025
@@ -138,7 +138,7 @@ ${suiteResult.verdict === 'PASS'
                   : "bg-red-500/20 text-red-500 border border-red-500/30"
               )}>
                 {suiteResult.verdict === 'PASS' 
-                  ? "🎉 FRACTAL RAI-OS: 100% FUNCTIONAL — DEC 2025" 
+                  ? "🎉 UnifiedAAI: 100% FUNCTIONAL — DEC 2025" 
                   : `❌ ${failedCount} TESTS FAILED — AUTO-HEALING ATTEMPTED`}
               </div>
             )}

@@ -155,7 +155,7 @@ export function TechnicalDashboard() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">Recent Validation Runs</CardTitle>
-          <Button variant="ghost" size="sm" onClick={() => navigate('/validation')}>
+          <Button variant="ghost" size="sm" onClick={() => navigate('/evaluation')}>
             View All <ArrowRight className="h-4 w-4 ml-1" />
           </Button>
         </CardHeader>

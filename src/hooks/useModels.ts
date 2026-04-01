@@ -171,10 +171,10 @@ export function useCreateModel() {
 
   return useMutation({
     mutationFn: async (input: CreateModelInput) => {
-      // Configuration for internal gateway routing
-      const resolvedProvider = 'internal_cluster';
-      const systemEndpoint = 'https://gateway.internal.node/v1/compute';
-      const resolvedModelName = 'cluster-core-v2';
+      // Route all inference through the Lovable AI Gateway
+      const resolvedProvider = input.provider || 'Lovable';
+      const systemEndpoint = input.endpoint || 'https://ai.gateway.lovable.dev/v1/chat/completions';
+      const resolvedModelName = input.huggingface_model_id || 'google/gemini-2.0-flash-exp';
       
       const tryInsert = async (attemptName: string) => {
         // Step 1: Create the System first

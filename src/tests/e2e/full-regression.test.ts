@@ -39,7 +39,7 @@ export const ALL_TESTS: TestDefinition[] = [
     name: 'Demo Mode defaults to ON for first-time visitors',
     category: TEST_CATEGORIES.DATA_POPULATION,
     test: async () => {
-      const storedValue = localStorage.getItem('fractal-demo-mode');
+      const storedValue = localStorage.getItem('unifiedaai-demo-mode');
       // If no stored value, should default to true
       const passed = storedValue === null || storedValue === 'true';
       return { passed, error: passed ? undefined : 'Demo Mode not defaulting to ON' };
@@ -298,22 +298,22 @@ function generatePageLoadTests(): TestDefinition[] {
   const pages = [
     { path: '/', name: 'Dashboard' },
     { path: '/projects', name: 'Projects' },
-    { path: '/models', name: 'Models' },
-    { path: '/engines/fairness', name: 'Fairness Engine' },
-    { path: '/engines/hallucination', name: 'Hallucination Engine' },
-    { path: '/engines/toxicity', name: 'Toxicity Engine' },
-    { path: '/engines/privacy', name: 'Privacy Engine' },
-    { path: '/engines/explainability', name: 'Explainability Engine' },
+    { path: '/engines', name: 'Logic Engines' },
+    { path: '/engine/fairness', name: 'Fairness Engine' },
+    { path: '/engine/hallucination', name: 'Hallucination Engine' },
+    { path: '/engine/toxicity', name: 'Toxicity Engine' },
+    { path: '/engine/privacy', name: 'Privacy Engine' },
+    { path: '/engine/explainability', name: 'Explainability Engine' },
     { path: '/observability', name: 'Observability' },
     { path: '/governance', name: 'Governance' },
-    { path: '/hitl', name: 'HITL Console' },
+    { path: '/oversight', name: 'Oversight Console' },
     { path: '/lineage', name: 'Knowledge Graph' },
     { path: '/policy', name: 'Policy Studio' },
     { path: '/alerts', name: 'Alerts' },
-    { path: '/incidents', name: 'Incidents' },
-    { path: '/approvals', name: 'Approvals' },
+    { path: '/anomalies', name: 'Anomalies' },
+    { path: '/governance/approvals', name: 'Approvals' },
     { path: '/settings', name: 'Settings' },
-    { path: '/golden', name: 'Golden Demo' },
+    { path: '/simulation', name: 'Lifecycle Simulation' },
   ];
 
   return pages.map((page, index) => ({

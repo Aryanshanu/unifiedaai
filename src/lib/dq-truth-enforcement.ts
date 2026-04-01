@@ -439,7 +439,7 @@ export function enforceDataQualityTruth(data: {
 }): TruthEnforcementReport {
   const errors: string[] = [];
   const warnings: string[] = [];
-  let percentagesChecked = 0;
+  const percentagesChecked = 0;
   let ratiosChecked = 0;
   let countsChecked = 0;
   let numericFailures = 0;

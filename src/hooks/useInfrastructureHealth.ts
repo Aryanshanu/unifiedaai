@@ -45,12 +45,12 @@ export function useInfrastructureHealth() {
         latency: edgeLatency
       };
 
-      // 3. System Control Plane Status (Local or Remote)
+      // 3. System Control Plane Status
       const gateway: ServiceStatus = {
         name: 'System Control Plane',
-        status: 'online',
-        latency: 12,
-        version: 'v2.4.1'
+        status: database.status === 'online' ? 'online' : 'degraded',
+        latency: Math.round((dbLatency + edgeLatency) / 2),
+        version: 'v1.0.0'
       };
 
       return {

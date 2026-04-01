@@ -182,7 +182,7 @@ function buildLiveDQContext(props: DQChatPanelProps['context']): LiveDQContext {
     : now;
 
   // Build column profiles map
-  let columnProfiles: Record<string, ColumnProfileInfo> = {};
+  const columnProfiles: Record<string, ColumnProfileInfo> = {};
   let columnCount = 0;
   
   if (props.profile?.column_profiles) {

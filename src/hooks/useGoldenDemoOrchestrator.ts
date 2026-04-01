@@ -531,7 +531,7 @@ export function useGoldenDemoOrchestrator() {
       if (!abortRef.current?.signal.aborted) {
         updateStep('incident-creation');
         if (mode === 'page-tour' && onNavigate) {
-          onNavigate('/incidents');
+          onNavigate('/anomalies');
           await sleep(1000);
         }
         const incidentId = await createIncident(systemId);
@@ -544,7 +544,7 @@ export function useGoldenDemoOrchestrator() {
       if (!abortRef.current?.signal.aborted) {
         updateStep('hitl-escalation');
         if (mode === 'page-tour' && onNavigate) {
-          onNavigate('/hitl');
+          onNavigate('/oversight');
           await sleep(1000);
         }
         const hitlCreated = await createHITLItem(systemId, artifacts.incidentIds[0]);
@@ -595,7 +595,7 @@ export function useGoldenDemoOrchestrator() {
         timerRef.current = null;
       }
     }
-  }, [isRunning, addLog, updateStep, artifacts.incidentIds, navigate]);
+  }, [isRunning, addLog, updateStep, artifacts.incidentIds, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
@@ -637,7 +637,7 @@ export function useGoldenDemoOrchestrator() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `fractal-rai-scorecard-${Date.now()}.json`;
+    a.download = `unifiedaai-scorecard-${Date.now()}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
