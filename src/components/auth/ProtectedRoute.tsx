@@ -59,6 +59,13 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
+  // Final check: persona route access
+  const isAllowed = canAccessRoute(roles, location.pathname);
+  if (!isAllowed) {
+    console.warn(`Access denied to ${location.pathname} for roles: ${roles.join(',')}`);
+    return <Navigate to="/" replace />;
+  }
+
   // Auto route-level access control
   if (roles.length > 0 && !canAccessRoute(roles, location.pathname)) {
     return (

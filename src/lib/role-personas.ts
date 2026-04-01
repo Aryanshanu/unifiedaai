@@ -19,11 +19,11 @@ export const PERSONA_MAP: Record<AppRole, PersonaConfig> = {
   admin: {
     role: 'admin',
     displayName: 'Chief Data & AI Officer',
-    description: 'Executive oversight of AI governance, risk posture, and compliance across the enterprise',
+    description: 'Executive oversight, risk strategy, and platform-wide governance reports.',
     icon: Crown,
     avatarEmoji: '👔',
-    avatarGradient: 'from-blue-500 to-purple-600',
-    borderColor: 'border-l-blue-500',
+    avatarGradient: 'from-blue-600 to-indigo-600',
+    borderColor: 'border-blue-500/50',
     defaultRoute: '/',
     dashboardLayout: 'executive',
     sidebarSections: ['discover', 'monitor', 'govern', 'data-governance', 'core-rai', 'core-security', 'configure', 'docs'],
@@ -36,7 +36,7 @@ export const PERSONA_MAP: Record<AppRole, PersonaConfig> = {
     avatarEmoji: '🛡️',
     avatarGradient: 'from-emerald-500 to-teal-600',
     borderColor: 'border-l-emerald-500',
-    defaultRoute: '/oversight',
+    defaultRoute: '/governance/approvals',
     dashboardLayout: 'governance',
     sidebarSections: ['discover', 'monitor', 'govern', 'data-governance'],
   },
@@ -67,13 +67,13 @@ export const PERSONA_MAP: Record<AppRole, PersonaConfig> = {
   superadmin: {
     role: 'superadmin',
     displayName: 'Platform Admin',
-    description: 'Full unrestricted access to all platform features, engines, and configuration',
+    description: 'Global system administration, user management, and infrastructure control.',
     icon: Crown,
-    avatarEmoji: '🔑',
-    avatarGradient: 'from-yellow-500 to-red-600',
-    borderColor: 'border-l-yellow-500',
-    defaultRoute: '/',
-    dashboardLayout: 'technical',
+    avatarEmoji: '⚡',
+    avatarGradient: 'from-slate-700 to-slate-900',
+    borderColor: 'border-slate-500/50',
+    defaultRoute: '/admin',
+    dashboardLayout: 'executive',
     sidebarSections: ['all'],
   },
 };
@@ -100,60 +100,67 @@ export const SECTION_KEY_MAP: Record<string, string> = {
  * Every role is explicitly listed — there is NO admin bypass.
  */
 export const ROUTE_ACCESS_MAP: Record<string, AppRole[]> = {
-  '/': ['admin', 'reviewer', 'analyst', 'viewer'],
-  '/auth': ['admin', 'reviewer', 'analyst', 'viewer'],
-  '/error': ['admin', 'reviewer', 'analyst', 'viewer'],
+  '/': ['admin', 'reviewer', 'analyst', 'viewer', 'superadmin'],
+  '/auth': ['admin', 'reviewer', 'analyst', 'viewer', 'superadmin'],
+  '/error': ['admin', 'reviewer', 'analyst', 'viewer', 'superadmin'],
+  '/admin': ['admin', 'superadmin'],
 
-  // Discover & Monitor (AUDIT section)
-  '/discovery': ['admin', 'reviewer', 'analyst'],
-  '/agents': ['admin', 'reviewer', 'analyst'],
-  '/observability': ['admin', 'reviewer', 'analyst'],
-  '/alerts': ['admin', 'reviewer', 'analyst'],
-  '/continuous-validation': ['admin', 'analyst'],
-  '/evaluation': ['admin', 'analyst'],
-  '/benchmarks': ['admin', 'analyst'],
+  // Infrastructure & Discovery
+  '/discovery': ['admin', 'reviewer', 'analyst', 'superadmin'],
+  '/agents': ['admin', 'reviewer', 'analyst', 'superadmin'],
+  '/observability': ['admin', 'reviewer', 'analyst', 'superadmin'],
+  '/alerts': ['admin', 'reviewer', 'analyst', 'superadmin'],
+  '/continuous-validation': ['admin', 'analyst', 'superadmin'],
+  '/evaluation': ['admin', 'analyst', 'superadmin'],
+  '/benchmarks': ['admin', 'analyst', 'superadmin'],
 
-  // Governance
-  '/governance': ['admin', 'reviewer', 'viewer'],
-  '/governance/approvals': ['admin', 'reviewer'],
-  '/oversight': ['admin', 'reviewer'],
-  '/anomalies': ['admin', 'reviewer', 'viewer'],
-  '/lineage': ['admin', 'reviewer', 'viewer'],
+  // Projects & Registries
+  '/projects': ['admin', 'analyst', 'superadmin'],
+  '/projects/:id': ['admin', 'analyst', 'superadmin'],
+  '/systems/:id': ['admin', 'analyst', 'superadmin'],
+  '/engines': ['admin', 'analyst', 'superadmin'],
+  '/engines/:id': ['admin', 'analyst', 'superadmin'],
+
+  // Governance Hub
+  '/governance': ['admin', 'reviewer', 'viewer', 'superadmin'],
+  '/governance/approvals': ['admin', 'reviewer', 'superadmin'],
+  '/oversight': ['admin', 'reviewer', 'superadmin'],
+  '/anomalies': ['admin', 'reviewer', 'viewer', 'superadmin'],
+  '/lineage': ['admin', 'reviewer', 'viewer', 'superadmin'],
   '/audit-center': ['admin', 'reviewer', 'viewer', 'superadmin'],
   '/audit': ['admin', 'reviewer', 'viewer', 'superadmin'],
   '/impact': ['admin', 'reviewer', 'viewer', 'superadmin'],
   '/risk': ['admin', 'reviewer', 'viewer', 'superadmin'],
-  '/runbooks': ['admin', 'reviewer', 'viewer'],
-  '/policy': ['admin', 'reviewer'],
-  '/regulatory-reports': ['admin', 'reviewer', 'viewer'],
+  '/regulatory-reports': ['admin', 'reviewer', 'viewer', 'superadmin'],
+  '/runbooks': ['admin', 'reviewer', 'viewer', 'superadmin'],
+  '/policy': ['admin', 'reviewer', 'superadmin'],
 
-  // Logic Governance Engines (was Core RAI) — admin + analyst
-  '/engine/fairness': ['admin', 'analyst'],
-  '/engine/hallucination': ['admin', 'analyst'],
-  '/engine/toxicity': ['admin', 'analyst'],
-  '/engine/privacy': ['admin', 'analyst'],
-  '/engine/explainability': ['admin', 'analyst'],
-  '/engine/data-quality': ['admin', 'analyst', 'reviewer', 'viewer'],
+  // Security Lab
+  '/security': ['admin', 'analyst', 'superadmin'],
+  '/security/pentest': ['admin', 'analyst', 'superadmin'],
+  '/security/jailbreak': ['admin', 'analyst', 'superadmin'],
+  '/security/threats': ['admin', 'analyst', 'superadmin'],
 
-  // Core Security — admin + analyst
-  '/security': ['admin', 'analyst'],
-  '/security/pentest': ['admin', 'analyst'],
-  '/security/jailbreak': ['admin', 'analyst'],
-  '/security/threats': ['admin', 'analyst'],
+  // Logic Governance (Core RAI Engines)
+  '/engine/fairness': ['admin', 'analyst', 'superadmin'],
+  '/engine/hallucination': ['admin', 'analyst', 'superadmin'],
+  '/engine/toxicity': ['admin', 'analyst', 'superadmin'],
+  '/engine/privacy': ['admin', 'analyst', 'superadmin'],
+  '/engine/explainability': ['admin', 'analyst', 'superadmin'],
+  '/engine/data-quality': ['admin', 'analyst', 'superadmin'],
 
-  // Data Governance — all roles for oversight
+  // Data Governance
   '/data-contracts': ['admin', 'reviewer', 'analyst', 'viewer', 'superadmin'],
   '/semantic-definitions': ['admin', 'reviewer', 'analyst', 'viewer', 'superadmin'],
   '/semantic-hub': ['admin', 'reviewer', 'analyst', 'viewer', 'superadmin'],
+  '/semantic-layer': ['admin', 'reviewer', 'analyst', 'viewer', 'superadmin'],
 
-  // Configure — admin + analyst
-  '/projects': ['admin', 'analyst'],
-  '/engines': ['admin', 'analyst'],
-  '/environments': ['admin', 'analyst'],
-  '/settings': ['admin', 'analyst'],
-  '/providers': ['admin', 'analyst'],
-  '/simulation': ['admin', 'analyst'],
-  '/docs': ['admin', 'reviewer', 'analyst', 'viewer'],
+  // Platform Ops & Simulation
+  '/environments': ['admin', 'analyst', 'superadmin'],
+  '/providers': ['admin', 'analyst', 'superadmin'],
+  '/simulation': ['admin', 'analyst', 'superadmin'],
+  '/settings': ['admin', 'analyst', 'superadmin'],
+  '/docs': ['admin', 'reviewer', 'analyst', 'viewer', 'superadmin'],
 };
 
 /**

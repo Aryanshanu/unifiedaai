@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useSidebarContext } from "@/contexts/SidebarContext";
 import { useAuth } from "@/hooks/useAuth";
-import { canAccessSection } from "@/lib/role-personas";
+import { canAccessSection, canAccessRoute, type AppRole } from "@/lib/role-personas";
 import {
   LayoutDashboard, FolderOpen, Database, Scale, AlertCircle,
   ShieldAlert, Lock, Eye, Settings, ChevronLeft, ChevronRight,
@@ -21,11 +21,11 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { path: "/", icon: LayoutDashboard, label: "Command Center" },
+  { divider: true, label: "Audit" },
   { path: "/audit-center", icon: ScanSearch, label: "Audit Center" },
-  { path: "/agents", icon: Bot, label: "Controller Governance" },
   { divider: true, label: "Monitor" },
-  { path: "/observability", icon: Activity, label: "Observability" },
-  { path: "/alerts", icon: Bell, label: "Alerts" },
+  { path: "/observability", icon: Activity, label: "Observability Hub" },
+  { path: "/alerts", icon: Bell, label: "Alerts & Signals" },
   { path: "/continuous-validation", icon: Clock, label: "Ongoing Validation" },
   { divider: true, label: "Govern" },
   { path: "/governance/approvals", icon: Shield, label: "Approvals" },
@@ -33,22 +33,19 @@ const navItems: NavItem[] = [
   { path: "/anomalies", icon: AlertCircle, label: "Anomalies" },
   { path: "/lineage", icon: GitBranch, label: "Knowledge Graph" },
   { path: "/evaluation", icon: FlaskConical, label: "Validation Hub" },
-  { path: "/risk", icon: Target, label: "Risk & Impact" },
-  { path: "/runbooks", icon: BookOpen, label: "Runbooks" },
-  { path: "/policy", icon: FileText, label: "Policy Studio" },
-  { path: "/regulatory-reports", icon: FileText, label: "Regulatory Reports" },
-  { divider: true, label: "DATA GOVERNANCE" },
+  { divider: true, label: "Data" },
   { path: "/engine/data-quality", icon: Database, label: "Data Quality Engine" },
   { path: "/data-contracts", icon: FileText, label: "Data Contracts" },
   { path: "/semantic-definitions", icon: BookOpen, label: "Semantic Layer" },
   { path: "/semantic-hub", icon: Database, label: "Feature Store" },
-  { divider: true, label: "LOGIC GOVERNANCE" },
+  { divider: true, label: "Logic" },
+  { path: "/agents", icon: Bot, label: "Controller Governance" },
   { path: "/engine/fairness", icon: Scale, label: "Bias Mitigation" },
   { path: "/engine/hallucination", icon: AlertCircle, label: "Factuality Auditor" },
   { path: "/engine/toxicity", icon: ShieldAlert, label: "Safety Engine" },
   { path: "/engine/privacy", icon: Lock, label: "Data Protection" },
   { path: "/engine/explainability", icon: Eye, label: "Logic Transparency" },
-  { divider: true, label: "CORE SECURITY" },
+  { divider: true, label: "Security" },
   { path: "/security", icon: Shield, label: "Security Dashboard" },
   { path: "/security/pentest", icon: ScanSearch, label: "System Hardening" },
   { path: "/security/jailbreak", icon: FlaskConical, label: "Constraint Testing" },
@@ -66,12 +63,12 @@ const navItems: NavItem[] = [
 export function Sidebar() {
   const { collapsed, toggle } = useSidebarContext();
   const location = useLocation();
-  const { persona } = useAuth();
+  const { persona, roles } = useAuth();
 
   const sidebarSections = persona.sidebarSections;
 
-  // Filter nav items based on role's allowed sections
-  const filteredItems = filterNavItems(navItems, sidebarSections);
+  // Filter nav items based on role's allowed sections and explicit route access
+  const filteredItems = filterNavItems(navItems, sidebarSections, roles);
 
   return (
     <aside
@@ -159,30 +156,42 @@ export function Sidebar() {
 }
 
 /** Filters nav items to only show sections allowed for the role */
-function filterNavItems(items: NavItem[], sidebarSections: string[]): NavItem[] {
+function filterNavItems(items: NavItem[], sidebarSections: string[], roles: AppRole[]): NavItem[] {
   if (sidebarSections.includes('all')) return items;
 
   const result: NavItem[] = [];
-  let currentSectionAllowed = true; // Command Center (before first divider) is always allowed
+  let lastDividerIndex = -1;
+  let hasItemsInSection = false;
 
   for (const item of items) {
     if (item.divider) {
-      currentSectionAllowed = canAccessSection(sidebarSections, item.label);
-      if (currentSectionAllowed) {
+      // If the outgoing section had items, keep the divider (if we want to show it)
+      // Actually, we'll only add the divider if the NEXT section has items.
+      // So we track the divider and only push it once we find a valid item.
+      lastDividerIndex = result.length;
+      result.push(item); 
+      hasItemsInSection = false;
+    } else if (item.path) {
+      const isAllowed = canAccessRoute(roles, item.path);
+      if (isAllowed) {
         result.push(item);
+        hasItemsInSection = true;
       }
-    } else if (item.path === '/') {
-      // Command Center always visible
-      result.push(item);
-    } else if (item.path === '/docs') {
-      // Docs visible for roles with 'docs' section
-      if (sidebarSections.includes('docs') || currentSectionAllowed) {
-        result.push(item);
-      }
-    } else if (currentSectionAllowed) {
-      result.push(item);
     }
   }
 
-  return result;
+  // Cleanup: Remove dividers that don't have items following them
+  return result.filter((item, idx, arr) => {
+    if (item.divider) {
+      // Check if there are any non-divider items until the next divider or end
+      const nextItems = arr.slice(idx + 1);
+      const nextIsDivider = nextItems.findIndex(i => i.divider);
+      const itemsInSection = nextIsDivider === -1 
+        ? nextItems 
+        : nextItems.slice(0, nextIsDivider);
+      
+      return itemsInSection.length > 0;
+    }
+    return true;
+  });
 }

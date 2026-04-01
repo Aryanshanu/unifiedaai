@@ -50,6 +50,7 @@ const Discovery = lazy(() => import("./pages/Discovery"));
 const ControllerGovernance = lazy(() => import("./pages/AgentGovernance"));
 const ContinuousValidation = lazy(() => import("./pages/ContinuousValidation"));
 const EnvironmentManagement = lazy(() => import("./pages/EnvironmentManagement"));
+const SystemAdmin = lazy(() => import("./pages/SystemAdmin"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const ImpactDashboard = lazy(() => import("./pages/ImpactDashboard"));
@@ -94,7 +95,7 @@ const App = () => (
               <Suspense fallback={<PageFallback />}>
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
-                  <Route path="/admin" element={<ProtectedRoute><AdminLogin /></ProtectedRoute>} />
+                  <Route path="/admin" element={<ProtectedRoute><SystemAdmin /></ProtectedRoute>} />
                 <Route path="/error" element={<Error />} />
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 {/* Project & System Registry */}

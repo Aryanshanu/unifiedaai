@@ -25,9 +25,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isAuthorized, setIsAuthorized] = useState(() => {
-    return localStorage.getItem('uag_role_authorized') === 'true';
-  });
+  const [isAuthorized, setIsAuthorized] = useState(false);
+
+  // Sync isAuthorized with session and localStorage on mount/change
+  useEffect(() => {
+    const hasAuthorizedFlag = localStorage.getItem('uag_role_authorized') === 'true';
+    const hasActiveRole = localStorage.getItem('uag_active_role');
+    
+    if (user && hasAuthorizedFlag && hasActiveRole) {
+      setIsAuthorized(true);
+    } else if (!loading) {
+      setIsAuthorized(false);
+      localStorage.removeItem('uag_role_authorized');
+    }
+  }, [user, loading]);
 
   const fetchUserRoles = async (userId: string) => {
     try {
