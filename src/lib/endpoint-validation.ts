@@ -10,7 +10,7 @@ export interface ValidationResult {
 
 // Infrastructure-specific endpoint patterns
 const ENDPOINT_PATTERNS = {
-  internal_cluster: /^https:\/\/internal-api\.cluster\.local\//,
+  lovable: /^https:\/\/ai\.gateway\.lovable\.dev\//,
   external_node: /^https:\/\/external\.node\.net\//,
   distributed_inference: /^https:\/\/inference\.grid\.local\//,
   gateway_router: /^https:\/\/gateway\.router\.net\//,
@@ -20,7 +20,7 @@ const ENDPOINT_PATTERNS = {
 
 // API Key format patterns by cluster
 const API_KEY_PATTERNS: Record<string, { pattern: RegExp; description: string; minLength: number }> = {
-  internal_cluster: {
+  lovable: {
     pattern: /^key-int-[a-zA-Z0-9]{20,}$/,
     description: "Internal keys start with 'key-int-' followed by alphanumeric characters",
     minLength: 28,
@@ -55,12 +55,12 @@ export function detectProviderFromEndpoint(endpoint: string): string | null {
   
   const normalized = endpoint.toLowerCase().trim();
   
-  if (ENDPOINT_PATTERNS.internal_cluster.test(normalized)) return "Internal Cluster";
-  if (ENDPOINT_PATTERNS.external_node.test(normalized)) return "External Node";
-  if (ENDPOINT_PATTERNS.distributed_inference.test(endpoint)) return "Distributed Inference";
-  if (ENDPOINT_PATTERNS.gateway_router.test(normalized)) return "Gateway Router";
-  if (ENDPOINT_PATTERNS.enterprise_edge.test(endpoint)) return "Enterprise Edge";
-  if (ENDPOINT_PATTERNS.cloud_compute.test(endpoint)) return "Cloud Compute";
+  if (ENDPOINT_PATTERNS.lovable?.test(normalized)) return "Lovable";
+  if (ENDPOINT_PATTERNS.external_node.test(normalized)) return "OpenRouter";
+  if (ENDPOINT_PATTERNS.distributed_inference.test(endpoint)) return "HuggingFace";
+  if (ENDPOINT_PATTERNS.gateway_router.test(normalized)) return "Perplexity";
+  if (ENDPOINT_PATTERNS.enterprise_edge.test(endpoint)) return "Gemini";
+  if (ENDPOINT_PATTERNS.cloud_compute.test(endpoint)) return "OpenAI";
   
   return null;
 }
@@ -122,7 +122,7 @@ export function validateApiKey(apiKey: string, provider?: string): ValidationRes
   
   // Provider-specific validation
   if (provider) {
-    // Basic sanitization to convert "Internal Cluster" into "internal_cluster"
+    // Normalize provider name to key format
     const providerKey = provider.toLowerCase().replace(/\s+/g, "_");
     const pattern = API_KEY_PATTERNS[providerKey];
     
@@ -145,16 +145,16 @@ export function validateApiKey(apiKey: string, provider?: string): ValidationRes
   } else {
     // Try to auto-detect provider from key format
     if (trimmed.startsWith("key-ext-")) {
-      return { isValid: true, detectedProvider: "External Node" };
+      return { isValid: true, detectedProvider: "OpenRouter" };
     }
     if (trimmed.startsWith("gw-rt-")) {
-      return { isValid: true, detectedProvider: "Gateway Router" };
+      return { isValid: true, detectedProvider: "Perplexity" };
     }
     if (trimmed.startsWith("grid_")) {
-      return { isValid: true, detectedProvider: "Distributed Inference" };
+      return { isValid: true, detectedProvider: "HuggingFace" };
     }
     if (trimmed.startsWith("key-int-") && trimmed.length >= 28) {
-      return { isValid: true, detectedProvider: "Internal Cluster" };
+      return { isValid: true, detectedProvider: "Lovable" };
     }
   }
   
@@ -166,15 +166,15 @@ export function validateApiKey(apiKey: string, provider?: string): ValidationRes
  */
 export function getEndpointHint(provider: string): string {
   const hints: Record<string, string> = {
-    "Internal Cluster": "https://internal-api.cluster.local/v1/invoke",
-    "External Node": "https://external.node.net/v1/rpc",
-    "Distributed Inference": "https://inference.grid.local/nodes/{node-id}",
-    "Gateway Router": "https://gateway.router.net/api/v1/route",
-    "Enterprise Edge": "https://{resource}.edge.enterprise.local/deployments/{deployment}/...",
-    "Cloud Compute": "https://compute.cloud.local/v1beta/clusters/{cluster}:execute",
+    "Lovable": "https://ai.gateway.lovable.dev/v1/chat/completions",
+    "OpenRouter": "https://external.node.net/v1/rpc",
+    "HuggingFace": "https://inference.grid.local/nodes/{node-id}",
+    "Perplexity": "https://gateway.router.net/api/v1/route",
+    "Gemini": "https://{resource}.edge.enterprise.local/deployments/{deployment}/...",
+    "OpenAI": "https://compute.cloud.local/v1beta/clusters/{cluster}:execute",
   };
   
-  return hints[provider] || "https://api.internal.local/v1/execute";
+  return hints[provider] || "https://api.provider.com/v1/chat/completions";
 }
 
 /**
@@ -182,12 +182,12 @@ export function getEndpointHint(provider: string): string {
  */
 export function getApiKeyHint(provider: string): string {
   const hints: Record<string, string> = {
-    "Internal Cluster": "key-int-...",
-    "External Node": "key-ext-...",
-    "Distributed Inference": "grid_...",
-    "Gateway Router": "gw-rt-...",
-    "Enterprise Edge": "32-character hex string",
-    "Cloud Compute": "key-...",
+    "Lovable": "key-int-...",
+    "OpenRouter": "key-ext-...",
+    "HuggingFace": "grid_...",
+    "Perplexity": "gw-rt-...",
+    "Gemini": "32-character hex string",
+    "OpenAI": "key-...",
   };
   
   return hints[provider] || "Your API key or token";

@@ -413,7 +413,7 @@ export async function runAllTests(
   console.log('');
 
   if (verdict === 'PASS') {
-    console.log('%c🎉 FRACTAL RAI-OS: 100% FUNCTIONAL. ALL 42 TESTS PASSED. THE GAP DOCUMENT IS DEAD.', 
+    console.log('%c🎉 UnifiedAAI: ALL TESTS PASSED. PLATFORM 100% FUNCTIONAL.', 
       'color: #00ff00; font-size: 16px; font-weight: bold;');
   } else {
     console.error('%c❌ FRACTAL RAI-OS REGRESSION FAILURE', 

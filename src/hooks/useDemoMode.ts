@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-const DEMO_MODE_KEY = 'fractal-rai-demo-mode';
+const DEMO_MODE_KEY = 'unifiedaai-demo-mode';
 const DEMO_INITIALIZED_KEY = 'unifiedaai-demo-initialized';
 
 // TRUTH ENFORCEMENT: Demo mode is ONLY allowed on /golden route

@@ -28,7 +28,7 @@ export default function LiveDiscoveryScanner() {
     }, 1000);
 
     setTimeout(() => {
-        setLogs(prev => [...prev, 'Analyzing src/hooks/useGateway.ts...', 'Matched logic pattern: standardized_provider/v1', 'Matched logic pattern: internal_bridge/v2']);
+        setLogs(prev => [...prev, 'Analyzing src/hooks/useModels.ts...', 'Matched logic pattern: standardized_provider/v1', 'Matched logic pattern: internal_bridge/v2']);
         setProgress(70);
     }, 2000);
 
@@ -83,7 +83,7 @@ export default function LiveDiscoveryScanner() {
               <div className="bg-slate-950 rounded-lg p-4 font-mono text-xs text-green-400 h-40 overflow-hidden border border-slate-800">
                 <div className="flex items-center gap-2 mb-2 text-slate-400 border-b border-slate-800 pb-2">
                   <Terminal className="w-3 h-3" />
-                  <span>discovery_agent@fractal-os:~$ rg --patterns openai,anthropic .</span>
+                  <span>discovery_agent@unifiedaai:~$ rg --patterns openai,anthropic .</span>
                 </div>
                 <ScrollArea className="h-full pr-4">
                   {logs.map((log, i) => (
