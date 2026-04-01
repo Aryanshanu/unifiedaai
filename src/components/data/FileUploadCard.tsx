@@ -56,18 +56,13 @@ export function FileUploadCard({
     fetchContracts();
   }, []);
 
-  const getFileType = (fileName: string): string | null => {
-    const ext = fileName.split('.').pop()?.toLowerCase();
-    if (allowedTypes.includes(ext || '')) return ext!;
-    return null;
-  };
-
   const handleFile = useCallback(async (file: File) => {
     setErrorMessage(null);
     setContractValidationStatus(null);
     
-    // Validate file type
-    const fileType = getFileType(file.name);
+    // Validate file type (inline to avoid stale closure)
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    const fileType = allowedTypes.includes(ext || '') ? ext! : null;
     if (!fileType) {
       setErrorMessage(`Invalid file type. Allowed: ${allowedTypes.join(', ')}`);
       setPhase('error');
@@ -199,6 +194,7 @@ export function FileUploadCard({
     }
   }, [allowedTypes, maxSizeMB, selectedContractId]);
 
+   
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragActive(false);

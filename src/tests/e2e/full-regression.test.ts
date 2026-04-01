@@ -336,7 +336,7 @@ export async function runAllTests(
   const results: TestResult[] = [];
   let healedCount = 0;
 
-  console.log('🚀 FRACTAL RAI-OS AUTOMATED TEST SUITE - DECEMBER 2025');
+  console.log('🚀 UnifiedAAI AUTOMATED TEST SUITE');
   console.log('═══════════════════════════════════════════════════════');
   console.log(`Running ${ALL_TESTS.length} tests...`);
   console.log('');
@@ -416,7 +416,7 @@ export async function runAllTests(
     console.log('%c🎉 UnifiedAAI: ALL TESTS PASSED. PLATFORM 100% FUNCTIONAL.', 
       'color: #00ff00; font-size: 16px; font-weight: bold;');
   } else {
-    console.error('%c❌ FRACTAL RAI-OS REGRESSION FAILURE', 
+    console.error('%c❌ UnifiedAAI REGRESSION FAILURE', 
       'color: #ff0000; font-size: 16px; font-weight: bold;');
     console.error('Failed tests:');
     results.filter(r => !r.passed).forEach(r => {

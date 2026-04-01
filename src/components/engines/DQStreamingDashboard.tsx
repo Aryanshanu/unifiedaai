@@ -76,10 +76,11 @@ function AnimatedCounter({
   className?: string;
 }) {
   const [displayValue, setDisplayValue] = useState(0);
+  const displayValueRef = useRef(0);
   const animationRef = useRef<number>();
 
   useEffect(() => {
-    const startValue = displayValue;
+    const startValue = displayValueRef.current;
     const endValue = value;
     const duration = 800;
     const startTime = Date.now();
@@ -89,6 +90,7 @@ function AnimatedCounter({
       const progress = Math.min(elapsed / duration, 1);
       const easeOut = 1 - Math.pow(1 - progress, 3);
       const current = startValue + (endValue - startValue) * easeOut;
+      displayValueRef.current = current;
       setDisplayValue(current);
 
       if (progress < 1) {

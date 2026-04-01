@@ -313,14 +313,14 @@ export default function Lineage() {
     return result;
   }, [layoutedNodes, searchQuery, entityTypeFilter]);
 
-  const filteredNodeIds = new Set(filteredNodes.map(n => n.id));
   const filteredEdges = useMemo(() => {
     if (!edges) return [];
     if (!searchQuery && entityTypeFilter === 'all') return edges;
+    const filteredNodeIds = new Set(filteredNodes.map(n => n.id));
     return edges.filter(edge => 
       filteredNodeIds.has(edge.source_node_id) && filteredNodeIds.has(edge.target_node_id)
     );
-  }, [edges, searchQuery, entityTypeFilter, filteredNodeIds]);
+  }, [edges, searchQuery, entityTypeFilter, filteredNodes]);
 
   // Get node position by ID for drawing edges
   const nodePositions = useMemo(() => {
