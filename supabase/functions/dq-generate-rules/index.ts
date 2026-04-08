@@ -93,6 +93,17 @@ function determineSeverity(columnName: string, dimension: string, threshold: num
   return "info";
 }
 
+// SECURITY: Whitelist validation for column names to prevent SQL injection
+const VALID_COLUMN_NAME = /^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/;
+
+function sanitizeColumnName(name: string): string {
+  if (!VALID_COLUMN_NAME.test(name)) {
+    throw new Error(`Rejected invalid column name: "${name}". Only alphanumeric characters and underscores are allowed.`);
+  }
+  // Double-quote the identifier for safety
+  return `"${name}"`;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -118,6 +129,22 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const columnProfiles: ColumnProfile[] = profiling_output.column_profiles;
+
+    // SECURITY: Validate all column names before processing
+    for (const col of columnProfiles) {
+      if (!VALID_COLUMN_NAME.test(col.column_name)) {
+        const response: RulesOutput = {
+          status: "error",
+          code: "INVALID_COLUMN_NAME",
+          message: `Column name "${col.column_name}" contains invalid characters. Only alphanumeric and underscores allowed.`,
+        };
+        return new Response(JSON.stringify(response), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const candidateRules: DQRule[] = [];
     
     // Get current max version for this dataset
@@ -139,6 +166,7 @@ serve(async (req) => {
 
     // Generate rules for each column
     for (const col of columnProfiles) {
+      const safeCol = sanitizeColumnName(col.column_name);
       // Rule 1: Completeness check for every column
       const completenessKey = `${col.column_name}_completeness_null_check`;
       if (!existingRuleKeys.has(completenessKey)) {
