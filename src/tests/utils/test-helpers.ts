@@ -19,50 +19,48 @@ export function renderWithQueryClient(
 // --- E2E test helpers used by full-regression.test.ts ---
 
 export async function countTable(tableName: string): Promise<number> {
-  const { count, error } = await supabase
+  const { count, error } = await (supabase as any)
     .from(tableName)
     .select('*', { count: 'exact', head: true });
   if (error) throw new Error(`countTable(${tableName}): ${error.message}`);
   return count ?? 0;
 }
 
-export async function verifyMinimumCount(tableName: string, minimum: number): Promise<{ passed: boolean; error?: string }> {
-  const count = await countTable(tableName);
-  return count >= minimum
-    ? { passed: true }
-    : { passed: false, error: `${tableName}: expected >= ${minimum}, got ${count}` };
+export async function verifyMinimumCount(tableName: string, minimum: number): Promise<{ passed: boolean; actual: number }> {
+  const actual = await countTable(tableName);
+  return { passed: actual >= minimum, actual };
 }
 
-export async function generateTestTraffic(): Promise<{ passed: boolean; error?: string }> {
+export async function generateTestTraffic(_count?: number): Promise<boolean> {
   try {
-    const { error } = await supabase.functions.invoke('generate-test-traffic', { body: { count: 5 } });
-    return { passed: !error, error: error?.message };
-  } catch (e: any) {
-    return { passed: false, error: e.message };
+    const { error } = await supabase.functions.invoke('generate-test-traffic', { body: { count: _count ?? 5 } });
+    return !error;
+  } catch {
+    return false;
   }
 }
 
-export async function runRedTeamCampaign(): Promise<{ passed: boolean; error?: string }> {
+export async function runRedTeamCampaign(): Promise<boolean> {
   try {
     const { error } = await supabase.functions.invoke('run-red-team', {
       body: { campaign_name: 'regression-test', attack_count: 3 },
     });
-    return { passed: !error, error: error?.message };
-  } catch (e: any) {
-    return { passed: false, error: e.message };
+    return !error;
+  } catch {
+    return false;
   }
 }
 
-export async function generateEUAIActAssessment(): Promise<{ passed: boolean; error?: string }> {
-  return { passed: true };
+export async function generateEUAIActAssessment(): Promise<boolean> {
+  return true;
 }
 
-export async function generateSignedAttestation(): Promise<{ passed: boolean; error?: string }> {
-  return { passed: true };
+export async function generateSignedAttestation(): Promise<boolean> {
+  return true;
 }
 
-export async function createHITLDecision(): Promise<{ passed: boolean; error?: string }> {
-  return { passed: true };
+export async function createHITLDecision(): Promise<boolean> {
+  return true;
 }
 
 export function elementExists(selector: string): boolean {
@@ -78,8 +76,8 @@ export async function waitFor(fn: () => boolean | Promise<boolean>, timeoutMs = 
   return false;
 }
 
-export async function healTable(tableName: string): Promise<{ passed: boolean; error?: string }> {
-  return { passed: true };
+export async function healTable(_tableName: string): Promise<boolean> {
+  return true;
 }
 
 export async function testRealtimeRequestLogs(): Promise<{ passed: boolean; latencyMs: number }> {
