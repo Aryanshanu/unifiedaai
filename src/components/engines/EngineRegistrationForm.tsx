@@ -670,7 +670,7 @@ export function EngineRegistrationForm({ open, onOpenChange, defaultProjectId }:
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Type</p>
-                      <p className="font-medium text-foreground">{formValues.model_type}</p>
+                      <p className="font-medium text-foreground">{formValues.engine_type}</p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Version</p>

@@ -32,7 +32,7 @@ const DOMAIN_OPTIONS: { value: HallucinationDomain; label: string; icon: React.R
   { value: 'general', label: 'General', icon: <Brain className="w-4 h-4" />, description: 'Standard fact-checking prompts' },
   { value: 'clinical', label: 'Clinical/Medical', icon: <Stethoscope className="w-4 h-4" />, description: 'HIPAA-aware medical prompts' },
   { value: 'legal', label: 'Legal', icon: <Scale className="w-4 h-4" />, description: 'Legal domain with ABA compliance' },
-  { value: 'finance', label: 'Finance', icon: <Landmark className="w-4 h-4" />, description: 'SEC/FINRA regulatory prompts' },
+  { value: 'financial', label: 'Finance', icon: <Landmark className="w-4 h-4" />, description: 'SEC/FINRA regulatory prompts' },
 ];
 
 function HallucinationEngineContent() {

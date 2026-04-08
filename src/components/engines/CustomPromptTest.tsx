@@ -151,10 +151,10 @@ export function CustomPromptTest({
                 <Shield className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
                 <div>
                   <span className="text-xs text-muted-foreground">Expected: </span>
-                  <Badge variant={getExpectedBadgeVariant(selectedAttackData.expectedResult)} className="text-xs">
-                    {selectedAttackData.expectedResult}
+                  <Badge variant={getExpectedBadgeVariant(selectedAttackData.expectedFail ? 'fail' : 'pass')} className="text-xs">
+                    {selectedAttackData.expectedFail ? 'Expected Fail' : 'Expected Pass'}
                   </Badge>
-                  <p className="text-xs text-muted-foreground mt-1">{selectedAttackData.reason}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{selectedAttackData.expectedBehavior}</p>
                 </div>
               </div>
             </div>
