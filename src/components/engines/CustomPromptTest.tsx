@@ -135,8 +135,8 @@ export function CustomPromptTest({
                     <span className="truncate max-w-[300px]">
                       {attack.prompt.slice(0, 50)}...
                     </span>
-                    <Badge variant={getExpectedBadgeVariant(attack.expectedResult)} className="ml-auto text-xs">
-                      {attack.expectedResult}
+                    <Badge variant={getExpectedBadgeVariant(attack.expectedFail ? 'fail' : 'pass')} className="ml-auto text-xs">
+                      {attack.expectedFail ? 'Expected Fail' : 'Expected Pass'}
                     </Badge>
                   </div>
                 </SelectItem>
@@ -151,10 +151,10 @@ export function CustomPromptTest({
                 <Shield className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
                 <div>
                   <span className="text-xs text-muted-foreground">Expected: </span>
-                  <Badge variant={getExpectedBadgeVariant(selectedAttackData.expectedResult)} className="text-xs">
-                    {selectedAttackData.expectedResult}
+                  <Badge variant={getExpectedBadgeVariant(selectedAttackData.expectedFail ? 'fail' : 'pass')} className="text-xs">
+                    {selectedAttackData.expectedFail ? 'Expected Fail' : 'Expected Pass'}
                   </Badge>
-                  <p className="text-xs text-muted-foreground mt-1">{selectedAttackData.reason}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{selectedAttackData.expectedBehavior}</p>
                 </div>
               </div>
             </div>

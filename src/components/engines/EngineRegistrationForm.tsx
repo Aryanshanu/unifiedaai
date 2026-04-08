@@ -197,7 +197,7 @@ export function EngineRegistrationForm({ open, onOpenChange, defaultProjectId }:
       if (!valid) return;
     }
     if (step === 2) {
-      const valid = await form.trigger(["name", "model_type", "description"]);
+      const valid = await form.trigger(["name", "engine_type", "description"]);
       if (!valid) return;
     }
     if (step < 4) setStep(step + 1);
@@ -670,7 +670,7 @@ export function EngineRegistrationForm({ open, onOpenChange, defaultProjectId }:
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Type</p>
-                      <p className="font-medium text-foreground">{formValues.model_type}</p>
+                      <p className="font-medium text-foreground">{formValues.engine_type}</p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Version</p>

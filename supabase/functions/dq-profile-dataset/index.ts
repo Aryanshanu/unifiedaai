@@ -352,10 +352,12 @@ serve(async (req) => {
         continue;
       }
       
-      if (col.dtype === 'number' && col.mean_value !== null && col.std_dev !== null && col.std_dev > 0) {
+      if (col.dtype === 'number' && col.mean_value != null && col.std_dev != null && col.std_dev > 0) {
         // REAL: Count values within 3 standard deviations of mean
-        const lowerBound = col.mean_value - 3 * col.std_dev;
-        const upperBound = col.mean_value + 3 * col.std_dev;
+        const meanVal = col.mean_value!;
+        const stdVal = col.std_dev!;
+        const lowerBound = meanVal - 3 * stdVal;
+        const upperBound = meanVal + 3 * stdVal;
         let validCount = 0;
         for (const row of dqData!) {
           const data = row.raw_data as Record<string, unknown>;

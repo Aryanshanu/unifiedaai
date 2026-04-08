@@ -93,6 +93,17 @@ function determineSeverity(columnName: string, dimension: string, threshold: num
   return "info";
 }
 
+// SECURITY: Whitelist validation for column names to prevent SQL injection
+const VALID_COLUMN_NAME = /^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/;
+
+function sanitizeColumnName(name: string): string {
+  if (!VALID_COLUMN_NAME.test(name)) {
+    throw new Error(`Rejected invalid column name: "${name}". Only alphanumeric characters and underscores are allowed.`);
+  }
+  // Double-quote the identifier for safety
+  return `"${name}"`;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -118,6 +129,22 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const columnProfiles: ColumnProfile[] = profiling_output.column_profiles;
+
+    // SECURITY: Validate all column names before processing
+    for (const col of columnProfiles) {
+      if (!VALID_COLUMN_NAME.test(col.column_name)) {
+        const response: RulesOutput = {
+          status: "error",
+          code: "INVALID_COLUMN_NAME",
+          message: `Column name "${col.column_name}" contains invalid characters. Only alphanumeric and underscores allowed.`,
+        };
+        return new Response(JSON.stringify(response), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const candidateRules: DQRule[] = [];
     
     // Get current max version for this dataset
@@ -139,6 +166,7 @@ serve(async (req) => {
 
     // Generate rules for each column
     for (const col of columnProfiles) {
+      const safeCol = sanitizeColumnName(col.column_name);
       // Rule 1: Completeness check for every column
       const completenessKey = `${col.column_name}_completeness_null_check`;
       if (!existingRuleKeys.has(completenessKey)) {
@@ -149,7 +177,7 @@ serve(async (req) => {
           dimension: "completeness",
           rule_name: `${col.column_name}_completeness`,
           logic_type: "null_check",
-          logic_code: `SELECT COUNT(*) as failed FROM data WHERE ${col.column_name} IS NULL OR ${col.column_name} = ''`,
+          logic_code: `SELECT COUNT(*) as failed FROM data WHERE ${safeCol} IS NULL OR ${safeCol} = ''`,
           column_name: col.column_name,
           threshold: completenessThreshold,
           severity: determineSeverity(col.column_name, "completeness", completenessThreshold),
@@ -178,7 +206,7 @@ serve(async (req) => {
             dimension: "uniqueness",
             rule_name: `${col.column_name}_uniqueness`,
             logic_type: "duplicate_check",
-            logic_code: `SELECT ${col.column_name}, COUNT(*) FROM data GROUP BY ${col.column_name} HAVING COUNT(*) > 1`,
+            logic_code: `SELECT ${safeCol}, COUNT(*) FROM data GROUP BY ${safeCol} HAVING COUNT(*) > 1`,
             column_name: col.column_name,
             threshold: uniquenessThreshold,
             severity: determineSeverity(col.column_name, "uniqueness", uniquenessThreshold),
@@ -207,7 +235,7 @@ serve(async (req) => {
             dimension: "validity",
             rule_name: `${col.column_name}_numeric_validity`,
             logic_type: "range_check",
-            logic_code: `SELECT COUNT(*) as failed FROM data WHERE ${col.column_name} < ${col.min_value ?? 0} OR ${col.column_name} > ${col.max_value ?? 999999}`,
+            logic_code: `SELECT COUNT(*) as failed FROM data WHERE ${safeCol} < ${col.min_value ?? 0} OR ${safeCol} > ${col.max_value ?? 999999}`,
             column_name: col.column_name,
             threshold: clampRatio(0.95),
             severity: "warning",
@@ -237,7 +265,7 @@ serve(async (req) => {
             dimension: "validity",
             rule_name: `${col.column_name}_email_format`,
             logic_type: "regex_match",
-            logic_code: `SELECT COUNT(*) as failed FROM data WHERE ${col.column_name} !~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$'`,
+            logic_code: `SELECT COUNT(*) as failed FROM data WHERE ${safeCol} !~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$'`,
             column_name: col.column_name,
             threshold: clampRatio(0.98),
             severity: "critical",
@@ -264,7 +292,7 @@ serve(async (req) => {
             dimension: "timeliness",
             rule_name: `${col.column_name}_freshness`,
             logic_type: "freshness_check",
-            logic_code: `SELECT COUNT(*) as failed FROM data WHERE ${col.column_name} < NOW() - INTERVAL '30 days'`,
+            logic_code: `SELECT COUNT(*) as failed FROM data WHERE ${safeCol} < NOW() - INTERVAL '30 days'`,
             column_name: col.column_name,
             threshold: clampRatio(0.8),
             severity: "info",

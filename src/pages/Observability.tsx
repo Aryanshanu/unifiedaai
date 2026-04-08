@@ -478,7 +478,7 @@ export default function Observability() {
                   </Badge>
                 )}
               </h2>
-              <AlertThresholdConfig />
+              {/* AlertThresholdConfig placeholder - to be implemented */}
             </div>
 
             {alertsLoading ? (
