@@ -197,7 +197,7 @@ export function EngineRegistrationForm({ open, onOpenChange, defaultProjectId }:
       if (!valid) return;
     }
     if (step === 2) {
-      const valid = await form.trigger(["name", "model_type", "description"]);
+      const valid = await form.trigger(["name", "engine_type", "description"]);
       if (!valid) return;
     }
     if (step < 4) setStep(step + 1);
