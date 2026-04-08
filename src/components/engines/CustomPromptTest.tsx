@@ -135,8 +135,8 @@ export function CustomPromptTest({
                     <span className="truncate max-w-[300px]">
                       {attack.prompt.slice(0, 50)}...
                     </span>
-                    <Badge variant={getExpectedBadgeVariant(attack.expectedResult)} className="ml-auto text-xs">
-                      {attack.expectedResult}
+                    <Badge variant={getExpectedBadgeVariant(attack.expectedFail ? 'fail' : 'pass')} className="ml-auto text-xs">
+                      {attack.expectedFail ? 'Expected Fail' : 'Expected Pass'}
                     </Badge>
                   </div>
                 </SelectItem>
