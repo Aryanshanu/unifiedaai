@@ -145,7 +145,7 @@ export default function Evaluation() {
           title="Avg Score"
           value={(stats?.avgScore || 0).toString()}
           subtitle="Across all metrics"
-          trend={{ value: 5, direction: "up" }}
+          trend={{ value: Math.abs(trendValue), direction: trendDirection }}
         />
         <MetricCard
           title="Running"

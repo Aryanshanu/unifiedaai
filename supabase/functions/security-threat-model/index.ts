@@ -2,9 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { validateSession, requireAuth, getServiceClient, corsHeaders, errorResponse, successResponse } from "../_shared/auth-helper.ts";
 import { isValidUUID } from "../_shared/input-validation.ts";
-
-const LOVABLE_API_KEY = () => Deno.env.get("LOVABLE_API_KEY");
-const AI_GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+import { callClaude, claudeErrorResponse, CLAUDE_DEFAULT, CLAUDE_FAST } from "../_shared/claude.ts";
 
 const FRAMEWORKS = ["STRIDE", "OWASP_LLM", "MAESTRO", "ATLAS"] as const;
 type Framework = typeof FRAMEWORKS[number];
@@ -17,73 +15,24 @@ const FRAMEWORK_DESCRIPTIONS: Record<Framework, string> = {
 };
 
 async function generateThreats(modelName: string, modelType: string, framework: Framework, systemDetails: string): Promise<any[]> {
-  const apiKey = LOVABLE_API_KEY();
-  if (!apiKey) {
-    return generateFallbackThreats(framework);
-  }
-
   try {
-    const response = await fetch(AI_GATEWAY_URL, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          {
-            role: "system",
-            content: `You are an AI security threat modeling expert. Generate realistic, specific threat vectors for AI/ML systems using the ${framework} framework (${FRAMEWORK_DESCRIPTIONS[framework]}). Be precise and actionable. Use the generate_threats tool.`
-          },
-          {
-            role: "user",
-            content: `Generate a threat model for this AI system:\n- Model: ${modelName} (${modelType})\n- System context: ${systemDetails}\n- Framework: ${framework}\n\nProvide 5-8 specific threat vectors with likelihood (1-5), impact (1-5), and concrete mitigations.`
-          }
-        ],
-        tools: [{
-          type: "function",
-          function: {
-            name: "generate_threats",
-            description: "Generate structured threat vectors for the AI system",
-            parameters: {
-              type: "object",
-              properties: {
-                threats: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      title: { type: "string" },
-                      description: { type: "string" },
-                      likelihood: { type: "number", description: "1-5 scale" },
-                      impact: { type: "number", description: "1-5 scale" },
-                      category: { type: "string" },
-                      mitigation_checklist: { type: "array", items: { type: "string" } },
-                    },
-                    required: ["title", "description", "likelihood", "impact", "category", "mitigation_checklist"],
-                    additionalProperties: false,
-                  }
-                }
-              },
-              required: ["threats"],
-              additionalProperties: false,
-            }
-          }
-        }],
-        tool_choice: { type: "function", function: { name: "generate_threats" } },
-      }),
-    });
+    const content = await callClaude(
+      [
+        {
+          role: "system",
+          content: `You are an AI security threat modeling expert. Generate realistic, specific threat vectors for AI/ML systems using the ${framework} framework (${FRAMEWORK_DESCRIPTIONS[framework]}). Be precise and actionable. Respond ONLY with valid JSON in the format: {"threats": [{"title": string, "description": string, "likelihood": number, "impact": number, "category": string, "mitigation_checklist": string[]}]}`,
+        },
+        {
+          role: "user",
+          content: `Generate a threat model for this AI system:\n- Model: ${modelName} (${modelType})\n- System context: ${systemDetails}\n- Framework: ${framework}\n\nProvide 5-8 specific threat vectors with likelihood (1-5), impact (1-5), and concrete mitigations. Respond with JSON only.`,
+        },
+      ],
+      { model: CLAUDE_DEFAULT, maxTokens: 2048, temperature: 0.3 }
+    );
 
-    if (!response.ok) {
-      if (response.status === 429 || response.status === 402) {
-        console.warn(`[security-threat-model] AI Gateway ${response.status}, using fallback`);
-        return generateFallbackThreats(framework);
-      }
-      throw new Error(`AI Gateway error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    if (toolCall?.function?.arguments) {
-      const parsed = JSON.parse(toolCall.function.arguments);
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
       return parsed.threats || [];
     }
     return generateFallbackThreats(framework);

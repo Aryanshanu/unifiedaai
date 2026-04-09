@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { callClaude, claudeErrorResponse, CLAUDE_DEFAULT, CLAUDE_FAST, ClaudeError } from "../_shared/claude.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -136,65 +137,45 @@ interface ChatResponse {
 }
 
 // ============================================
-// INTENT CLASSIFICATION (via tool calling)
+// INTENT CLASSIFICATION (via Claude FAST)
 // ============================================
 
-async function classifyIntent(message: string, apiKey: string): Promise<DQIntent> {
+async function classifyIntent(message: string): Promise<DQIntent> {
+  const validIntents: DQIntent[] = [
+    'SUMMARY', 'FAILED_RULES', 'COLUMN_ISSUE', 'INCIDENT_STATUS',
+    'ROOT_CAUSE', 'REMEDIATION', 'TREND', 'GOVERNANCE_TRUST', 'UNKNOWN'
+  ];
+
   try {
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { 
-            role: "system", 
-            content: "Classify the user's data quality question intent. Choose the most specific intent that matches." 
-          },
-          { role: "user", content: message }
-        ],
-        tools: [{
-          type: "function",
-          function: {
-            name: "classify_intent",
-            description: "Classify the user's data quality question intent",
-            parameters: {
-              type: "object",
-              properties: {
-                intent: {
-                  type: "string",
-                  enum: ["SUMMARY", "FAILED_RULES", "COLUMN_ISSUE", "INCIDENT_STATUS", "ROOT_CAUSE", "REMEDIATION", "TREND", "GOVERNANCE_TRUST", "UNKNOWN"],
-                  description: "SUMMARY=general status, FAILED_RULES=what failed, COLUMN_ISSUE=specific column, INCIDENT_STATUS=open incidents, ROOT_CAUSE=why it happened, REMEDIATION=how to fix, TREND=historical, GOVERNANCE_TRUST=integrity score explanation"
-                },
-                confidence: { type: "number", minimum: 0, maximum: 1 }
-              },
-              required: ["intent"]
-            }
-          }
-        }],
-        tool_choice: { type: "function", function: { name: "classify_intent" } },
-        temperature: 0.1,
-        max_tokens: 100,
-      }),
-    });
+    const answer = await callClaude(
+      [
+        {
+          role: "system",
+          content: `Classify the user's data quality question into exactly one of these intent labels:
+SUMMARY=general status overview
+FAILED_RULES=what rules failed
+COLUMN_ISSUE=question about a specific column
+INCIDENT_STATUS=open incidents
+ROOT_CAUSE=why something happened
+REMEDIATION=how to fix an issue
+TREND=historical trend analysis
+GOVERNANCE_TRUST=integrity score explanation
+UNKNOWN=does not fit any category
 
-    if (!response.ok) {
-      console.log("[dq-chat] Intent classification failed, defaulting to UNKNOWN");
-      return "UNKNOWN";
+Respond with ONLY the intent label, nothing else. Example: FAILED_RULES`
+        },
+        { role: "user", content: message }
+      ],
+      { model: CLAUDE_FAST, maxTokens: 20, temperature: 0.0 }
+    );
+
+    const intent = answer.trim().toUpperCase() as DQIntent;
+    if (validIntents.includes(intent)) {
+      console.log(`[dq-chat] Intent classified: ${intent}`);
+      return intent;
     }
 
-    const data = await response.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    
-    if (toolCall?.function?.arguments) {
-      const args = JSON.parse(toolCall.function.arguments);
-      console.log(`[dq-chat] Intent classified: ${args.intent} (confidence: ${args.confidence || 'N/A'})`);
-      return args.intent as DQIntent || "UNKNOWN";
-    }
-    
+    console.log(`[dq-chat] Unrecognized intent label "${intent}", defaulting to UNKNOWN`);
     return "UNKNOWN";
   } catch (error) {
     console.error("[dq-chat] Intent classification error:", error);
@@ -223,30 +204,30 @@ function validateContextForIntent(intent: DQIntent, context: LiveDQContext): Val
         return { valid: true }; // No failures, but context is valid
       }
       break;
-      
+
     case "COLUMN_ISSUE":
       if (!context.profiling) {
         return { valid: false, reason: "Profiling data not available. Please run profiling first." };
       }
       break;
-      
+
     case "INCIDENT_STATUS":
       if (!context.incidents) {
         return { valid: false, reason: "No incidents data available." };
       }
       break;
-      
+
     case "GOVERNANCE_TRUST":
       if (!context.governance_report) {
         return { valid: false, reason: "Governance Integrity Report not available. Complete a full pipeline run." };
       }
       break;
-      
+
     case "TREND":
       // Trend requires historical data - we only have current snapshot
       return { valid: false, reason: "Historical trend analysis is not available in the current pipeline run. Only current snapshot data is accessible." };
   }
-  
+
   return { valid: true };
 }
 
@@ -255,12 +236,12 @@ function validateContextForIntent(intent: DQIntent, context: LiveDQContext): Val
 // ============================================
 
 function buildGovernancePrompt(
-  context: LiveDQContext, 
-  intent: DQIntent, 
+  context: LiveDQContext,
+  intent: DQIntent,
   entities: ExtractedEntities
 ): string {
   const contextSummary = buildContextSummary(context);
-  
+
   // Enhanced system prompt with mandatory markdown formatting for better UX
   return `You are the Data Quality Governance Assistant for the Fractal Unified Governance Platform.
 
@@ -276,9 +257,9 @@ STRICT RULES:
 
 RESPONSE STYLE (ADAPTIVE - ZERO-SHOT):
 - Answer the question DIRECTLY first - no preamble or unnecessary headers
-- For simple factual questions (rates, counts, scores): 
+- For simple factual questions (rates, counts, scores):
   Give the answer in 1-2 sentences with calculation transparency
-- For complex questions (root cause, remediation): 
+- For complex questions (root cause, remediation):
   Use brief structured sections only when genuinely needed
 - For explanations: Use bullet points for clarity when helpful
 
@@ -329,23 +310,23 @@ BEGIN RESPONSE.`;
 
 function buildContextSummary(context: LiveDQContext): string {
   const parts: string[] = [];
-  
+
   // Dataset info
   parts.push(`Dataset: ${context.dataset_name || context.dataset_id || 'Unknown'}`);
   parts.push(`Pipeline Run ID: ${context.pipeline_run_id || 'N/A'}`);
   parts.push(`Timestamp: ${context.timestamp}`);
-  
+
   // Profiling
   if (context.profiling) {
     parts.push(`\n--- PROFILING ---`);
     parts.push(`Row Count: ${context.profiling.row_count.toLocaleString()}`);
     parts.push(`Column Count: ${context.profiling.column_count}`);
-    
+
     // List columns with completeness issues
     const lowCompleteness = Object.values(context.profiling.column_profiles)
       .filter(c => c.completeness < 95)
       .sort((a, b) => a.completeness - b.completeness);
-    
+
     if (lowCompleteness.length > 0) {
       parts.push(`Columns with <95% completeness:`);
       lowCompleteness.slice(0, 10).forEach(c => {
@@ -355,14 +336,14 @@ function buildContextSummary(context: LiveDQContext): string {
         parts.push(`  ... and ${lowCompleteness.length - 10} more`);
       }
     }
-    
+
     parts.push(`Available dimensions: ${context.profiling.available_dimensions.join(', ') || 'none'}`);
     parts.push(`Missing dimensions: ${context.profiling.unavailable_dimensions.join(', ') || 'none'}`);
   } else {
     parts.push(`\n--- PROFILING ---`);
     parts.push(`Status: Not available`);
   }
-  
+
   // Rules
   if (context.rules) {
     parts.push(`\n--- RULES ---`);
@@ -373,7 +354,7 @@ function buildContextSummary(context: LiveDQContext): string {
     parts.push(`\n--- RULES ---`);
     parts.push(`Status: No rules defined`);
   }
-  
+
   // Execution
   if (context.execution) {
     parts.push(`\n--- EXECUTION ---`);
@@ -382,7 +363,7 @@ function buildContextSummary(context: LiveDQContext): string {
     parts.push(`Failed: ${context.execution.failed}`);
     parts.push(`Overall Score: ${context.execution.overall_score !== null ? `${context.execution.overall_score}%` : 'N/A'}`);
     parts.push(`Critical Failure: ${context.execution.critical_failure ? 'YES' : 'No'}`);
-    
+
     if (context.execution.failed_rules.length > 0) {
       parts.push(`\nFailed Rules Details:`);
       context.execution.failed_rules.forEach(r => {
@@ -396,13 +377,13 @@ function buildContextSummary(context: LiveDQContext): string {
     parts.push(`\n--- EXECUTION ---`);
     parts.push(`Status: Not executed`);
   }
-  
+
   // Incidents
   if (context.incidents) {
     parts.push(`\n--- INCIDENTS ---`);
     parts.push(`Total Open: ${context.incidents.open}`);
     parts.push(`By Severity: P0=${context.incidents.by_severity.P0}, P1=${context.incidents.by_severity.P1}, P2=${context.incidents.by_severity.P2}`);
-    
+
     if (context.incidents.items.length > 0) {
       parts.push(`\nIncident Details:`);
       context.incidents.items.slice(0, 5).forEach(i => {
@@ -416,23 +397,23 @@ function buildContextSummary(context: LiveDQContext): string {
     parts.push(`\n--- INCIDENTS ---`);
     parts.push(`Status: No incidents`);
   }
-  
+
   // Governance Report
   if (context.governance_report) {
     parts.push(`\n--- GOVERNANCE INTEGRITY REPORT ---`);
     parts.push(`Integrity Score: ${context.governance_report.integrity_score}/100`);
-    
+
     if (context.governance_report.missing_dimensions.length > 0) {
       parts.push(`Missing Dimensions: ${context.governance_report.missing_dimensions.join(', ')}`);
     }
-    
+
     if (context.governance_report.inconsistencies.length > 0) {
       parts.push(`Inconsistencies Found:`);
       context.governance_report.inconsistencies.forEach(i => {
         parts.push(`  - ${i}`);
       });
     }
-    
+
     if (context.governance_report.score_breakdown) {
       const sb = context.governance_report.score_breakdown;
       parts.push(`\nScore Breakdown:`);
@@ -443,7 +424,7 @@ function buildContextSummary(context: LiveDQContext): string {
       parts.push(`  Warning Penalty: -${sb.warning_penalty}`);
     }
   }
-  
+
   return parts.join('\n');
 }
 
@@ -511,24 +492,24 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    
+
     // Extract mode (default to 'dataset' for backward compatibility)
     const mode = body.mode || 'dataset';
-    
+
     // Handle both old string-based context and new structured context
     const isLegacyRequest = typeof body.context === 'string';
-    
+
     let message: string;
     let history: Array<{ role: 'user' | 'assistant'; content: string }>;
     let context: LiveDQContext | null;
     let extractedEntities: ExtractedEntities;
-    
+
     if (isLegacyRequest) {
       // Legacy: context is a string
       message = body.message;
       history = body.history || [];
       extractedEntities = { columns: [], rules: [], dimensions: [], severities: [], steps: [] };
-      
+
       // Convert string context to minimal LiveDQContext
       context = {
         dataset_id: 'legacy',
@@ -536,7 +517,7 @@ serve(async (req) => {
         pipeline_run_id: null,
         timestamp: new Date().toISOString()
       };
-      
+
       // If context string indicates no data, return error
       if (!body.context || body.context === 'No data quality context available.') {
         console.log("[dq-chat] No context provided (legacy)");
@@ -575,134 +556,86 @@ serve(async (req) => {
       });
     }
 
-    // Get Lovable API key
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      console.error("[dq-chat] LOVABLE_API_KEY not configured");
-      const response: ChatResponse = {
-        status: 'error',
-        error_code: 'MODEL_UNAVAILABLE',
-        error_message: 'AI service is not configured. Please contact support.',
-        metadata: { mode }
-      };
-      return new Response(JSON.stringify(response), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
-
     // ============================================
     // GENERAL MODE - No context required
     // ============================================
     if (mode === 'general') {
       console.log(`[dq-chat] General mode query: "${message.substring(0, 50)}..."`);
-      
+
       const systemPrompt = buildGeneralGovernancePrompt();
-      
+
       const messages = [
-        { role: 'system', content: systemPrompt },
-        ...history.slice(-8).map(m => ({ role: m.role, content: m.content })),
-        { role: 'user', content: message }
+        { role: 'system' as const, content: systemPrompt },
+        ...history.slice(-8).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+        { role: 'user' as const, content: message }
       ];
-      
-      console.log(`[dq-chat] Calling Lovable AI Gateway for general mode`);
-      
-      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages,
-          temperature: 0.3,
-          max_tokens: 2000,
-        }),
-      });
-      
-      // Handle rate limiting
-      if (aiResponse.status === 429) {
-        console.log("[dq-chat] Rate limited by Lovable AI");
+
+      console.log(`[dq-chat] Calling Claude for general mode`);
+
+      try {
+        const answer = await callClaude(messages, { model: CLAUDE_DEFAULT, maxTokens: 2000, temperature: 0.3 });
+
+        if (!answer) {
+          console.error("[dq-chat] Empty response from AI");
+          const response: ChatResponse = {
+            status: 'error',
+            error_code: 'MODEL_UNAVAILABLE',
+            error_message: 'The AI returned an empty response. Please try again.',
+            metadata: { mode }
+          };
+          return new Response(JSON.stringify(response), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+
+        console.log(`[dq-chat] General mode response generated successfully`);
+
         const response: ChatResponse = {
-          status: 'error',
-          error_code: 'RATE_LIMITED',
-          error_message: 'Too many requests. Please wait a moment and try again.',
+          status: 'success',
+          answer,
           metadata: { mode }
         };
+
         return new Response(JSON.stringify(response), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
+      } catch (aiError) {
+        if (aiError instanceof ClaudeError) {
+          if (aiError.code === "RATE_LIMITED") {
+            console.log("[dq-chat] Rate limited by Claude");
+            const response: ChatResponse = {
+              status: 'error',
+              error_code: 'RATE_LIMITED',
+              error_message: 'Too many requests. Please wait a moment and try again.',
+              metadata: { mode }
+            };
+            return new Response(JSON.stringify(response), {
+              status: 200,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+          }
+          console.error("[dq-chat] Claude error:", aiError.message);
+          const response: ChatResponse = {
+            status: 'error',
+            error_code: 'MODEL_UNAVAILABLE',
+            error_message: 'The AI model is temporarily unavailable. Please try again in a moment.',
+            metadata: { mode }
+          };
+          return new Response(JSON.stringify(response), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+        throw aiError;
       }
-
-      // Handle payment required
-      if (aiResponse.status === 402) {
-        console.log("[dq-chat] Payment required for Lovable AI");
-        const response: ChatResponse = {
-          status: 'error',
-          error_code: 'MODEL_UNAVAILABLE',
-          error_message: 'AI credits exhausted. Please add credits to continue.',
-          metadata: { mode }
-        };
-        return new Response(JSON.stringify(response), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
-
-      // Handle other errors
-      if (!aiResponse.ok) {
-        const errorText = await aiResponse.text();
-        console.error("[dq-chat] AI gateway error:", aiResponse.status, errorText);
-        const response: ChatResponse = {
-          status: 'error',
-          error_code: 'MODEL_UNAVAILABLE',
-          error_message: 'The AI model is temporarily unavailable. Please try again in a moment.',
-          metadata: { mode }
-        };
-        return new Response(JSON.stringify(response), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
-
-      // Parse successful response
-      const data = await aiResponse.json();
-      const answer = data.choices?.[0]?.message?.content;
-
-      if (!answer) {
-        console.error("[dq-chat] Empty response from AI");
-        const response: ChatResponse = {
-          status: 'error',
-          error_code: 'MODEL_UNAVAILABLE',
-          error_message: 'The AI returned an empty response. Please try again.',
-          metadata: { mode }
-        };
-        return new Response(JSON.stringify(response), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
-
-      console.log(`[dq-chat] General mode response generated successfully`);
-      
-      const response: ChatResponse = {
-        status: 'success',
-        answer,
-        metadata: { mode }
-      };
-      
-      return new Response(JSON.stringify(response), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
     }
 
     // ============================================
     // DATASET MODE - Context required
     // ============================================
-    
+
     // Validation: context required for dataset mode
     if (!context || !context.dataset_id) {
       console.log("[dq-chat] No context provided for dataset mode");
@@ -720,7 +653,7 @@ serve(async (req) => {
 
     // Step 1: Classify intent
     console.log(`[dq-chat] Classifying intent for: "${message.substring(0, 50)}..."`);
-    const intent = await classifyIntent(message, LOVABLE_API_KEY);
+    const intent = await classifyIntent(message);
     console.log(`[dq-chat] Intent: ${intent}`);
 
     // Step 2: Validate context for intent
@@ -749,111 +682,77 @@ serve(async (req) => {
 
     // Step 4: Build messages array
     const messages = [
-      { role: 'system', content: systemPrompt },
-      ...history.slice(-8).map(m => ({ role: m.role, content: m.content })),
-      { role: 'user', content: message }
+      { role: 'system' as const, content: systemPrompt },
+      ...history.slice(-8).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+      { role: 'user' as const, content: message }
     ];
 
-    console.log(`[dq-chat] Calling Lovable AI Gateway with ${messages.length} messages, intent=${intent}`);
+    console.log(`[dq-chat] Calling Claude with ${messages.length} messages, intent=${intent}`);
 
-    // Step 5: Call Lovable AI Gateway
+    // Step 5: Call Claude
+    try {
+      const answer = await callClaude(messages, { model: CLAUDE_DEFAULT, maxTokens: 2000, temperature: 0.2 });
 
-    // Step 5: Call Lovable AI Gateway
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages,
-        temperature: 0.2, // Lower temperature for more consistent formatting
-        max_tokens: 2000, // Increased for detailed structured responses
-      }),
-    });
-
-    // Handle rate limiting
-    if (aiResponse.status === 429) {
-      console.log("[dq-chat] Rate limited by Lovable AI");
-      const response: ChatResponse = {
-        status: 'error',
-        error_code: 'RATE_LIMITED',
-        error_message: 'Too many requests. Please wait a moment and try again.',
-        metadata: { mode: 'dataset' }
-      };
-      return new Response(JSON.stringify(response), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
-
-    // Handle payment required
-    if (aiResponse.status === 402) {
-      console.log("[dq-chat] Payment required for Lovable AI");
-      const response: ChatResponse = {
-        status: 'error',
-        error_code: 'MODEL_UNAVAILABLE',
-        error_message: 'AI credits exhausted. Please add credits to continue.',
-        metadata: { mode: 'dataset' }
-      };
-      return new Response(JSON.stringify(response), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
-
-    // Handle other errors
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error("[dq-chat] AI gateway error:", aiResponse.status, errorText);
-      const response: ChatResponse = {
-        status: 'error',
-        error_code: 'MODEL_UNAVAILABLE',
-        error_message: 'The AI model is temporarily unavailable. Please try again in a moment.',
-        metadata: { mode: 'dataset' }
-      };
-      return new Response(JSON.stringify(response), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
-
-    // Parse successful response
-    const data = await aiResponse.json();
-    const answer = data.choices?.[0]?.message?.content;
-
-    if (!answer) {
-      console.error("[dq-chat] Empty response from AI");
-      const response: ChatResponse = {
-        status: 'error',
-        error_code: 'MODEL_UNAVAILABLE',
-        error_message: 'The AI returned an empty response. Please try again.',
-        metadata: { mode: 'dataset' }
-      };
-      return new Response(JSON.stringify(response), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
-
-    console.log(`[dq-chat] Response generated successfully (intent=${intent})`);
-    
-    const response: ChatResponse = {
-      status: 'success',
-      answer,
-      metadata: {
-        intent,
-        entities: extractedEntities,
-        context_timestamp: context.timestamp,
-        mode: 'dataset'
+      if (!answer) {
+        console.error("[dq-chat] Empty response from AI");
+        const response: ChatResponse = {
+          status: 'error',
+          error_code: 'MODEL_UNAVAILABLE',
+          error_message: 'The AI returned an empty response. Please try again.',
+          metadata: { mode: 'dataset' }
+        };
+        return new Response(JSON.stringify(response), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
       }
-    };
-    
-    return new Response(JSON.stringify(response), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
-    });
+
+      console.log(`[dq-chat] Response generated successfully (intent=${intent})`);
+
+      const response: ChatResponse = {
+        status: 'success',
+        answer,
+        metadata: {
+          intent,
+          entities: extractedEntities,
+          context_timestamp: context.timestamp,
+          mode: 'dataset'
+        }
+      };
+
+      return new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    } catch (aiError) {
+      if (aiError instanceof ClaudeError) {
+        if (aiError.code === "RATE_LIMITED") {
+          console.log("[dq-chat] Rate limited by Claude");
+          const response: ChatResponse = {
+            status: 'error',
+            error_code: 'RATE_LIMITED',
+            error_message: 'Too many requests. Please wait a moment and try again.',
+            metadata: { mode: 'dataset' }
+          };
+          return new Response(JSON.stringify(response), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+        console.error("[dq-chat] Claude error:", aiError.message);
+        const response: ChatResponse = {
+          status: 'error',
+          error_code: 'MODEL_UNAVAILABLE',
+          error_message: 'The AI model is temporarily unavailable. Please try again in a moment.',
+          metadata: { mode: 'dataset' }
+        };
+        return new Response(JSON.stringify(response), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      throw aiError;
+    }
 
   } catch (error) {
     console.error("[dq-chat] Error:", error);

@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { validateSession, requireAuth, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
+import { CLAUDE_DEFAULT } from "../_shared/claude.ts";
 
 // Fractal Unified Autonomous Governance Platform System Knowledge Base
 const SYSTEM_KNOWLEDGE = `
@@ -254,7 +255,7 @@ serve(async (req) => {
         .select("*, projects(*)")
         .eq("id", systemId)
         .single();
-      
+
       if (system) {
         contextParts.push(`\n## Selected System: ${system.name}`);
         contextParts.push(`- Type: ${system.system_type}`);
@@ -286,34 +287,45 @@ ${thinkingMode ? '\n- THINKING MODE ENABLED: Show your step-by-step reasoning be
 
 ${contextParts.join('\n')}`;
 
-    // Select model based on thinking mode
-    const model = thinkingMode ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
-
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY not configured");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) {
+      throw new Error("ANTHROPIC_API_KEY not configured");
     }
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    // Extract system messages and filter to user/assistant only (Anthropic format)
+    const systemParts: string[] = [systemPrompt];
+    const filteredMessages: Array<{ role: "user" | "assistant"; content: string }> = [];
+    for (const msg of messages) {
+      if (msg.role === "system") {
+        systemParts.push(msg.content);
+      } else {
+        filteredMessages.push({ role: msg.role as "user" | "assistant", content: msg.content });
+      }
+    }
+    if (filteredMessages.length === 0) {
+      filteredMessages.push({ role: "user", content: "Begin." });
+    }
+
+    const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...messages,
-        ],
+        model: CLAUDE_DEFAULT,
+        max_tokens: 4096,
+        system: systemParts.join("\n\n"),
+        messages: filteredMessages,
         stream: true,
       }),
     });
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error("AI Gateway error:", aiResponse.status, errorText);
-      
+      console.error("Anthropic API error:", aiResponse.status, errorText);
+
       if (aiResponse.status === 429) {
         return new Response(
           JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
@@ -326,7 +338,7 @@ ${contextParts.join('\n')}`;
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      throw new Error(`AI Gateway error: ${aiResponse.status}`);
+      throw new Error(`Anthropic API error: ${aiResponse.status}`);
     }
 
     // Stream the response

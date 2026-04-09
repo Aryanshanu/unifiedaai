@@ -7,7 +7,7 @@ export class AnthropicAdapter extends BaseAdapter {
   private baseUrl = 'https://api.anthropic.com/v1/messages';
 
   getDefaultModel(): string {
-    return 'claude-3-5-sonnet-20241022';
+    return 'claude-opus-4-6';
   }
 
   getSupportedModels(): string[] {

@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { validateSession, requireAuth, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
 import { validateAIGatewayInput, validationErrorResponse } from "../_shared/input-validation.ts";
+import { callClaude, claudeErrorResponse, CLAUDE_DEFAULT, CLAUDE_FAST, ClaudeError } from "../_shared/claude.ts";
 
 // =====================================================
 // RATE LIMITING (Database-backed persistent rate limiting)
@@ -853,73 +854,62 @@ serve(async (req) => {
         });
         
         if (!aiResponse.ok) {
-          console.warn(`User endpoint failed with ${aiResponse.status}, falling back to Lovable AI`);
+          console.warn(`User endpoint failed with ${aiResponse.status}, falling back to Claude`);
           usedUserEndpoint = false;
         }
       } catch (endpointError) {
-        console.warn(`User endpoint error: ${endpointError}, falling back to Lovable AI`);
+        console.warn(`User endpoint error: ${endpointError}, falling back to Claude`);
         usedUserEndpoint = false;
       }
     }
     
-    // Fallback to Lovable AI if no user endpoint or it failed
+    // Fallback to Claude if no user endpoint or it failed
+    let assistantMessage = "";
     if (!usedUserEndpoint) {
-      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      if (!LOVABLE_API_KEY) {
-        throw new Error("LOVABLE_API_KEY not configured");
+      try {
+        const claudeMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+          { role: "system", content: system.use_case || "You are a helpful AI assistant." },
+          ...messages.map((m: any) => ({
+            role: (m.role === "system" || m.role === "user" || m.role === "assistant")
+              ? m.role as "system" | "user" | "assistant"
+              : "user" as const,
+            content: m.content,
+          })),
+        ];
+        assistantMessage = await callClaude(claudeMessages, {
+          model: CLAUDE_DEFAULT,
+          maxTokens: 2048,
+        });
+      } catch (claudeErr) {
+        if (claudeErr instanceof ClaudeError) {
+          if (claudeErr.code === "RATE_LIMITED") {
+            return new Response(
+              JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
+              { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+          throw new Error(`Claude API error: ${claudeErr.message}`);
+        }
+        throw claudeErr;
       }
-
-      aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            { role: "system", content: system.use_case || "You are a helpful AI assistant." },
-            ...messages,
-          ],
-        }),
-      });
-    }
-
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error("AI Gateway error:", aiResponse.status, errorText);
-      
-      if (aiResponse.status === 429) {
+    } else {
+      // Parse response from user's configured endpoint
+      const responseText = await aiResponse.text();
+      let aiData;
+      try {
+        aiData = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error("Failed to parse AI response as JSON:", responseText.substring(0, 200));
         return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({
+            error: "External AI provider returned invalid response. Please try again or check your endpoint configuration.",
+            trace_id: traceId
+          }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      if (aiResponse.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI credits exhausted. Please add funds." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      throw new Error(`AI Gateway error: ${aiResponse.status}`);
+      assistantMessage = aiData.choices?.[0]?.message?.content || aiData.content?.[0]?.text || "";
     }
-
-    // Parse response, handling HTML error pages gracefully
-    const responseText = await aiResponse.text();
-    let aiData;
-    try {
-      aiData = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error("Failed to parse AI response as JSON:", responseText.substring(0, 200));
-      return new Response(
-        JSON.stringify({ 
-          error: "External AI provider returned invalid response. Please try again or check your endpoint configuration.",
-          trace_id: traceId
-        }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    const assistantMessage = aiData.choices?.[0]?.message?.content || "";
 
     // Run output evaluations
     const outputEngineScores: EngineScore[] = [
@@ -934,22 +924,13 @@ serve(async (req) => {
       output: Object.fromEntries(outputEngineScores.map(e => [e.engine, e])),
     };
 
-    let finalResponse = aiData;
     let finalStatusCode = 200;
     let decision = outputVerdict;
+    let finalAssistantMessage = assistantMessage;
 
     // Modify response if output is blocked
     if (outputVerdict === "BLOCK") {
-      finalResponse = {
-        ...aiData,
-        choices: [{
-          ...aiData.choices?.[0],
-          message: {
-            role: "assistant",
-            content: "I apologize, but I cannot provide that response as it was flagged by our safety systems.",
-          }
-        }]
-      };
+      finalAssistantMessage = "I apologize, but I cannot provide that response as it was flagged by our safety systems.";
       decision = "BLOCK";
     }
 
@@ -959,7 +940,7 @@ serve(async (req) => {
       system_id: systemId,
       project_id: system.project_id,
       request_body: { messages },
-      response_body: { message: assistantMessage.substring(0, 500) },
+      response_body: { message: finalAssistantMessage.substring(0, 500) },
       status_code: finalStatusCode,
       latency_ms: latencyMs,
       trace_id: traceId,
@@ -979,7 +960,7 @@ serve(async (req) => {
     // Update runtime metrics
     const now = new Date();
     const windowStart = new Date(now.getTime() - 5 * 60 * 1000).toISOString();
-    
+
     await serviceClient.from("risk_metrics").insert([
       { system_id: systemId, metric_name: "request_logged", metric_value: 1, time_window: "5m" },
       { system_id: systemId, metric_name: "latency_ms", metric_value: latencyMs, time_window: "5m" },
@@ -988,7 +969,14 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        ...finalResponse,
+        choices: [{
+          message: {
+            role: "assistant",
+            content: finalAssistantMessage,
+          },
+          index: 0,
+          finish_reason: "stop",
+        }],
         _meta: {
           decision,
           latency_ms: latencyMs,

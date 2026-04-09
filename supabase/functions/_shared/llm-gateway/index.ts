@@ -11,7 +11,6 @@ import {
   LLMRequestLog
 } from './types.ts';
 
-import { LovableAdapter } from './adapters/lovable-adapter.ts';
 import { OpenAIAdapter } from './adapters/openai-adapter.ts';
 import { GeminiAdapter } from './adapters/gemini-adapter.ts';
 import { HuggingFaceAdapter } from './adapters/huggingface-adapter.ts';
@@ -24,7 +23,6 @@ export * from './types.ts';
 
 // Adapter registry
 const adapters = new Map<LLMProvider, ProviderAdapter>();
-adapters.set('lovable', new LovableAdapter());
 adapters.set('openai', new OpenAIAdapter());
 adapters.set('gemini', new GeminiAdapter());
 adapters.set('huggingface', new HuggingFaceAdapter());
@@ -169,7 +167,7 @@ export function createRequestLog(
   return {
     request_id: `error-${Date.now()}`,
     timestamp: new Date().toISOString(),
-    provider: error?.provider || 'lovable',
+    provider: error?.provider || 'anthropic',
     model: 'unknown',
     latency_ms: 0,
     prompt_tokens: 0,
@@ -193,7 +191,7 @@ export function detectProviderFromEndpoint(endpoint: string): LLMProvider | null
   if (url.includes('huggingface.co') || url.includes('api-inference.huggingface.co')) return 'huggingface';
   if (url.includes('perplexity.ai')) return 'perplexity';
   if (url.includes('openrouter.ai')) return 'openrouter';
-  if (url.includes('ai.gateway.lovable.dev')) return 'lovable';
+  // Lovable AI Gateway removed — all AI routes through Anthropic Claude
   
   return null;
 }

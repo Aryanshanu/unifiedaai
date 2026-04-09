@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.84.0";
+import { callClaude, claudeErrorResponse, CLAUDE_DEFAULT, CLAUDE_FAST, ClaudeError } from "../_shared/claude.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -52,9 +53,9 @@ async function executeOpenAI(
   baseUrl?: string
 ): Promise<{ success: boolean; response?: string; error?: string }> {
   const url = baseUrl || 'https://api.openai.com/v1/chat/completions';
-  
+
   console.log(`[target-executor][OpenAI] Calling ${url} with model ${model}`);
-  
+
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -131,8 +132,8 @@ async function executeAzure(
   temperature: number
 ): Promise<{ success: boolean; response?: string; error?: string }> {
   // Azure OpenAI endpoint format: https://{resource}.openai.azure.com/openai/deployments/{deployment}/chat/completions?api-version=2024-02-01
-  const url = endpoint.includes('chat/completions') 
-    ? endpoint 
+  const url = endpoint.includes('chat/completions')
+    ? endpoint
     : `${endpoint}/openai/deployments/${model}/chat/completions?api-version=2024-02-01`;
 
   console.log(`[target-executor][Azure] Calling ${url}`);
@@ -209,7 +210,7 @@ async function executeHuggingFace(
   temperature: number
 ): Promise<{ success: boolean; response?: string; error?: string }> {
   const url = `https://api-inference.huggingface.co/models/${model}`;
-  
+
   console.log(`[target-executor][HuggingFace] Calling with model ${model}`);
 
   // HuggingFace inference API format varies by model
@@ -242,7 +243,7 @@ async function executeHuggingFace(
 }
 
 // ============================================================================
-// OPENROUTER PROVIDER (NEW)
+// OPENROUTER PROVIDER
 // ============================================================================
 
 async function executeOpenRouter(
@@ -253,7 +254,7 @@ async function executeOpenRouter(
   temperature: number
 ): Promise<{ success: boolean; response?: string; error?: string }> {
   const url = 'https://openrouter.ai/api/v1/chat/completions';
-  
+
   console.log(`[target-executor][OpenRouter] Calling with model ${model}`);
 
   // Add timeout for long-running requests
@@ -313,7 +314,7 @@ async function executeCustom(
     'Content-Type': 'application/json',
     ...customHeaders,
   };
-  
+
   if (apiKey) {
     headers['Authorization'] = `Bearer ${apiKey}`;
   }
@@ -338,48 +339,40 @@ async function executeCustom(
 
   const result = await response.json();
   // Try to extract content from common response formats
-  const content = result.choices?.[0]?.message?.content 
-    || result.response 
-    || result.content 
-    || result.text 
-    || result.output 
+  const content = result.choices?.[0]?.message?.content
+    || result.response
+    || result.content
+    || result.text
+    || result.output
     || JSON.stringify(result);
   return { success: true, response: content };
 }
 
-async function executeLovable(
+// ============================================================================
+// CLAUDE FALLBACK (replaces executeLovable)
+// ============================================================================
+
+async function executeClaude(
   messages: Array<{ role: string; content: string }>,
   maxTokens: number
 ): Promise<{ success: boolean; response?: string; error?: string }> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  
-  if (!LOVABLE_API_KEY) {
-    return { success: false, error: 'LOVABLE_API_KEY not configured' };
+  console.log(`[target-executor][Claude] Using built-in fallback`);
+
+  try {
+    const claudeMessages = messages.map(m => ({
+      role: (m.role === "system" || m.role === "user" || m.role === "assistant")
+        ? m.role as "system" | "user" | "assistant"
+        : "user" as const,
+      content: m.content,
+    }));
+
+    const text = await callClaude(claudeMessages, { model: CLAUDE_DEFAULT, maxTokens });
+    return { success: true, response: text };
+  } catch (err) {
+    const errMsg = err instanceof ClaudeError ? err.message : `Claude error: ${err instanceof Error ? err.message : 'Unknown error'}`;
+    console.error(`[target-executor][Claude] Error:`, err);
+    return { success: false, error: errMsg };
   }
-
-  console.log(`[target-executor][Lovable] Using built-in fallback`);
-
-  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'google/gemini-2.5-flash',
-      messages,
-      max_tokens: maxTokens,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`[target-executor][Lovable] Error: ${response.status} - ${errorText.substring(0, 300)}`);
-    return { success: false, error: `Lovable AI error (${response.status}): ${errorText.substring(0, 200)}` };
-  }
-
-  const result = await response.json();
-  return { success: true, response: result.choices?.[0]?.message?.content || '' };
 }
 
 // ============================================================================
@@ -388,15 +381,15 @@ async function executeLovable(
 
 function detectProviderFromEndpoint(endpoint: string | null, currentProvider: string): string {
   if (!endpoint) return currentProvider;
-  
+
   const endpointLower = endpoint.toLowerCase();
-  
+
   // Auto-detect OpenRouter
   if (endpointLower.includes('openrouter.ai')) {
     console.log('[target-executor] Auto-detected OpenRouter from endpoint URL');
     return 'openrouter';
   }
-  
+
   // Auto-detect other providers
   if (endpointLower.includes('api.openai.com')) {
     return 'openai';
@@ -413,7 +406,7 @@ function detectProviderFromEndpoint(endpoint: string | null, currentProvider: st
   if (endpointLower.includes('openai.azure.com')) {
     return 'azure';
   }
-  
+
   return currentProvider;
 }
 
@@ -426,7 +419,7 @@ function extractModelFromOpenRouterUrl(endpoint: string, modelName: string | nul
   if (modelName && modelName.trim() && modelName.includes('/')) {
     return modelName;
   }
-  
+
   // model_name is missing or invalid (e.g. "Gemma" instead of "google/gemma-3n-e4b-it")
   // Try to extract model from URL path like https://openrouter.ai/google/gemma-3n-e4b-it
   const urlMatch = endpoint.match(/openrouter\.ai\/([^/]+\/[^/?\s]+)/);
@@ -435,7 +428,7 @@ function extractModelFromOpenRouterUrl(endpoint: string, modelName: string | nul
     console.log(`[target-executor] model_name "${modelName}" is not a valid OpenRouter ID, extracted from URL: ${extractedModel}`);
     return extractedModel;
   }
-  
+
   // Default fallback
   console.warn(`[target-executor] Could not resolve OpenRouter model from name="${modelName}" or endpoint="${endpoint}", using fallback`);
   return 'openai/gpt-4o-mini';
@@ -494,7 +487,7 @@ serve(async (req) => {
     console.log(`[target-executor] ${correlationId} Executing against: ${config.name} (provider: ${config.provider}, endpoint: ${config.endpoint?.substring(0, 50)}...)`);
 
     let result: { success: boolean; response?: string; error?: string };
-    let provider = config.provider?.toLowerCase() || 'lovable';
+    let provider = config.provider?.toLowerCase() || 'anthropic';
     const apiKey = config.api_token_encrypted || '';
     const endpoint = config.endpoint || '';
     const customHeaders = config.api_headers || {};
@@ -545,10 +538,10 @@ serve(async (req) => {
         break;
       case 'lovable':
       default:
-        // Fallback to Lovable AI for testing or when no custom endpoint configured
+        // Fallback to Claude for testing or when no custom endpoint configured
         if (!apiKey && !endpoint) {
-          console.log(`[target-executor] ${correlationId} No API key configured, using Lovable AI fallback`);
-          result = await executeLovable(messages, maxTokens);
+          console.log(`[target-executor] ${correlationId} No API key configured, using Claude fallback`);
+          result = await executeClaude(messages, maxTokens);
         } else if (endpoint) {
           // Check if it looks like OpenRouter
           const detectedProvider = detectProviderFromEndpoint(endpoint, 'custom');
@@ -559,7 +552,7 @@ serve(async (req) => {
             result = await executeCustom(apiKey, endpoint, messages, maxTokens, temperature, customHeaders);
           }
         } else {
-          result = await executeLovable(messages, maxTokens);
+          result = await executeClaude(messages, maxTokens);
         }
         break;
     }

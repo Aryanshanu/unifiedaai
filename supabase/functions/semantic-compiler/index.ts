@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { callClaude, claudeErrorResponse, CLAUDE_DEFAULT, CLAUDE_FAST } from "../_shared/claude.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,7 +16,6 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
 
     const supabase = createClient(supabaseUrl, serviceKey);
 
@@ -42,58 +42,37 @@ serve(async (req) => {
       def.ai_context,
     ].filter(Boolean).join(" | ");
 
-    if (!lovableApiKey) {
-      console.warn("LOVABLE_API_KEY not set, skipping vector embedding");
-      return new Response(JSON.stringify({ status: "skipped", reason: "no api key" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // Generate embedding via Claude
+    let embedding: number[] | null = null;
+    try {
+      const content = await callClaude([
+        {
+          role: "system",
+          content: "You are a semantic embedding generator. Return ONLY a JSON array of 768 floating point numbers between -1 and 1 that represent the semantic embedding of the input text. No explanation, no markdown, just the JSON array.",
+        },
+        {
+          role: "user",
+          content: `Generate a 768-dimensional semantic embedding for this metric definition:\n\n${textForEmbedding}`,
+        },
+      ], { model: CLAUDE_FAST, maxTokens: 4096 });
 
-    // Generate embedding via Lovable AI Gateway
-    const embeddingResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
-        messages: [
-          {
-            role: "system",
-            content: "You are a semantic embedding generator. Return ONLY a JSON array of 768 floating point numbers between -1 and 1 that represent the semantic embedding of the input text. No explanation, no markdown, just the JSON array.",
-          },
-          {
-            role: "user",
-            content: `Generate a 768-dimensional semantic embedding for this metric definition:\n\n${textForEmbedding}`,
-          },
-        ],
-      }),
-    });
-
-    if (!embeddingResponse.ok) {
-      const errText = await embeddingResponse.text();
-      console.error("AI gateway error:", embeddingResponse.status, errText);
-      return new Response(JSON.stringify({ status: "error", error: "AI gateway failed" }), {
+      try {
+        const cleaned = content.replace(/```json\n?/g, "").replace(/```/g, "").trim();
+        const parsed = JSON.parse(cleaned);
+        if (Array.isArray(parsed) && parsed.length === 768) {
+          embedding = parsed;
+        } else {
+          console.warn("Invalid embedding dimensions:", parsed?.length);
+        }
+      } catch {
+        console.warn("Failed to parse embedding from AI response");
+      }
+    } catch (aiErr) {
+      console.error("AI embedding error:", aiErr);
+      return new Response(JSON.stringify({ status: "error", error: "AI call failed" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-    }
-
-    const aiResult = await embeddingResponse.json();
-    const content = aiResult.choices?.[0]?.message?.content || "";
-
-    // Parse embedding array from response
-    let embedding: number[] | null = null;
-    try {
-      const cleaned = content.replace(/```json\n?/g, "").replace(/```/g, "").trim();
-      embedding = JSON.parse(cleaned);
-      if (!Array.isArray(embedding) || embedding.length !== 768) {
-        console.warn("Invalid embedding dimensions:", embedding?.length);
-        embedding = null;
-      }
-    } catch {
-      console.warn("Failed to parse embedding from AI response");
     }
 
     if (embedding) {

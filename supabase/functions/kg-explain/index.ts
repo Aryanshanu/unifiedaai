@@ -2,8 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { validateSession, requireAuth, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
-
-const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+import { callClaude, CLAUDE_DEFAULT, ClaudeError } from "../_shared/claude.ts";
 
 interface ExplainRequest {
   question: string;
@@ -24,11 +23,11 @@ serve(async (req) => {
     if (authError) return authError;
 
     console.log(`[kg-explain] User ${authResult.user?.id} requesting explanation...`);
-    
+
     const supabase = getServiceClient();
 
     const { question, entity_id, entity_type, context = {} }: ExplainRequest = await req.json();
-    
+
     console.log('KG Explain:', question);
 
     // Gather relevant graph context
@@ -98,7 +97,7 @@ serve(async (req) => {
     }
 
     // Check for specific compliance question
-    const isComplianceQuestion = question.toLowerCase().includes('non-compliant') || 
+    const isComplianceQuestion = question.toLowerCase().includes('non-compliant') ||
                                   question.toLowerCase().includes('compliance') ||
                                   question.toLowerCase().includes('violat');
 
@@ -118,7 +117,7 @@ Risk Assessments: ${JSON.stringify(riskRes.data || [])}
       `;
     }
 
-    // Use Lovable AI to explain
+    // Build system prompt
     const systemPrompt = `You are an AI expert in analyzing knowledge graphs for AI governance and compliance.
 You have access to the following graph context and should use it to answer questions accurately.
 
@@ -137,29 +136,14 @@ Instructions:
 4. Provide actionable recommendations when appropriate
 5. Be concise but thorough`;
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: question }
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Lovable AI error:', errorText);
-      throw new Error('Failed to get AI explanation');
-    }
-
-    const aiResponse = await response.json();
-    const explanation = aiResponse.choices?.[0]?.message?.content || 'Unable to generate explanation';
+    // Call Claude
+    const explanation = await callClaude(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: question },
+      ],
+      { model: CLAUDE_DEFAULT, maxTokens: 2048 }
+    );
 
     // Extract key findings from the explanation
     const findings = {

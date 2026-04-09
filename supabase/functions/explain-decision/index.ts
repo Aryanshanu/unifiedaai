@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { callClaude, claudeErrorResponse, CLAUDE_DEFAULT, CLAUDE_FAST } from "../_shared/claude.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -30,9 +31,7 @@ async function computeFeatureImportance(
   decisionValue: string,
   modelName: string
 ): Promise<FeatureInfluence[]> {
-  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-  
-  if (lovableKey && Object.keys(featureData).length > 0) {
+  if (Object.keys(featureData).length > 0) {
     try {
       const prompt = `Analyze these input features for an AI decision and compute realistic feature importance scores.
 
@@ -45,27 +44,14 @@ Return ONLY a JSON array of objects with: {"feature": string, "value": the_value
 - Base importance on logical reasoning about which features most influence this decision type
 - Return valid JSON array only, no markdown.`;
 
-      const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: [
-            { role: "system", content: "You are a feature importance analysis engine. Return valid JSON only." },
-            { role: "user", content: prompt },
-          ],
-          temperature: 0.2,
-          max_tokens: 600,
-        }),
-      });
+      const content = await callClaude([
+        { role: "system", content: "You are a feature importance analysis engine. Return valid JSON only." },
+        { role: "user", content: prompt },
+      ], { model: CLAUDE_FAST, maxTokens: 600, temperature: 0.2 });
 
-      if (resp.ok) {
-        const result = await resp.json();
-        const content = result.choices?.[0]?.message?.content || "";
-        const jsonMatch = content.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-          return JSON.parse(jsonMatch[0]) as FeatureInfluence[];
-        }
+      const jsonMatch = content.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]) as FeatureInfluence[];
       }
     } catch (e) {
       console.error("AI feature importance error:", e);
@@ -92,7 +78,7 @@ function generateCounterfactual(
   decisionValue: string
 ): Record<string, unknown> {
   const counterfactual: Record<string, unknown> = {};
-  
+
   Object.entries(featureData).forEach(([key, value]) => {
     if (typeof value === "number") {
       // Suggest a different numeric value
@@ -115,7 +101,7 @@ function generateCounterfactual(
       };
     }
   });
-  
+
   return {
     originalDecision: decisionValue,
     alternativeDecision: `NOT_${decisionValue}`,
@@ -125,26 +111,21 @@ function generateCounterfactual(
 }
 
 /**
- * Generates natural language explanation using Lovable AI
+ * Generates natural language explanation using Claude
  */
 async function generateNaturalLanguageExplanation(
   decisionValue: string,
   featureInfluences: FeatureInfluence[],
   modelName: string
 ): Promise<string> {
-  const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
-  
-  if (!lovableApiKey) {
-    // Fallback to template-based explanation
-    const topFeatures = featureInfluences.slice(0, 3);
-    const featureList = topFeatures
-      .map(f => `${f.feature} (${(f.contribution * 100).toFixed(1)}% influence)`)
-      .join(", ");
-    
-    return `The model "${modelName}" made the decision "${decisionValue}" primarily based on: ${featureList}. ` +
-      `The most influential factor was "${topFeatures[0]?.feature}" which contributed ${(topFeatures[0]?.contribution * 100).toFixed(1)}% to the outcome.`;
-  }
-  
+  // Fallback template
+  const topFeatures = featureInfluences.slice(0, 3);
+  const featureList = topFeatures
+    .map(f => `${f.feature} (${(f.contribution * 100).toFixed(1)}% influence)`)
+    .join(", ");
+  const fallback = `The model "${modelName}" made the decision "${decisionValue}" primarily based on: ${featureList}. ` +
+    `The most influential factor was "${topFeatures[0]?.feature}" which contributed ${(topFeatures[0]?.contribution * 100).toFixed(1)}% to the outcome.`;
+
   try {
     const prompt = `Generate a clear, human-readable explanation for the following AI decision:
 
@@ -161,33 +142,14 @@ Write a 2-3 sentence explanation that a non-technical person could understand. F
 
 Do not use technical jargon. Be clear and concise.`;
 
-    const response = await fetch("https://api.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${lovableApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: "You are an AI explainability assistant that helps humans understand AI decisions." },
-          { role: "user", content: prompt },
-        ],
-        max_tokens: 300,
-        temperature: 0.7,
-      }),
-    });
+    const text = await callClaude([
+      { role: "system", content: "You are an AI explainability assistant that helps humans understand AI decisions." },
+      { role: "user", content: prompt },
+    ], { model: CLAUDE_FAST, maxTokens: 300, temperature: 0.7 });
 
-    if (!response.ok) {
-      throw new Error(`Lovable AI error: ${response.status}`);
-    }
-
-    const result = await response.json();
-    return result.choices?.[0]?.message?.content || "Unable to generate explanation.";
-    
+    return text || fallback;
   } catch (err) {
     console.error("Natural language generation error:", err);
-    // Fallback
     const topFeature = featureInfluences[0];
     return `The decision "${decisionValue}" was primarily influenced by ${topFeature?.feature} (${(topFeature?.contribution * 100).toFixed(1)}% contribution).`;
   }
@@ -247,23 +209,23 @@ serve(async (req) => {
     }
 
     // Use provided feature data or extract from context
-    const features: Record<string, unknown> = featureData || 
-      (decision.context as Record<string, unknown>)?.features as Record<string, unknown> || 
+    const features: Record<string, unknown> = featureData ||
+      (decision.context as Record<string, unknown>)?.features as Record<string, unknown> ||
       { placeholder: "no_features_provided" };
-    
+
     // Generate explanation based on type
     let featureInfluences: FeatureInfluence[] = [];
     let counterfactual: Record<string, unknown> | null = null;
     let naturalLanguage: string | null = null;
-    
+
     if (Object.keys(features).length > 0) {
       const modelName = (decision.models as any)?.name || "AI Model";
       featureInfluences = await computeFeatureImportance(features, decision.decision_value, modelName);
-      
+
       if (explanationType === "counterfactual") {
         counterfactual = generateCounterfactual(features, decision.decision_value);
       }
-      
+
       if (generateNaturalLanguage) {
         naturalLanguage = await generateNaturalLanguageExplanation(
           decision.decision_value,

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { callClaude, claudeErrorResponse, CLAUDE_DEFAULT, CLAUDE_FAST } from "../_shared/claude.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -138,12 +139,10 @@ serve(async (req) => {
       const features = feature_data || (decision.context as Record<string, unknown>)?.features || {};
       const modelName = (decision.models as any)?.name || "AI Model";
 
-      // Use Lovable AI Gateway for real explanation
-      const lovableKey = Deno.env.get("LOVABLE_API_KEY");
       let naturalLanguage = "";
       let featureInfluences: unknown[] = [];
 
-      if (lovableKey && Object.keys(features).length > 0) {
+      if (Object.keys(features).length > 0) {
         const prompt = `Analyze this AI decision and provide feature importance:
 Decision: ${decision.decision_value}
 Model: ${modelName}
@@ -156,29 +155,16 @@ Return a JSON object with:
 Base the contributions on logical reasoning about which features would most influence this type of decision. Contributions must sum to 1.0.`;
 
         try {
-          const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              model: "google/gemini-3-flash-preview",
-              messages: [
-                { role: "system", content: "You are an AI explainability engine. Return valid JSON only." },
-                { role: "user", content: prompt },
-              ],
-              temperature: 0.3,
-              max_tokens: 800,
-            }),
-          });
+          const content = await callClaude([
+            { role: "system", content: "You are an AI explainability engine. Return valid JSON only." },
+            { role: "user", content: prompt },
+          ], { model: CLAUDE_FAST, maxTokens: 800, temperature: 0.3 });
 
-          if (aiResp.ok) {
-            const result = await aiResp.json();
-            const content = result.choices?.[0]?.message?.content || "";
-            const jsonMatch = content.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-              const parsed = JSON.parse(jsonMatch[0]);
-              featureInfluences = parsed.feature_influences || [];
-              naturalLanguage = parsed.explanation || "";
-            }
+          const jsonMatch = content.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            featureInfluences = parsed.feature_influences || [];
+            naturalLanguage = parsed.explanation || "";
           }
         } catch (e) {
           console.error("AI explanation error:", e);
@@ -198,7 +184,7 @@ Base the contributions on logical reasoning about which features would most infl
           explanation_type: "feature_importance",
           feature_influences: featureInfluences,
           natural_language: naturalLanguage,
-          generation_method: "lovable_ai_gateway_v1",
+          generation_method: "claude_v1",
         })
         .select()
         .single();

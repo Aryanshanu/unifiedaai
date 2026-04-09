@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { validateSession, requireAuth, hasAnyRole, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
 import { validateRAIReasoningInput, validationErrorResponse, createTimeoutFetch } from "../_shared/input-validation.ts";
+import { callClaude, CLAUDE_DEFAULT, ClaudeError } from "../_shared/claude.ts";
 
 // Timeout fetch for AI calls (45 seconds for deep reasoning)
 const aiFetch = createTimeoutFetch(45000);
@@ -24,7 +25,6 @@ interface EngineAnalysis {
   transparency_summary: string;
 }
 
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -243,36 +243,14 @@ const ENGINE_TEST_PROMPTS: Record<string, { prompt: string; context?: string }[]
   ],
 };
 
-async function callLovableAI(systemPrompt: string, userPrompt: string): Promise<string> {
-  if (!LOVABLE_API_KEY) {
-    throw new Error("LOVABLE_API_KEY is not configured");
-  }
-
-  const response = await aiFetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-pro", // Using the best model for deep reasoning
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.1, // Low temperature for consistent, analytical responses
-      max_tokens: 4000,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("Lovable AI error:", response.status, errorText);
-    throw new Error(`Lovable AI error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  return data.choices?.[0]?.message?.content || "";
+async function callClaudeForAnalysis(systemPrompt: string, userPrompt: string): Promise<string> {
+  return await callClaude(
+    [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+    { model: CLAUDE_DEFAULT, maxTokens: 4000, temperature: 0.1 }
+  );
 }
 
 async function callTargetModel(endpoint: string, apiToken: string, prompt: string): Promise<string> {
@@ -323,11 +301,11 @@ serve(async (req) => {
     // Use auth-helper for consistent authentication
     const authResult = await validateSession(req);
     const authError = requireAuth(authResult);
-    
+
     if (authError) {
       return authError;
     }
-    
+
     const { user } = authResult;
     const userClient = authResult.supabase!;
     const serviceClient = getServiceClient();
@@ -338,7 +316,7 @@ serve(async (req) => {
     if (!validation.success) {
       return validationErrorResponse(validation.errors!, corsHeaders);
     }
-    
+
     const { modelId, engineType } = validation.data!;
 
     console.log(`[rai-reasoning-engine] User ${user?.id} requesting evaluation for model ${modelId}`);
@@ -361,7 +339,6 @@ serve(async (req) => {
     // RLS already handles authorization - if user can see the model, they can evaluate it
     // Additional role check for extra security
     const isOwner = model.owner_id === user?.id || model.system?.owner_id === user?.id;
-    
     if (!isOwner && !hasAnyRole(user!, ['admin', 'analyst', 'reviewer', 'superadmin'])) {
       console.warn(`[rai-reasoning-engine] Unauthorized access attempt: user ${user?.id} tried to access model ${modelId}`);
       return new Response(
@@ -398,7 +375,7 @@ serve(async (req) => {
 
     // Collect responses from target model
     const modelResponses: { prompt: string; response: string }[] = [];
-    
+
     for (const test of testPrompts) {
       const response = await callTargetModel(endpoint, apiToken, test.prompt);
       modelResponses.push({ prompt: test.prompt, response });
@@ -409,16 +386,16 @@ serve(async (req) => {
       .map((r, i) => `### Test ${i + 1}\n**Prompt:** ${r.prompt}\n**Response:** ${r.response}`)
       .join("\n\n");
 
-    // Use Gemini Pro for deep chain-of-thought analysis
+    // Use Claude for deep chain-of-thought analysis
     const analysisPrompt = `Analyze these model responses using the K2 reasoning framework:
 
 ${responsesForAnalysis}
 
 Apply rigorous step-by-step reasoning to evaluate each dimension. Be thorough and specific in your analysis.`;
 
-    console.log("Calling Lovable AI for deep reasoning analysis...");
-    const analysisResponse = await callLovableAI(systemPrompt, analysisPrompt);
-    console.log("Received analysis from Lovable AI");
+    console.log("Calling Claude for deep reasoning analysis...");
+    const analysisResponse = await callClaudeForAnalysis(systemPrompt, analysisPrompt);
+    console.log("Received analysis from Claude");
 
     // Parse the analysis
     const analysis = parseJSONFromResponse(analysisResponse);
@@ -446,7 +423,7 @@ Apply rigorous step-by-step reasoning to evaluate each dimension. Be thorough an
       recommendations: analysis.recommendations || [],
       transparency_summary: analysis.transparency_summary || "",
       model_responses: modelResponses.slice(0, 3), // Include sample responses
-      analysis_model: "google/gemini-2.5-pro",
+      analysis_model: CLAUDE_DEFAULT,
       analysis_method: "K2 Chain-of-Thought Reasoning",
     };
 

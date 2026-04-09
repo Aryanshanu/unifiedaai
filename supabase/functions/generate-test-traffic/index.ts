@@ -9,6 +9,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { validateSession, requireAuth, hasRole, hasAnyRole, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
 import { validateTestTrafficInput, validationErrorResponse } from "../_shared/input-validation.ts";
+import { CLAUDE_DEFAULT } from "../_shared/claude.ts";
 
 // Test prompts for each engine type
 const testPrompts = {
@@ -212,9 +213,9 @@ serve(async (req) => {
           system_id: system.id,
           project_id: system.project_id,
           environment: environments[Math.floor(Math.random() * environments.length)],
-          request_body: { 
+          request_body: {
             prompt,
-            model: 'gpt-4',
+            model: CLAUDE_DEFAULT,
             max_tokens: Math.floor(Math.random() * 500) + 100,
             temperature: Math.random() * 0.5 + 0.5,
           },

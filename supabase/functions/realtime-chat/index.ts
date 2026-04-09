@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { validateSession, requireAuth, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
 import { createTimeoutFetch, isValidUUID, isValidString } from "../_shared/input-validation.ts";
+import { callClaude, CLAUDE_DEFAULT, CLAUDE_FAST, ClaudeError } from "../_shared/claude.ts";
 
 // HuggingFace Models for real-time scanning
 const HF_TOXICITY_MODEL = "ml6team/toxic-comment-classification";
@@ -41,7 +42,7 @@ async function callToxicityModel(text: string, hfToken: string): Promise<{ score
     }
 
     const output = await response.json();
-    
+
     // Parse ml6team output format
     let maxScore = 0;
     if (Array.isArray(output)) {
@@ -81,7 +82,7 @@ async function callPrivacyModel(text: string, hfToken: string): Promise<{ entiti
     }
 
     const output = await response.json();
-    
+
     // Parse NER output
     const entities: string[] = [];
     if (Array.isArray(output)) {
@@ -185,7 +186,7 @@ serve(async (req) => {
   if (upgradeHeader.toLowerCase() !== "websocket") {
     // Handle as regular HTTP request for testing
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: "Expected WebSocket connection. Use ws:// protocol.",
         usage: "Connect via WebSocket with { systemId, messages } payload"
       }),
@@ -195,11 +196,11 @@ serve(async (req) => {
 
   // Upgrade to WebSocket
   const { socket, response } = Deno.upgradeWebSocket(req);
-  
+
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseKey);
-  
+
   let systemId: string | null = null;
   let tokenCount = 0;
   let blockedAtToken: number | null = null;
@@ -213,73 +214,73 @@ serve(async (req) => {
   socket.onmessage = async (event) => {
     try {
       const data = JSON.parse(event.data);
-      
+
       if (data.type === "session.init") {
         // Validate session.init payload
         if (!isValidUUID(data.systemId)) {
-          socket.send(JSON.stringify({ 
-            type: "error", 
-            message: "Invalid systemId: must be a valid UUID" 
+          socket.send(JSON.stringify({
+            type: "error",
+            message: "Invalid systemId: must be a valid UUID"
           }));
           return;
         }
-        
+
         systemId = data.systemId;
         tokenCount = 0;
         blockedAtToken = null;
         accumulatedText = "";
         startTime = Date.now();
-        
+
         // Fetch system configuration
         const { data: system, error } = await supabase
           .from("systems")
           .select("*, projects(*)")
           .eq("id", systemId)
           .single();
-          
+
         if (error || !system) {
-          socket.send(JSON.stringify({ 
-            type: "error", 
-            message: "System not found" 
+          socket.send(JSON.stringify({
+            type: "error",
+            message: "System not found"
           }));
           return;
         }
-        
-        socket.send(JSON.stringify({ 
+
+        socket.send(JSON.stringify({
           type: "session.created",
           systemId,
           systemName: system.name
         }));
-        
+
         return;
       }
-      
+
       if (data.type === "message.send") {
         // Validate message.send payload
         const messages = data.messages || [];
         if (!Array.isArray(messages) || messages.length === 0) {
-          socket.send(JSON.stringify({ 
-            type: "error", 
-            message: "messages must be a non-empty array" 
+          socket.send(JSON.stringify({
+            type: "error",
+            message: "messages must be a non-empty array"
           }));
           return;
         }
-        
+
         const userMessage = messages.find((m: any) => m.role === "user")?.content || "";
         if (!isValidString(userMessage, { minLength: 1, maxLength: 50000 })) {
-          socket.send(JSON.stringify({ 
-            type: "error", 
-            message: "User message must be 1-50000 characters" 
+          socket.send(JSON.stringify({
+            type: "error",
+            message: "User message must be 1-50000 characters"
           }));
           return;
         }
-        
+
         const hfToken = Deno.env.get("HUGGING_FACE_ACCESS_TOKEN") || null;
-        
+
         // Pre-scan user input with HuggingFace models
         console.log(`[realtime-chat] Scanning input with HF models...`);
         const inputScan = await scanWithHFModels(userMessage, hfToken);
-        
+
         if (inputScan.hasToxicity || inputScan.hasPII) {
           socket.send(JSON.stringify({
             type: "response.blocked",
@@ -291,7 +292,7 @@ serve(async (req) => {
               scan_latency_ms: inputScan.latencyMs,
             }
           }));
-          
+
           // Log the blocked request
           await supabase.from("request_logs").insert({
             system_id: systemId,
@@ -300,191 +301,165 @@ serve(async (req) => {
             status_code: 451,
             latency_ms: Date.now() - startTime,
             decision: "BLOCK",
-            engine_scores: { 
+            engine_scores: {
               input_scan: inputScan,
               models_used: inputScan.modelsUsed,
             }
           });
-          
+
           return;
         }
-        
-        // Stream from AI gateway
-        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-        if (!LOVABLE_API_KEY) {
-          socket.send(JSON.stringify({ 
-            type: "error", 
-            message: "AI API key not configured" 
-          }));
-          return;
-        }
-        
-        const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: data.model || "google/gemini-2.5-flash",
-            messages,
-            stream: true,
-          }),
-        });
-        
-        if (!aiResponse.ok) {
-          const errorText = await aiResponse.text();
-          socket.send(JSON.stringify({ 
-            type: "error", 
-            message: `AI Gateway error: ${aiResponse.status}`,
-            details: errorText
-          }));
-          return;
-        }
-        
-        const reader = aiResponse.body?.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-        
+
+        // Call Claude via shared helper
+        console.log(`[realtime-chat] Calling Claude...`);
         socket.send(JSON.stringify({ type: "response.started" }));
-        
-        while (reader) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          
-          buffer += decoder.decode(value, { stream: true });
-          
-          // Process SSE lines
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-          
-          for (const line of lines) {
-            if (!line.startsWith("data: ") || line === "data: [DONE]") continue;
-            
-            try {
-              const parsed = JSON.parse(line.slice(6));
-              const content = parsed.choices?.[0]?.delta?.content;
-              
-              if (content) {
-                tokenCount++;
-                accumulatedText += content;
-                
-                // REAL-TIME TOKEN SCANNING with HuggingFace (every 50 tokens for efficiency)
-                if (tokenCount % 50 === 0 && blockedAtToken === null) {
-                  const tokenScan = await scanWithHFModels(accumulatedText, hfToken);
-                  
-                  if ((tokenScan.hasToxicity || tokenScan.hasPII) && blockedAtToken === null) {
-                    blockedAtToken = tokenCount;
-                    
-                    socket.send(JSON.stringify({
-                      type: "response.blocked",
-                      blockedAtToken,
-                      reason: "Output blocked by HuggingFace safety models",
-                      details: {
-                        pii: tokenScan.piiEntities,
-                        toxicity_score: tokenScan.toxicityScore,
-                        models_used: tokenScan.modelsUsed,
-                        scan_latency_ms: tokenScan.latencyMs,
-                      }
-                    }));
-                    
-                    // Create HITL review item for blocked response
-                    await supabase.from("review_queue").insert({
-                      title: `Token Stream Blocked at position ${blockedAtToken}`,
-                      description: `Real-time HuggingFace safety block. Models: ${tokenScan.modelsUsed.join(", ")}. PII: ${tokenScan.piiEntities.join(", ")}. Toxicity: ${Math.round(tokenScan.toxicityScore * 100)}%`,
-                      review_type: "realtime_block_hf",
-                      severity: tokenScan.hasToxicity ? "critical" : "high",
-                      status: "pending",
-                      context: {
-                        system_id: systemId,
-                        blocked_at_token: blockedAtToken,
-                        scan_result: tokenScan,
-                        partial_text: accumulatedText.substring(0, 500),
-                        models_used: tokenScan.modelsUsed,
-                      },
-                      sla_deadline: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
-                    });
-                    
-                    // Create incident for critical blocks
-                    if (tokenScan.hasToxicity) {
-                      await supabase.from("incidents").insert({
-                        title: `Real-time HF Toxicity Block at token ${blockedAtToken}`,
-                        description: `Streaming response blocked by ${HF_TOXICITY_MODEL}. Toxicity score: ${Math.round(tokenScan.toxicityScore * 100)}%`,
-                        incident_type: "realtime_toxicity_hf",
-                        severity: "critical",
-                        status: "open"
-                      });
-                    }
-                    
-                    // Log blocked request
-                    await supabase.from("request_logs").insert({
-                      system_id: systemId,
-                      request_body: { messages },
-                      response_body: { 
-                        blocked: true, 
-                        blocked_at_token: blockedAtToken,
-                        partial_text: accumulatedText.substring(0, 200),
-                        models_used: tokenScan.modelsUsed,
-                      },
-                      status_code: 451,
-                      latency_ms: Date.now() - startTime,
-                      decision: "BLOCK",
-                      engine_scores: { 
-                        realtime_scan: tokenScan,
-                        blocked_at_token: blockedAtToken,
-                        models_used: tokenScan.modelsUsed,
-                      }
-                    });
-                    
-                    reader.cancel();
-                    break;
-                  }
+
+        let assistantText = "";
+        try {
+          const claudeMessages = messages.map((m: any) => ({
+            role: (m.role === "system" || m.role === "user" || m.role === "assistant")
+              ? m.role as "system" | "user" | "assistant"
+              : "user" as const,
+            content: m.content,
+          }));
+
+          assistantText = await callClaude(claudeMessages, {
+            model: CLAUDE_DEFAULT,
+            maxTokens: 2048,
+          });
+        } catch (aiErr) {
+          const errMsg = aiErr instanceof ClaudeError
+            ? aiErr.message
+            : `AI error: ${aiErr instanceof Error ? aiErr.message : "Unknown error"}`;
+          socket.send(JSON.stringify({
+            type: "error",
+            message: errMsg,
+          }));
+          return;
+        }
+
+        // Simulate token-by-token delivery and output scanning
+        // Split response into word-level chunks for a streaming feel
+        const words = assistantText.split(" ");
+        const chunkSize = 5; // words per "token chunk"
+
+        for (let i = 0; i < words.length; i += chunkSize) {
+          const chunk = words.slice(i, i + chunkSize).join(" ") + (i + chunkSize < words.length ? " " : "");
+          tokenCount++;
+          accumulatedText += chunk;
+
+          // Output scan every 50 simulated tokens
+          if (tokenCount % 50 === 0 && blockedAtToken === null) {
+            const tokenScan = await scanWithHFModels(accumulatedText, hfToken);
+
+            if ((tokenScan.hasToxicity || tokenScan.hasPII) && blockedAtToken === null) {
+              blockedAtToken = tokenCount;
+
+              socket.send(JSON.stringify({
+                type: "response.blocked",
+                blockedAtToken,
+                reason: "Output blocked by HuggingFace safety models",
+                details: {
+                  pii: tokenScan.piiEntities,
+                  toxicity_score: tokenScan.toxicityScore,
+                  models_used: tokenScan.modelsUsed,
+                  scan_latency_ms: tokenScan.latencyMs,
                 }
-                
-                // Send token to client
-                socket.send(JSON.stringify({
-                  type: "response.delta",
-                  token: content,
-                  tokenIndex: tokenCount
-                }));
+              }));
+
+              // Create HITL review item for blocked response
+              await supabase.from("review_queue").insert({
+                title: `Token Stream Blocked at position ${blockedAtToken}`,
+                description: `Real-time HuggingFace safety block. Models: ${tokenScan.modelsUsed.join(", ")}. PII: ${tokenScan.piiEntities.join(", ")}. Toxicity: ${Math.round(tokenScan.toxicityScore * 100)}%`,
+                review_type: "realtime_block_hf",
+                severity: tokenScan.hasToxicity ? "critical" : "high",
+                status: "pending",
+                context: {
+                  system_id: systemId,
+                  blocked_at_token: blockedAtToken,
+                  scan_result: tokenScan,
+                  partial_text: accumulatedText.substring(0, 500),
+                  models_used: tokenScan.modelsUsed,
+                },
+                sla_deadline: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
+              });
+
+              // Create incident for critical blocks
+              if (tokenScan.hasToxicity) {
+                await supabase.from("incidents").insert({
+                  title: `Real-time HF Toxicity Block at token ${blockedAtToken}`,
+                  description: `Streaming response blocked by ${HF_TOXICITY_MODEL}. Toxicity score: ${Math.round(tokenScan.toxicityScore * 100)}%`,
+                  incident_type: "realtime_toxicity_hf",
+                  severity: "critical",
+                  status: "open"
+                });
               }
-            } catch {
-              // Ignore parse errors for incomplete JSON
+
+              // Log blocked request
+              await supabase.from("request_logs").insert({
+                system_id: systemId,
+                request_body: { messages },
+                response_body: {
+                  blocked: true,
+                  blocked_at_token: blockedAtToken,
+                  partial_text: accumulatedText.substring(0, 200),
+                  models_used: tokenScan.modelsUsed,
+                },
+                status_code: 451,
+                latency_ms: Date.now() - startTime,
+                decision: "BLOCK",
+                engine_scores: {
+                  realtime_scan: tokenScan,
+                  blocked_at_token: blockedAtToken,
+                  models_used: tokenScan.modelsUsed,
+                }
+              });
+
+              break;
             }
           }
+
+          if (blockedAtToken !== null) break;
+
+          // Send chunk to client
+          socket.send(JSON.stringify({
+            type: "response.delta",
+            token: chunk,
+            tokenIndex: tokenCount
+          }));
         }
-        
+
         if (blockedAtToken === null) {
           // Response completed successfully
-          socket.send(JSON.stringify({ 
+          socket.send(JSON.stringify({
             type: "response.done",
             totalTokens: tokenCount
           }));
-          
+
           // Log successful request
           await supabase.from("request_logs").insert({
             system_id: systemId,
             request_body: { messages },
-            response_body: { 
+            response_body: {
               message: accumulatedText.substring(0, 500),
               total_tokens: tokenCount
             },
             status_code: 200,
             latency_ms: Date.now() - startTime,
             decision: "ALLOW",
-            engine_scores: { 
+            engine_scores: {
               total_tokens: tokenCount,
               models_available: hfToken ? [HF_TOXICITY_MODEL, HF_PRIVACY_MODEL] : ["regex-fallback"],
             }
           });
         }
       }
-      
+
     } catch (error) {
       console.error("WebSocket message error:", error);
-      socket.send(JSON.stringify({ 
-        type: "error", 
-        message: error instanceof Error ? error.message : "Unknown error" 
+      socket.send(JSON.stringify({
+        type: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
       }));
     }
   };

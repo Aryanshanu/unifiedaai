@@ -2,9 +2,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { validateSession, requireAuth, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
 import { validateEvalEngineInput, validationErrorResponse } from "../_shared/input-validation.ts";
+import { callClaude, claudeErrorResponse, CLAUDE_DEFAULT, CLAUDE_FAST } from "../_shared/claude.ts";
 
-// Timeout for external API calls (30 seconds)
-const FETCH_TIMEOUT = 30000;
 const BATCH_SIZE = 3; // Smaller batch for explainability since each includes LLM analysis
 
 // ============================================
@@ -26,63 +25,27 @@ const EXPLAINABILITY_TEST_PROMPTS = [
   { id: 5, prompt: "How confident is the model in this prediction and why?", expectsExplanation: true },
 ];
 
-// Fetch with timeout wrapper
-async function fetchWithTimeout(url: string, options: RequestInit, timeout: number): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-  
-  try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
-    return response;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
 async function callUserModel(
-  _endpoint: string, 
-  _apiToken: string | null, 
+  _endpoint: string,
+  _apiToken: string | null,
   prompt: string,
   _modelName?: string
 ): Promise<{ output: string; success: boolean; error?: string; errorType?: string }> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) {
-    return { output: "", success: false, error: "LOVABLE_API_KEY not configured", errorType: "config_error" };
-  }
-
   try {
-    const response = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 500,
-        temperature: 0.7,
-      }),
-    }, FETCH_TIMEOUT);
-
-    if (!response.ok) {
-      const error = await response.text();
-      const errorType = response.status === 429 ? "rate_limit" : 
-                       response.status === 402 ? "payment_required" : "api_error";
-      return { output: "", success: false, error: `HTTP ${response.status}: ${error.substring(0, 200)}`, errorType };
-    }
-
-    const data = await response.json();
-    const output = data.choices?.[0]?.message?.content || JSON.stringify(data);
+    const output = await callClaude(
+      [{ role: "user", content: prompt }],
+      { model: CLAUDE_DEFAULT, maxTokens: 500, temperature: 0.7 }
+    );
     return { output, success: true };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    const errorType = errorMessage.includes("aborted") ? "timeout" : "network_error";
-    return { output: "", success: false, error: errorType === "timeout" ? "Request timed out after 30s" : errorMessage, errorType };
+    const errorType = (error as any)?.code === "RATE_LIMITED" ? "rate_limit" :
+                      (error as any)?.code === "AUTH_ERROR" ? "auth_error" : "api_error";
+    return { output: "", success: false, error: errorMessage, errorType };
   }
 }
 
-async function analyzeExplanationQuality(output: string, lovableApiKey: string): Promise<{
+async function analyzeExplanationQuality(output: string): Promise<{
   clarity: number;
   faithfulness: number;
   actionability: number;
@@ -105,27 +68,14 @@ Rate each criterion (1-5):
 Respond ONLY in this JSON format:
 {"clarity": 4, "faithfulness": 3, "actionability": 4, "simplicity": 3, "hasAllElements": true, "issues": []}`;
 
-    const response = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${lovableApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: "You are an explainability evaluator. Respond only with valid JSON." },
-          { role: "user", content: analysisPrompt }
-        ],
-        temperature: 0.3,
-      }),
-    }, FETCH_TIMEOUT);
+    const content = await callClaude(
+      [
+        { role: "system", content: "You are an explainability evaluator. Respond only with valid JSON." },
+        { role: "user", content: analysisPrompt },
+      ],
+      { model: CLAUDE_FAST, maxTokens: 256, temperature: 0.3 }
+    );
 
-    if (!response.ok) throw new Error("Lovable AI error");
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || "{}";
-    
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       return JSON.parse(jsonMatch[0]);
@@ -133,13 +83,13 @@ Respond ONLY in this JSON format:
   } catch {
     // Fallback analysis
   }
-  
+
   // Simple heuristic fallback
   const hasNumbers = /\d+/.test(output);
   const hasBecause = /because|due to|reason|factor/i.test(output);
   const hasAction = /should|could|try|improve|change/i.test(output);
   const wordCount = output.split(' ').length;
-  
+
   return {
     clarity: hasBecause ? 4 : 2,
     faithfulness: hasNumbers ? 4 : 2,
@@ -207,14 +157,6 @@ serve(async (req) => {
     }
 
     const { modelId, explanations, customPrompt, autoEscalate = true } = validation.data!;
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
-
-    if (!lovableApiKey) {
-      return new Response(
-        JSON.stringify({ error: "LOVABLE_API_KEY not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
 
     if (!modelId) {
       return new Response(
@@ -272,7 +214,7 @@ serve(async (req) => {
       };
       
       if (result.success && result.output.length > 20) {
-        analysis = await analyzeExplanationQuality(result.output, lovableApiKey);
+        analysis = await analyzeExplanationQuality(result.output);
       }
 
       return { testCase, result, analysis };

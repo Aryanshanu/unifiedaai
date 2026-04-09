@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { validateSession, requireAuth, hasAnyRole, getServiceClient, corsHeaders, errorResponse, successResponse } from "../_shared/auth-helper.ts";
+import { callClaude, claudeErrorResponse, CLAUDE_DEFAULT, ClaudeError } from "../_shared/claude.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -12,18 +13,18 @@ serve(async (req) => {
     // =====================================================
     const authResult = await validateSession(req);
     const authError = requireAuth(authResult);
-    
+
     if (authError) {
       console.log("[copilot] Authentication failed");
       return authError;
     }
-    
+
     const { user } = authResult;
     // User client respects RLS for data reads
     const supabase = authResult.supabase!;
     // Service client for system operations
     const serviceClient = getServiceClient();
-    
+
     console.log(`[copilot] Authenticated user: ${user?.id}`);
 
     const { systemId, question } = await req.json();
@@ -136,7 +137,7 @@ serve(async (req) => {
       contextParts.push(
         `## Semantic Layer (${semanticDefs.length} active definitions)`,
         `These are the governed metric definitions. Always use these when answering metric questions:`,
-        ...semanticDefs.map((d: any) => 
+        ...semanticDefs.map((d: any) =>
           `- **${d.display_name || d.name}** (${d.name}): ${d.description || 'No description'}${d.sql_logic ? ` | SQL: \`${d.sql_logic}\`` : ''}${d.ai_context ? ` | Context: ${d.ai_context}` : ''}${d.grain ? ` | Grain: ${d.grain}` : ''}`
         ),
         ``
@@ -163,44 +164,29 @@ When providing recommendations:
 Context about the system:
 ${contextParts.join("\n")}`;
 
-    // Call AI Gateway
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY not configured");
-    }
-
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
+    // Call Claude
+    try {
+      const answer = await callClaude(
+        [
           { role: "system", content: systemPrompt },
           { role: "user", content: question },
         ],
-      }),
-    });
+        { model: CLAUDE_DEFAULT, maxTokens: 2048 }
+      );
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error("AI Gateway error:", aiResponse.status, errorText);
-      
-      if (aiResponse.status === 429) {
-        return errorResponse("Rate limit exceeded. Please try again later.", 429);
+      return successResponse({
+        answer,
+        context: { riskAssessment, impactAssessment, logsCount: recentLogs.length }
+      });
+    } catch (aiError) {
+      if (aiError instanceof ClaudeError) {
+        if (aiError.code === "RATE_LIMITED") {
+          return errorResponse("Rate limit exceeded. Please try again later.", 429);
+        }
+        throw aiError;
       }
-      throw new Error(`AI Gateway error: ${aiResponse.status}`);
+      throw aiError;
     }
-
-    const aiData = await aiResponse.json();
-    const answer = aiData.choices?.[0]?.message?.content || "I couldn't generate a response.";
-
-    return successResponse({ 
-      answer, 
-      context: { riskAssessment, impactAssessment, logsCount: recentLogs.length } 
-    });
 
   } catch (error) {
     console.error("Copilot error:", error);

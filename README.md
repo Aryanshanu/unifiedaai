@@ -1,73 +1,197 @@
-# Welcome to your Lovable project
+# UnifiedAAI — Fractal Autonomous Governance Platform
 
-## Project info
+Enterprise AI Governance platform for evaluating, monitoring, and enforcing responsible AI policies across every model and dataset in your organisation.
 
-**URL**: https://lovable.dev/projects/f392db16-d6a9-44d2-b826-d983c2d4ea7a
+---
 
-## How can I edit this code?
+## Tech Stack
 
-There are several ways of editing your application.
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React 18 + TypeScript + Vite |
+| UI | shadcn/ui · Tailwind CSS · Recharts |
+| Backend | Supabase (PostgreSQL + Auth + Edge Functions) |
+| AI | **Claude claude-opus-4-6** (Anthropic) — all inference |
+| Auth | Supabase Auth · JWT · RBAC (5 roles) |
 
-**Use Lovable**
+---
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/f392db16-d6a9-44d2-b826-d983c2d4ea7a) and start prompting.
+## Getting Started
 
-Changes made via Lovable will be committed automatically to this repo.
+### Prerequisites
 
-**Use your preferred IDE**
+- Node.js ≥ 18
+- [Supabase CLI](https://supabase.com/docs/guides/cli)
+- An [Anthropic API key](https://console.anthropic.com/) (`sk-ant-...`)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+### 1 — Clone & install
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
 git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+cd unifiedaai
+npm install
 ```
 
-**Edit a file directly in GitHub**
+### 2 — Configure environment
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```sh
+cp .env.example .env.local
+# Edit .env.local and fill in your Supabase URL and anon key
+```
 
-**Use GitHub Codespaces**
+### 3 — Add your Claude API key (backend secret)
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+The API key lives **only** on the server — it is never exposed to the browser.
 
-## What technologies are used for this project?
+```sh
+supabase secrets set ANTHROPIC_API_KEY=sk-ant-api03-...
+```
 
-This project is built with:
+> **Optional:** If you want real ML-based scoring in the evaluation engines, also set:
+> ```sh
+> supabase secrets set HUGGING_FACE_ACCESS_TOKEN=hf_...
+> ```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### 4 — Run locally
 
-## How can I deploy this project?
+```sh
+npm run dev
+# → http://localhost:5174
+```
 
-Simply open [Lovable](https://lovable.dev/projects/f392db16-d6a9-44d2-b826-d983c2d4ea7a) and click on Share -> Publish.
+---
 
-## Can I connect a custom domain to my Lovable project?
+## Environment Variables
 
-Yes, you can!
+### Frontend (`.env.local`)
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+| Variable | Description |
+|----------|-------------|
+| `VITE_SUPABASE_URL` | Your Supabase project URL |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase anon/public key |
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+### Backend (Supabase Secrets — never in `.env`)
+
+| Secret | Required | Description |
+|--------|----------|-------------|
+| `ANTHROPIC_API_KEY` | **Yes** | Powers every AI feature across all edge functions |
+| `HUGGING_FACE_ACCESS_TOKEN` | No | Real ML model scoring in evaluation engines |
+
+---
+
+## AI Architecture
+
+All AI inference routes **exclusively through Claude** (Anthropic) via a single shared backend module:
+
+```
+supabase/functions/_shared/claude.ts
+```
+
+- No API keys are ever sent to or stored in the frontend
+- Every edge function imports `callClaude()` from the shared helper
+- The helper reads `ANTHROPIC_API_KEY` from Supabase secrets at runtime
+- Model used: `claude-opus-4-6` (complex tasks) · `claude-haiku-4-5-20251001` (fast classification)
+
+```
+Frontend  →  supabase.functions.invoke("function-name")
+                    ↓
+          Supabase Edge Function
+                    ↓
+          _shared/claude.ts  →  Anthropic API (ANTHROPIC_API_KEY)
+```
+
+---
+
+## Platform Features
+
+### RAI Governance Engines
+- **Fairness** — Demographic parity, equalized odds, calibration
+- **Hallucination** — Factuality, groundedness, BLEU/ROUGE scoring
+- **Toxicity** — Content safety, policy adherence
+- **Privacy** — PII/PHI detection, data leakage analysis
+- **Explainability** — SHAP values, reasoning quality
+
+### Data Inventory (`/inventory`)
+Upload CSV, TSV, JSON, or PDF files. Claude automatically:
+- Extracts metadata and schema
+- Classifies every column as **PII / PHI / Sensitive / Unique / Standard**
+- Generates business-grade glossary descriptions
+- Validates data quality (completeness, uniqueness, validity)
+- Saves history locally for audit trail
+
+### Governance & Compliance
+- Policy DSL studio with CI/CD gate enforcement
+- Approval workflows and HITL review queues
+- Regulatory reporting (GDPR, CCPA, EU AI Act)
+- Audit trails, lineage graph, runbooks
+
+### Security Lab
+- Penetration testing, jailbreak testing, threat modelling
+- Red-team campaign runner with Claude-generated adversarial prompts
+
+### Data Quality
+- Automated profiling, rule synthesis, incident management
+- DQ chat assistant (ask questions about your pipeline in natural language)
+
+---
+
+## Role-Based Access
+
+| Role | Display Name | Dashboard |
+|------|-------------|-----------|
+| `admin` | Chief Data & AI Officer | Executive |
+| `superadmin` | Platform Admin | All sections |
+| `reviewer` | AI Steward | Governance |
+| `analyst` | Agent Engineer | Technical |
+| `viewer` | Compliance Auditor | Compliance |
+
+---
+
+## Project Structure
+
+```
+src/
+  pages/          # 47 full-page route components
+  components/     # 150+ UI components across 31 domains
+  hooks/          # 50+ custom React hooks
+  lib/            # RAI formulas, role personas, utilities
+  core/           # Evaluator harness
+
+supabase/
+  functions/      # 78 edge functions (all use Claude)
+    _shared/
+      claude.ts         ← Single Claude helper (all functions use this)
+      auth-helper.ts
+      call-user-model.ts
+      llm-gateway/      ← Multi-provider gateway (Anthropic adapter active)
+  migrations/     # 60+ SQL migrations
+```
+
+---
+
+## Scripts
+
+```sh
+npm run dev          # Development server (port 5174)
+npm run build        # Production build
+npm run preview      # Preview production build
+npm run lint         # ESLint check
+npm run test         # Vitest unit tests
+npm run test:ui      # Vitest visual UI
+npm run test:coverage # Coverage report
+```
+
+---
+
+## Deploying Edge Functions
+
+```sh
+# Deploy all functions
+supabase functions deploy
+
+# Deploy a single function
+supabase functions deploy inventory-analyze
+
+# Verify secrets are set
+supabase secrets list
+```

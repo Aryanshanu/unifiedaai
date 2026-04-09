@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateAuditDataInput, validationErrorResponse } from "../_shared/input-validation.ts";
+import { callClaude, claudeErrorResponse, CLAUDE_DEFAULT, CLAUDE_FAST } from "../_shared/claude.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -364,7 +365,7 @@ Deno.serve(async (req) => {
 
     addLog('computation', {
       step: 'ai_summary',
-      model: 'google/gemini-3-flash-preview',
+      model: CLAUDE_FAST,
       verdict: aiSummary.data_quality_verdict,
       confidence: aiSummary.confidence_score,
     });
@@ -746,7 +747,7 @@ async function generateAISummary(
     data_quality_verdict: metrics.overall >= 0.9 ? 'Ready for Production' : metrics.overall >= 0.7 ? 'Needs Review' : 'Critical Issues Found',
     confidence_score: 85,
     generated_at: new Date().toISOString(),
-    model_used: 'google/gemini-3-flash-preview'
+    model_used: CLAUDE_FAST,
   };
 
   // Categorize issues by priority
@@ -773,12 +774,6 @@ async function generateAISummary(
   };
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      console.log('[audit-data] LOVABLE_API_KEY not found, using default summary');
-      return defaultSummary;
-    }
-
     const prompt = `You are a Data Quality Analyst. Analyze this data quality assessment and provide a structured summary.
 
 Dataset: ${fileName}
@@ -787,7 +782,7 @@ Columns: ${columnAnalysis.length}
 
 Quality Metrics:
 - Completeness: ${Math.round(metrics.completeness * 100)}%
-- Validity: ${Math.round(metrics.validity * 100)}%  
+- Validity: ${Math.round(metrics.validity * 100)}%
 - Uniqueness: ${Math.round(metrics.uniqueness * 100)}%
 - Freshness: ${Math.round(metrics.freshness * 100)}%
 - Overall Score: ${Math.round(metrics.overall * 100)}%
@@ -808,30 +803,14 @@ Provide a JSON response with:
 Return ONLY valid JSON, no markdown code blocks, no explanation. Example:
 {"brief_summary":"...","priority_categories":{"high":{"issues":[],"count":0,"action":""},"medium":{"issues":[],"count":0,"action":""},"low":{"issues":[],"count":0,"action":""}},"recommendations":["..."],"data_quality_verdict":"Needs Review","confidence_score":87}`;
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-3-flash-preview',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.3,
-        max_tokens: 1500
-      })
+    const rawContent = await callClaude([{ role: 'user', content: prompt }], {
+      model: CLAUDE_FAST,
+      maxTokens: 1500,
+      temperature: 0.3,
     });
 
-    if (!response.ok) {
-      console.error('[audit-data] AI summary request failed:', response.status);
-      return defaultSummary;
-    }
-
-    const result = await response.json();
-    const content = result.choices?.[0]?.message?.content || '';
-    
     // Extract JSON from response (handle potential markdown code blocks)
-    let jsonStr = content.trim();
+    let jsonStr = rawContent.trim();
     if (jsonStr.startsWith('```')) {
       jsonStr = jsonStr.replace(/```json?\s*/g, '').replace(/```\s*$/g, '');
     }
@@ -863,7 +842,7 @@ Return ONLY valid JSON, no markdown code blocks, no explanation. Example:
         data_quality_verdict: parsed.data_quality_verdict || defaultSummary.data_quality_verdict,
         confidence_score: parsed.confidence_score ?? defaultSummary.confidence_score,
         generated_at: new Date().toISOString(),
-        model_used: 'google/gemini-3-flash-preview'
+        model_used: CLAUDE_FAST,
       };
     }
     
@@ -879,9 +858,8 @@ async function performSemanticAnalysis(sampleData: Record<string, unknown>[]): P
   const issues: QualityIssue[] = [];
 
   try {
-    // Use Lovable AI for semantic analysis
     const prompt = `Analyze this data sample for quality issues. Return a JSON array of issues found.
-    
+
 Data sample:
 ${JSON.stringify(sampleData.slice(0, 5), null, 2)}
 
@@ -896,35 +874,25 @@ Return ONLY a valid JSON array like this (no markdown, no explanation):
 
 If no issues found, return: []`;
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.2,
-        max_tokens: 1000
-      })
+    const content = await callClaude([{ role: 'user', content: prompt }], {
+      model: CLAUDE_FAST,
+      maxTokens: 1000,
+      temperature: 0.2,
     });
 
-    if (response.ok) {
-      const result = await response.json();
-      const content = result.choices?.[0]?.message?.content || '[]';
-      
-      // Extract JSON from response
-      const jsonMatch = content.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        const semanticIssues = JSON.parse(jsonMatch[0]);
-        
-        for (const issue of semanticIssues) {
-          issues.push({
-            issue_type: 'semantic_error',
-            severity: issue.severity || 'warning',
-            description: issue.description || 'Semantic issue detected',
-            column_name: issue.column,
-            suggested_fix: issue.fix
-          });
-        }
+    // Extract JSON from response
+    const jsonMatch = content.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      const semanticIssues = JSON.parse(jsonMatch[0]);
+
+      for (const issue of semanticIssues) {
+        issues.push({
+          issue_type: 'semantic_error',
+          severity: issue.severity || 'warning',
+          description: issue.description || 'Semantic issue detected',
+          column_name: issue.column,
+          suggested_fix: issue.fix
+        });
       }
     }
   } catch (error) {

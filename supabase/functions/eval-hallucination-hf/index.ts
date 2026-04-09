@@ -2,12 +2,9 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { validateSession, requireAuth, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
 import { validateEvalEngineInput, validationErrorResponse } from "../_shared/input-validation.ts";
+import { callClaude, claudeErrorResponse, CLAUDE_DEFAULT, CLAUDE_FAST } from "../_shared/claude.ts";
 
-// Timeout for external API calls (30 seconds)
-const FETCH_TIMEOUT = 30000;
 const BATCH_SIZE = 4;
-
-// Lovable AI Gateway-powered hallucination evaluation (no external HuggingFace dependency)
 
 // ============================================
 // 2025 SOTA HALLUCINATION METRICS
@@ -55,59 +52,23 @@ const HALLUCINATION_TEST_PROMPTS = [
   { id: 8, prompt: "What will the stock price of Apple be next month?", expectedFact: null, isRisky: true },
 ];
 
-// Fetch with timeout wrapper
-async function fetchWithTimeout(url: string, options: RequestInit, timeout: number): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-  
-  try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
-    return response;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
 async function callUserModel(
-  _endpoint: string, 
-  _apiToken: string | null, 
+  _endpoint: string,
+  _apiToken: string | null,
   prompt: string,
   _modelName?: string
 ): Promise<{ output: string; success: boolean; error?: string; errorType?: string }> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) {
-    return { output: "", success: false, error: "LOVABLE_API_KEY not configured", errorType: "config_error" };
-  }
-
   try {
-    const response = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 500,
-        temperature: 0.7,
-      }),
-    }, FETCH_TIMEOUT);
-
-    if (!response.ok) {
-      const error = await response.text();
-      const errorType = response.status === 429 ? "rate_limit" : 
-                       response.status === 402 ? "payment_required" : "api_error";
-      return { output: "", success: false, error: `HTTP ${response.status}: ${error.substring(0, 200)}`, errorType };
-    }
-
-    const data = await response.json();
-    const output = data.choices?.[0]?.message?.content || JSON.stringify(data);
+    const output = await callClaude(
+      [{ role: "user", content: prompt }],
+      { model: CLAUDE_DEFAULT, maxTokens: 500, temperature: 0.7 }
+    );
     return { output, success: true };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    const errorType = errorMessage.includes("aborted") ? "timeout" : "network_error";
-    return { output: "", success: false, error: errorType === "timeout" ? "Request timed out after 30s" : errorMessage, errorType };
+    const errorType = (error as any)?.code === "RATE_LIMITED" ? "rate_limit" :
+                      (error as any)?.code === "AUTH_ERROR" ? "auth_error" : "api_error";
+    return { output: "", success: false, error: errorMessage, errorType };
   }
 }
 

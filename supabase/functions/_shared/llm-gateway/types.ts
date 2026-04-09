@@ -38,14 +38,13 @@ export interface UnifiedError {
   details?: unknown;
 }
 
-export type LLMProvider = 
-  | 'lovable'      // Lovable AI Gateway (default)
-  | 'openai'       // OpenAI ChatGPT
-  | 'gemini'       // Google Gemini
-  | 'huggingface'  // HuggingFace Inference
-  | 'perplexity'   // Perplexity AI
-  | 'anthropic'    // Anthropic Claude
-  | 'openrouter';  // OpenRouter
+export type LLMProvider =
+  | 'anthropic'    // Anthropic Claude (default — all platform AI)
+  | 'openai'       // OpenAI — user-configured target systems only
+  | 'gemini'       // Google Gemini — user-configured target systems only
+  | 'huggingface'  // HuggingFace — evaluation engines with user models
+  | 'perplexity'   // Perplexity — user-configured target systems only
+  | 'openrouter';  // OpenRouter — user-configured target systems only
 
 export type LLMErrorCode =
   | 'PROVIDER_TIMEOUT'

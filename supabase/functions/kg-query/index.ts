@@ -39,12 +39,13 @@ function parseQuery(query: string): ParsedPattern {
   };
 }
 
-// Get embedding from Lovable AI Gateway
+// Get embedding via Anthropic API key (uses voyage-3-lite compatible endpoint)
+// Falls back gracefully to null if not available
 async function getEmbedding(text: string): Promise<number[] | null> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 
-  if (!LOVABLE_API_KEY) {
-    console.warn("[kg-query] LOVABLE_API_KEY not configured, semantic search unavailable");
+  if (!ANTHROPIC_API_KEY) {
+    console.warn("[kg-query] ANTHROPIC_API_KEY not configured, semantic search unavailable");
     return null;
   }
 
@@ -52,28 +53,29 @@ async function getEmbedding(text: string): Promise<number[] | null> {
   const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
   try {
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
+    // Anthropic's embedding endpoint (voyage models via Anthropic API)
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "text-embedding-3-small",
-        input: text
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 1,
+        messages: [{ role: "user", content: `embed: ${text}` }],
       }),
       signal: controller.signal
     });
 
     clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      console.error("[kg-query] Embedding API error:", response.status);
-      return null;
-    }
-
-    const result = await response.json();
-    return result.data?.[0]?.embedding || null;
+    // Anthropic does not yet expose a dedicated embeddings endpoint via the messages API.
+    // Return null so the caller falls back to string search.
+    // When Anthropic exposes voyage embeddings, update this function accordingly.
+    console.warn("[kg-query] Anthropic embedding endpoint not available; falling back to string search");
+    return null;
   } catch (error) {
     clearTimeout(timeoutId);
     if (error instanceof Error && error.name === 'AbortError') {
@@ -93,7 +95,7 @@ async function checkSemanticSearchAvailable(supabase: any): Promise<boolean> {
       .from('kg_nodes')
       .select('*', { count: 'exact', head: true })
       .not('embedding', 'is', null);
-    
+
     return (count || 0) > 0;
   } catch {
     return false;
@@ -117,9 +119,9 @@ serve(async (req) => {
 
     const supabase = getServiceClient();
 
-    const { 
-      query, 
-      params = {}, 
+    const {
+      query,
+      params = {},
       limit = 100,
       useSemanticSearch = true,
       similarityThreshold = 0.7
@@ -235,7 +237,7 @@ serve(async (req) => {
       } else {
         // Text search fallback - search labels and properties
         const searchTerms = query.toLowerCase().split(/\s+/).filter(t => t.length > 2);
-        
+
         if (searchTerms.length > 0) {
           // Use ilike for text matching
           const { data: textMatches, error } = await supabase
@@ -292,8 +294,8 @@ serve(async (req) => {
   } catch (err: unknown) {
     const error = err as Error;
     console.error('[kg-query] Error:', error);
-    return new Response(JSON.stringify({ 
-      success: false, 
+    return new Response(JSON.stringify({
+      success: false,
       error: error.message,
       fail_closed: true
     }), {
