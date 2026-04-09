@@ -150,6 +150,7 @@ export const ROUTE_ACCESS_MAP: Record<string, AppRole[]> = {
   '/engine/data-quality': ['admin', 'analyst', 'superadmin'],
 
   // Data Governance
+  '/inventory': ['admin', 'reviewer', 'analyst', 'viewer', 'superadmin'],
   '/data-contracts': ['admin', 'reviewer', 'analyst', 'viewer', 'superadmin'],
   '/semantic-definitions': ['admin', 'reviewer', 'analyst', 'viewer', 'superadmin'],
   '/semantic-hub': ['admin', 'reviewer', 'analyst', 'viewer', 'superadmin'],
