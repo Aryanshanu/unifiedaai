@@ -50,77 +50,109 @@ export default function Inventory() {
     }
   };
 
+  const parseCSVLine = (line: string): string[] => {
+    const result: string[] = [];
+    let cell = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        result.push(cell.trim().replace(/^"|"$/g, ''));
+        cell = "";
+      } else {
+        cell += char;
+      }
+    }
+    result.push(cell.trim().replace(/^"|"$/g, ''));
+    return result;
+  };
+
   const startAnalysis = (uploadedFile: File) => {
     setIsScanning(true);
     setScanProgress(0);
     setAnalysis(null);
 
-    // Simulate progress
-    const interval = setInterval(() => {
-      setScanProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          return 100;
-        }
-        return prev + 20;
-      });
-    }, 500);
+    // Simulate steady progress for UI feel
+    const progressInterval = setInterval(() => {
+      setScanProgress((prev) => (prev >= 95 ? 95 : prev + 5));
+    }, 200);
 
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
-      const firstLine = text.split('\n')[0] || "";
-      const headers = firstLine.split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+      const lines = text.split(/\r?\n/).filter(line => line.trim());
+      if (lines.length === 0) {
+        setIsScanning(false);
+        clearInterval(progressInterval);
+        toast({ title: "Empty File", description: "The uploaded file contains no data.", variant: "destructive" });
+        return;
+      }
+
+      const headers = parseCSVLine(lines[0]);
+      const dataRows = lines.slice(1);
       
       const heuristicSensitivity = (col: string): "None" | "PII" | "PHI" | "Sensitive" => {
         const lower = col.toLowerCase();
         
-        // PHI - Protected Health Information (HIPAA Safe Harbor)
+        // PHI - Protected Health Information (HIPAA)
         if (/(medical|health|doctor|hospital|clinic|medication|test|condition|disease|diagnosis|icd|patient|treatment|admission|discharge|blood|surgery|therapy|prescription)/.test(lower)) return "PHI";
-        if (/(mrn|health_plan|beneficiary|device_id)/.test(lower)) return "PHI";
+        if (/(mrn|health_plan|beneficiary|device_id|biometric|fingerprint|retina)/.test(lower)) return "PHI";
 
-        // PII - Personally Identifiable Information (NIST)
+        // PII - Personally Identifiable Information
         if (/(name|first_name|last_name|full_name|ssn|social_security|passport|driver.*license|license_plate|dob|date_of_birth|birth|religion|ethnicity|gender|sex|age)/.test(lower)) return "PII";
-        if (/(email|phone|address|street|city|state|zip|postal|geo|location|ip_address|mac_address|url)/.test(lower)) return "PII";
+        if (/(email|phone|address|street|city|state|zip|postal|geo|location|ip_address|mac_address|url|username|candidate_id)/.test(lower)) return "PII";
 
-        // Sensitive / PCI / Financial
-        if (/(password|secret|token|credential|credit.*card|bank.*account|routing|financial|billing|transaction|salary|wage|income)/.test(lower)) return "Sensitive";
+        // Sensitive / Financial / Security
+        if (/(password|secret|token|credential|credit.*card|bank.*account|routing|financial|billing|transaction|salary|wage|income|revenue|profit|tax|api_key|private_key)/.test(lower)) return "Sensitive";
 
         return "None";
       };
 
-      const columns: ColumnMeta[] = headers.filter(h => h).map((h) => ({
+      const columns: ColumnMeta[] = headers.map((h) => ({
         name: h,
-        type: "string", // defaulting to string since we don't infer it yet
+        type: "string", // Simple inference could be added here
         definition: `Auto-extracted column: ${h}`,
         isVerified: false,
         sensitivity: heuristicSensitivity(h)
       }));
 
-      // Simulate AI parsing after a delay
+      // Calculate real missing values percentage
+      let missingCells = 0;
+      const totalCells = dataRows.length * headers.length;
+      
+      dataRows.forEach(row => {
+        const cells = parseCSVLine(row);
+        cells.forEach(cell => {
+          if (!cell || cell.toLowerCase() === 'null' || cell.toLowerCase() === 'na' || cell.toLowerCase() === 'n/a') {
+            missingCells++;
+          }
+        });
+      });
+
+      const missingPct = totalCells > 0 ? (missingCells / totalCells) * 100 : 0;
+      const qualityScore = Math.max(0, Math.min(100, 100 - (missingPct * 2) - (columns.filter(c => c.sensitivity !== "None").length * 2)));
+
       setTimeout(() => {
+        clearInterval(progressInterval);
+        setScanProgress(100);
         setIsScanning(false);
         
-        const mockResult: DatasetAnalysis = {
+        setAnalysis({
           filename: uploadedFile.name,
-          totalRows: Math.floor(Math.random() * 50000) + 1000,
-          totalCols: columns.length,
-          qualityScore: 92,
-          missingValuesPct: 4.5,
+          totalRows: dataRows.length,
+          totalCols: headers.length,
+          qualityScore: Math.round(qualityScore),
+          missingValuesPct: parseFloat(missingPct.toFixed(2)),
           columns: columns,
-        };
+        });
 
-        setAnalysis(mockResult);
-
-        // Simulate defaulting the business owner if it's not present (we leave it empty or partially filled)
-        setOwnerName("");
-        setOwnerEmail("");
-        
         toast({
           title: "Scan Complete",
-          description: `Successfully analyzed ${uploadedFile.name} with ${columns.length} columns.`,
+          description: `Successfully analyzed ${uploadedFile.name} with ${dataRows.length} rows and ${columns.length} columns.`,
         });
-      }, 3000);
+      }, 1500);
     };
     reader.readAsText(uploadedFile);
   };
