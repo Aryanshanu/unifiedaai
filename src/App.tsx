@@ -60,6 +60,7 @@ const Policy = lazy(() => import("./pages/Policy"));
 const GoldenDemoV2 = lazy(() => import("./pages/GoldenDemoV2"));
 const SolutionProviders = lazy(() => import("./pages/Vendors"));
 const Benchmarks = lazy(() => import("@/pages/Benchmarks"));
+const Inventory = lazy(() => import("./pages/Inventory"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -130,6 +131,7 @@ const App = () => (
                 <Route path="/security/jailbreak" element={<ProtectedRoute><SecurityJailbreak /></ProtectedRoute>} />
                 <Route path="/security/threats" element={<ProtectedRoute><SecurityThreatModel /></ProtectedRoute>} />
                 {/* Data Governance */}
+                <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
                 <Route path="/data-contracts" element={<ProtectedRoute><DataContracts /></ProtectedRoute>} />
                 {/* Settings & Docs */}
                 <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
