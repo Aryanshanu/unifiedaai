@@ -34,6 +34,7 @@ const navItems: NavItem[] = [
   { path: "/lineage", icon: GitBranch, label: "Knowledge Graph" },
   { path: "/evaluation", icon: FlaskConical, label: "Validation Hub" },
   { divider: true, label: "Data" },
+  { path: "/inventory", icon: Database, label: "Data Inventory" },
   { path: "/engine/data-quality", icon: Database, label: "Data Quality Engine" },
   { path: "/data-contracts", icon: FileText, label: "Data Contracts" },
   { path: "/semantic-definitions", icon: BookOpen, label: "Semantic Layer" },
