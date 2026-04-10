@@ -5,7 +5,7 @@
 
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
-export type AppRole = 'admin' | 'reviewer' | 'analyst' | 'viewer';
+export type AppRole = 'admin' | 'reviewer' | 'analyst' | 'viewer' | 'superadmin';
 
 export interface AuthenticatedUser {
   id: string;
@@ -109,7 +109,7 @@ export function requireAuth(authResult: AuthResult): Response | null {
       }),
       { 
         status: 401, 
-        headers: { "Content-Type": "application/json" } 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
       }
     );
   }
