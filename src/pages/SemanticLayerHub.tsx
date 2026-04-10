@@ -76,26 +76,21 @@ export default function SemanticLayerHub() {
     setTestResult("");
     try {
       if (testPath.includes("/search")) {
-        // Implement Local Semantic Search Logic
         const queryObj = testBody ? JSON.parse(testBody) : { query: "" };
         const query = queryObj.query?.toLowerCase() || "";
-        const results = (features as any[] || []).filter(f => 
-          f.name.toLowerCase().includes(query) || 
+        const t0 = Date.now();
+        const results = (features as any[] || []).filter(f =>
+          f.name?.toLowerCase().includes(query) ||
           f.description?.toLowerCase().includes(query) ||
           f.display_name?.toLowerCase().includes(query)
         );
-        
-        await new Promise(resolve => setTimeout(resolve, 800)); // Simulate processing
+        const latency = Date.now() - t0;
         setTestResult(JSON.stringify({
           object: "list",
           data: results,
-          metadata: {
-            engine: "UnifiedAAI Local Semantic Cluster",
-            latency_ms: 800,
-            status: "authoritative"
-          }
+          metadata: { matched: results.length, latency_ms: latency, source: "feature_registry" }
         }, null, 2));
-        toast({ title: "Local semantic search complete" });
+        toast({ title: `Found ${results.length} result(s)` });
         return;
       }
 

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatModelName, getModelProvider } from '@/lib/utils';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,19 +11,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useEvaluationSchedules, useCreateSchedule, useToggleSchedule } from '@/hooks/useEvaluationSchedules';
+import { useQueryClient } from '@tanstack/react-query';
 import { useModels } from '@/hooks/useModels';
 import { useScheduleRuns } from '@/hooks/useScheduleRuns';
-import { Clock, Plus, Play, Pause, Timer, CheckCircle, XCircle, Loader2, RotateCw } from 'lucide-react';
+import { Clock, Plus, Play, Pause, Timer, CheckCircle, XCircle, Loader2, RotateCw, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 const CHECK_OPTIONS = [
-  { id: 'fairness', label: 'Parity' },
-  { id: 'toxicity', label: 'Integrity' },
-  { id: 'privacy', label: 'Protection' },
-  { id: 'hallucination', label: 'Divergence' },
-  { id: 'explainability', label: 'Interpretability' },
+  { id: 'fairness', label: 'Fairness' },
+  { id: 'toxicity', label: 'Safety' },
+  { id: 'privacy', label: 'Privacy' },
+  { id: 'hallucination', label: 'Hallucination' },
+  { id: 'explainability', label: 'Explainability' },
 ];
 
 const CRON_PRESETS = [
@@ -39,12 +41,29 @@ export default function OngoingValidation() {
   const { data: runs } = useScheduleRuns();
   const createMutation = useCreateSchedule();
   const toggleMutation = useToggleSchedule();
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [runningId, setRunningId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [useCustomCron, setUseCustomCron] = useState(false);
   const [form, setForm] = useState({
     name: '', model_id: '', cron_expression: '0 0 * * *',
     engine_types: ['fairness', 'toxicity', 'privacy', 'hallucination', 'explainability'],
   });
+
+  const handleDelete = async (scheduleId: string, scheduleName: string) => {
+    if (!window.confirm(`Delete schedule "${scheduleName}"? This cannot be undone.`)) return;
+    setDeletingId(scheduleId);
+    try {
+      const { error } = await supabase.from('evaluation_schedules').delete().eq('id', scheduleId);
+      if (error) throw error;
+      toast.success(`Schedule "${scheduleName}" deleted`);
+    } catch (e: any) {
+      toast.error('Failed to delete: ' + e.message);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const handleSubmit = () => {
     if (!form.name || !form.model_id) return;
@@ -101,17 +120,37 @@ export default function OngoingValidation() {
                   <Select value={form.model_id} onValueChange={v => setForm(f => ({ ...f, model_id: v }))}>
                     <SelectTrigger><SelectValue placeholder="Select logic engine" /></SelectTrigger>
                     <SelectContent>
-                      {models?.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+                      {models?.map(m => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {formatModelName(m.name)}
+                          {getModelProvider(m.name) && <span className="text-muted-foreground ml-1">· {getModelProvider(m.name)}</span>}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <div><Label>Frequency</Label>
-                  <Select value={form.cron_expression} onValueChange={v => setForm(f => ({ ...f, cron_expression: v }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {CRON_PRESETS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <Label>Frequency</Label>
+                    <button type="button" className="text-xs text-primary underline" onClick={() => setUseCustomCron(c => !c)}>
+                      {useCustomCron ? 'Use preset' : 'Custom cron'}
+                    </button>
+                  </div>
+                  {useCustomCron ? (
+                    <Input
+                      value={form.cron_expression}
+                      onChange={e => setForm(f => ({ ...f, cron_expression: e.target.value }))}
+                      placeholder="e.g. 0 */3 * * * (every 3 hours)"
+                      className="font-mono text-sm"
+                    />
+                  ) : (
+                    <Select value={form.cron_expression} onValueChange={v => setForm(f => ({ ...f, cron_expression: v }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {CRON_PRESETS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
                 <div>
                   <Label className="mb-2 block">Validation Checks</Label>
@@ -163,8 +202,11 @@ export default function OngoingValidation() {
                             <Badge key={e} variant="secondary" className="text-xs">{e}</Badge>
                           ))}
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => handleRunNow(s.id)} disabled={runningId === s.id}>
+                        <Button variant="outline" size="sm" onClick={() => handleRunNow(s.id)} disabled={runningId === s.id} title="Run now">
                           {runningId === s.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
+                        </Button>
+                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDelete(s.id, s.name)} disabled={deletingId === s.id} title="Delete schedule">
+                          {deletingId === s.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                         </Button>
                         <Switch
                           checked={s.is_active}

@@ -422,33 +422,33 @@ export default function EngineDetail() {
           </p>
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <ScoreCard 
-              title="Parity Score" 
-              score={model.fairness_score} 
+            <ScoreCard
+              title="Fairness Score"
+              score={model.fairness_score}
               icon={<Scale className="w-5 h-5" />}
               type="fairness"
             />
-            <ScoreCard 
-              title="Stability Score" 
-              score={model.robustness_score} 
+            <ScoreCard
+              title="Robustness Score"
+              score={model.robustness_score}
               icon={<Shield className="w-5 h-5" />}
               type="robustness"
             />
-            <ScoreCard 
-              title="Protection Score" 
-              score={model.privacy_score} 
+            <ScoreCard
+              title="Privacy Score"
+              score={model.privacy_score}
               icon={<Lock className="w-5 h-5" />}
               type="privacy"
             />
-            <ScoreCard 
-              title="Integrity Score" 
-              score={model.toxicity_score} 
+            <ScoreCard
+              title="Safety Score"
+              score={model.toxicity_score}
               icon={<Eye className="w-5 h-5" />}
               type="toxicity"
             />
-            <ScoreCard 
-              title="Aggregate Performance" 
-              score={model.overall_score} 
+            <ScoreCard
+              title="Overall Score"
+              score={model.overall_score}
               icon={<Brain className="w-5 h-5" />}
               type="overall"
             />

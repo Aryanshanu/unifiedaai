@@ -312,7 +312,7 @@ export default function GoldenDemoV2() {
         </CardHeader>
         <CardContent>
           <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-            <li>Run all 5 evaluation engines (Parity, Anomaly, Integrity, Drift, Attribution)</li>
+            <li>Run all 5 evaluation engines (Fairness, Robustness, Safety, Drift, Attribution)</li>
             <li>Generate real traffic through the System Control Plane</li>
             <li>Detect drift in engine behavior</li>
             <li>Create anomalies and escalate to HITL review</li>

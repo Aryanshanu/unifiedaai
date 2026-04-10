@@ -10,6 +10,7 @@ import {
   ShieldAlert, Lock, Eye, Settings, ChevronLeft, ChevronRight,
   Shield, GitBranch, Users, Activity, FileText, Bell, BookOpen,
   ScanSearch, FlaskConical, Target, Bot, Clock, Server, Layers,
+  Crown, Radar,
 } from "lucide-react";
 
 interface NavItem {
@@ -21,13 +22,16 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { path: "/", icon: LayoutDashboard, label: "Command Center" },
+  { path: "/admin", icon: Crown, label: "System Admin" },
   { divider: true, label: "Audit" },
   { path: "/audit-center", icon: ScanSearch, label: "Audit Center" },
+  { path: "/discovery", icon: Radar, label: "Shadow AI Discovery" },
   { divider: true, label: "Monitor" },
   { path: "/observability", icon: Activity, label: "Observability Hub" },
   { path: "/alerts", icon: Bell, label: "Alerts & Signals" },
   { path: "/continuous-validation", icon: Clock, label: "Ongoing Validation" },
   { divider: true, label: "Govern" },
+  { path: "/governance", icon: Shield, label: "Governance Controls" },
   { path: "/governance/approvals", icon: Shield, label: "Approvals" },
   { path: "/oversight", icon: Users, label: "Oversight Console" },
   { path: "/anomalies", icon: AlertCircle, label: "Anomalies" },
@@ -45,11 +49,11 @@ const navItems: NavItem[] = [
   { path: "/semantic-hub", icon: Database, label: "Feature Store" },
   { divider: true, label: "Logic" },
   { path: "/agents", icon: Bot, label: "Controller Governance" },
-  { path: "/engine/fairness", icon: Scale, label: "Bias Mitigation" },
-  { path: "/engine/hallucination", icon: AlertCircle, label: "Factuality Auditor" },
-  { path: "/engine/toxicity", icon: ShieldAlert, label: "Safety Engine" },
-  { path: "/engine/privacy", icon: Lock, label: "Data Protection" },
-  { path: "/engine/explainability", icon: Eye, label: "Logic Transparency" },
+  { path: "/engine/fairness", icon: Scale, label: "Fairness Engine" },
+  { path: "/engine/hallucination", icon: AlertCircle, label: "Hallucination Engine" },
+  { path: "/engine/toxicity", icon: ShieldAlert, label: "Toxicity Engine" },
+  { path: "/engine/privacy", icon: Lock, label: "Privacy Engine" },
+  { path: "/engine/explainability", icon: Eye, label: "Explainability Engine" },
   { divider: true, label: "Security" },
   { path: "/security", icon: Shield, label: "Security Dashboard" },
   { path: "/security/pentest", icon: ScanSearch, label: "System Hardening" },
@@ -58,7 +62,7 @@ const navItems: NavItem[] = [
   { divider: true, label: "Configure" },
   { path: "/projects", icon: FolderOpen, label: "Projects" },
   { path: "/engines", icon: Database, label: "Logic Engines" },
-  { path: "/benchmarks", icon: Layers, label: "Stability Benchmarks" },
+  { path: "/benchmarks", icon: Layers, label: "Robustness Benchmarks" },
   { path: "/simulation", icon: FlaskConical, label: "Lifecycle Simulation" },
   { path: "/environments", icon: Server, label: "Environments" },
   { path: "/settings", icon: Settings, label: "Settings" },
@@ -90,7 +94,7 @@ export function Sidebar() {
           </div>
           {!collapsed && (
             <div className="flex flex-col">
-              <span className="font-bold text-foreground text-sm tracking-tight">UnifiedAAI System</span>
+              <span className="font-bold text-foreground text-sm tracking-tight">Fractal RAI-OS</span>
               <Badge variant="outline" className="text-[9px] h-4 px-1.5 w-fit capitalize mt-0.5">
                 {persona.displayName}
               </Badge>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { LiveMetrics } from "@/components/dashboard/LiveMetrics";
@@ -42,6 +43,7 @@ function getModelStatus(model: Model): "healthy" | "warning" | "critical" {
 }
 
 export default function Observability() {
+  const navigate = useNavigate();
   const { data: driftAlerts, isLoading: alertsLoading, refetch: refetchAlerts } = useDriftAlerts();
   const { data: driftStats, refetch: refetchStats } = useDriftAlertStats();
   const { data: models, isLoading: modelsLoading, refetch: refetchModels } = useModels();
@@ -520,11 +522,11 @@ export default function Observability() {
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Force Model Refresh
               </Button>
-              <Button variant="outline" className="w-full justify-start">
+              <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/alerts')}>
                 <AlertTriangle className="w-4 h-4 mr-2" />
                 View All Alerts
               </Button>
-              <Button variant="outline" className="w-full justify-start">
+              <Button variant="outline" className="w-full justify-start" onClick={() => setActiveTab('drift')}>
                 <TrendingUp className="w-4 h-4 mr-2" />
                 Drift Analysis
               </Button>

@@ -76,7 +76,7 @@ serve(async (req) => {
 
     const { user } = authResult;
     
-    // Only admins and analysts can run drift detection
+    // Only admins, analysts and superadmins can run drift detection
     if (!hasAnyRole(user!, ['admin', 'analyst', 'superadmin'])) {
       return new Response(
         JSON.stringify({ error: "Admin or analyst role required for drift detection" }),

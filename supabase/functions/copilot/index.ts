@@ -44,7 +44,7 @@ serve(async (req) => {
       return errorResponse("System not found or access denied", 404);
     }
 
-    // Authorization check: user must be owner or have admin/analyst role
+    // Authorization check: user must be owner or have admin/analyst/superadmin role
     const isOwner = system.owner_id === user?.id;
     const hasPrivilegedRole = hasAnyRole(user!, ['admin', 'analyst', 'superadmin']);
 

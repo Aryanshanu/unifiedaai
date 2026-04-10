@@ -114,36 +114,59 @@ function DataContractsContent() {
 
   const validateContractMutation = useMutation({
     mutationFn: async (contractId: string) => {
-      toast.info("Executing local contract validation protocol...");
-      await new Promise(resolve => setTimeout(resolve, 1200));
-      
       const contract = contracts?.find(c => c.id === contractId);
       if (!contract) throw new Error("Contract not found");
 
-      const shouldFail = Math.random() > 0.7;
-      
-      if (shouldFail) {
+      const violations: string[] = [];
+
+      // Check freshness: was there a quality run within the SLA window?
+      if (contract.dataset_id && contract.freshness_sla_hours) {
+        const cutoff = new Date(Date.now() - contract.freshness_sla_hours * 60 * 60 * 1000).toISOString();
+        const { data: recentRuns } = await supabase
+          .from('dataset_quality_runs')
+          .select('id, verdict, created_at')
+          .eq('dataset_id', contract.dataset_id)
+          .gte('created_at', cutoff)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (!recentRuns || recentRuns.length === 0) {
+          violations.push(`Freshness SLA breach: no quality run in last ${contract.freshness_sla_hours}h`);
+        } else if (recentRuns[0].verdict === 'FAIL') {
+          violations.push(`Quality check failed: last run on ${new Date(recentRuns[0].created_at).toLocaleDateString()} returned FAIL`);
+        }
+      }
+
+      // Check for existing unresolved violations on this contract
+      const { data: existingViolations } = await supabase
+        .from('data_contract_violations')
+        .select('id, violation_type')
+        .eq('contract_id', contractId)
+        .eq('status', 'open');
+
+      if (existingViolations && existingViolations.length > 0) {
+        violations.push(`${existingViolations.length} unresolved violation(s) still open`);
+      }
+
+      if (violations.length > 0) {
         const { error } = await supabase
           .from('data_contract_violations')
           .insert({
             contract_id: contractId,
             dataset_id: contract.dataset_id,
-            violation_type: 'schema_drift',
-            severity: 'critical',
-            violation_details: {
-              detected_issue: "Schema validation failed: unexpected fields detected in payload",
-              expectation: "Payload must strictly conform to Cluster-v2 schema"
-            },
+            violation_type: 'freshness_sla',
+            severity: 'high',
+            violation_details: { detected_issues: violations },
             status: 'open'
           } as any);
         if (error) throw error;
-        throw new Error("Contract violation detected: Schema Drift");
+        throw new Error(`Validation failed: ${violations[0]}`);
       }
-      
+
       return true;
     },
     onSuccess: () => {
-      toast.success('Contract validation passed: 100% compliant');
+      toast.success('Contract validation passed — no violations detected');
       queryClient.invalidateQueries({ queryKey: ['contract-violations'] });
     },
     onError: (e) => toast.error(e.message)

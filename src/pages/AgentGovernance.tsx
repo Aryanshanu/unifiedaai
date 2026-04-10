@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatModelName, getModelProvider } from '@/lib/utils';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,11 +13,65 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAgents, useAgentTraces, useCreateAgent, type AIAgent } from '@/hooks/useAgents';
 import { useModels } from '@/hooks/useModels';
 import { useSystems } from '@/hooks/useSystems';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Bot, Plus, Activity, ShieldAlert, Eye, Clock, AlertTriangle,
-  CheckCircle, XCircle, Zap,
+  CheckCircle, XCircle, Zap, Loader2,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
+
+const DEMO_AGENTS = [
+  {
+    name: 'Customer Support Controller',
+    agent_type: 'conversational',
+    description: 'Handles tier-1 customer queries, escalates to human agents when confidence is low.',
+    status: 'active',
+    risk_tier: 'medium',
+    max_autonomy_level: 'supervised',
+    environment: 'production',
+    trace_enabled: true,
+    capabilities: ['query_resolution', 'escalation', 'sentiment_analysis'],
+    permissions: ['read_customer_data', 'create_tickets'],
+  },
+  {
+    name: 'Fraud Detection Controller',
+    agent_type: 'autonomous',
+    description: 'Real-time transaction analysis and anomaly flagging with auto-block on high-risk signals.',
+    status: 'active',
+    risk_tier: 'high',
+    max_autonomy_level: 'human_in_loop',
+    environment: 'production',
+    trace_enabled: true,
+    capabilities: ['anomaly_detection', 'risk_scoring', 'transaction_blocking'],
+    permissions: ['read_transactions', 'flag_accounts'],
+  },
+  {
+    name: 'HR Onboarding Controller',
+    agent_type: 'semi_autonomous',
+    description: 'Automates new employee onboarding workflows, document collection, and system provisioning.',
+    status: 'under_review',
+    risk_tier: 'low',
+    max_autonomy_level: 'supervised',
+    environment: 'staging',
+    trace_enabled: true,
+    capabilities: ['document_collection', 'system_provisioning', 'notification'],
+    permissions: ['read_employee_data', 'send_emails', 'provision_accounts'],
+  },
+  {
+    name: 'Code Review Controller',
+    agent_type: 'tool_calling',
+    description: 'Automated code quality checks, security scans, and PR summarization.',
+    status: 'active',
+    risk_tier: 'low',
+    max_autonomy_level: 'fully_autonomous',
+    environment: 'development',
+    trace_enabled: false,
+    capabilities: ['static_analysis', 'security_scanning', 'pr_summarization'],
+    permissions: ['read_repositories', 'post_comments'],
+  },
+];
 
 const statusIcon = (s: string) => {
   switch (s) {
@@ -38,9 +93,10 @@ const riskColor = (r: string) => {
 function AgentRegistryTab() {
   const { data: agents, isLoading } = useAgents();
   const { data: models } = useModels();
-  const { data: systems } = useSystems();
   const createMutation = useCreateAgent();
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [seeding, setSeeding] = useState(false);
   const [form, setForm] = useState({
     name: '', agent_type: 'autonomous', description: '', max_autonomy_level: 'supervised',
     environment: 'development', model_id: '', system_id: '',
@@ -55,88 +111,131 @@ function AgentRegistryTab() {
     });
   };
 
+  const handleSeedDemo = async () => {
+    setSeeding(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const toInsert = DEMO_AGENTS.map(a => ({ ...a, created_by: user?.id }));
+      const { error } = await supabase.from('ai_agents').insert(toInsert as never);
+      if (error) throw error;
+      await queryClient.invalidateQueries({ queryKey: ['ai-agents'] });
+      toast.success('4 demo controllers loaded successfully');
+    } catch (e: any) {
+      toast.error('Failed to load demo data: ' + e.message);
+    } finally {
+      setSeeding(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap gap-2 items-center justify-between">
         <p className="text-sm text-muted-foreground">Register and manage all autonomous controllers across your enterprise.</p>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button size="sm"><Plus className="w-4 h-4 mr-1" /> Register Controller</Button></DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>Register Controller</DialogTitle></DialogHeader>
-            <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-              <div><Label>Controller Name</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Customer Support Controller" /></div>
-              <div><Label>Controller Type</Label>
-                <Select value={form.agent_type} onValueChange={v => setForm(f => ({ ...f, agent_type: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="autonomous">Autonomous</SelectItem>
-                    <SelectItem value="semi_autonomous">Semi-Autonomous</SelectItem>
-                    <SelectItem value="tool_calling">Tool Calling</SelectItem>
-                    <SelectItem value="conversational">Conversational</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div><Label>Description</Label><Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
-              <div><Label>Autonomy Level</Label>
-                <Select value={form.max_autonomy_level} onValueChange={v => setForm(f => ({ ...f, max_autonomy_level: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="fully_autonomous">Fully Autonomous</SelectItem>
-                    <SelectItem value="supervised">Supervised</SelectItem>
-                    <SelectItem value="human_in_loop">Human-in-the-Loop</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div><Label>Environment</Label>
-                <Select value={form.environment} onValueChange={v => setForm(f => ({ ...f, environment: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="development">Development</SelectItem>
-                    <SelectItem value="staging">Staging</SelectItem>
-                    <SelectItem value="production">Production</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {models?.length ? (
-                <div><Label>Linked Engine (optional)</Label>
-                  <Select value={form.model_id} onValueChange={v => setForm(f => ({ ...f, model_id: v }))}>
-                    <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+        <div className="flex items-center gap-2">
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild><Button size="sm"><Plus className="w-4 h-4 mr-1" /> Register Controller</Button></DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader><DialogTitle>Register Controller</DialogTitle></DialogHeader>
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+                <div><Label>Controller Name</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Customer Support Controller" /></div>
+                <div><Label>Controller Type</Label>
+                  <Select value={form.agent_type} onValueChange={v => setForm(f => ({ ...f, agent_type: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
-                      {models.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+                      <SelectItem value="autonomous">Autonomous</SelectItem>
+                      <SelectItem value="semi_autonomous">Semi-Autonomous</SelectItem>
+                      <SelectItem value="tool_calling">Tool Calling</SelectItem>
+                      <SelectItem value="conversational">Conversational</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-              ) : null}
-              <Button onClick={handleSubmit} disabled={!form.name || createMutation.isPending} className="w-full">Register Controller</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+                <div><Label>Description</Label><Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
+                <div><Label>Autonomy Level</Label>
+                  <Select value={form.max_autonomy_level} onValueChange={v => setForm(f => ({ ...f, max_autonomy_level: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="fully_autonomous">Fully Autonomous</SelectItem>
+                      <SelectItem value="supervised">Supervised</SelectItem>
+                      <SelectItem value="human_in_loop">Human-in-the-Loop</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div><Label>Environment</Label>
+                  <Select value={form.environment} onValueChange={v => setForm(f => ({ ...f, environment: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="development">Development</SelectItem>
+                      <SelectItem value="staging">Staging</SelectItem>
+                      <SelectItem value="production">Production</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {models?.length ? (
+                  <div><Label>Linked Engine (optional)</Label>
+                    <Select value={form.model_id} onValueChange={v => setForm(f => ({ ...f, model_id: v }))}>
+                      <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">None</SelectItem>
+                        {models.map(m => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {formatModelName(m.name)}
+                            {getModelProvider(m.name) && <span className="text-muted-foreground ml-1">· {getModelProvider(m.name)}</span>}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : null}
+                <Button onClick={handleSubmit} disabled={!form.name || createMutation.isPending} className="w-full">Register Controller</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
-      {!agents?.length ? (
-        <Card className="bg-card border-border"><CardContent className="py-12 text-center text-muted-foreground">
-          <Bot className="w-12 h-12 mx-auto mb-3 opacity-40" />
-          <p>No controllers registered. Register your autonomous controllers to enable governance.</p>
-        </CardContent></Card>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+          <Loader2 className="w-5 h-5 animate-spin" /> Loading controllers...
+        </div>
+      ) : !agents?.length ? (
+        <Card className="bg-card border-border">
+          <CardContent className="py-16 flex flex-col items-center text-center gap-4">
+            <Bot className="w-14 h-14 text-muted-foreground opacity-40" />
+            <div>
+              <p className="font-medium text-foreground">No controllers registered yet</p>
+              <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+                Register autonomous controllers to enable governance, trace execution, and enforce policies.
+              </p>
+            </div>
+            <div className="flex gap-3 mt-2">
+              <Button variant="outline" size="sm" onClick={handleSeedDemo} disabled={seeding}>
+                {seeding ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Plus className="w-4 h-4 mr-1" />}
+                Load Demo Controllers
+              </Button>
+              <Button size="sm" onClick={() => setOpen(true)}>
+                <Plus className="w-4 h-4 mr-1" /> Register Controller
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid gap-3">
           {agents.map(a => (
             <Card key={a.id} className="bg-card border-border">
               <CardContent className="py-4 px-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
                     {statusIcon(a.status)}
-                    <div>
-                      <div className="font-medium text-foreground">{a.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {a.agent_type} · {a.max_autonomy_level} · {a.environment}
+                    <div className="min-w-0">
+                      <div className="font-medium text-foreground truncate">{a.name}</div>
+                      <div className="text-xs text-muted-foreground capitalize">
+                        {a.agent_type?.replace(/_/g, ' ')} · {a.max_autonomy_level?.replace(/_/g, ' ')} · {a.environment}
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     <Badge variant={riskColor(a.risk_tier)}>{a.risk_tier}</Badge>
-                    <Badge variant="outline">{a.status}</Badge>
+                    <Badge variant="outline">{a.status?.replace(/_/g, ' ')}</Badge>
                     {a.trace_enabled && <Badge variant="secondary" className="text-xs"><Activity className="w-3 h-3 mr-1" />Tracing</Badge>}
                   </div>
                 </div>

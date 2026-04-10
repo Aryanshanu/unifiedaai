@@ -198,7 +198,7 @@ serve(async (req) => {
 
     if (action === 'activate') {
       // Only admin/analyst can activate policies
-      if (!hasAnyRole(user!, ['admin', 'analyst'])) {
+      if (!hasAnyRole(user!, ['admin', 'analyst', 'superadmin'])) {
         return errorResponse('Only admins and analysts can activate policies', 403);
       }
       

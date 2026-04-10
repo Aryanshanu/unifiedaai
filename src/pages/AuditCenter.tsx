@@ -41,7 +41,8 @@ import {
   Filter,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format, subDays } from 'date-fns';
+import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import { toast } from 'sonner';
 
 interface AuditEvent {
   id: string;
@@ -55,22 +56,34 @@ interface AuditEvent {
   previous_hash: string | null;
 }
 
+const DATE_PRESETS = [
+  { label: 'Last 24h', days: 1 },
+  { label: 'Last 7 days', days: 7 },
+  { label: 'Last 30 days', days: 30 },
+  { label: 'Last 90 days', days: 90 },
+  { label: 'All time', days: 0 },
+];
+
 function TimelineTab() {
   const [searchQuery, setSearchQuery] = useState('');
   const [tableFilter, setTableFilter] = useState<string>('all');
+  const [dateDays, setDateDays] = useState<number>(30);
 
   const { data: events, isLoading } = useQuery({
-    queryKey: ['audit-timeline', tableFilter],
+    queryKey: ['audit-timeline', tableFilter, dateDays],
     staleTime: 120_000,
     queryFn: async () => {
       let query = supabase
         .from('admin_audit_log')
         .select('*')
         .order('performed_at', { ascending: false })
-        .limit(200);
+        .limit(500);
 
       if (tableFilter !== 'all') {
         query = query.eq('table_name', tableFilter);
+      }
+      if (dateDays > 0) {
+        query = query.gte('performed_at', subDays(new Date(), dateDays).toISOString());
       }
 
       const { data, error } = await query;
@@ -79,11 +92,32 @@ function TimelineTab() {
     },
   });
 
-  const filteredEvents = events?.filter(e => 
-    !searchQuery || 
+  const filteredEvents = events?.filter(e =>
+    !searchQuery ||
     e.change_summary?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     e.table_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleExportCSV = () => {
+    if (!filteredEvents?.length) return;
+    const header = ['Time', 'Action', 'Table', 'Summary', 'Hash'];
+    const rows = filteredEvents.map(e => [
+      format(new Date(e.performed_at), 'yyyy-MM-dd HH:mm:ss'),
+      e.action_type,
+      e.table_name,
+      (e.change_summary || '').replace(/,/g, ';'),
+      e.record_hash || '',
+    ]);
+    const csv = [header, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `audit-log-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${filteredEvents.length} events`);
+  };
 
   const getActionBadge = (action: string) => {
     switch (action) {
@@ -104,8 +138,8 @@ function TimelineTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-4">
-        <div className="relative flex-1">
+      <div className="flex flex-wrap gap-3 items-center">
+        <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search audit events..."
@@ -115,7 +149,7 @@ function TimelineTab() {
           />
         </div>
         <Select value={tableFilter} onValueChange={setTableFilter}>
-          <SelectTrigger className="w-48">
+          <SelectTrigger className="w-40">
             <SelectValue placeholder="Filter by table" />
           </SelectTrigger>
           <SelectContent>
@@ -127,6 +161,22 @@ function TimelineTab() {
             <SelectItem value="incidents">Incidents</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={String(dateDays)} onValueChange={v => setDateDays(Number(v))}>
+          <SelectTrigger className="w-36">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {DATE_PRESETS.map(p => (
+              <SelectItem key={p.days} value={String(p.days)}>{p.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={!filteredEvents?.length}>
+          <Download className="h-4 w-4 mr-1" /> Export CSV
+        </Button>
+        {filteredEvents && (
+          <span className="text-xs text-muted-foreground">{filteredEvents.length} events</span>
+        )}
       </div>
 
       <Card>

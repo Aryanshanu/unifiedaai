@@ -77,10 +77,10 @@ serve(async (req) => {
 
     const { user } = authResult;
     
-    // Only admins can generate test traffic
+    // Only admins, analysts and superadmins can generate test traffic
     if (!hasAnyRole(user!, ['admin', 'analyst', 'superadmin'])) {
       return new Response(
-        JSON.stringify({ error: "Admin role required to generate test traffic" }),
+        JSON.stringify({ error: "Admin or analyst role required to generate test traffic" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

@@ -211,7 +211,7 @@ export function RAIAssistant({ systemId, currentPage }: RAIAssistantProps) {
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-foreground">
             <Bot className="w-5 h-5 text-primary" />
-            Fractal AI Assistant
+            UnifiedAAI Assistant
           </CardTitle>
           <div className="flex items-center gap-2">
             <Button

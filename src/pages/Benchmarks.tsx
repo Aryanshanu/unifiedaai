@@ -27,10 +27,12 @@ import {
   Play
 } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function Benchmarks() {
+  const navigate = useNavigate();
   const { data: raiData, isLoading } = useModelRAIScores();
   const { data: trendsData, isLoading: isTrendsLoading } = useDashboardTrends(30);
   const [isRunningEval, setIsRunningEval] = useState(false);
@@ -119,7 +121,7 @@ export default function Benchmarks() {
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900 border-slate-800 border-dashed hover:border-primary/50 cursor-pointer transition-all">
+          <Card className="bg-slate-900 border-slate-800 border-dashed hover:border-primary/50 cursor-pointer transition-all" onClick={() => navigate('/engines')}>
             <CardContent className="pt-6 h-full flex items-center justify-center">
               <div className="flex flex-col items-center gap-1 group">
                 <Plus className="h-5 w-5 text-slate-500 group-hover:text-primary transition-colors" />
@@ -223,9 +225,9 @@ export default function Benchmarks() {
                         />
                         <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
                         <Line type="monotone" dataKey="composite" name="Overall Readiness" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                        <Line type="monotone" dataKey="fairness" name="Parity" stroke="#22c55e" strokeDasharray="4 4" strokeWidth={2} dot={false} />
-                        <Line type="monotone" dataKey="toxicity" name="Integrity" stroke="#ef4444" strokeDasharray="4 4" strokeWidth={2} dot={false} />
-                        <Line type="monotone" dataKey="privacy" name="Protection" stroke="#eab308" strokeDasharray="4 4" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="fairness" name="Fairness" stroke="#22c55e" strokeDasharray="4 4" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="toxicity" name="Safety" stroke="#ef4444" strokeDasharray="4 4" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="privacy" name="Privacy" stroke="#eab308" strokeDasharray="4 4" strokeWidth={2} dot={false} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>

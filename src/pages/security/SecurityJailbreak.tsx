@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatModelName, getModelProvider } from '@/lib/utils';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -80,7 +81,7 @@ function SecurityJailbreakContent() {
             <label className="text-sm font-medium text-foreground mb-2 block">Select Model</label>
             <Select value={selectedModelId} onValueChange={setSelectedModelId}>
               <SelectTrigger><SelectValue placeholder="Choose a registered model" /></SelectTrigger>
-              <SelectContent>{models?.map(m => <SelectItem key={m.id} value={m.id}>{m.name} ({m.model_type})</SelectItem>)}</SelectContent>
+              <SelectContent>{models?.map(m => <SelectItem key={m.id} value={m.id}>{formatModelName(m.name)}{getModelProvider(m.name) ? ` · ${getModelProvider(m.name)}` : ''}</SelectItem>)}</SelectContent>
             </Select>
             {selectedModelId && !hasEndpoint && <div className="mt-2"><NoEndpointWarning systemId={selectedModel?.system_id} /></div>}
           </div>

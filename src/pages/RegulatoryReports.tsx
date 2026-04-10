@@ -172,12 +172,12 @@ export default function RegulatoryReports() {
     };
 
     const labels: Record<string, string> = {
-      eu_ai_act_conformity: 'EU Digital Governance',
-      model_card: 'Engine Descriptor',
-      data_card: 'Resource Metadata',
-      impact_assessment: 'Outcome Assessment',
-      bias_audit: 'Parity Audit',
-      transparency_report: 'Operational Transparency',
+      eu_ai_act_conformity: 'EU AI Act Compliance',
+      model_card: 'Model Card',
+      data_card: 'Data Card',
+      impact_assessment: 'Impact Assessment',
+      bias_audit: 'Bias Audit',
+      transparency_report: 'Full Audit Report',
     };
 
     return (

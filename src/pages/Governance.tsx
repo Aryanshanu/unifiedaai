@@ -209,16 +209,28 @@ export default function Governance() {
             </span>
           </div>
         </div>
-        <Button 
-          size="sm" 
-          variant="outline" 
+        <Button
+          size="sm"
+          variant="outline"
           className="h-7 text-xs border-success/30 hover:bg-success/20"
-          onClick={() => {
+          onClick={async () => {
             const toastId = "gov-scan";
-            toast.info("Initializing Logic Controller Audit...", { id: toastId });
-            setTimeout(() => {
-              toast.success("Governance Audit Complete: All local cluster nodes compliant with active policies.", { id: toastId });
-            }, 1500);
+            toast.info("Running governance audit...", { id: toastId });
+            try {
+              const [{ count: total }, { count: compliant }, { count: pending }] = await Promise.all([
+                supabase.from('control_assessments').select('*', { count: 'exact', head: true }),
+                supabase.from('control_assessments').select('*', { count: 'exact', head: true }).eq('status', 'compliant'),
+                supabase.from('control_assessments').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+              ]);
+              const score = total ? Math.round(((compliant || 0) / total) * 100) : 100;
+              if (pending && pending > 0) {
+                toast.warning(`Audit complete: ${score}% compliant — ${pending} control(s) still pending assessment`, { id: toastId });
+              } else {
+                toast.success(`Audit complete: ${score}% compliant across ${total || 0} controls`, { id: toastId });
+              }
+            } catch {
+              toast.error("Audit failed — check database connection", { id: toastId });
+            }
           }}
         >
           <Play className="h-3 w-3 mr-1" />

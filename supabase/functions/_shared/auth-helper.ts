@@ -103,13 +103,14 @@ export function hasRole(user: AuthenticatedUser, role: AppRole): boolean {
 export function requireAuth(authResult: AuthResult): Response | null {
   if (!authResult.user) {
     return new Response(
-      JSON.stringify({ 
-        error: "UNAUTHORIZED", 
-        message: authResult.error || "Authentication required" 
+      JSON.stringify({
+        error: "UNAUTHORIZED",
+        message: authResult.error || "Authentication required"
       }),
-      { 
-        status: 401, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      }
       }
     );
   }
@@ -144,7 +145,7 @@ export async function canAccessSystem(
   systemId: string
 ): Promise<{ allowed: boolean; system: any | null; error: string | null }> {
   if (hasAnyRole(user, ['admin', 'analyst', 'superadmin'])) {
-    // Admin/analyst can access any system - fetch it
+    // Admin/analyst/superadmin can access any system - fetch it
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const adminClient = createClient(supabaseUrl, serviceKey);
@@ -211,7 +212,7 @@ export async function canAccessModel(
     return { allowed: false, model: null, error: "Model not found" };
   }
 
-  // Admin/analyst can access any model
+  // Admin/analyst/superadmin can access any model
   if (hasAnyRole(user, ['admin', 'analyst', 'superadmin'])) {
     return { allowed: true, model, error: null };
   }

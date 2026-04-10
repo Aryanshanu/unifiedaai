@@ -32,7 +32,7 @@ export function ReportGenerator({ systems, onGenerate, onClose, isGenerating }: 
 
   const reportTypes = [
     {
-      id: 'eu_ai_act',
+      id: 'eu_ai_act_conformity',
       name: 'EU AI Act Compliance',
       description: 'Risk classification, transparency requirements, and human oversight documentation per EU AI Act Articles',
       icon: Shield,
@@ -50,7 +50,7 @@ export function ReportGenerator({ systems, onGenerate, onClose, isGenerating }: 
       icon: Database,
     },
     {
-      id: 'audit_report',
+      id: 'transparency_report',
       name: 'Full Audit Report',
       description: 'Comprehensive audit trail including all governance events, decisions, and compliance status',
       icon: FileText,

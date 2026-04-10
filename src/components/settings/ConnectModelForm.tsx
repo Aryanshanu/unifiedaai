@@ -11,7 +11,7 @@ export function ConnectModelForm() {
           AI Gateway Status
         </CardTitle>
         <CardDescription>
-          All evaluations are routed through the Fractal AI Gateway. No configuration needed.
+          All evaluations are routed through the UnifiedAAI Gateway. No configuration needed.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

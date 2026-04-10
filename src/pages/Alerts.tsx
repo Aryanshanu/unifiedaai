@@ -72,6 +72,8 @@ export default function Alerts() {
   const [newChannelType, setNewChannelType] = useState<'email' | 'slack' | 'teams' | 'webhook'>('email');
   const [newChannelName, setNewChannelName] = useState('');
   const [newChannelConfig, setNewChannelConfig] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [severityFilter, setSeverityFilter] = useState<string>('all');
 
   // Supabase Realtime subscriptions - use stable queryClient reference
   const subscriptionRef = useRef(false);
@@ -135,6 +137,14 @@ export default function Alerts() {
       details: i.description || '',
     })),
   ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  const filteredAlerts = allAlerts.filter(a => {
+    const matchesSearch = !searchQuery ||
+      a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      a.details.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSeverity = severityFilter === 'all' || a.severity === severityFilter;
+    return matchesSearch && matchesSeverity;
+  });
 
   const toggleChannel = async (channelId: string, enabled: boolean) => {
     try {
@@ -208,19 +218,33 @@ export default function Alerts() {
       {/* Alerts Tab */}
       {activeTab === 'alerts' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <Input 
-                placeholder="Search alerts..." 
-                className="w-64 bg-secondary border-border"
+              <Input
+                placeholder="Search alerts..."
+                className="w-56 bg-secondary border-border"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
               />
-              <Button variant="outline" size="sm" onClick={() => toast.info("Use search to filter alerts")}>
-                <Filter className="w-4 h-4 mr-2" />
-                Filter
-              </Button>
+              <select
+                className="h-9 rounded-md border border-border bg-secondary text-sm px-2 text-foreground"
+                value={severityFilter}
+                onChange={e => setSeverityFilter(e.target.value)}
+              >
+                <option value="all">All severities</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+              {(searchQuery || severityFilter !== 'all') && (
+                <Button variant="ghost" size="sm" onClick={() => { setSearchQuery(''); setSeverityFilter('all'); }}>
+                  Clear
+                </Button>
+              )}
             </div>
             <span className="text-sm text-muted-foreground">
-              {allAlerts.filter(a => a.status === 'open').length} active alerts
+              {filteredAlerts.filter(a => a.status === 'open').length} of {allAlerts.filter(a => a.status === 'open').length} active alerts
             </span>
           </div>
 
@@ -228,15 +252,15 @@ export default function Alerts() {
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
-          ) : allAlerts.length === 0 ? (
+          ) : filteredAlerts.length === 0 ? (
             <EmptyState
               icon={<CheckCircle className="w-8 h-8 text-success/50" />}
-              title="Systems nominal"
+              title={allAlerts.length === 0 ? "Systems nominal" : "No matching alerts"}
               description="No active alerts. Your systems are healthy."
             />
           ) : (
             <div className="space-y-3">
-              {allAlerts.map(alert => {
+              {filteredAlerts.map(alert => {
                 const riskLevel = normalizeRiskLevel(alert.severity);
                 const config = FRACTAL_RISK[riskLevel];
                 

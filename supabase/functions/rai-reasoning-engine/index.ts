@@ -339,6 +339,7 @@ serve(async (req) => {
     // RLS already handles authorization - if user can see the model, they can evaluate it
     // Additional role check for extra security
     const isOwner = model.owner_id === user?.id || model.system?.owner_id === user?.id;
+
     if (!isOwner && !hasAnyRole(user!, ['admin', 'analyst', 'reviewer', 'superadmin'])) {
       console.warn(`[rai-reasoning-engine] Unauthorized access attempt: user ${user?.id} tried to access model ${modelId}`);
       return new Response(

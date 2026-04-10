@@ -99,7 +99,7 @@ const Documentation = () => {
               </h2>
               <div className="grid md:grid-cols-3 gap-4 text-sm">
                 <div className="space-y-2">
-                  <a href="#what-is-this" className="block p-2 rounded hover:bg-muted transition-colors">1. What is UnifiedALogic Engine?</a>
+                  <a href="#what-is-this" className="block p-2 rounded hover:bg-muted transition-colors">1. What is UnifiedAAI?</a>
                   <a href="#getting-started" className="block p-2 rounded hover:bg-muted transition-colors">2. Getting Started (Step-by-Step)</a>
                   <a href="#architecture" className="block p-2 rounded hover:bg-muted transition-colors">3. Understanding the Architecture</a>
                   <a href="#projects" className="block p-2 rounded hover:bg-muted transition-colors">4. Projects (Complete Guide)</a>
@@ -127,7 +127,7 @@ const Documentation = () => {
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <span className="text-primary font-bold">1</span>
                 </div>
-                What is Fractal?
+                What is UnifiedAAI?
               </h2>
 
               <div className="space-y-6">
@@ -163,7 +163,7 @@ const Documentation = () => {
                 <div className="p-6 rounded-xl border bg-card">
                   <h3 className="text-lg font-semibold mb-4">Our Solution</h3>
                   <p className="text-muted-foreground mb-4">
-                    UnifiedALogic Engine provides a complete platform to:
+                    UnifiedAAI provides a complete platform to:
                   </p>
                   <ul className="space-y-2 text-sm">
                     <li className="flex items-start gap-2">
@@ -204,7 +204,7 @@ const Documentation = () => {
                   <div className="p-4 rounded-lg border bg-orange-500/5 border-orange-500/20">
                     <FileCheck className="h-6 w-6 text-orange-500 mb-2" />
                     <h4 className="font-semibold mb-1">Compliant</h4>
-                    <p className="text-xs text-muted-foreground">Aligned with EU Logic Engine Act & NIST</p>
+                    <p className="text-xs text-muted-foreground">Aligned with EU AI Act & NIST</p>
                   </div>
                 </div>
 
@@ -315,7 +315,7 @@ const Documentation = () => {
                             <tr>
                               <td className="py-2 px-3 font-mono text-xs">compliance_frameworks</td>
                               <td className="py-2 px-3">Which regulations apply?</td>
-                              <td className="py-2 px-3">"EU Logic Engine Act", "NIST Logic Engine RMF", "SOC 2"</td>
+                              <td className="py-2 px-3">"EU AI Act", "NIST Logic Engine RMF", "SOC 2"</td>
                               <td className="py-2 px-3"><Badge variant="secondary" className="text-xs">No</Badge></td>
                             </tr>
                           </tbody>
@@ -549,7 +549,7 @@ const Documentation = () => {
                         <li>• <strong>ComputationBreakdown</strong>: Shows the exact formulas used</li>
                         <li>• <strong>RawDataLog</strong>: Timestamps, latency, raw test data</li>
                         <li>• <strong>EvidencePackage</strong>: Downloadable JSON with SHA-256 hash</li>
-                        <li>• <strong>If score &lt; 70%</strong>: Red "NON-COMPLIANT" warning with EU Logic Engine Act reference</li>
+                        <li>• <strong>If score &lt; 70%</strong>: Red "NON-COMPLIANT" warning with EU AI Act reference</li>
                       </ul>
                     </div>
                   </div>
@@ -584,7 +584,7 @@ const Documentation = () => {
                         Available Report Types
                       </h4>
                       <ul className="text-sm text-muted-foreground space-y-1">
-                        <li>• <strong>EU Logic Engine Act Compliance</strong>: Full conformity assessment</li>
+                        <li>• <strong>EU AI Act Compliance</strong>: Full conformity assessment</li>
                         <li>• <strong>Bias Audit</strong>: Fairness analysis across demographics</li>
                         <li>• <strong>Risk Assessment</strong>: Comprehensive risk evaluation</li>
                         <li>• <strong>Technical Documentation</strong>: Model specifications</li>
@@ -836,7 +836,7 @@ const Documentation = () => {
                               <tr>
                                 <td className="py-2 px-3">Compliance Frameworks</td>
                                 <td className="py-2 px-3">Multi-select</td>
-                                <td className="py-2 px-3">EU Logic Engine Act, NIST Logic Engine RMF, SOC 2, ISO 27001</td>
+                                <td className="py-2 px-3">EU AI Act, NIST Logic Engine RMF, SOC 2, ISO 27001</td>
                               </tr>
                             </tbody>
                           </table>
@@ -933,7 +933,7 @@ const Documentation = () => {
 
               <div className="space-y-6">
                 <div className="p-6 rounded-xl border bg-card">
-                  <h3 className="text-lg font-semibold mb-4">What is a Model in Fractal?</h3>
+                  <h3 className="text-lg font-semibold mb-4">What is a Model in UnifiedAAI?</h3>
                   <p className="text-muted-foreground mb-4">
                     A Model represents any Logic Engine/ML model that you want to evaluate, monitor, and govern. 
                     This can be an Pattern Engine (like Core Logic v4), a classification model (like XGBoost), 
@@ -1577,7 +1577,7 @@ const Documentation = () => {
                     8.4 Incidents
                   </h3>
                   <p className="text-muted-foreground mb-4">
-                    Track safety and compliance incidents. Required for EU Logic Engine Act Article 62 incident reporting.
+                    Track safety and compliance incidents. Required for EU AI Act Article 62 incident reporting.
                   </p>
 
                   <div className="p-4 rounded-lg bg-muted/50">
@@ -1723,7 +1723,7 @@ const Documentation = () => {
                         <h4 className="font-medium mb-2 text-red-700 dark:text-red-400">Fail (&lt;70%)</h4>
                         <p className="text-xs text-muted-foreground">
                           Model shows significant bias. Red warning and "NON-COMPLIANT" status 
-                          with EU Logic Engine Act Article 10 reference.
+                          with EU AI Act Article 10 reference.
                         </p>
                       </div>
                     </div>
@@ -1791,7 +1791,7 @@ const Documentation = () => {
                       </h4>
                       <p className="text-xs text-muted-foreground">
                         If any test case produces toxic output, a Critical alert is generated and 
-                        the model is flagged for immediate review. This maps to EU Logic Engine Act Article 5 (prohibited practices).
+                        the model is flagged for immediate review. This maps to EU AI Act Article 5 (prohibited practices).
                       </p>
                     </div>
                   </div>
@@ -1861,7 +1861,7 @@ const Documentation = () => {
                         Regulatory Requirement
                       </h4>
                       <p className="text-xs text-muted-foreground">
-                        EU Logic Engine Act Article 13 requires that users can understand how high-risk Logic Engine systems 
+                        EU AI Act Article 13 requires that users can understand how high-risk Logic Engine systems 
                         make decisions. This engine helps demonstrate compliance.
                       </p>
                     </div>
@@ -2089,9 +2089,9 @@ const Documentation = () => {
                           </thead>
                           <tbody className="text-muted-foreground">
                             <tr className="border-b">
-                              <td className="py-2 px-3">EU Logic Engine Act Conformity</td>
+                              <td className="py-2 px-3">EU AI Act Conformity</td>
                               <td className="py-2 px-3">Full compliance assessment</td>
-                              <td className="py-2 px-3">EU Logic Engine Act</td>
+                              <td className="py-2 px-3">EU AI Act</td>
                             </tr>
                             <tr className="border-b">
                               <td className="py-2 px-3">Bias Audit Report</td>
@@ -2101,7 +2101,7 @@ const Documentation = () => {
                             <tr className="border-b">
                               <td className="py-2 px-3">Technical Documentation</td>
                               <td className="py-2 px-3">Model specifications and design</td>
-                              <td className="py-2 px-3">EU Logic Engine Act Annex IV</td>
+                              <td className="py-2 px-3">EU AI Act Annex IV</td>
                             </tr>
                             <tr className="border-b">
                               <td className="py-2 px-3">Risk Assessment</td>
@@ -2111,7 +2111,7 @@ const Documentation = () => {
                             <tr>
                               <td className="py-2 px-3">Incident Report</td>
                               <td className="py-2 px-3">Safety incident documentation</td>
-                              <td className="py-2 px-3">EU Logic Engine Act Art. 62</td>
+                              <td className="py-2 px-3">EU AI Act Art. 62</td>
                             </tr>
                           </tbody>
                         </table>

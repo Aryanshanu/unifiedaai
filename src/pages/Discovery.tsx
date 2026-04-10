@@ -138,11 +138,23 @@ function ShadowAITab() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant={riskColor(d.risk_assessment)}>{d.risk_assessment}</Badge>
-                  <Badge variant="outline">{d.status}</Badge>
+                  <Badge variant={d.status === 'authorized' ? 'default' : d.status === 'blocked' ? 'destructive' : 'outline'}>
+                    {d.status === 'under_review' ? 'Under Review' : d.status === 'authorized' ? 'Authorized' : d.status === 'blocked' ? 'Blocked' : d.status}
+                  </Badge>
                   {d.status === 'discovered' && (
-                    <Button size="sm" variant="outline" onClick={() => updateMutation.mutate({ id: d.id, status: 'under_review' } as any)}>
-                      Review
+                    <Button size="sm" variant="outline" disabled={updateMutation.isPending} onClick={() => updateMutation.mutate({ id: d.id, status: 'under_review' } as any)}>
+                      <Clock className="w-3 h-3 mr-1" /> Review
                     </Button>
+                  )}
+                  {d.status === 'under_review' && (
+                    <>
+                      <Button size="sm" variant="outline" className="text-green-400 border-green-400/40 hover:bg-green-400/10" disabled={updateMutation.isPending} onClick={() => updateMutation.mutate({ id: d.id, status: 'authorized', resolved_at: new Date().toISOString() } as any)}>
+                        <CheckCircle className="w-3 h-3 mr-1" /> Authorize
+                      </Button>
+                      <Button size="sm" variant="outline" className="text-red-400 border-red-400/40 hover:bg-red-400/10" disabled={updateMutation.isPending} onClick={() => updateMutation.mutate({ id: d.id, status: 'blocked', resolved_at: new Date().toISOString() } as any)}>
+                        <XCircle className="w-3 h-3 mr-1" /> Block
+                      </Button>
+                    </>
                   )}
                 </div>
               </CardContent>
@@ -234,7 +246,7 @@ export default function Discovery() {
 
         <Tabs defaultValue="auto" className="space-y-4">
           <TabsList>
-            <TabsTrigger value="auto"><ScanSearch className="w-4 h-4 mr-1" /> Active logic Auditor</TabsTrigger>
+            <TabsTrigger value="auto"><ScanSearch className="w-4 h-4 mr-1" /> Active Logic Auditor</TabsTrigger>
             <TabsTrigger value="shadow"><AlertTriangle className="w-4 h-4 mr-1" /> Unregistered Logic</TabsTrigger>
             <TabsTrigger value="vendors"><Building2 className="w-4 h-4 mr-1" /> Providers</TabsTrigger>
           </TabsList>

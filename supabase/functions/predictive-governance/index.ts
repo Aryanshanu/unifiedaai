@@ -1,11 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+import { validateSession, requireAuth, corsHeaders } from "../_shared/auth-helper.ts";
 
 interface PredictiveRequest {
   entity_type?: 'model' | 'system' | 'dataset';
@@ -39,13 +34,11 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    
-    const authHeader = req.headers.get("Authorization");
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: authHeader ? { Authorization: authHeader } : {} },
-    });
+    const authResult = await validateSession(req);
+    const authError = requireAuth(authResult);
+    if (authError) return authError;
+
+    const supabase = authResult.supabase!;
 
     const body: PredictiveRequest = await req.json().catch(() => ({}));
     const lookbackDays = body.lookback_days || 30;

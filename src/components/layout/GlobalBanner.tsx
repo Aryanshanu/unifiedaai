@@ -10,17 +10,16 @@ export function GlobalBanner() {
 
   return (
     <div className={cn(
-      "w-full bg-gradient-to-r from-primary via-primary/80 to-primary",
-      "text-primary-foreground py-2 px-4 flex items-center justify-center gap-3 relative"
+      "w-full bg-[#2D3A8C] text-white py-2 px-4 flex items-center justify-center gap-3 relative"
     )}>
-      <Globe className="w-4 h-4 animate-pulse" />
-      <span className="text-sm font-medium">
-        UnifiedAAI - Enterprise AI Governance Platform
+      <span className="text-sm font-medium tracking-wide">
+        Fractal Unified Autonomous Governance Platform
       </span>
+      <Globe className="w-4 h-4 opacity-80" />
       <Button
         variant="ghost"
         size="iconSm"
-        className="absolute right-2 hover:bg-primary-foreground/10"
+        className="absolute right-2 hover:bg-white/10 text-white"
         onClick={() => setDismissed(true)}
       >
         <X className="w-4 h-4" />

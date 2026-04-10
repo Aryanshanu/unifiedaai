@@ -17,7 +17,7 @@ serve(async (req) => {
 
     const { user } = authResult;
     
-    // Only admins and analysts can sync the knowledge graph
+    // Only admins, analysts and superadmins can sync the knowledge graph
     if (!hasAnyRole(user!, ['admin', 'analyst', 'superadmin'])) {
       return new Response(
         JSON.stringify({ error: "Admin or analyst role required for KG sync" }),

@@ -174,7 +174,7 @@ export default function ImpactDashboard() {
               <div className="flex items-start gap-3">
                 <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
                 <div>
-                  <h3 className="font-semibold text-destructive">Parity Anomalies Detected</h3>
+                  <h3 className="font-semibold text-destructive">Fairness Anomalies Detected</h3>
                   <ul className="mt-2 space-y-1">
                     {(alerts as Array<{ type: string; message: string; severity: string }>).map((alert, i) => (
                       <li key={i} className="text-sm text-muted-foreground">
@@ -254,7 +254,7 @@ export default function ImpactDashboard() {
 
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Longitudinal Parity Chart */}
+          {/* Longitudinal Fairness Chart */}
           <LongitudinalFairness 
             groups={groups as Array<{ group: string; positiveRate: number; harmRate: number }>} 
             timeWindow={timeWindow}
