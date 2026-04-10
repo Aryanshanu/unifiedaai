@@ -143,7 +143,7 @@ export async function canAccessSystem(
   user: AuthenticatedUser,
   systemId: string
 ): Promise<{ allowed: boolean; system: any | null; error: string | null }> {
-  if (hasAnyRole(user, ['admin', 'analyst'])) {
+  if (hasAnyRole(user, ['admin', 'analyst', 'superadmin'])) {
     // Admin/analyst can access any system - fetch it
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -212,7 +212,7 @@ export async function canAccessModel(
   }
 
   // Admin/analyst can access any model
-  if (hasAnyRole(user, ['admin', 'analyst'])) {
+  if (hasAnyRole(user, ['admin', 'analyst', 'superadmin'])) {
     return { allowed: true, model, error: null };
   }
 

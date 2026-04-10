@@ -45,7 +45,7 @@ serve(async (req) => {
 
     // Authorization check: user must be owner or have admin/analyst role
     const isOwner = system.owner_id === user?.id;
-    const hasPrivilegedRole = hasAnyRole(user!, ['admin', 'analyst']);
+    const hasPrivilegedRole = hasAnyRole(user!, ['admin', 'analyst', 'superadmin']);
 
     if (!isOwner && !hasPrivilegedRole) {
       console.log(`[copilot] Unauthorized access attempt: user ${user?.id} tried to access system ${systemId}`);

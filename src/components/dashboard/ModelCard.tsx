@@ -99,7 +99,7 @@ export function ModelCard({
   const deleteModel = useDeleteModel();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   
-  const canDelete = hasAnyRole(['admin', 'analyst']);
+  const canDelete = hasAnyRole(['admin', 'analyst', 'superadmin']);
   const displayEnv = environment || getEnvFromStatus(status);
   const displayRisk = riskLevel || getRiskFromScores(fairnessScore, robustnessScore);
   const typeKey = type.toLowerCase().replace(/[^a-z]/g, '');

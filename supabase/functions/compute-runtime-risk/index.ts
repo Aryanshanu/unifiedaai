@@ -31,7 +31,7 @@ serve(async (req) => {
     const { user } = authResult;
     
     // Only admins and analysts can run risk computation
-    if (!hasAnyRole(user!, ['admin', 'analyst'])) {
+    if (!hasAnyRole(user!, ['admin', 'analyst', 'superadmin'])) {
       return new Response(
         JSON.stringify({ error: "Admin or analyst role required for risk computation" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
