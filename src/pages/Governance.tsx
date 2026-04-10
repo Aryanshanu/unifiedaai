@@ -18,6 +18,7 @@ import { CreateFrameworkDialog } from "@/components/governance/CreateFrameworkDi
 import { GovernanceEnforcementPanel } from "@/components/governance/GovernanceEnforcementPanel";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useHighRiskPredictions } from "@/hooks/usePredictiveGovernance";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Governance() {
   const { data: frameworks, isLoading: frameworksLoading, isError: frameworksError, refetch: refetchFrameworks } = useControlFrameworks();

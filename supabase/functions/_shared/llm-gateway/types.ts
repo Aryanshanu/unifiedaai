@@ -44,7 +44,8 @@ export type LLMProvider =
   | 'gemini'       // Google Gemini — user-configured target systems only
   | 'huggingface'  // HuggingFace — evaluation engines with user models
   | 'perplexity'   // Perplexity — user-configured target systems only
-  | 'openrouter';  // OpenRouter — user-configured target systems only
+  | 'openrouter'   // OpenRouter — user-configured target systems only
+  | 'lovable';     // Lovable AI Gateway
 
 export type LLMErrorCode =
   | 'PROVIDER_TIMEOUT'

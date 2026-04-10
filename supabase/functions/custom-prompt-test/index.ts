@@ -290,10 +290,7 @@ serve(async (req) => {
     // Check authorization: owner or admin/analyst
     const systemData = model.system as any;
     const isOwner = systemData?.owner_id === user?.id;
-<<<<<<< HEAD
-=======
 
->>>>>>> 686ff3d (feat: align branding with Fractal RAI-OS and sync latest governance updates)
     if (!isOwner && !hasAnyRole(authResult.user!, ['admin', 'analyst', 'superadmin'])) {
       console.log(`[custom-prompt-test] Authorization denied for user ${user?.id} on model ${modelId}`);
       return errorResponse("Unauthorized access to this model", 403);

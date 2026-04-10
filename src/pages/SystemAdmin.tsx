@@ -111,10 +111,10 @@ export default function SystemAdmin() {
     try {
       const { error } = await supabase
         .from("systems")
-        .update({ deployment_status: "suspended" })
-        .neq("deployment_status", "archived");
+        .update({ deployment_status: "blocked" })
+        .in("deployment_status", ["approved", "deployed", "ready_for_review", "pending_approval"]);
       if (error) throw error;
-      toast.error("Platform lockdown initiated — all systems suspended", { duration: 8000 });
+      toast.error("Platform lockdown initiated — all active systems blocked", { duration: 8000 });
       queryClient.invalidateQueries({ queryKey: ["systems"] });
     } catch (e: any) {
       toast.error("Lockdown failed: " + e.message);

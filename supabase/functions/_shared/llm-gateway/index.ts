@@ -17,6 +17,7 @@ import { HuggingFaceAdapter } from './adapters/huggingface-adapter.ts';
 import { PerplexityAdapter } from './adapters/perplexity-adapter.ts';
 import { OpenRouterAdapter } from './adapters/openrouter-adapter.ts';
 import { AnthropicAdapter } from './adapters/anthropic-adapter.ts';
+import { LovableAdapter } from './adapters/lovable-adapter.ts';
 
 // Re-export types
 export * from './types.ts';
@@ -29,6 +30,7 @@ adapters.set('huggingface', new HuggingFaceAdapter());
 adapters.set('perplexity', new PerplexityAdapter());
 adapters.set('openrouter', new OpenRouterAdapter());
 adapters.set('anthropic', new AnthropicAdapter());
+adapters.set('lovable', new LovableAdapter());
 
 /**
  * Get provider adapter by name
