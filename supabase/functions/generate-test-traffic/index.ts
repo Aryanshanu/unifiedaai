@@ -7,7 +7,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { validateSession, requireAuth, hasRole, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
+import { validateSession, requireAuth, hasRole, hasAnyRole, getServiceClient, corsHeaders } from "../_shared/auth-helper.ts";
 import { validateTestTrafficInput, validationErrorResponse } from "../_shared/input-validation.ts";
 
 // Test prompts for each engine type
@@ -77,7 +77,7 @@ serve(async (req) => {
     const { user } = authResult;
     
     // Only admins can generate test traffic
-    if (!hasRole(user!, 'admin')) {
+    if (!hasAnyRole(user!, ['admin', 'analyst', 'superadmin'])) {
       return new Response(
         JSON.stringify({ error: "Admin role required to generate test traffic" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }

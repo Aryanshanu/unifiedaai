@@ -45,7 +45,7 @@ serve(async (req) => {
     const { user } = authResult;
     
     // Only admins and analysts can upsert to knowledge graph
-    if (!hasAnyRole(user!, ['admin', 'analyst'])) {
+    if (!hasAnyRole(user!, ['admin', 'analyst', 'superadmin'])) {
       return new Response(
         JSON.stringify({ error: "Admin or analyst role required for KG upsert" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
