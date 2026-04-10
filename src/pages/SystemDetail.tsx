@@ -613,23 +613,23 @@ export default function SystemDetail() {
                   <ShieldCheck className="h-12 w-12 text-muted-foreground mb-4" />
                   <h3 className="text-lg font-semibold">Audit Engine Ready</h3>
                   <p className="text-muted-foreground mt-2 max-w-md">
-                    Scanning {requestLogs?.length || 0} recent requests against UnifiedAAI Security Cluster v2.0.
+                    Scanning {requestLogs?.length || 0} recent requests against Fractal Unified AI Security Cluster v2.0.
                   </p>
-                  <Button 
+                  <Button
                     className="mt-6 gap-2"
                     onClick={() => {
-                      const count = requestLogs?.length || 0;
-                      const toastId = "audit-toast";
+                      const logs = requestLogs || [];
+                      const errorLogs = logs.filter(l => (l.status_code || 0) >= 400);
+                      const slowLogs = logs.filter(l => (l.latency_ms || 0) > 5000);
+                      const findings = errorLogs.length + slowLogs.length;
                       import("sonner").then(({ toast }) => {
-                        toast.info(`Auditing ${count} requests...`, { id: toastId });
-                        setTimeout(() => {
-                          const findings = Math.random() > 0.8 ? 1 : 0;
-                          if (findings > 0) {
-                            toast.error(`Audit Complete: ${findings} anomaly detected in cluster nodes.`, { id: toastId });
-                          } else {
-                            toast.success(`Audit Complete: 0 anomalies detected. System is compliant.`, { id: toastId });
-                          }
-                        }, 2000);
+                        if (findings > 0) {
+                          toast.error(`Audit Complete: ${findings} issue(s) detected — ${errorLogs.length} error responses, ${slowLogs.length} slow requests (>5s).`);
+                        } else if (logs.length === 0) {
+                          toast.info(`No request logs available for this system yet.`);
+                        } else {
+                          toast.success(`Audit Complete: 0 anomalies detected across ${logs.length} requests. System is compliant.`);
+                        }
                       });
                     }}
                   >

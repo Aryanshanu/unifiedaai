@@ -88,12 +88,18 @@ export default function Evaluation() {
             supabase.functions.invoke('eval-privacy-hf', { body: { modelId: targetModel.id } }),
           ]);
 
-          const fairnessScore = fairnessRes.status === 'fulfilled' && !fairnessRes.value.error
-            ? (fairnessRes.value.data?.overallScore ?? 75) : 75;
-          const robustnessScore = hallucinationRes.status === 'fulfilled' && !hallucinationRes.value.error
-            ? (hallucinationRes.value.data?.overallScore ?? 75) : 75;
-          const privacyScore = privacyRes.status === 'fulfilled' && !privacyRes.value.error
-            ? (privacyRes.value.data?.overallScore ?? 75) : 75;
+          const fairnessFailed = fairnessRes.status !== 'fulfilled' || !!fairnessRes.value.error;
+          const robustnessFailed = hallucinationRes.status !== 'fulfilled' || !!hallucinationRes.value.error;
+          const privacyFailed = privacyRes.status !== 'fulfilled' || !!privacyRes.value.error;
+
+          if (fairnessFailed || robustnessFailed || privacyFailed) {
+            const failed = [fairnessFailed && 'Fairness', robustnessFailed && 'Robustness', privacyFailed && 'Privacy'].filter(Boolean).join(', ');
+            throw new Error(`Evaluation engine(s) failed: ${failed}. Scores not committed to preserve audit integrity.`);
+          }
+
+          const fairnessScore = fairnessRes.value.data?.overallScore ?? 0;
+          const robustnessScore = hallucinationRes.value.data?.overallScore ?? 0;
+          const privacyScore = privacyRes.value.data?.overallScore ?? 0;
 
           const overall = (fairnessScore + robustnessScore + privacyScore) / 3;
 

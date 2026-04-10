@@ -421,7 +421,7 @@ export function useGoldenDemoOrchestrator() {
             <li>Privacy: 95%</li>
             <li>Security: 78% (Requires Review)</li>
           </ul>
-          <p style="font-size: 0.8em; color: #666;">Generated locally by UnifiedAAI Cluster Protocol</p>
+          <p style="font-size: 0.8em; color: #666;">Generated locally by Fractal Unified AI Cluster Protocol</p>
         </div>
       `;
 

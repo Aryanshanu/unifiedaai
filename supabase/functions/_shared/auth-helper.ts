@@ -111,7 +111,6 @@ export function requireAuth(authResult: AuthResult): Response | null {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       }
-      }
     );
   }
   return null;

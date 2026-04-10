@@ -95,7 +95,7 @@ export default function Observability() {
               description: `${(payload.new as any)?.feature || 'Feature'} drift detected`,
               action: {
                 label: "View",
-                onClick: () => {}
+                onClick: () => setActiveTab('drift')
               }
             });
           }

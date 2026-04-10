@@ -146,7 +146,7 @@ export function useDemoMode() {
       // Mark as initialized for this session
       sessionStorage.setItem(DEMO_INITIALIZED_KEY, 'true');
 
-      console.log('UnifiedAAI: DEMO MODE INITIALIZED. ALL DATA SEEDED.');
+      console.log('Unified AI: DEMO MODE INITIALIZED. ALL DATA SEEDED.');
 
     } catch (error) {
       console.error('Demo initialization error:', error);
@@ -419,7 +419,7 @@ async function verifyMinimumData() {
     control_assessments: assessmentsCount || 0
   };
 
-  console.log('UnifiedAAI: Demo data seeded:', results);
+  console.log('Unified AI: Demo data seeded:', results);
 
   // Verify minimums
   const minimums = {
@@ -437,13 +437,13 @@ async function verifyMinimumData() {
   let allPassed = true;
   for (const [key, min] of Object.entries(minimums)) {
     if (results[key as keyof typeof results] < min) {
-      console.error(`UnifiedAAI QA: ${key} below minimum (${results[key as keyof typeof results]} < ${min})`);
+      console.error(`Unified AI QA: ${key} below minimum (${results[key as keyof typeof results]} < ${min})`);
       allPassed = false;
     }
   }
 
   if (allPassed) {
-    console.log('UnifiedAAI: 100% FUNCTIONAL. ALL GAPS CLOSED. EVERY BUTTON WORKS. DEC 2025.');
+    console.log('Unified AI: 100% FUNCTIONAL. ALL GAPS CLOSED. EVERY BUTTON WORKS. DEC 2025.');
   }
 
   return results;

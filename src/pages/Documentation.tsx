@@ -61,7 +61,7 @@ import {
 
 const Documentation = () => {
   return (
-    <MainLayout title="Documentation" subtitle="Beginner-Friendly Guide to UnifiedAAI Sovereign Governance Cluster">
+    <MainLayout title="Documentation" subtitle="Beginner-Friendly Guide to Fractal Unified AI Sovereign Governance Cluster">
       <div className="min-h-screen bg-background">
         <ScrollArea className="h-[calc(100vh-4rem)]">
           <div className="max-w-5xl mx-auto px-6 py-12">
@@ -73,7 +73,7 @@ const Documentation = () => {
                 <span className="text-sm font-medium text-primary">Sovereign Engineering Manual</span>
               </div>
               <h1 className="text-4xl font-bold tracking-tight mb-4 text-foreground">
-                UnifiedAAI: Sovereign Governance Cluster
+                Fractal Unified AI: Sovereign Governance Cluster
               </h1>
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-4">
                 The First Vendor-Neutral Operating System for Autonomous Logic
@@ -99,7 +99,7 @@ const Documentation = () => {
               </h2>
               <div className="grid md:grid-cols-3 gap-4 text-sm">
                 <div className="space-y-2">
-                  <a href="#what-is-this" className="block p-2 rounded hover:bg-muted transition-colors">1. What is UnifiedAAI?</a>
+                  <a href="#what-is-this" className="block p-2 rounded hover:bg-muted transition-colors">1. What is Fractal Unified AI?</a>
                   <a href="#getting-started" className="block p-2 rounded hover:bg-muted transition-colors">2. Getting Started (Step-by-Step)</a>
                   <a href="#architecture" className="block p-2 rounded hover:bg-muted transition-colors">3. Understanding the Architecture</a>
                   <a href="#projects" className="block p-2 rounded hover:bg-muted transition-colors">4. Projects (Complete Guide)</a>
@@ -127,7 +127,7 @@ const Documentation = () => {
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <span className="text-primary font-bold">1</span>
                 </div>
-                What is UnifiedAAI?
+                What is Fractal Unified AI?
               </h2>
 
               <div className="space-y-6">
@@ -163,7 +163,7 @@ const Documentation = () => {
                 <div className="p-6 rounded-xl border bg-card">
                   <h3 className="text-lg font-semibold mb-4">Our Solution</h3>
                   <p className="text-muted-foreground mb-4">
-                    UnifiedAAI provides a complete platform to:
+                    Fractal Unified AI provides a complete platform to:
                   </p>
                   <ul className="space-y-2 text-sm">
                     <li className="flex items-start gap-2">
@@ -933,7 +933,7 @@ const Documentation = () => {
 
               <div className="space-y-6">
                 <div className="p-6 rounded-xl border bg-card">
-                  <h3 className="text-lg font-semibold mb-4">What is a Model in UnifiedAAI?</h3>
+                  <h3 className="text-lg font-semibold mb-4">What is a Model in Fractal Unified AI?</h3>
                   <p className="text-muted-foreground mb-4">
                     A Model represents any Logic Engine/ML model that you want to evaluate, monitor, and govern. 
                     This can be an Pattern Engine (like Core Logic v4), a classification model (like XGBoost), 
@@ -2292,7 +2292,7 @@ const Documentation = () => {
 
             {/* Footer */}
             <div className="text-center text-sm text-muted-foreground">
-              <p>UnifiedAAI Platform Documentation • Version 1.0.0 • MIT License</p>
+              <p>Fractal Unified AI Platform Documentation • Version 1.0.0 • MIT License</p>
               <p className="mt-2">
                 Built with transparency, honesty, and passion. 🚀
               </p>

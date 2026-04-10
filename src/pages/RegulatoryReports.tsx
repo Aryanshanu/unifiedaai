@@ -76,7 +76,19 @@ export default function RegulatoryReports() {
       const system = systems?.find(s => s.id === params.systemId);
       if (!system) throw new Error("System context not found");
 
-      // Step 2: Construct the transparent engineering report
+      // Step 2: Fetch real metrics for this system
+      const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const [{ count: totalLogs }, { count: errorLogs }, { count: totalControls }, { count: compliantControls }] = await Promise.all([
+        supabase.from('request_logs').select('*', { count: 'exact', head: true }).eq('system_id', params.systemId).gte('timestamp', since30d),
+        supabase.from('request_logs').select('*', { count: 'exact', head: true }).eq('system_id', params.systemId).gte('timestamp', since30d).gte('status_code', 500),
+        supabase.from('control_assessments').select('*', { count: 'exact', head: true }),
+        supabase.from('control_assessments').select('*', { count: 'exact', head: true }).eq('status', 'compliant'),
+      ]);
+
+      const uptimePct = totalLogs && totalLogs > 0 ? (((totalLogs - (errorLogs || 0)) / totalLogs) * 100).toFixed(2) + '%' : 'N/A (no logs)';
+      const auditPct = totalControls && totalControls > 0 ? Math.round(((compliantControls || 0) / totalControls) * 100) + '%' : 'N/A';
+
+      // Step 3: Construct the transparent engineering report
       const reportData = {
         title: `${params.reportType.replace(/_/g, ' ').toUpperCase()} - ${system.name}`,
         generated_at: new Date().toISOString(),
@@ -84,14 +96,14 @@ export default function RegulatoryReports() {
           id: system.id,
           name: system.name,
           provider: system.provider,
-          engine_version: "1.0.0",
           endpoint: system.endpoint
         },
         compliance_metrics: {
-          uptime_sla: "99.95%",
+          uptime_sla_30d: uptimePct,
           data_residency: (system as any).data_residency || "internal-cluster",
-          redundancy_tier: "high-availability",
-          audit_completeness: "100%"
+          audit_completeness: auditPct,
+          total_requests_30d: totalLogs || 0,
+          error_requests_30d: errorLogs || 0,
         },
         governance_trace: {
           integrity_verified: true,
@@ -100,13 +112,13 @@ export default function RegulatoryReports() {
         }
       };
 
-      // Step 3: Generate a real SHA-256 cryptographic hash of the content
+      // Step 4: Generate a real SHA-256 cryptographic hash of the content
       const msgUint8 = new TextEncoder().encode(JSON.stringify(reportData));
       const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
       
-      // Step 4: Store the generated report directly in the database
+      // Step 5: Store the generated report directly in the database
       const { error: insertError } = await supabase
         .from("regulatory_reports")
         .insert({
