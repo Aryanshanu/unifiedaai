@@ -358,7 +358,7 @@ serve(async (req) => {
     const systemData = model.system as any;
     const isOwner = systemData?.owner_id === user?.id;
     
-    if (!isOwner && !hasAnyRole(authResult.user!, ['admin', 'analyst'])) {
+    if (!isOwner && !hasAnyRole(authResult.user!, ['admin', 'analyst', 'superadmin'])) {
       console.log(`[custom-prompt-test] Authorization denied for user ${user?.id} on model ${modelId}`);
       return errorResponse("Unauthorized access to this model", 403);
     }
